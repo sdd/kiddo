@@ -1,6 +1,7 @@
 use crate::util::{distance_to_bounds, extend};
 use num_traits::Float;
 use std::cmp::PartialEq;
+use std::fmt::Debug;
 
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
@@ -10,29 +11,31 @@ use crate::custom_serde::*;
 
 pub(crate) const LEAF_OFFSET: usize = usize::MAX.overflowing_shr(1).0;
 
-pub trait Axis: Float {}
-impl<T: Float> Axis for T {}
+pub trait Axis: Float + Default + Debug {}
+impl<T: Float + Default + Debug> Axis for T {}
 
-pub trait Content: PartialEq + Default + Clone + Copy + Ord {}
-impl<T: PartialEq + Default + Clone + Copy + Ord> Content for T {}
+pub trait Content: PartialEq + Default + Clone + Copy + Ord + Debug {}
+impl<T: PartialEq + Default + Clone + Copy + Ord + Debug> Content for T {}
 
 // A: Axis, ie points
 // T: Content
 // K: Dimensions
 // B: Bucket size
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serialize_rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct KdTree<A, T, const K: usize, const B: usize> {
+pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize> {
     pub(crate) size: usize,
     pub(crate) root_index: usize,
 
-    pub(crate) stems: Vec<StemNode<A, K>>,
-    pub(crate) leaves: Vec<LeafNode<A, T, K, B>>,
+    pub stems: Vec<StemNode<A, K>>,
+    pub leaves: Vec<LeafNode<A, T, K, B>>,
 }
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serialize_rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct StemNode<A, const K: usize> {
+pub struct StemNode<A: Axis, const K: usize> {
     pub(crate) left: usize,
     pub(crate) right: usize,
 
@@ -43,8 +46,9 @@ pub(crate) struct StemNode<A, const K: usize> {
 }
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serialize_rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct LeafNode<A, T, const K: usize, const B: usize> {
+pub struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize> {
     pub(crate) size: usize,
 
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
@@ -52,7 +56,7 @@ pub(crate) struct LeafNode<A, T, const K: usize, const B: usize> {
         feature = "serialize",
         serde(bound(
             serialize = "A: Serialize, T: Serialize",
-            deserialize = "A: Deserialize<'de>, T: Deserialize<'de>"
+            deserialize = "A: Deserialize<'de>, T: Deserialize<'de> + Copy + Default"
         ))
     )]
     pub(crate) content: [LeafNodeEntry<A, T, K>; B],
@@ -60,18 +64,19 @@ pub(crate) struct LeafNode<A, T, const K: usize, const B: usize> {
     #[cfg_attr(feature = "serialize", serde(with = "array_of_2ples"))]
     #[cfg_attr(
         feature = "serialize",
-        serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
+        serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de> + Copy + Default"))
     )]
     pub(crate) bounds: [(A, A); K],
 }
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serialize_rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct LeafNodeEntry<A, T, const K: usize> {
+pub struct LeafNodeEntry<A: Axis, T: Content, const K: usize> {
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
     #[cfg_attr(
         feature = "serialize",
-        serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
+        serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de> + Copy + Default"))
     )]
     pub(crate) point: [A; K],
     pub(crate) item: T,

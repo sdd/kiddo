@@ -3,6 +3,7 @@ use crate::sok::{Axis, Content, LEAF_OFFSET};
 use crate::KdTree;
 use std::collections::BinaryHeap;
 use std::ops::Rem;
+//use log::debug;
 
 impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
     #[inline]
@@ -41,6 +42,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
     {
         if KdTree::<A, T, K, B>::is_stem_index(curr_node_idx) {
             let node = &self.stems[curr_node_idx];
+            //debug!("stem node: {:?}", &node);
 
             let child_node_indices = if query[split_dim] < node.split_val {
                 [node.left, node.right]
