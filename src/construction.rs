@@ -5,6 +5,15 @@ use std::ops::Rem;
 impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
     #[inline]
     pub fn add(&mut self, query: &[A; K], item: T) {
+
+        /* TODO: refactor so that:
+            1) the stem while loop is replaced with a recursive function
+            2) the leaf node extend() returns bool as to whether extension occurred
+            3) as the recursive stem stack unwinds, stem.extend() is called only if
+                leaf.extend() was true, and so on up the stack, so we stop extend()
+                calls early if possible
+        */
+
         let mut stem_idx = self.root_index;
         let mut split_dim = 0;
         let mut stem_node;
@@ -72,6 +81,10 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
 
         let mut left = LeafNode::<A, T, K, B>::new();
         let mut right = LeafNode::<A, T, K, B>::new();
+        left.bounds = orig_bounds.clone();
+        right.bounds = orig_bounds.clone();
+        left.bounds[split_dim].1 = orig.content[pivot_idx - 1].point[split_dim];
+        right.bounds[split_dim].0 = orig.content[pivot_idx].point[split_dim];
 
         if B.rem(2) == 1 {
             left.content[..pivot_idx].copy_from_slice(&orig.content[..pivot_idx]);
@@ -86,9 +99,6 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
             right.content[..pivot_idx].copy_from_slice(&orig.content[pivot_idx..]);
             right.size = B - pivot_idx;
         }
-
-        left.calc_bounds();
-        right.calc_bounds();
 
         *orig = left;
         self.leaves.push(right);

@@ -36,6 +36,7 @@ pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize> {
 #[cfg_attr(feature = "serialize_rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StemNode<A: Axis, const K: usize> {
+    // TODO: investigate changing usize to u32
     pub(crate) left: usize,
     pub(crate) right: usize,
 
@@ -116,7 +117,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> LeafNode<A, T, K, B> {
         extend(&mut self.bounds, point);
     }
 
-    pub(crate) fn calc_bounds(&mut self) {
+    /*pub(crate) fn calc_bounds(&mut self) {
         self.bounds = [(A::infinity(), A::neg_infinity()); K];
         for idx in 0..self.size {
             self.bounds.iter_mut().enumerate().for_each(|(dim, bound)| {
@@ -129,7 +130,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> LeafNode<A, T, K, B> {
                 }
             })
         }
-    }
+    }*/
 }
 
 impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
