@@ -36,13 +36,16 @@ pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize> {
 #[cfg_attr(feature = "serialize_rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StemNode<A: Axis, const K: usize> {
+    // TODO: investigate changing usize to u32
     pub(crate) left: usize,
     pub(crate) right: usize,
 
     pub(crate) split_val: A,
 
-    #[cfg_attr(feature = "serialize", serde(with = "array_of_2ples"))]
-    pub(crate) bounds: [(A, A); K],
+    #[cfg_attr(feature = "serialize", serde(with = "array"))]
+    pub(crate) min_bound: [A; K],
+    #[cfg_attr(feature = "serialize", serde(with = "array"))]
+    pub(crate) max_bound: [A; K],
 }
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
@@ -61,12 +64,19 @@ pub struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize> {
     )]
     pub(crate) content: [LeafNodeEntry<A, T, K>; B],
 
-    #[cfg_attr(feature = "serialize", serde(with = "array_of_2ples"))]
+    #[cfg_attr(feature = "serialize", serde(with = "array"))]
     #[cfg_attr(
         feature = "serialize",
         serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de> + Copy + Default"))
     )]
-    pub(crate) bounds: [(A, A); K],
+    pub(crate) min_bound: [A; K],
+
+    #[cfg_attr(feature = "serialize", serde(with = "array"))]
+    #[cfg_attr(
+    feature = "serialize",
+    serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de> + Copy + Default"))
+    )]
+    pub(crate) max_bound: [A; K],
 }
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
@@ -99,7 +109,7 @@ impl<A: Axis, T: Content, const K: usize> LeafNodeEntry<A, T, K> {
 
 impl<A: Axis, const K: usize> StemNode<A, K> {
     pub(crate) fn extend(&mut self, point: &[A; K]) {
-        extend(&mut self.bounds, point);
+        extend(&mut self.min_bound, &mut self.max_bound, point);
     }
 }
 
@@ -108,28 +118,34 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> LeafNode<A, T, K, B> {
         Self {
             size: 0,
             content: [LeafNodeEntry::default(); B],
-            bounds: [(A::infinity(), A::neg_infinity()); K],
+            min_bound: [A::infinity(); K],
+            max_bound: [A::neg_infinity(); K],
         }
     }
 
     pub(crate) fn extend(&mut self, point: &[A; K]) {
-        extend(&mut self.bounds, point);
+        extend(&mut self.min_bound, &mut self.max_bound, point);
     }
 
-    pub(crate) fn calc_bounds(&mut self) {
+
+    /*pub(crate) fn calc_bounds(&mut self) {
         self.bounds = [(A::infinity(), A::neg_infinity()); K];
         for idx in 0..self.size {
-            self.bounds.iter_mut().enumerate().for_each(|(dim, bound)| {
-                let curr_point_val = self.content[idx].point[dim];
-                if curr_point_val < bound.0 {
-                    bound.0 = curr_point_val;
+            self.min_bound.iter_mut().enumerate().for_each(|(dim, bound)| {
+                let curr_point_val = *unsafe { self.content.get_unchecked(idx).point.get_unchecked(dim) };
+                if curr_point_val < *bound {
+                    *bound = curr_point_val;
                 }
-                if curr_point_val > bound.1 {
-                    bound.1 = curr_point_val;
+            });
+
+            self.max_bound.iter_mut().enumerate().for_each(|(dim, bound)| {
+                let curr_point_val = *unsafe { self.content.get_unchecked(idx).point.get_unchecked(dim) };
+                if curr_point_val > *bound {
+                    *bound = curr_point_val;
                 }
-            })
+            });
         }
-    }
+    }*/
 }
 
 impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
@@ -171,11 +187,13 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
         F: Fn(&[A; K], &[A; K]) -> A,
     {
         if KdTree::<A, T, K, B>::is_stem_index(child_node_idx) {
-            distance_to_bounds(query, &self.stems[child_node_idx].bounds, distance_fn)
+            distance_to_bounds(query, &self.stems[child_node_idx].min_bound, &self.stems[child_node_idx].max_bound, distance_fn)
         } else {
             distance_to_bounds(
                 query,
-                &self.leaves[child_node_idx - LEAF_OFFSET].bounds,
+                &self.leaves[child_node_idx - LEAF_OFFSET].min_bound,
+                &self.leaves[child_node_idx - LEAF_OFFSET].max_bound,
+
                 distance_fn,
             )
         }

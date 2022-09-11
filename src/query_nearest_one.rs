@@ -1,4 +1,4 @@
-use crate::sok::{Axis, Content, LEAF_OFFSET};
+use crate::sok::{Axis, Content, LEAF_OFFSET, StemNode};
 use crate::KdTree;
 use std::ops::Rem;
 
@@ -27,8 +27,8 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
         mut best_item: T,
         mut best_dist: A,
     ) -> (A, T)
-    where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        where
+            F: Fn(&[A; K], &[A; K]) -> A,
     {
         if KdTree::<A, T, K, B>::is_stem_index(curr_node_idx) {
             let node = &self.stems[curr_node_idx];

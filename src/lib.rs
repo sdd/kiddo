@@ -1,5 +1,6 @@
 #![feature(int_roundings)]
 #![feature(int_log)]
+#![feature(stdsimd)]
 #![doc(html_root_url = "https://docs.rs/sok/0.0.1")]
 #![doc(issue_tracker_base_url = "https://github.com/sdd/sok/issues/")]
 

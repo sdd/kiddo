@@ -5,6 +5,15 @@ use std::ops::Rem;
 impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
     #[inline]
     pub fn add(&mut self, query: &[A; K], item: T) {
+
+        /* TODO: refactor so that:
+            1) the stem while loop is replaced with a recursive function
+            2) the leaf node extend() returns bool as to whether extension occurred
+            3) as the recursive stem stack unwinds, stem.extend() is called only if
+                leaf.extend() was true, and so on up the stack, so we stop extend()
+                calls early if possible
+        */
+
         let mut stem_idx = self.root_index;
         let mut split_dim = 0;
         let mut stem_node;
@@ -59,7 +68,8 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
         was_parents_left: bool,
     ) -> usize {
         let orig = &mut self.leaves[leaf_idx];
-        let orig_bounds = orig.bounds;
+        let orig_min_bound = orig.min_bound;
+        let orig_max_bound = orig.max_bound;
         let pivot_idx = B.div_floor(2);
 
         orig.content.select_nth_unstable_by(pivot_idx, |a, b| {
@@ -72,6 +82,12 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
 
         let mut left = LeafNode::<A, T, K, B>::new();
         let mut right = LeafNode::<A, T, K, B>::new();
+        left.min_bound = orig_min_bound;
+        left.max_bound = orig_max_bound;
+        right.min_bound = orig_min_bound;
+        right.max_bound = orig_max_bound;
+        left.max_bound[split_dim] = orig.content[pivot_idx - 1].point[split_dim];
+        right.min_bound[split_dim] = orig.content[pivot_idx].point[split_dim];
 
         if B.rem(2) == 1 {
             left.content[..pivot_idx].copy_from_slice(&orig.content[..pivot_idx]);
@@ -87,9 +103,6 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
             right.size = B - pivot_idx;
         }
 
-        left.calc_bounds();
-        right.calc_bounds();
-
         *orig = left;
         self.leaves.push(right);
 
@@ -97,7 +110,8 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
             left: leaf_idx + LEAF_OFFSET,
             right: self.leaves.len() - 1 + LEAF_OFFSET,
             split_val,
-            bounds: orig_bounds,
+            min_bound: orig_min_bound,
+            max_bound: orig_max_bound,
         });
         let new_stem_index = self.stems.len() - 1;
 
