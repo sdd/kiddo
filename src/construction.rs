@@ -68,7 +68,8 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
         was_parents_left: bool,
     ) -> usize {
         let orig = &mut self.leaves[leaf_idx];
-        let orig_bounds = orig.bounds;
+        let orig_min_bound = orig.min_bound;
+        let orig_max_bound = orig.max_bound;
         let pivot_idx = B.div_floor(2);
 
         orig.content.select_nth_unstable_by(pivot_idx, |a, b| {
@@ -81,10 +82,12 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
 
         let mut left = LeafNode::<A, T, K, B>::new();
         let mut right = LeafNode::<A, T, K, B>::new();
-        left.bounds = orig_bounds.clone();
-        right.bounds = orig_bounds.clone();
-        left.bounds[split_dim].1 = orig.content[pivot_idx - 1].point[split_dim];
-        right.bounds[split_dim].0 = orig.content[pivot_idx].point[split_dim];
+        left.min_bound = orig_min_bound;
+        left.max_bound = orig_max_bound;
+        right.min_bound = orig_min_bound;
+        right.max_bound = orig_max_bound;
+        left.max_bound[split_dim] = orig.content[pivot_idx - 1].point[split_dim];
+        right.min_bound[split_dim] = orig.content[pivot_idx].point[split_dim];
 
         if B.rem(2) == 1 {
             left.content[..pivot_idx].copy_from_slice(&orig.content[..pivot_idx]);
@@ -107,7 +110,8 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
             left: leaf_idx + LEAF_OFFSET,
             right: self.leaves.len() - 1 + LEAF_OFFSET,
             split_val,
-            bounds: orig_bounds,
+            min_bound: orig_min_bound,
+            max_bound: orig_max_bound,
         });
         let new_stem_index = self.stems.len() - 1;
 

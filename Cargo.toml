@@ -25,6 +25,7 @@ rayon = "1.5.3"
 [dev-dependencies]
 rand = "0.8"
 rand_distr = "0.4"
+rayon = "1.5"
 criterion = "0.3.4"
 aligned = "0.4"
 serde = "1.0"
