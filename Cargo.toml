@@ -20,6 +20,7 @@ codegen-units = 1
 log = "0.4"
 num-traits = "0.2"
 rand = "0.8" # delete at some point, only used in test bin
+rayon = "1.5.3"
 
 [dev-dependencies]
 rand = "0.8"
@@ -75,6 +76,14 @@ harness = false
 
 [[bench]]
 name = "best_n_within_into_iter"
+harness = false
+
+[[bench]]
+name = "build"
+harness = false
+
+[[bench]]
+name = "query"
 harness = false
 
 [[bin]]
