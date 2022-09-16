@@ -1,8 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use rayon::prelude::*;
-use sok::KdTree;
-
 use sok::distance::squared_euclidean;
+use sok::simd::f32::d4::kdtree::KdTree;
+
+use rayon::prelude::*;
 
 const K: usize = 4;
 const BUCKET_SIZE: usize = 32;
@@ -18,9 +18,12 @@ fn criterion_benchmark(c: &mut Criterion) {
             .map(|_| [(); K].map(|_| rand::random()))
             .collect();
 
-        let mut group = c.benchmark_group(format!("{:?} queries (ndata = {})", QUERY, ndata));
+        let mut group = c.benchmark_group(format!(
+            "{:?} queries SIMD f32 4D (ndata = {})",
+            QUERY, ndata
+        ));
 
-        let mut kdtree = KdTree::<_, _, K, BUCKET_SIZE>::with_capacity(ndata);
+        let mut kdtree = KdTree::with_capacity(BUCKET_SIZE);
         for idx in 0..ndata {
             kdtree.add(&data[idx], idx);
         }

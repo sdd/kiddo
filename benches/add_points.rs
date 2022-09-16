@@ -77,7 +77,7 @@ pub fn add_100_3d(c: &mut Criterion) {
 }
 
 pub fn add_100_4d(c: &mut Criterion) {
-    let mut group = c.benchmark_group("add 100 items to 4d kdtree of increasing size");
+    let mut group = c.benchmark_group("add 100 items to d4 kdtree of increasing size");
 
     for size in [100, 1_000, 10_000, 100_000, 1_000_000].iter() {
         group.throughput(Throughput::Elements(100));

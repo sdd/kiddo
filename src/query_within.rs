@@ -67,15 +67,19 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
         } else {
             let leaf_node = &self.leaves[curr_node_idx - LEAF_OFFSET];
 
-            leaf_node.content.iter().for_each(|entry| {
-                let distance = distance_fn(query, &entry.point);
-                if distance < radius {
-                    matching_items.push(HeapElement {
-                        distance,
-                        item: entry.item,
-                    })
-                }
-            });
+            leaf_node
+                .content
+                .iter()
+                .take(leaf_node.size)
+                .for_each(|entry| {
+                    let distance = distance_fn(query, &entry.point);
+                    if distance < radius {
+                        matching_items.push(HeapElement {
+                            distance,
+                            item: entry.item,
+                        })
+                    }
+                });
         }
     }
 }

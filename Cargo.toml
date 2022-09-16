@@ -21,6 +21,8 @@ log = "0.4"
 num-traits = "0.2"
 rand = "0.8" # delete at some point, only used in test bin
 rayon = "1.5.3"
+aligned = "0.4"
+aligned-array = "1.0.1"
 
 [dev-dependencies]
 rand = "0.8"
@@ -55,6 +57,7 @@ features = ["alloc", "copy_unsafe", "size_64"]
 [features]
 serialize = ["serde", "serde_derive", "serde_with"]
 serialize_rkyv = ["rkyv"]
+simd = []
 
 [package.metadata.docs.rs]
 all-features = true
@@ -85,6 +88,14 @@ harness = false
 
 [[bench]]
 name = "query"
+harness = false
+
+[[bench]]
+name = "build-simd-f32-d4"
+harness = false
+
+[[bench]]
+name = "query-simd-f32-d4"
 harness = false
 
 [[bin]]

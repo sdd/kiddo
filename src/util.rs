@@ -58,8 +58,6 @@ use crate::sok::Axis;
 //     }
 // }
 
-
-
 #[inline(never)]
 pub(crate) fn distance_to_bounds<F, A, const K: usize>(
     p1: &[A; K],
@@ -89,15 +87,16 @@ where
 }
 
 #[inline(never)]
+#[allow(dead_code)]
 pub(crate) fn distance_to_bounds_simd<F, A, const K: usize>(
     p1: &[A; K],
     min_bound: &[A; K],
     max_bound: &[A; K],
     distance: &F,
 ) -> A
-    where
-        F: Fn(&[A; K], &[A; K]) -> A,
-        A: Axis,
+where
+    F: Fn(&[A; K], &[A; K]) -> A,
+    A: Axis,
 {
     let mut p2 = [A::nan(); K];
 
@@ -128,7 +127,11 @@ pub(crate) fn clamp<A: Axis>(val: A, min_bound: A, max_bound: A) -> A {
 }
 
 #[inline(never)]
-pub(crate) fn extend<A: Axis, const K: usize>(min_bound: &mut [A; K], max_bound: &mut [A; K], point: &[A; K]) {
+pub(crate) fn extend<A: Axis, const K: usize>(
+    min_bound: &mut [A; K],
+    max_bound: &mut [A; K],
+    point: &[A; K],
+) {
     min_bound.iter_mut().enumerate().for_each(|(dim, bound)| {
         if point[dim] < *bound {
             *bound = point[dim];

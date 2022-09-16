@@ -6,7 +6,7 @@ pub(crate) mod array {
         ser::SerializeTuple,
         Deserialize, Deserializer, Serialize, Serializer,
     };
-    use std::{marker::PhantomData};
+    use std::marker::PhantomData;
 
     pub fn serialize<S: Serializer, T: Serialize, const N: usize>(
         data: &[T; N],
@@ -45,7 +45,7 @@ pub(crate) mod array {
                     Some(val) => {
                         // data.push(val);
                         data[idx] = val;
-                    },
+                    }
                     None => return Err(serde::de::Error::invalid_length(N, &self)),
                 }
             }
@@ -74,7 +74,7 @@ pub(crate) mod array_of_2ples {
         ser::SerializeTuple,
         Deserialize, Deserializer, Serialize, Serializer,
     };
-    use std::{marker::PhantomData};
+    use std::marker::PhantomData;
 
     pub fn serialize<S: Serializer, T: Serialize, const N: usize>(
         data: &[(T, T); N],
@@ -107,7 +107,7 @@ pub(crate) mod array_of_2ples {
         {
             // can be optimized using MaybeUninit
             // let mut data: Vec<(T, T)> = Vec::with_capacity(N);
-            let mut data= [(T::default(), T::default()); N];
+            let mut data = [(T::default(), T::default()); N];
 
             for idx in 0..N {
                 match (seq.next_element::<T>())? {

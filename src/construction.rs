@@ -5,15 +5,6 @@ use std::ops::Rem;
 impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
     #[inline]
     pub fn add(&mut self, query: &[A; K], item: T) {
-
-        /* TODO: refactor so that:
-            1) the stem while loop is replaced with a recursive function
-            2) the leaf node extend() returns bool as to whether extension occurred
-            3) as the recursive stem stack unwinds, stem.extend() is called only if
-                leaf.extend() was true, and so on up the stack, so we stop extend()
-                calls early if possible
-        */
-
         let mut stem_idx = self.root_index;
         let mut split_dim = 0;
         let mut stem_node;
@@ -57,6 +48,89 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
         leaf_node.extend(query);
 
         self.size += 1;
+    }
+
+    #[inline]
+    pub fn add_recursive(&mut self, query: &[A; K], item: T) {
+        self.add_recurse_stem(query, item, self.root_index, 0, usize::MAX, false);
+    }
+
+    fn add_recurse_stem(
+        &mut self,
+        query: &[A; K],
+        item: T,
+        stem_idx: usize,
+        split_dim: usize,
+        parent_idx: usize,
+        was_parents_left: bool,
+    ) -> ([A; K], [A; K]) {
+        let next_split_dim = (split_dim + 1).rem(K);
+
+        if KdTree::<A, T, K, B>::is_stem_index(stem_idx) {
+            let mut was_parents_left: bool = false;
+            let next_stem_idx = if query[split_dim] < self.stems[stem_idx].split_val {
+                was_parents_left = true;
+                self.stems[stem_idx].left
+            } else {
+                self.stems[stem_idx].right
+            };
+
+            let extend_result = self.add_recurse_stem(
+                query,
+                item,
+                next_stem_idx,
+                next_split_dim,
+                stem_idx,
+                was_parents_left,
+            );
+            self.stems[stem_idx].extend(&extend_result.0);
+            self.stems[stem_idx].extend(&extend_result.1);
+
+            (
+                self.stems[stem_idx].min_bound,
+                self.stems[stem_idx].max_bound,
+            )
+        } else {
+            self.add_recurse_leaf(
+                query,
+                item,
+                stem_idx - LEAF_OFFSET,
+                split_dim,
+                was_parents_left,
+                parent_idx,
+            )
+        }
+    }
+
+    fn add_recurse_leaf(
+        &mut self,
+        query: &[A; K],
+        item: T,
+        mut leaf_idx: usize,
+        split_dim: usize,
+        was_parents_left: bool,
+        parent_idx: usize,
+    ) -> ([A; K], [A; K]) {
+        let mut leaf_node = &mut self.leaves[leaf_idx];
+
+        if leaf_node.size == B {
+            let stem_idx = self.split(leaf_idx, split_dim, parent_idx, was_parents_left);
+            let node = &self.stems[stem_idx];
+
+            leaf_idx = (if query[split_dim] < node.split_val {
+                node.left
+            } else {
+                node.right
+            } - LEAF_OFFSET);
+
+            leaf_node = &mut self.leaves[leaf_idx];
+        }
+
+        leaf_node.content[leaf_node.size] = LeafNodeEntry::new(*query, item);
+        leaf_node.size += 1;
+        self.size += 1;
+
+        leaf_node.extend_with_result(query)
     }
 
     //#[inline(never)]
@@ -137,18 +211,22 @@ mod tests {
     #[test]
     fn can_add_an_item() {
         let mut tree: KdTree<f64, i32, 2, 10> = KdTree::new();
+        let mut tree2: KdTree<f64, i32, 2, 10> = KdTree::new();
 
         let point = [1f64, 2f64];
         let item = 123;
 
         tree.add(&point, item);
+        tree2.add_recursive(&point, item);
 
         assert_eq!(tree.size(), 1);
+        assert_eq!(tree2.size(), 1);
     }
 
     #[test]
     fn can_add_enough_items_to_cause_a_split() {
         let mut tree: KdTree<f64, i32, 2, 4> = KdTree::new();
+        let mut tree2: KdTree<f64, i32, 2, 4> = KdTree::new();
 
         let content_to_add = [
             ([9f64, 0f64], 9),
@@ -171,8 +249,10 @@ mod tests {
 
         for (point, item) in content_to_add {
             tree.add(&point, item);
+            tree2.add_recursive(&point, item);
         }
 
         assert_eq!(tree.size(), 16);
+        assert_eq!(tree2.size(), 16);
     }
 }

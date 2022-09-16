@@ -1,4 +1,5 @@
 use crate::util::{distance_to_bounds, extend};
+// use crate::bounds_extender::BoundsExtender;
 use num_traits::Float;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
@@ -22,7 +23,10 @@ impl<T: PartialEq + Default + Clone + Copy + Ord + Debug> Content for T {}
 // K: Dimensions
 // B: Bucket size
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serialize_rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
+#[cfg_attr(
+    feature = "serialize_rkyv",
+    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
+)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize> {
     pub(crate) size: usize,
@@ -33,7 +37,10 @@ pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize> {
 }
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serialize_rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
+#[cfg_attr(
+    feature = "serialize_rkyv",
+    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
+)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StemNode<A: Axis, const K: usize> {
     // TODO: investigate changing usize to u32
@@ -49,7 +56,10 @@ pub struct StemNode<A: Axis, const K: usize> {
 }
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serialize_rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
+#[cfg_attr(
+    feature = "serialize_rkyv",
+    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
+)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize> {
     pub(crate) size: usize,
@@ -67,26 +77,38 @@ pub struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize> {
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
     #[cfg_attr(
         feature = "serialize",
-        serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de> + Copy + Default"))
+        serde(bound(
+            serialize = "A: Serialize",
+            deserialize = "A: Deserialize<'de> + Copy + Default"
+        ))
     )]
     pub(crate) min_bound: [A; K],
 
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
     #[cfg_attr(
-    feature = "serialize",
-    serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de> + Copy + Default"))
+        feature = "serialize",
+        serde(bound(
+            serialize = "A: Serialize",
+            deserialize = "A: Deserialize<'de> + Copy + Default"
+        ))
     )]
     pub(crate) max_bound: [A; K],
 }
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serialize_rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
+#[cfg_attr(
+    feature = "serialize_rkyv",
+    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
+)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct LeafNodeEntry<A: Axis, T: Content, const K: usize> {
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
     #[cfg_attr(
         feature = "serialize",
-        serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de> + Copy + Default"))
+        serde(bound(
+            serialize = "A: Serialize",
+            deserialize = "A: Deserialize<'de> + Copy + Default"
+        ))
     )]
     pub(crate) point: [A; K],
     pub(crate) item: T,
@@ -109,6 +131,7 @@ impl<A: Axis, T: Content, const K: usize> LeafNodeEntry<A, T, K> {
 
 impl<A: Axis, const K: usize> StemNode<A, K> {
     pub(crate) fn extend(&mut self, point: &[A; K]) {
+        /*BoundsExtender::*/
         extend(&mut self.min_bound, &mut self.max_bound, point);
     }
 }
@@ -124,9 +147,15 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> LeafNode<A, T, K, B> {
     }
 
     pub(crate) fn extend(&mut self, point: &[A; K]) {
+        /*BoundsExtender::*/
         extend(&mut self.min_bound, &mut self.max_bound, point);
     }
 
+    pub(crate) fn extend_with_result(&mut self, point: &[A; K]) -> ([A; K], [A; K]) {
+        /*BoundsExtender::*/
+        extend(&mut self.min_bound, &mut self.max_bound, point);
+        return (self.min_bound, self.max_bound);
+    }
 
     /*pub(crate) fn calc_bounds(&mut self) {
         self.bounds = [(A::infinity(), A::neg_infinity()); K];
@@ -187,13 +216,17 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
         F: Fn(&[A; K], &[A; K]) -> A,
     {
         if KdTree::<A, T, K, B>::is_stem_index(child_node_idx) {
-            distance_to_bounds(query, &self.stems[child_node_idx].min_bound, &self.stems[child_node_idx].max_bound, distance_fn)
+            distance_to_bounds(
+                query,
+                &self.stems[child_node_idx].min_bound,
+                &self.stems[child_node_idx].max_bound,
+                distance_fn,
+            )
         } else {
             distance_to_bounds(
                 query,
                 &self.leaves[child_node_idx - LEAF_OFFSET].min_bound,
                 &self.leaves[child_node_idx - LEAF_OFFSET].max_bound,
-
                 distance_fn,
             )
         }

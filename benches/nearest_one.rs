@@ -10,7 +10,6 @@ const K: usize = 3;
 const BUCKET_SIZE: usize = 32;
 const QUERY: usize = 1_000_000;
 
-
 fn rand_unit_sphere_point_f64() -> [f64; 3] {
     SPHERE.sample(&mut rand::thread_rng())
 }
@@ -54,11 +53,8 @@ pub fn nearest_one_3d(c: &mut Criterion) {
         group.throughput(Throughput::Elements(QUERY.try_into().unwrap()));
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
             b.iter(|| {
-                black_box(&query_points)
-                .iter().for_each(|point|{
-                    let res = black_box(
-                        kdtree.nearest_one(point, &squared_euclidean)
-                    );
+                black_box(&query_points).iter().for_each(|point| {
+                    let res = black_box(kdtree.nearest_one(point, &squared_euclidean));
                 })
             });
         });
