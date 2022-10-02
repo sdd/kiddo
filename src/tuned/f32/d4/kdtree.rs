@@ -1,8 +1,6 @@
 use std::arch::x86_64::{
     _mm_load_ps, _mm_loadu_ps, _mm_max_ps, _mm_min_ps, _mm_store_ps, _mm_storeu_ps,
 };
-// use crate::simd::f32::d4::util::{distance_to_bounds, distance_to_bounds_simd_f32_4d_squared_euclidean, extend};
-// use aligned_array::{Aligned, A16};
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 
@@ -11,11 +9,11 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;
-use crate::simd::f32::d4::util::{
-    distance_to_bounds, distance_to_bounds_simd_f32_4d_squared_euclidean, extend,
+use crate::tuned::f32::d4::util::{
+    distance_to_bounds_simd_f32_4d_squared_euclidean, extend,
 };
-
-pub(crate) const LEAF_OFFSET: usize = usize::MAX.overflowing_shr(1).0;
+// The type used to store node indices
+pub(crate) type IDX = usize;
 
 // A: Axis, ie points
 pub(crate) type A = f32;
@@ -27,6 +25,8 @@ pub(crate) const K: usize = 4;
 pub(crate) const B: usize = 32;
 pub(crate) type PT = [A; K];
 
+pub(crate) const LEAF_OFFSET: IDX = IDX::MAX.overflowing_shr(1).0;
+
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "serialize_rkyv",
@@ -36,8 +36,8 @@ pub(crate) type PT = [A; K];
 pub struct KdTree {
     pub leaves: Vec<LeafNode>,
     pub stems: Vec<StemNode>,
-    pub(crate) root_index: usize,
-    pub(crate) size: usize,
+    pub(crate) root_index: IDX,
+    pub(crate) size: IDX,
 }
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
@@ -49,16 +49,16 @@ pub struct KdTree {
 #[repr(align(128))]
 pub struct StemNode {
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
-    pub(crate) min_bound: PT,
+    pub(crate) min_bound: PT, // 32 * 4 = 128
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
-    pub(crate) max_bound: PT,
+    pub(crate) max_bound: PT, // 32 * 4 = 128
 
-    pub(crate) split_val: A,
+    pub(crate) split_val: A, // 32 * 1 =  32
 
     // TODO: investigate changing usize to u32
-    pub(crate) left: usize,
-    pub(crate) right: usize,
-}
+    pub(crate) left: IDX,  // 64 * 1 =  64
+    pub(crate) right: IDX, // 64 * 1 =  64
+} // SIZE   = 416 bits (52 bytes)
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
@@ -80,46 +80,14 @@ pub struct LeafNode {
 
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
     #[cfg_attr(
-    feature = "serialize",
-    serde(bound(
-    serialize = "A: Serialize, T: Serialize",
-    deserialize = "A: Deserialize<'de>, T: Deserialize<'de> + Copy + Default"
-    ))
+        feature = "serialize",
+        serde(bound(
+            serialize = "A: Serialize, T: Serialize",
+            deserialize = "A: Deserialize<'de>, T: Deserialize<'de> + Copy + Default"
+        ))
     )]
     pub(crate) content_items: [T; B],
 
-    #[cfg_attr(feature = "serialize", serde(with = "array"))]
-    #[cfg_attr(
-    feature = "serialize",
-    serde(bound(
-    serialize = "A: Serialize",
-    deserialize = "A: Deserialize<'de> + Copy + Default"
-    ))
-    )]
-    pub(crate) min_bound: PT,
-
-    #[cfg_attr(feature = "serialize", serde(with = "array"))]
-    #[cfg_attr(
-    feature = "serialize",
-    serde(bound(
-    serialize = "A: Serialize",
-    deserialize = "A: Deserialize<'de> + Copy + Default"
-    ))
-    )]
-    pub(crate) max_bound: PT,
-
-    pub(crate) size: usize,
-    pub(crate) _padding: usize,
-}
-
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-#[cfg_attr(
-    feature = "serialize_rkyv",
-    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
-)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-#[repr(align(128))]
-pub struct LeafNodeEntry {
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
     #[cfg_attr(
         feature = "serialize",
@@ -128,29 +96,19 @@ pub struct LeafNodeEntry {
             deserialize = "A: Deserialize<'de> + Copy + Default"
         ))
     )]
-    pub(crate) point: PT,
-    pub(crate) item: T,
-    _padding: usize,
-}
+    pub(crate) min_bound: PT,
 
-impl Default for LeafNodeEntry {
-    fn default() -> Self {
-        LeafNodeEntry {
-            point: [0.0; K],
-            item: T::default(),
-            _padding: 0,
-        }
-    }
-}
+    #[cfg_attr(feature = "serialize", serde(with = "array"))]
+    #[cfg_attr(
+        feature = "serialize",
+        serde(bound(
+            serialize = "A: Serialize",
+            deserialize = "A: Deserialize<'de> + Copy + Default"
+        ))
+    )]
+    pub(crate) max_bound: PT,
 
-impl LeafNodeEntry {
-    pub(crate) fn new(point: PT, item: T) -> Self {
-        LeafNodeEntry {
-            point,
-            item,
-            _padding: 0,
-        }
-    }
+    pub(crate) size: IDX,
 }
 
 impl StemNode {
@@ -204,7 +162,6 @@ impl LeafNode {
             content_points: [[0.0; K]; B],
             content_items: [0; B],
             size: 0,
-            _padding: 0,
         }
     }
 
@@ -277,11 +234,11 @@ impl LeafNode {
 impl KdTree {
     #[inline]
     pub fn new() -> Self {
-        KdTree::with_capacity(B * 10)
+        KdTree::with_capacity((B * 10) as IDX)
     }
 
     #[inline]
-    pub fn with_capacity(capacity: usize) -> Self {
+    pub fn with_capacity(capacity: IDX) -> Self {
         let mut tree = Self {
             size: 0,
             stems: Vec::with_capacity(capacity.ilog2() as usize),
@@ -295,19 +252,19 @@ impl KdTree {
     }
 
     #[inline]
-    pub fn size(&self) -> usize {
-        self.size
+    pub fn size(&self) -> IDX {
+        self.size as IDX
     }
 
-    pub(crate) fn is_stem_index(x: usize) -> bool {
+    pub(crate) fn is_stem_index(x: IDX) -> bool {
         x < LEAF_OFFSET
     }
 
     pub(crate) fn child_dist_to_bounds<F>(
         &self,
         query: &PT,
-        child_node_idx: usize,
-        distance_fn: &F,
+        child_node_idx: IDX,
+        _distance_fn: &F,
     ) -> A
     where
         F: Fn(&PT, &PT) -> A,
@@ -315,15 +272,15 @@ impl KdTree {
         if KdTree::is_stem_index(child_node_idx) {
             distance_to_bounds_simd_f32_4d_squared_euclidean(
                 query,
-                &self.stems[child_node_idx].min_bound,
-                &self.stems[child_node_idx].max_bound,
+                &self.stems[child_node_idx as usize].min_bound,
+                &self.stems[child_node_idx as usize].max_bound,
                 //distance_fn
             )
         } else {
             distance_to_bounds_simd_f32_4d_squared_euclidean(
                 query,
-                &self.leaves[child_node_idx - LEAF_OFFSET].min_bound,
-                &self.leaves[child_node_idx - LEAF_OFFSET].max_bound,
+                &self.leaves[(child_node_idx - LEAF_OFFSET) as usize].min_bound,
+                &self.leaves[(child_node_idx - LEAF_OFFSET) as usize].max_bound,
                 //distance_fn
             )
         }
@@ -339,10 +296,10 @@ impl Default for KdTree {
 #[cfg(test)]
 mod tests {
     // use aligned::Aligned;
-    use crate::simd::f32::d4::kdtree::KdTree;
+    use crate::tuned::f32::d4::kdtree::KdTree;
 
     #[cfg(feature = "serialize")]
-    use crate::simd::f32::d4::kdtree::{PT, T};
+    use crate::tuned::f32::d4::kdtree::{PT, T};
 
     #[test]
     fn it_can_be_constructed_with_new() {

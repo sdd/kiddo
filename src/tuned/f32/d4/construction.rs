@@ -1,8 +1,8 @@
-use crate::simd::f32::d4::kdtree::{
-    KdTree, LeafNode, LeafNodeEntry, StemNode, B, K, LEAF_OFFSET, PT, T,
+use crate::tuned::f32::d4::kdtree::{
+    KdTree, LeafNode, StemNode, B, IDX, K, LEAF_OFFSET, PT, T,
 };
+use crate::tuned::f32::d4::util::mirror_select_nth_unstable_by;
 use std::ops::Rem;
-use crate::simd::f32::d4::util::mirror_select_nth_unstable_by;
 
 impl KdTree {
     #[inline]
@@ -13,7 +13,7 @@ impl KdTree {
             let mut stem_idx = self.root_index;
             let mut split_dim = 0;
             let mut stem_node;
-            let mut parent_idx = usize::MAX;
+            let mut parent_idx: IDX = IDX::MAX;
             let mut was_parents_left: bool = false;
 
             while KdTree::is_stem_index(stem_idx) {
@@ -38,11 +38,6 @@ impl KdTree {
 
             let mut leaf_idx = stem_idx - LEAF_OFFSET;
             let mut leaf_node = self.leaves.get_unchecked_mut(leaf_idx);
-
-            debug_assert!(leaf_node.min_bound.as_ptr() as usize % 16 == 0);
-            debug_assert!(leaf_node.max_bound.as_ptr() as usize % 16 == 0);
-            debug_assert!(leaf_node.content_points[1].as_ptr() as usize % 16 == 0);
-            debug_assert!(leaf_node.content_points[0].as_ptr() as usize % 16 == 0);
 
             if leaf_node.size == B {
                 stem_idx = self.split(leaf_idx, split_dim, parent_idx, was_parents_left);
@@ -86,7 +81,9 @@ impl KdTree {
         if KdTree::is_stem_index(stem_idx) {
             unsafe {
                 let mut was_parents_left: bool = false;
-                let next_stem_idx = if *query.get_unchecked(split_dim) < self.stems.get_unchecked(stem_idx).split_val {
+                let next_stem_idx = if *query.get_unchecked(split_dim)
+                    < self.stems.get_unchecked(stem_idx).split_val
+                {
                     was_parents_left = true;
                     self.stems.get_unchecked(stem_idx).left
                 } else {
@@ -101,8 +98,12 @@ impl KdTree {
                     stem_idx,
                     was_parents_left,
                 );
-                self.stems.get_unchecked_mut(stem_idx).extend(&extend_result.0);
-                self.stems.get_unchecked_mut(stem_idx).extend(&extend_result.1);
+                self.stems
+                    .get_unchecked_mut(stem_idx)
+                    .extend(&extend_result.0);
+                self.stems
+                    .get_unchecked_mut(stem_idx)
+                    .extend(&extend_result.1);
 
                 (
                     self.stems.get_unchecked(stem_idx).min_bound,
@@ -174,7 +175,7 @@ impl KdTree {
                 a[split_dim]
                     .partial_cmp(&b[split_dim])
                     .expect("Leaf node sort failed. Have you put a NaN in here?")
-            }
+            },
         );
 
         let split_val = orig.content_points[pivot_idx][split_dim];
@@ -193,7 +194,8 @@ impl KdTree {
             left.content_items[..pivot_idx].copy_from_slice(&orig.content_items[..pivot_idx]);
             left.size = pivot_idx;
 
-            right.content_points[..pivot_idx + 1].copy_from_slice(&orig.content_points[pivot_idx..]);
+            right.content_points[..pivot_idx + 1]
+                .copy_from_slice(&orig.content_points[pivot_idx..]);
             right.content_items[..pivot_idx + 1].copy_from_slice(&orig.content_items[pivot_idx..]);
             right.size = B - pivot_idx;
         } else {
@@ -235,7 +237,7 @@ impl KdTree {
 
 #[cfg(test)]
 mod tests {
-    use crate::simd::f32::d4::kdtree::{KdTree, PT, T};
+    use crate::tuned::f32::d4::kdtree::{KdTree, PT, T};
     use aligned_array::Aligned;
     use aligned_array::A16;
 

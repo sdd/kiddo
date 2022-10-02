@@ -1,6 +1,6 @@
 use std::ops::Rem;
-// use crate::simd::f32::d4::distance::squared_euclidean_simd_f32_d4_a_unaligned;
-use crate::simd::f32::d4::kdtree::{KdTree, LeafNode, A, K, LEAF_OFFSET, PT, T};
+// use crate::tuned::f32::d4::distance::squared_euclidean_simd_f32_d4_a_unaligned;
+use crate::tuned::f32::d4::kdtree::{KdTree, LeafNode, A, K, LEAF_OFFSET, PT, T, IDX};
 
 impl KdTree {
     #[inline]
@@ -15,7 +15,7 @@ impl KdTree {
         &self,
         query: &[A; K],
         distance_fn: &F,
-        curr_node_idx: usize,
+        curr_node_idx: IDX,
         split_dim: usize,
         mut best_item: T,
         mut best_dist: A,
@@ -60,7 +60,13 @@ impl KdTree {
             can be loaded into an __mm_256. It may be possible to unroll, loading
             several sets of __mm_256 at the same time and then processing them all
             consecutively.*/
-            Self::search_content_for_best(query, distance_fn, &mut best_item, &mut best_dist, leaf_node);
+            Self::search_content_for_best(
+                query,
+                distance_fn,
+                &mut best_item,
+                &mut best_dist,
+                leaf_node,
+            );
         }
 
         (best_dist, best_item)
@@ -94,8 +100,8 @@ impl KdTree {
 #[cfg(test)]
 mod tests {
     use crate::distance::squared_euclidean;
-    use crate::simd::f32::d4::kdtree::{KdTree, A, PT, T};
-    // use crate::simd::f32::d4::distance::squared_euclidean_simd_f32_d4;
+    use crate::tuned::f32::d4::kdtree::{KdTree, A, PT, T};
+    // use crate::tuned::f32::d4::distance::squared_euclidean_simd_f32_d4;
     use rand::Rng;
 
     #[test]

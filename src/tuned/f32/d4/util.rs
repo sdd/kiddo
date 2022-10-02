@@ -3,11 +3,11 @@ use std::arch::x86_64::{
     _mm_movehl_ps, _mm_mul_ps, _mm_sub_ps,
 };
 use std::cmp::Ordering;
-use std::cmp::Ordering::{Greater, Less};
-use std::{cmp, mem, ptr};
+use std::cmp::Ordering::{Less};
 use std::mem::MaybeUninit;
+use std::{cmp, mem, ptr};
 // use aligned_array::Aligned;
-use crate::simd::f32::d4::kdtree::{A, T, B, K, PT};
+use crate::tuned::f32::d4::kdtree::{A, K, PT};
 
 #[allow(dead_code)]
 pub(crate) fn distance_to_bounds<F>(p1: &PT, min_bound: &PT, max_bound: &PT, distance: &F) -> A
@@ -108,12 +108,15 @@ pub(crate) fn extend(min_bound: &mut PT, max_bound: &mut PT, point: &PT) {
 //     }).collect();
 // }
 
-
 // performs select_nth_unstable_by on target,
 // but all the operations performed in the sort are applied to mirror as well
-pub fn mirror_select_nth_unstable_by<AA, BB, F>(target: &mut [AA], mirror: &mut [BB], index: usize, mut compare: F)
-    where
-        F: FnMut(&AA, &AA) -> Ordering,
+pub fn mirror_select_nth_unstable_by<AA, BB, F>(
+    target: &mut [AA],
+    mirror: &mut [BB],
+    index: usize,
+    mut compare: F,
+) where
+    F: FnMut(&AA, &AA) -> Ordering,
 {
     let mut f = |a: &AA, b: &AA| compare(a, b) == Less;
 
@@ -191,15 +194,14 @@ fn mirror_partition_equal<AA, BB, F>(
     target: &mut [AA],
     mirror: &mut [BB],
     pivot: usize,
-    is_less: &mut F
+    is_less: &mut F,
 ) -> usize
-    where
-        F: FnMut(&AA, &AA) -> bool,
+where
+    F: FnMut(&AA, &AA) -> bool,
 {
     // Place the pivot at the beginning of slice.
     target.swap(0, pivot);
     mirror.swap(0, pivot);
-
 
     let (pivot, v) = target.split_at_mut(1);
     let pivot = &mut pivot[0];
@@ -211,12 +213,18 @@ fn mirror_partition_equal<AA, BB, F>(
     // operation panics, the pivot will be automatically written back into the slice.
     // SAFETY: The pointer here is valid because it is obtained from a reference to a slice.
     let tmp = mem::ManuallyDrop::new(unsafe { ptr::read(pivot) });
-    let _pivot_guard = CopyOnDrop { src: &*tmp, dest: pivot };
+    let _pivot_guard = CopyOnDrop {
+        src: &*tmp,
+        dest: pivot,
+    };
     let pivot = &*tmp;
 
     let mirror_tmp = mem::ManuallyDrop::new(unsafe { ptr::read(mirror_pivot) });
-    let _mirror_pivot_guard = CopyOnDrop { src: &*mirror_tmp, dest: mirror_pivot };
-    let mirror_pivot = &*mirror_tmp;
+    let _mirror_pivot_guard = CopyOnDrop {
+        src: &*mirror_tmp,
+        dest: mirror_pivot,
+    };
+    let _mirror_pivot = &*mirror_tmp;
 
     // Now partition the slice.
     let mut l = 0;
@@ -264,10 +272,10 @@ fn mirror_partition<AA, BB, F>(
     target: &mut [AA],
     mirror: &mut [BB],
     pivot: usize,
-    is_less: &mut F
+    is_less: &mut F,
 ) -> (usize, bool)
-    where
-        F: FnMut(&AA, &AA) -> bool,
+where
+    F: FnMut(&AA, &AA) -> bool,
 {
     let (mid, was_partitioned) = {
         // Place the pivot at the beginning of slice.
@@ -284,12 +292,18 @@ fn mirror_partition<AA, BB, F>(
 
         // SAFETY: `pivot` is a reference to the first element of `v`, so `ptr::read` is safe.
         let tmp = mem::ManuallyDrop::new(unsafe { ptr::read(pivot) });
-        let _pivot_guard = CopyOnDrop { src: &*tmp, dest: pivot };
+        let _pivot_guard = CopyOnDrop {
+            src: &*tmp,
+            dest: pivot,
+        };
         let pivot = &*tmp;
 
         let mirror_tmp = mem::ManuallyDrop::new(unsafe { ptr::read(mirror_pivot) });
-        let _mirror_pivot_guard = CopyOnDrop { src: &*mirror_tmp, dest: mirror_pivot };
-        let mirror_pivot = &*mirror_tmp;
+        let _mirror_pivot_guard = CopyOnDrop {
+            src: &*mirror_tmp,
+            dest: mirror_pivot,
+        };
+        let _mirror_pivot = &*mirror_tmp;
 
         // Find the first pair of out-of-order elements.
         let mut l = 0;
@@ -311,7 +325,10 @@ fn mirror_partition<AA, BB, F>(
             }
         }
 
-        (l + mirror_partition_in_blocks(&mut v[l..r], &mut mirror_v[l..r],  pivot, is_less), l >= r)
+        (
+            l + mirror_partition_in_blocks(&mut v[l..r], &mut mirror_v[l..r], pivot, is_less),
+            l >= r,
+        )
 
         // `_pivot_guard` goes out of scope and writes the pivot (which is a stack-allocated
         // variable) back into the slice where it originally was. This step is critical in ensuring
@@ -325,15 +342,14 @@ fn mirror_partition<AA, BB, F>(
     (mid, was_partitioned)
 }
 
-
 fn mirror_partition_in_blocks<AA, BB, F>(
     target: &mut [AA],
     mirror: &mut [BB],
     pivot: &AA,
-    is_less: &mut F
+    is_less: &mut F,
 ) -> usize
-    where
-        F: FnMut(&AA, &AA) -> bool,
+where
+    F: FnMut(&AA, &AA) -> bool,
 {
     // Number of elements in a typical block.
     const BLOCK: usize = 128;
@@ -379,7 +395,7 @@ fn mirror_partition_in_blocks<AA, BB, F>(
     let mut mirror_offsets_r = [MaybeUninit::<u8>::uninit(); BLOCK];
 
     // FIXME: When we get VLAs, try creating one array of length `min(v.len(), 2 * BLOCK)` rather
-    // than two fixed-size arrays of length `BLOCK`. VLAs might be more cache-efficient.
+    // than two u16-size arrays of length `BLOCK`. VLAs might be more cache-efficient.
 
     // Returns the number of elements between pointers `l` (inclusive) and `r` (exclusive).
     fn width<T>(l: *mut T, r: *mut T) -> usize {
@@ -663,8 +679,8 @@ fn mirror_partition_in_blocks<AA, BB, F>(
 
 //// BELOW ARE UNCHANGED FROM sort.rs BUT WERE PRIVATE
 fn choose_pivot<T, F>(v: &mut [T], is_less: &mut F) -> (usize, bool)
-    where
-        F: FnMut(&T, &T) -> bool,
+where
+    F: FnMut(&T, &T) -> bool,
 {
     // Minimum length to choose the median-of-medians method.
     // Shorter slices use the simple median-of-three method.
