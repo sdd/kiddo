@@ -21,7 +21,7 @@ mod query_best_n_within_into_iter;
 mod query_nearest_one;
 mod query_within;
 mod query_within_unsorted;
-pub mod simd;
+pub mod tuned;
 pub mod sok;
 mod util;
 // mod bounds_extender;

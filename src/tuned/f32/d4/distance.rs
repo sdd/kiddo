@@ -2,7 +2,7 @@
 //! euclidean distance which is no more than the square root of the sum of the
 //! squares of the distances in each dimension.
 
-use crate::simd::f32::d4::kdtree::{A, K, PT, T};
+use crate::tuned::f32::d4::kdtree::{A, K, PT};
 #[cfg(any(target_arch = "x86_64"))]
 use std::arch::x86_64::*;
 
