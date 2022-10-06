@@ -24,6 +24,7 @@ rayon = "1.5.3"
 aligned = "0.4"
 aligned-array = "1.0.1"
 fixed = "1.19.0"
+az = "1.2.1"
 
 [dev-dependencies]
 rand = "0.8"

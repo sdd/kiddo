@@ -25,6 +25,7 @@ pub(crate) type PTU16 = [u16; K];
 
 pub(crate) const LEAF_OFFSET: IDX = IDX::MAX.overflowing_shr(1).0;
 
+#[allow(dead_code)]
 #[cfg_attr(
 feature = "serialize_rkyv",
 derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
@@ -45,6 +46,7 @@ pub struct KdTree {
     pub(crate) size: IDX,
 }
 
+#[allow(dead_code)]
 #[cfg_attr(
 feature = "serialize_rkyv",
 derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
@@ -71,6 +73,7 @@ pub struct StemNode {
     pub(crate) split_val: A,
 }
 
+#[allow(dead_code)]
 #[cfg_attr(
 feature = "serialize_rkyv",
 derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)

@@ -34,6 +34,6 @@ pub fn squared_euclidean(a: &PT, b: &PT) -> A {
             let res = res.floor() + res.frac();
             res
         })
-        .fold(A::from_num(0), ::std::ops::Add::add)
+        .fold(A::from_num(0), |acc, v| acc.saturating_add(v))
 }
 

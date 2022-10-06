@@ -1,13 +1,14 @@
-use crate::tuned::u16::d4::kdtree::{KdTree, LeafNode, A, IDX, K, LEAF_OFFSET, PT, T};
+use crate::tuned::u16::dn::kdtree::{KdTree, LeafNode, Axis, Index, Content};
 use std::ops::Rem;
+use az::{Az, Cast};
 
-impl KdTree {
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> KdTree<A, T, K, B, IDX> where usize: Cast<IDX>  {
     #[inline]
     pub fn nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> (A, T)
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
-        unsafe { self.nearest_one_recurse(query, distance_fn, self.root_index, 0, 0, A::MAX) }
+        unsafe { self.nearest_one_recurse(query, distance_fn, self.root_index, 0, T::zero(), A::MAX) }
     }
 
     #[inline]
@@ -21,10 +22,10 @@ impl KdTree {
         mut best_dist: A,
     ) -> (A, T)
     where
-        F: Fn(&PT, &PT) -> A,
+        F: Fn(&[A; K], &[A; K]) -> A,
     {
-        if KdTree::is_stem_index(curr_node_idx) {
-            let node = &self.stems.get_unchecked(curr_node_idx as usize);
+        if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
+            let node = &self.stems.get_unchecked(curr_node_idx.az::<usize>());
 
             let child_node_indices = if *query.get_unchecked(split_dim) < node.split_val {
                 [node.left, node.right]
@@ -52,7 +53,7 @@ impl KdTree {
                 }
             }
         } else {
-            let leaf_node = self.leaves.get_unchecked((curr_node_idx - LEAF_OFFSET) as usize);
+            let leaf_node = self.leaves.get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
 
             Self::search_content_for_best(
                 query,
@@ -67,19 +68,19 @@ impl KdTree {
     }
 
     fn search_content_for_best<F>(
-        query: &[A; 4],
+        query: &[A; K],
         distance_fn: &F,
         best_item: &mut T,
         best_dist: &mut A,
-        leaf_node: &LeafNode,
+        leaf_node: &LeafNode<A, T, K, B, IDX>,
     ) where
-        F: Fn(&PT, &PT) -> A,
+        F: Fn(&[A; K], &[A; K]) -> A,
     {
         leaf_node
             .content_points
             .iter()
             .enumerate()
-            .take(leaf_node.size as usize)
+            .take(leaf_node.size.az::<usize>())
             .for_each(|(idx, entry)| {
                 let dist = distance_fn(query, &entry);
                 if dist < *best_dist {
@@ -92,21 +93,23 @@ impl KdTree {
 
 #[cfg(test)]
 mod tests {
-    use fixed::types::extra::U16;
+    use fixed::types::extra::U14;
     use fixed::FixedU16;
-    use crate::tuned::u16::d4::distance::squared_euclidean;
-    use crate::tuned::u16::d4::kdtree::{KdTree, A, PT, T};
+    use crate::tuned::u16::dn::distance::manhattan;
+    use crate::tuned::u16::dn::kdtree::{KdTree, Axis};
     use rand::Rng;
 
-    fn n(num: f32) -> FixedU16<U16> {
-        FixedU16::<U16>::from_num(num)
+    type FXD = FixedU16<U14>;
+
+    fn n(num: f32) -> FXD {
+        FXD::from_num(num)
     }
 
     #[test]
     fn can_query_nearest_one_item() {
-        let mut tree: KdTree = KdTree::new();
+        let mut tree: KdTree<FXD, u32, 4, 32, u32> = KdTree::new();
 
-        let content_to_add: [(PT, T); 16] = [
+        let content_to_add: [([FXD; 4], u32); 16] = [
             ([n(0.9f32), n(0.0f32), n(0.9f32), n(0.0f32)], 9),
             ([n(0.4f32), n(0.5f32), n(0.4f32), n(0.5f32)], 4),
             ([n(0.12f32), n(0.3f32), n(0.12f32), n(0.3f32)], 12),
@@ -137,9 +140,9 @@ mod tests {
             n(0.78f32),
             n(0.55f32),
         ];
-        let expected = (n(0.18979), 6);
+        let expected = (n(0.86), 4);
 
-        let result = tree.nearest_one(&query_point, &squared_euclidean);
+        let result = tree.nearest_one(&query_point, &manhattan);
         assert_eq!(result, expected);
 
         let mut rng = rand::thread_rng();
@@ -152,7 +155,7 @@ mod tests {
             ];
             let expected = linear_search(&content_to_add, &query_point);
 
-            let result = tree.nearest_one(&query_point, &squared_euclidean);
+            let result = tree.nearest_one(&query_point, &manhattan);
 
             if result.1 != expected.1 || result.0 != expected.0 {
                 println!(
@@ -167,12 +170,15 @@ mod tests {
         }
     }
 
-    fn linear_search(content: &[(PT, T)], query_point: &PT) -> (A, T) {
+    fn linear_search<A: Axis, const K: usize>(
+        content: &[([A; K], u32)],
+        query_point: &[A; K],
+    ) -> (A, u32) {
         let mut best_dist: A = A::MAX;
-        let mut best_item: T = T::MAX;
+        let mut best_item: u32 = u32::MAX;
 
         for &(p, item) in content {
-            let dist = squared_euclidean(query_point, &p);
+            let dist = manhattan(query_point, &p);
             if dist < best_dist {
                 best_item = item;
                 best_dist = dist;
