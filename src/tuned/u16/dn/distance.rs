@@ -5,8 +5,7 @@
 // #[cfg(any(target_arch = "x86_64"))]
 // use std::arch::x86_64::*;
 
-
-use az::Az;
+use fixed::traits::Fixed;
 use crate::tuned::u16::dn::kdtree::Axis;
 
 /// Returns the squared euclidean distance between two points. When you only
@@ -30,6 +29,7 @@ use crate::tuned::u16::dn::kdtree::Axis;
 /// assert!(ONE == manhattan(&[ZERO, ZERO], &[ONE, ZERO]));
 /// assert!(TWO == manhattan(&[ZERO, ZERO], &[ONE, ONE]));
 /// ```
+#[inline(never)]
 pub fn manhattan<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A {
     a.iter()
         .zip(b.iter())
@@ -43,17 +43,25 @@ pub fn manhattan<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A {
         .fold(A::ZERO, |a, b|a.saturating_add(b))
 }
 
+// TODO: sat_mul and sat_add are preventing vectorisation. Need to
+//       rewrite, or rescale fixed points to prevent overflow
+// #[inline(never)]
 pub fn squared_euclidean<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A {
     a.iter()
         .zip(b.iter())
         .map(|(&a_val, &b_val)| {
-            let diff: A = if a_val > b_val {
-                a_val - b_val
-            } else {
-                b_val - a_val
-            };
-            // let res = diff; // / (A::from_num(K))
-            let res = diff.saturating_mul(diff); // / (A::from_num(K))
+            // let diff: A = if a_val > b_val {
+            //     a_val - b_val
+            // } else {
+            //     b_val - a_val
+            // };
+            // let diff: A = a_val.dist(b_val);
+            let diff = a_val - b_val;
+            //let diff = diff / A::from_num(4);
+
+            //let res = diff.saturating_mul(diff);
+            let res = diff * diff;
+
             // let res = (diff * A::from_num(0.5)).saturating_mul(diff); // / (A::from_num(K))
             // if res == A::MAX {
             //     println!("Dist saturated at mult (a={}, b={}, diff={})", &a_val, &b_val, &diff);
@@ -61,7 +69,8 @@ pub fn squared_euclidean<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A {
             res
         })
         .fold(A::ZERO, |a, b| {
-            let res = a.saturating_add(b);
+            // let res = a.saturating_add(b);
+            let res = a + b;
             // let res = a.saturating_add(b.shr(2) );
             // if res == A::MAX {
             //     println!("Dist saturated at add")

@@ -113,6 +113,7 @@ derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[cfg(feature = "serialize_rkyv")]
 pub struct LeafNodeRK<A: PrimInt, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
+    // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
     pub(crate) content_points: [[A; K]; B],
     pub(crate) content_items: [T; B],
     pub(crate) min_bound: [A; K],
@@ -131,6 +132,7 @@ pub struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize, IDX: In
             deserialize = "A: Deserialize<'de>, T: Deserialize<'de> + Copy + Default"
         ))
     )]
+    // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
     pub(crate) content_points: [[A; K]; B],
 
     #[cfg_attr(feature = "serialize", serde(with = "array"))]

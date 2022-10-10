@@ -1,4 +1,4 @@
-use crate::tuned::u16::dn::kdtree::{KdTree, Axis, Index, Content};
+use crate::tuned::u16::dn::kdtree::{KdTree, Axis, Index, Content, LeafNode};
 
 use std::collections::BinaryHeap;
 use std::ops::Rem;
@@ -73,25 +73,44 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
         } else {
             let leaf_node = self.leaves.get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
 
-            leaf_node
-                .content_points
-                .iter()
-                .enumerate()
-                .take(leaf_node.size.az::<usize>())
-                .for_each(|(idx, entry)| {
-                    let distance = distance_fn(query, &entry);
-                    if distance <= radius {
-                        let item = *leaf_node.content_items.get_unchecked(idx.az::<usize>());
-                        if best_items.len() < max_qty {
-                            best_items.push(item);
-                        } else {
-                            let mut top = best_items.peek_mut().unwrap();
-                            if item < *top {
-                                *top = item;
-                            }
-                        }
-                    }
-                });
+            Self::process_leaf_node(query, radius, max_qty, distance_fn, best_items, leaf_node);
+        }
+    }
+
+    #[inline(never)]
+    unsafe fn process_leaf_node<F>(
+        query: &[A; K],
+        radius: A,
+        max_qty: usize,
+        distance_fn: &F,
+        best_items: &mut BinaryHeap<T>,
+        leaf_node: &LeafNode<A, T, K, B, IDX>
+    ) where
+        F: Fn(&[A; K], &[A; K]) -> A, {
+        leaf_node
+            .content_points
+            .iter()
+            .take(leaf_node.size.az::<usize>())
+            .map(|entry| {
+                distance_fn(query, &entry)
+            })
+            .enumerate()
+            .filter(|(_, distance)| *distance <= radius)
+            .for_each(|(idx, _)| {
+                Self::get_item_and_add_if_good(max_qty, best_items, leaf_node, idx)
+            });
+    }
+
+    #[inline(never)]
+    unsafe fn get_item_and_add_if_good(max_qty: usize, best_items: &mut BinaryHeap<T>, leaf_node: &LeafNode<A, T, K, B, IDX>, idx: usize) {
+        let item = *leaf_node.content_items.get_unchecked(idx.az::<usize>());
+        if best_items.len() < max_qty {
+            best_items.push(item);
+        } else {
+            let mut top = best_items.peek_mut().unwrap();
+            if item < *top {
+                *top = item;
+            }
         }
     }
 }
