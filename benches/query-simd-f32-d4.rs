@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use sok::distance::squared_euclidean;
+use sok::tuned::f32::d4::distance::squared_euclidean;
 use sok::tuned::f32::d4::kdtree::KdTree;
 
 use rayon::prelude::*;

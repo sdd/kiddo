@@ -1,8 +1,9 @@
-use crate::sok::{Axis, Content, LEAF_OFFSET};
-use crate::KdTree;
 use std::ops::Rem;
+use az::{Az, Cast};
 
-impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
+use crate::float::kdtree::{KdTree, Axis, Index, Content};
+
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> KdTree<A, T, K, B, IDX> where usize: Cast<IDX> {
     #[inline]
     pub fn within_unsorted<F>(&self, query: &[A; K], radius: A, distance_fn: &F) -> Vec<(A, T)>
     where
@@ -10,33 +11,35 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
     {
         let mut matching_items = Vec::new();
 
-        self.within_unsorted_recurse(
-            query,
-            radius,
-            distance_fn,
-            self.root_index,
-            0,
-            &mut matching_items,
-        );
+        unsafe {
+            self.within_unsorted_recurse(
+                query,
+                radius,
+                distance_fn,
+                self.root_index,
+                0,
+                &mut matching_items,
+            );
+        }
 
         matching_items
     }
 
-    fn within_unsorted_recurse<F>(
+    unsafe fn within_unsorted_recurse<F>(
         &self,
         query: &[A; K],
         radius: A,
         distance_fn: &F,
-        curr_node_idx: usize,
+        curr_node_idx: IDX,
         split_dim: usize,
         matching_items: &mut Vec<(A, T)>,
     ) where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
-        if KdTree::<A, T, K, B>::is_stem_index(curr_node_idx) {
-            let node = &self.stems[curr_node_idx];
+        if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
+            let node = self.stems.get_unchecked(curr_node_idx.az::<usize>());
 
-            let child_node_indices = if query[split_dim] < node.split_val {
+            let child_node_indices = if *query.get_unchecked(split_dim) < node.split_val {
                 [node.left, node.right]
             } else {
                 [node.right, node.left]
@@ -57,16 +60,19 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
                 }
             }
         } else {
-            let leaf_node = &self.leaves[curr_node_idx - LEAF_OFFSET];
+            let leaf_node = self.leaves.get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
+            // println!("Leaf node: {:?}", (curr_node_idx - LEAF_OFFSET) as usize);
 
             leaf_node
-                .content
+                .content_points
                 .iter()
-                .take(leaf_node.size)
-                .for_each(|entry| {
-                    let distance = distance_fn(query, &entry.point);
+                .enumerate()
+                .take(leaf_node.size.az::<usize>())
+                .for_each(|(idx, entry)| {
+                    let distance = distance_fn(query, &entry);
+
                     if distance < radius {
-                        matching_items.push((distance, entry.item))
+                        matching_items.push((distance, *leaf_node.content_items.get_unchecked(idx.az::<usize>())));
                     }
                 });
         }
@@ -75,36 +81,18 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {
 
 #[cfg(test)]
 mod tests {
-    use crate::distance::squared_euclidean;
-    use crate::KdTree;
-    use rand::Rng;
     use std::cmp::Ordering;
-    use num_traits::Float;
+    use rand::Rng;
+    use crate::float::distance::squared_euclidean;
+    use crate::float::kdtree::{Axis, KdTree};
+
+    type AX = f32;
 
     #[test]
-    fn can_query_items_within_unsorted_radius() {
-        // let mut tree: KdTree<f64, i32, 2, 4> = KdTree::new();
-        // let content_to_add = [
-        //     ([9f64, 0f64], 9),
-        //     ([4f64, 500f64], 4),
-        //     ([12f64, -300f64], 12),
-        //     ([7f64, 200f64], 7),
-        //     ([13f64, -400f64], 13),
-        //     ([6f64, 300f64], 6),
-        //     ([2f64, 700f64], 2),
-        //     ([14f64, -500f64], 14),
-        //     ([3f64, 600f64], 3),
-        //     ([10f64, -100f64], 10),
-        //     ([16f64, -700f64], 16),
-        //     ([1f64, 800f64], 1),
-        //     ([15f64, -600f64], 15),
-        //     ([5f64, 400f64], 5),
-        //     ([8f64, 100f64], 8),
-        //     ([11f64, -200f64], 11),
-        // ];
+    fn can_query_items_within_radius() {
+        let mut tree: KdTree<AX, u32, 4, 4, u32> = KdTree::new();
 
-        let mut tree: KdTree<f32, i32, 4, 4> = KdTree::new();
-        let content_to_add: [([f32; 4], i32); 16] = [
+        let content_to_add: [([AX; 4], u32); 16] = [
             ([0.9f32, 0.0f32, 0.9f32, 0.0f32], 9),
             ([0.4f32, 0.5f32, 0.4f32, 0.5f32], 4),
             ([0.12f32, 0.3f32, 0.12f32, 0.3f32], 12),
@@ -129,31 +117,21 @@ mod tests {
 
         assert_eq!(tree.size(), 16);
 
-        // let query_point = [9f64, 0f64];
-        // let radius = 20000f64;
-
         let query_point = [
             0.78f32,
             0.55f32,
             0.78f32,
             0.55f32,
         ];
-        let radius = 0.2;
 
+        let radius = 0.2;
         let expected = linear_search(&content_to_add, &query_point, radius);
 
-        let mut result = tree.within(&query_point, radius, &squared_euclidean);
-        sort_result(&mut result);
+        let result = tree.within_unsorted(&query_point, radius, &squared_euclidean);
         assert_eq!(result, expected);
 
         let mut rng = rand::thread_rng();
         for _i in 0..1000 {
-            // let query_point = [
-            //     rng.gen_range(-10f64..20f64),
-            //     rng.gen_range(-1000f64..1000f64),
-            // ];
-            // let radius = 10000f64;
-
             let query_point = [
                 rng.gen_range(0f32..1f32),
                 rng.gen_range(0f32..1f32),
@@ -161,21 +139,20 @@ mod tests {
                 rng.gen_range(0f32..1f32),
             ];
             let radius = 0.2;
-
             let expected = linear_search(&content_to_add, &query_point, radius);
 
-            let mut result = tree.within(&query_point, radius, &squared_euclidean);
-            sort_result(&mut result);
+            let mut result = tree.within_unsorted(&query_point, radius, &squared_euclidean);
+            stabilize_sort(&mut result);
 
             assert_eq!(result, expected);
         }
     }
 
-    fn linear_search<F: Float, const K: usize>(
-        content: &[([F; K], i32)],
-        query_point: &[F; K],
-        radius: F,
-    ) -> Vec<(F, i32)> {
+    fn linear_search<A: Axis, const K: usize,>(
+        content: &[([A; K], u32)],
+        query_point: &[A; K],
+        radius: A,
+    ) -> Vec<(A, u32)> {
         let mut matching_items = vec![];
 
         for &(p, item) in content {
@@ -185,12 +162,13 @@ mod tests {
             }
         }
 
-        sort_result(&mut matching_items);
+        stabilize_sort(&mut matching_items);
+
         matching_items
     }
 
-    fn sort_result<F: Float>(vec: &mut Vec<(F, i32)>) {
-        vec.sort_unstable_by(|a, b| {
+    fn stabilize_sort<A: Axis>(matching_items: &mut Vec<(A, u32)>) {
+        matching_items.sort_unstable_by(|a, b| {
             let dist_cmp = a.0.partial_cmp(&b.0).unwrap();
             if dist_cmp == Ordering::Equal {
                 a.1.cmp(&b.1)

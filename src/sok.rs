@@ -147,34 +147,13 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> LeafNode<A, T, K, B> {
     }
 
     pub(crate) fn extend(&mut self, point: &[A; K]) {
-        /*BoundsExtender::*/
         extend(&mut self.min_bound, &mut self.max_bound, point);
     }
 
     pub(crate) fn extend_with_result(&mut self, point: &[A; K]) -> ([A; K], [A; K]) {
-        /*BoundsExtender::*/
         extend(&mut self.min_bound, &mut self.max_bound, point);
         return (self.min_bound, self.max_bound);
     }
-
-    /*pub(crate) fn calc_bounds(&mut self) {
-        self.bounds = [(A::infinity(), A::neg_infinity()); K];
-        for idx in 0..self.size {
-            self.min_bound.iter_mut().enumerate().for_each(|(dim, bound)| {
-                let curr_point_val = *unsafe { self.content.get_unchecked(idx).point.get_unchecked(dim) };
-                if curr_point_val < *bound {
-                    *bound = curr_point_val;
-                }
-            });
-
-            self.max_bound.iter_mut().enumerate().for_each(|(dim, bound)| {
-                let curr_point_val = *unsafe { self.content.get_unchecked(idx).point.get_unchecked(dim) };
-                if curr_point_val > *bound {
-                    *bound = curr_point_val;
-                }
-            });
-        }
-    }*/
 }
 
 impl<A: Axis, T: Content, const K: usize, const B: usize> KdTree<A, T, K, B> {

@@ -1,22 +1,16 @@
 use az::{Az, Cast};
 use std::cmp::PartialEq;
 use std::fmt::Debug;
-use fixed::traits::Fixed;
-use num_traits::{One, PrimInt, Unsigned, Zero};
+use num_traits::{One, Float, PrimInt, Unsigned, Zero};
 
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;
-use crate::tuned::u16::dn::util::{distance_to_bounds, extend};
+use crate::float::util::{distance_to_bounds, extend};
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
 
-pub trait Axis: Fixed + Default + Debug + Copy {}
-impl<T: Fixed + Default + Debug + Copy> Axis for T {}
-
-#[cfg(feature = "serialize_rkyv")]
-pub trait AxisRK: Zero + Default + Debug + rkyv::Archive {}
-#[cfg(feature = "serialize_rkyv")]
-impl<T: Zero + Default + Debug + rkyv::Archive> AxisRK for T {}
+pub trait Axis: Float + Default + Debug + Copy {}
+impl<T: Float + Default + Debug + Copy> Axis for T {}
 
 pub trait Content: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug {}
 impl<T: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug> Content for T {}
@@ -59,19 +53,11 @@ impl Index for u16 {
     fn div_ceil(self, b: u16) -> u16 { u16::div_ceil(self, b) }
 }
 
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
 feature = "serialize_rkyv",
 derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
-#[cfg(feature = "serialize_rkyv")]
-pub struct KdTreeRK<A: PrimInt, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
-    pub leaves: Vec<LeafNodeRK<A, T, K, B, IDX>>,
-    pub stems: Vec<StemNodeRK<A, K, IDX>>,
-    pub(crate) root_index: IDX,
-    size: T,
-}
-
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
     pub leaves: Vec<LeafNode<A, T, K, B, IDX>>,
@@ -80,21 +66,11 @@ pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize, IDX: Inde
     pub(crate) size: T,
 }
 
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
 feature = "serialize_rkyv",
 derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
-#[cfg(feature = "serialize_rkyv")]
-pub struct StemNodeRK<A: PrimInt, const K: usize, IDX: Index<T = IDX>> {
-    pub(crate) min_bound: [A; K],
-    pub(crate) max_bound: [A; K],
-
-    pub(crate) left: IDX,
-    pub(crate) right: IDX,
-    pub(crate) split_val: A,
-}
-
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct StemNode<A: Axis, const K: usize, IDX: Index<T = IDX>> {
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
@@ -107,21 +83,11 @@ pub struct StemNode<A: Axis, const K: usize, IDX: Index<T = IDX>> {
     pub(crate) split_val: A,
 }
 
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
 feature = "serialize_rkyv",
 derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
-#[cfg(feature = "serialize_rkyv")]
-pub struct LeafNodeRK<A: PrimInt, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
-    // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
-    pub(crate) content_points: [[A; K]; B],
-    pub(crate) content_items: [T; B],
-    pub(crate) min_bound: [A; K],
-    pub(crate) max_bound: [A; K],
-    pub(crate) size: IDX,
-}
-
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
@@ -177,9 +143,9 @@ impl<A: Axis, const K: usize, IDX: Index<T = IDX>> StemNode<A, K, IDX>  {
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> LeafNode<A, T, K, B, IDX> {
     pub(crate) fn new() -> Self {
         Self {
-            min_bound: [A::MAX; K],
-            max_bound: [A::MIN; K],
-            content_points: [[A::ZERO; K]; B],
+            min_bound: [A::max_value(); K],
+            max_bound: [A::min_value(); K],
+            content_points: [[A::zero(); K]; B],
             content_items: [T::zero(); B],
             size: IDX::zero(),
         }
@@ -256,23 +222,19 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
 
 #[cfg(test)]
 mod tests {
-    use fixed::types::extra::U14;
-    use fixed::FixedU16;
-
-    use crate::tuned::u16::dn::kdtree::KdTree;
-
-    type FXD = FixedU16<U14>;
+    use crate::float::kdtree::KdTree;
+    type AX = f64;
 
     #[test]
     fn it_can_be_constructed_with_new() {
-        let tree: KdTree<FXD, u32, 4, 32, u32> = KdTree::new();
+        let tree: KdTree<AX, u32, 4, 32, u32> = KdTree::new();
 
         assert_eq!(tree.size(), 0);
     }
 
     #[test]
     fn it_can_be_constructed_with_a_defined_capacity() {
-        let tree: KdTree<FXD, u32, 4, 32, u32> = KdTree::with_capacity(10);
+        let tree: KdTree<AX, u32, 4, 32, u32> = KdTree::with_capacity(10);
 
         assert_eq!(tree.size(), 0);
     }

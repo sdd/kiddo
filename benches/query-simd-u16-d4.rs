@@ -1,10 +1,12 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use fixed::types::extra::U14;
 use fixed::FixedU16;
-use sok::tuned::u16::d4::distance::squared_euclidean;
-use sok::tuned::u16::d4::kdtree::KdTree;
+use sok::fixed::distance::squared_euclidean;
+use sok::fixed::kdtree::KdTree;
 
 use rayon::prelude::*;
+
+type FXPT = FixedU16<U14>;
 
 const K: usize = 4;
 const BUCKET_SIZE: usize = 32;
@@ -13,13 +15,13 @@ const QUERY: usize = 1_000_000;
 fn criterion_benchmark(c: &mut Criterion) {
     // Bench building tree
     for ndata in [3, 4, 5, 6, 7].map(|p| 10_usize.pow(p)) {
-        let data: Vec<[FixedU16<U14>; K]> = (0..ndata)
+        let data: Vec<[FXPT; K]> = (0..ndata)
             .map(|_| [(); K].map(|_| {
                 let val: u16 = rand::random();
                 unsafe { std::mem::transmute(val) }
             }))
             .collect();
-        let query: Vec<[FixedU16<U14>; K]> = (0..QUERY)
+        let query: Vec<[FXPT; K]> = (0..QUERY)
             .map(|_| [(); K].map(|_| {
                 let val: u16 = rand::random();
                 unsafe { std::mem::transmute(val) }
@@ -31,7 +33,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             QUERY, ndata
         ));
 
-        let mut kdtree = KdTree::with_capacity(BUCKET_SIZE);
+        let mut kdtree: KdTree<FXPT, u32, K, BUCKET_SIZE, u32> = KdTree::with_capacity(BUCKET_SIZE);
         for idx in 0..ndata {
             kdtree.add(&data[idx], idx as u32);
         }

@@ -58,7 +58,7 @@ use crate::sok::Axis;
 //     }
 // }
 
-#[inline(never)]
+// #[inline(never)]
 pub(crate) fn distance_to_bounds<F, A, const K: usize>(
     p1: &[A; K],
     min_bound: &[A; K],
@@ -86,7 +86,7 @@ where
     distance(p1, &p2)
 }
 
-#[inline(never)]
+// #[inline(never)]
 #[allow(dead_code)]
 pub(crate) fn distance_to_bounds_simd<F, A, const K: usize>(
     p1: &[A; K],
@@ -115,7 +115,7 @@ where
     distance(p1, &p2)
 }
 
-#[inline(never)]
+// #[inline(never)]
 pub(crate) fn clamp<A: Axis>(val: A, min_bound: A, max_bound: A) -> A {
     if val < min_bound {
         min_bound
@@ -126,7 +126,7 @@ pub(crate) fn clamp<A: Axis>(val: A, min_bound: A, max_bound: A) -> A {
     }
 }
 
-#[inline(never)]
+// #[inline(never)]
 pub(crate) fn extend<A: Axis, const K: usize>(
     min_bound: &mut [A; K],
     max_bound: &mut [A; K],

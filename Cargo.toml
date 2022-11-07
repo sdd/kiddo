@@ -25,6 +25,7 @@ aligned = "0.4"
 aligned-array = "1.0.1"
 fixed = "1.19.0"
 az = "1.2.1"
+min-max-heap = "1.3.0"
 
 [dev-dependencies]
 rand = "0.8"
@@ -73,6 +74,10 @@ name = "nearest_one"
 harness = false
 
 [[bench]]
+name = "nearest_n"
+harness = false
+
+[[bench]]
 name = "within"
 harness = false
 
@@ -97,6 +102,10 @@ name = "build-simd-f32-d4"
 harness = false
 
 [[bench]]
+name = "build-float-f32-d4"
+harness = false
+
+[[bench]]
 name = "query-simd-f32-d4"
 harness = false
 
@@ -106,6 +115,10 @@ harness = false
 
 [[bench]]
 name = "query-simd-u16-d4"
+harness = false
+
+[[bench]]
+name = "query-float-f32-d4"
 harness = false
 
 [[bench]]

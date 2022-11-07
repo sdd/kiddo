@@ -1,4 +1,4 @@
-use crate::tuned::u16::dn::kdtree::{KdTree, Axis, Index, Content, LeafNode};
+use crate::fixed::kdtree::{KdTree, Axis, Index, Content, LeafNode};
 
 use std::collections::BinaryHeap;
 use std::ops::Rem;
@@ -16,6 +16,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
+        // TODO: switch to https://docs.rs/min-max-heap/1.3.0/min_max_heap/struct.MinMaxHeap.html
         let mut best_items: BinaryHeap<T> = BinaryHeap::new();
 
         unsafe {
@@ -77,7 +78,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
         }
     }
 
-    #[inline(never)]
+    // #[inline(never)]
     unsafe fn process_leaf_node<F>(
         query: &[A; K],
         radius: A,
@@ -95,13 +96,15 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
                 distance_fn(query, &entry)
             })
             .enumerate()
-            .filter(|(_, distance)| *distance <= radius)
+            .filter(|(_, distance)| {
+                *distance <= radius
+            })
             .for_each(|(idx, _)| {
                 Self::get_item_and_add_if_good(max_qty, best_items, leaf_node, idx)
             });
     }
 
-    #[inline(never)]
+    // #[inline(never)]
     unsafe fn get_item_and_add_if_good(max_qty: usize, best_items: &mut BinaryHeap<T>, leaf_node: &LeafNode<A, T, K, B, IDX>, idx: usize) {
         let item = *leaf_node.content_items.get_unchecked(idx.az::<usize>());
         if best_items.len() < max_qty {
@@ -117,31 +120,39 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
 
 #[cfg(test)]
 mod tests {
-    use crate::distance::squared_euclidean;
-    use crate::KdTree;
+    use fixed::types::extra::U14;
+    use fixed::FixedU16;
+    use crate::fixed::distance::squared_euclidean;
+    use crate::fixed::kdtree::{KdTree, Axis};
     use rand::Rng;
+
+    type FXD = FixedU16<U14>;
+
+    fn n(num: f32) -> FXD {
+        FXD::from_num(num)
+    }
 
     #[test]
     fn can_query_best_n_items_within_radius() {
-        let mut tree: KdTree<f64, i32, 2, 4> = KdTree::new();
+        let mut tree: KdTree<FXD, u32, 2, 4, u32> = KdTree::new();
 
-        let content_to_add = [
-            ([9f64, 0f64], 9),
-            ([4f64, 500f64], 4),
-            ([12f64, -300f64], 12),
-            ([7f64, 200f64], 7),
-            ([13f64, -400f64], 13),
-            ([6f64, 300f64], 6),
-            ([2f64, 700f64], 2),
-            ([14f64, -500f64], 14),
-            ([3f64, 600f64], 3),
-            ([10f64, -100f64], 10),
-            ([16f64, -700f64], 16),
-            ([1f64, 800f64], 1),
-            ([15f64, -600f64], 15),
-            ([5f64, 400f64], 5),
-            ([8f64, 100f64], 8),
-            ([11f64, -200f64], 11),
+        let content_to_add: [([FXD; 2], u32); 16] = [
+            ([n(0.9f32), n(0.0f32)], 9),
+            ([n(0.4f32), n(0.5f32)], 4),
+            ([n(0.12f32), n(0.3f32)], 12),
+            ([n(0.7f32), n(0.2f32)], 7),
+            ([n(0.13f32), n(0.4f32)], 13),
+            ([n(0.6f32), n(0.3f32)], 6),
+            ([n(0.2f32), n(0.7f32)], 2),
+            ([n(0.14f32), n(0.5f32)], 14),
+            ([n(0.3f32), n(0.6f32)], 3),
+            ([n(0.10f32), n(0.1f32)], 10),
+            ([n(0.16f32), n(0.7f32)], 16),
+            ([n(0.1f32), n(0.8f32)], 1),
+            ([n(0.15f32), n(0.6f32)], 15),
+            ([n(0.5f32), n(0.4f32)], 5),
+            ([n(0.8f32), n(0.1f32)], 8),
+            ([n(0.11f32), n(0.2f32)], 11),
         ];
 
         for (point, item) in content_to_add {
@@ -149,11 +160,11 @@ mod tests {
         }
 
         assert_eq!(tree.size(), 16);
+        let max_qty = 5;
 
-        let query = [9f64, 0f64];
-        let radius = 20000f64;
-        let max_qty = 3;
-        let expected = vec![10, 9, 8];
+        let query = [n(0.9f32), n(0.7f32)];
+        let radius = n(0.6f32);
+        let expected = vec![6, 5, 3, 2, 4];
 
         let result: Vec<_> = tree
             .best_n_within_into_iter(&query, radius, max_qty, &squared_euclidean)
@@ -163,30 +174,32 @@ mod tests {
         let mut rng = rand::thread_rng();
         for _i in 0..1000 {
             let query = [
-                rng.gen_range(-10f64..20f64),
-                rng.gen_range(-1000f64..1000f64),
+                n(rng.gen_range(0.0f32..0.9f32)),
+                n(rng.gen_range(0.0f32..0.9f32)),
             ];
-            let radius = 10000f64;
+            println!("{}: {}, {}", _i, query[0].to_string(), query[1].to_string());
+            let radius = n(0.1f32);
             let expected = linear_search(&content_to_add, &query, radius, max_qty);
 
-            let result: Vec<_> = tree
+            let mut result: Vec<_> = tree
                 .best_n_within_into_iter(&query, radius, max_qty, &squared_euclidean)
                 .collect();
+            result.sort_unstable();
             assert_eq!(result, expected);
         }
     }
 
-    fn linear_search(
-        content: &[([f64; 2], i32)],
-        query: &[f64; 2],
-        radius: f64,
+    fn linear_search<A: Axis, const K: usize>(
+        content: &[([A; K], u32)],
+        query_point: &[A; K],
+        radius: A,
         max_qty: usize,
-    ) -> Vec<i32> {
+    ) -> Vec<u32> {
         let mut best_items = Vec::with_capacity(max_qty);
 
         for &(p, item) in content {
-            let dist = squared_euclidean(query, &p);
-            if dist < radius {
+            let dist = squared_euclidean(query_point, &p);
+            if dist <= radius {
                 if best_items.len() < max_qty {
                     best_items.push(item);
                 } else {
@@ -197,7 +210,6 @@ mod tests {
                 }
             }
             best_items.sort_unstable();
-            best_items.reverse();
         }
 
         best_items

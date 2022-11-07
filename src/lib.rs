@@ -24,6 +24,9 @@ mod query_within_unsorted;
 pub mod tuned;
 pub mod sok;
 mod util;
+pub mod float;
+pub mod fixed;
+mod mirror_select_nth_unstable_by;
 // mod bounds_extender;
 
 pub use crate::sok::KdTree;

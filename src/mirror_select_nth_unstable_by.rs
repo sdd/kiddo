@@ -1,98 +1,7 @@
 use std::cmp::Ordering;
 use std::cmp::Ordering::Less;
-use std::mem::MaybeUninit;
 use std::{cmp, mem, ptr};
-use crate::tuned::u16::dn::kdtree::Axis;
-
-#[allow(dead_code)]
-pub(crate) fn distance_to_bounds<A: Axis, const K: usize, F>(p1: &[A; K], min_bound: &[A; K], max_bound: &[A; K], distance: &F) -> A
-where
-    F: Fn(&[A; K], &[A; K]) -> A,
-{
-    let mut p2 = [A::ZERO; K];
-
-    p1.iter()
-        .zip(min_bound)
-        .zip(max_bound)
-        .map(|((&v, &min_bound), &max_bound)| v.clamp(min_bound, max_bound))
-        .zip(p2.iter_mut())
-        .for_each(|(clamped_val, p2_coord)| *p2_coord = clamped_val);
-
-    distance(p1, &p2)
-}
-
-// #[allow(dead_code)]
-// pub(crate) fn distance_to_bounds_simd_u16_4d_squared_euclidean(
-//     p1: &PT,
-//     min_bound: &PT,
-//     max_bound: &PT,
-// ) -> A {
-//     unsafe {
-//         let pt_mm = _mm_loadu_ps(p1.as_ptr());
-//         let max_mm = _mm_loadu_ps(max_bound.as_ptr());
-//
-//         let mut clamped = _mm_min_ps(max_mm, pt_mm);
-//         let min_mm = _mm_load_ps(min_bound.as_ptr());
-//         clamped = _mm_max_ps(min_mm, clamped);
-//
-//         let diff = _mm_sub_ps(pt_mm, clamped);
-//
-//         let squared = _mm_mul_ps(diff, diff);
-//
-//         let mut shuf = _mm_movehdup_ps(squared); // broadcast elements 3,1 to 2,0
-//         let mut sums = _mm_add_ps(squared, shuf);
-//         shuf = _mm_movehl_ps(shuf, sums); // high half -> low half
-//         sums = _mm_add_ss(sums, shuf);
-//
-//         f32::from_bits(_mm_extract_ps::<0>(sums) as u32)
-//     }
-// }
-
-
-pub(crate) fn extend<A: Axis, const K: usize>(min_bound: &mut [A; K], max_bound: &mut [A; K], point: &[A; K]) {
-    min_bound.iter_mut().enumerate().for_each(|(dim, bound)| {
-        if point[dim] < *bound {
-            *bound = point[dim];
-        }
-    });
-
-    max_bound.iter_mut().enumerate().for_each(|(dim, bound)| {
-        if point[dim] > *bound {
-            *bound = point[dim];
-        }
-    });
-}
-
-//// SLOWER
-// pub(crate) fn extend<A: Axis, const K: usize>(min_bound: &mut [A; K], max_bound: &mut [A; K], point: &[A; K]) {
-//     point.iter().zip(min_bound.iter_mut()).for_each(|(&point_coord, bound)| {
-//         if point_coord < *bound {
-//             *bound = point_coord;
-//         }
-//     });
-//     point.iter().zip(max_bound.iter_mut()).for_each(|(&point_coord, bound)| {
-//         if point_coord > *bound {
-//             *bound = point_coord;
-//         }
-//     });
-// }
-
-//// SLOWER
-// #[inline(never)]
-// pub(crate) fn extend<A: Axis, const K: usize>(bounds: &mut [(A, A); K], point: &PT) {
-//     point.iter().zip(bounds.iter_mut()).for_each(|(&point_coord, bound)| {
-//         bound.0 = bound.0.min(point_coord);
-//         bound.1 = bound.1.max(point_coord);
-//     });
-// }
-
-//// DOESN'T WORK
-// #[inline(never)]
-// pub(crate) fn extend<A: Axis, const K: usize>(bounds: &mut [(A, A); K], point: &PT) {
-//     bounds = point.iter().zip(bounds.iter()).map(|(&point_coord, (&lo, &hi))| {
-//         (lo.min(point_coord), hi.max(point_coord))
-//     }).collect();
-// }
+use std::mem::MaybeUninit;
 
 // performs select_nth_unstable_by on target,
 // but all the operations performed in the sort are applied to mirror as well
@@ -120,7 +29,7 @@ fn mirror_partition_at_index_loop<'a, AA, BB, F>(
 {
     loop {
         // Choose a pivot
-        let (pivot, _) = choose_pivot(target, is_less);
+        let (pivot, _) = choose_pivot(target, mirror, is_less);
 
         // If the chosen pivot is equal to the predecessor, then it's the smallest element in the
         // slice. Partition the slice into elements equal to and elements greater than the pivot.
@@ -149,13 +58,17 @@ fn mirror_partition_at_index_loop<'a, AA, BB, F>(
         let (left, right) = target.split_at_mut(mid);
         let (pivot, right) = right.split_at_mut(1);
         let pivot = &pivot[0];
+        let (left_mirror, right_mirror) = mirror.split_at_mut(mid);
+        let (_, right_mirror) = right_mirror.split_at_mut(1);
 
         if mid < index {
             target = right;
+            mirror = right_mirror;
             index = index - mid - 1;
             pred = Some(pivot);
         } else if mid > index {
             target = left;
+            mirror = left_mirror;
         } else {
             // If mid == index, then we're done, since partition() guaranteed that all elements
             // after mid are greater than or equal to mid.
@@ -171,8 +84,8 @@ fn mirror_partition_equal<AA, BB, F>(
     pivot: usize,
     is_less: &mut F,
 ) -> usize
-where
-    F: FnMut(&AA, &AA) -> bool,
+    where
+        F: FnMut(&AA, &AA) -> bool,
 {
     // Place the pivot at the beginning of slice.
     target.swap(0, pivot);
@@ -249,8 +162,8 @@ fn mirror_partition<AA, BB, F>(
     pivot: usize,
     is_less: &mut F,
 ) -> (usize, bool)
-where
-    F: FnMut(&AA, &AA) -> bool,
+    where
+        F: FnMut(&AA, &AA) -> bool,
 {
     let (mid, was_partitioned) = {
         // Place the pivot at the beginning of slice.
@@ -323,8 +236,8 @@ fn mirror_partition_in_blocks<AA, BB, F>(
     pivot: &AA,
     is_less: &mut F,
 ) -> usize
-where
-    F: FnMut(&AA, &AA) -> bool,
+    where
+        F: FnMut(&AA, &AA) -> bool,
 {
     // Number of elements in a typical block.
     const BLOCK: usize = 128;
@@ -652,10 +565,10 @@ where
     }
 }
 
-//// BELOW ARE UNCHANGED FROM sort.rs BUT WERE PRIVATE
-fn choose_pivot<T, F>(v: &mut [T], is_less: &mut F) -> (usize, bool)
-where
-    F: FnMut(&T, &T) -> bool,
+//// UNCHANGED FROM sort.rs
+fn choose_pivot<AA, BB, F>(v: &mut [AA], w: &mut [BB], is_less: &mut F) -> (usize, bool)
+    where
+        F: FnMut(&AA, &AA) -> bool,
 {
     // Minimum length to choose the median-of-medians method.
     // Shorter slices use the simple median-of-three method.
@@ -718,6 +631,7 @@ where
         // The maximum number of swaps was performed. Chances are the slice is descending or mostly
         // descending, so reversing will probably help sort it faster.
         v.reverse();
+        w.reverse();
         (len - 1 - b, true)
     }
 }
@@ -734,6 +648,93 @@ impl<T> Drop for CopyOnDrop<T> {
         //          Namely, one must be sure that `src` and `dst` does not overlap as required by `ptr::copy_nonoverlapping`.
         unsafe {
             ptr::copy_nonoverlapping(self.src, self.dest, 1);
+        }
+    }
+}
+
+#[test]
+fn test_mirror_select_nth_unstable_by() {
+    use core::cmp::Ordering::{Equal, Greater, Less};
+    use rand::rngs::StdRng;
+    use rand::seq::SliceRandom;
+    use rand::{Rng, SeedableRng};
+
+    const LEN: usize = 32;
+
+    let mut rng = StdRng::from_entropy();
+
+    let mut orig = [0; LEN];
+    let mut orig_mirror = [0; LEN];
+
+    for &modulus in &[5, 10, 1000] {
+        for _ in 0..10 {
+            for i in 0..LEN {
+                orig[i] = rng.gen::<i32>() % modulus;
+                orig_mirror[i] = 1_000_000 - orig[i]
+            }
+
+            // Sort in ascending order.
+            for pivot in 0..LEN {
+                let mut v = orig.clone();
+                let mut w = orig_mirror.clone();
+                // let (left, pivot, right) = mirror_select_nth_unstable_by(&mut v, &mut w,pivot, |a, b| a.cmp(b));
+                let f = |a: &i32, b :&i32| a.cmp(b);
+                mirror_select_nth_unstable_by(&mut v, &mut w,pivot, f);
+
+                //assert_eq!(left.len() + right.len(), LEN - 1);
+
+                for l in 0..pivot {
+                    assert!(v[l] <= v[pivot]);
+                    for r in (pivot+1)..LEN {
+                        assert!(v[pivot] <= v[r]);
+                    }
+                }
+
+                for i in 0..LEN {
+                    assert!(1_000_000 - w[i] == v[i]);
+                }
+            }
+
+            // Sort in descending order.
+            let sort_descending_comparator = |a: &i32, b: &i32| b.cmp(a);
+            let v_sorted_descending = {
+                let mut v = orig.clone();
+                v.sort_by(sort_descending_comparator);
+                v
+            };
+
+            for pivot in 0..LEN {
+                let mut v = orig.clone();
+                let mut w = orig_mirror.clone();
+                mirror_select_nth_unstable_by(&mut v,&mut w, pivot, sort_descending_comparator);
+
+                assert_eq!(v_sorted_descending[pivot], v[pivot]);
+                for i in 0..pivot {
+                    for j in pivot..LEN {
+                        assert!(v[j] <= v[i]);
+                    }
+                    assert!(1_000_000 - w[i] == v[i]);
+                }
+            }
+        }
+    }
+
+    // Sort at index using a completely random comparison function.
+    // This will reorder the elements *somehow*, but won't panic.
+    let mut v = [0; 500];
+    let mut w = [0; 500];
+    for i in 0..v.len() {
+        v[i] = i as i32;
+        w[i] = 1_000_000 - v[i];
+    }
+
+    for pivot in 0..v.len() {
+        mirror_select_nth_unstable_by(&mut v, &mut w,pivot, |_, _| *[Less, Equal, Greater].choose(&mut rng).unwrap());
+        v.sort();
+        w.sort();
+        for i in 0..v.len() {
+            assert_eq!(v[i], i as i32);
+            assert_eq!(w[i], 1_000_000 - 499 + i as i32);
         }
     }
 }
