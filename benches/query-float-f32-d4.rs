@@ -1,41 +1,30 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use fixed::types::extra::U14;
-
-use fixed::FixedU16;
-use sok::tuned::u16::d4::distance::squared_euclidean;
-use sok::tuned::u16::d4::kdtree::{A, KdTree};
+use sok::float::distance::squared_euclidean;
+use sok::float::kdtree::KdTree;
 
 use rayon::prelude::*;
 
+type FLT = f32;
 const K: usize = 4;
 const BUCKET_SIZE: usize = 32;
-const QUERY: usize = 10_000;
-
-
-const RADIUS: A = A::unwrapped_from_str("0.002");
+const QUERY: usize = 1_000_000;
 
 fn criterion_benchmark(c: &mut Criterion) {
     // Bench building tree
     for ndata in [3, 4, 5, 6, 7].map(|p| 10_usize.pow(p)) {
-        let data: Vec<[A; K]> = (0..ndata)
-            .map(|_| [(); K].map(|_| {
-                let val: u16 = rand::random();
-                unsafe { std::mem::transmute(val) }
-            }))
+        let data: Vec<[f32; K]> = (0..ndata)
+            .map(|_| [(); K].map(|_| rand::random()))
             .collect();
-        let query: Vec<[A; K]> = (0..QUERY)
-            .map(|_| [(); K].map(|_| {
-                let val: u16 = rand::random();
-                unsafe { std::mem::transmute(val) }
-            }))
+        let query: Vec<[f32; K]> = (0..QUERY)
+            .map(|_| [(); K].map(|_| rand::random()))
             .collect();
 
         let mut group = c.benchmark_group(format!(
-            "{:?} within SIMD u16 4D (ndata = {})",
+            "{:?} queries float f32 4D (ndata = {})",
             QUERY, ndata
         ));
 
-        let mut kdtree = KdTree::with_capacity(BUCKET_SIZE);
+        let mut kdtree: KdTree<FLT, u32, K, BUCKET_SIZE, u32> = KdTree::with_capacity(BUCKET_SIZE);
         for idx in 0..ndata {
             kdtree.add(&data[idx], idx as u32);
         }
@@ -45,8 +34,9 @@ fn criterion_benchmark(c: &mut Criterion) {
                 let v: Vec<_> = black_box(&query)
                     .par_iter()
                     .map_with(black_box(&kdtree), |t, q| {
-                        let results = t.within(q, RADIUS, &squared_euclidean);
-                        drop(results);
+                        let (dist, idx) = t.nearest_one(black_box(&q), &squared_euclidean);
+                        drop(dist);
+                        drop(idx);
                     })
                     .collect();
                 drop(v)

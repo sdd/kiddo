@@ -1,7 +1,7 @@
 use az::{Az, Cast};
-use crate::tuned::u16::dn::util::mirror_select_nth_unstable_by;
+use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
 use std::ops::Rem;
-use crate::tuned::u16::dn::kdtree::{Axis, Content, Index, KdTree, LeafNode, StemNode};
+use crate::float::kdtree::{Axis, Content, Index, KdTree, LeafNode, StemNode};
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> KdTree<A, T, K, B, IDX> where usize: Cast<IDX> {
     #[inline]
@@ -82,13 +82,13 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
 
         let mut left = LeafNode::new();
         let mut right = LeafNode::new();
-        left.min_bound = orig_min_bound;
-        left.max_bound = orig_max_bound;
-        right.min_bound = orig_min_bound;
-        right.max_bound = orig_max_bound;
 
-        *left.max_bound.get_unchecked_mut(split_dim) = *orig.content_points.get_unchecked((pivot_idx - IDX::one()).az::<usize>()).get_unchecked(split_dim);
-        *right.min_bound.get_unchecked_mut(split_dim) = *orig.content_points.get_unchecked(pivot_idx.az::<usize>()).get_unchecked(split_dim);
+        // left.min_bound = orig_min_bound;
+        // left.max_bound = orig_max_bound;
+        // right.min_bound = orig_min_bound;
+        // right.max_bound = orig_max_bound;
+        // *left.max_bound.get_unchecked_mut(split_dim) = *orig.content_points.get_unchecked((pivot_idx - IDX::one()).az::<usize>()).get_unchecked(split_dim);
+        // *right.min_bound.get_unchecked_mut(split_dim) = *orig.content_points.get_unchecked(pivot_idx.az::<usize>()).get_unchecked(split_dim);
 
         if B.rem(2) == 1 {
             left.content_points.get_unchecked_mut(..(pivot_idx.az::<usize>()))
@@ -117,6 +117,46 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
 
             right.size = (B.az::<IDX>()) - pivot_idx;
         }
+
+        left.min_bound = [A::infinity(); K];
+        left.max_bound = [A::neg_infinity(); K];
+        right.min_bound = [A::infinity(); K];
+        right.max_bound = [A::neg_infinity(); K];
+        left.content_points.iter().take(left.size.az::<usize>()).for_each(
+            |a| a.iter().enumerate().for_each(|(idx, val)| {
+                left.min_bound[idx] = left.min_bound[idx].min(*val);
+                left.max_bound[idx] = left.max_bound[idx].max(*val);
+            })
+        );
+        right.content_points.iter().take(right.size.az::<usize>()).for_each(
+            |a| a.iter().enumerate().for_each(|(idx, val)| {
+                right.min_bound[idx] = right.min_bound[idx].min(*val);
+                right.max_bound[idx] = right.max_bound[idx].max(*val);
+            })
+        );
+
+
+        // left.min_bound[split_dim] = *orig_min_bound.get_unchecked(split_dim);
+        // left.max_bound[split_dim] = *orig.content_points.get_unchecked((pivot_idx - IDX::one()).az::<usize>()).get_unchecked(split_dim);
+        // left.content_points.iter().take(left.size.az::<usize>()).for_each(
+        //     |a| a.iter().enumerate().for_each(|(idx, val)| {
+        //         if idx != split_dim {
+        //             left.min_bound[idx] = left.min_bound[idx].min(*val);
+        //             left.max_bound[idx] = left.max_bound[idx].max(*val);
+        //         }
+        //     })
+        // );
+        // right.min_bound[split_dim] = *orig.content_points.get_unchecked(pivot_idx.az::<usize>()).get_unchecked(split_dim);
+        // right.max_bound[split_dim] = *orig_max_bound.get_unchecked(split_dim);
+        // right.content_points.iter().take(right.size.az::<usize>()).for_each(
+        //     |a| a.iter().enumerate().for_each(|(idx, val)| {
+        //         if idx != split_dim {
+        //             right.min_bound[idx] = right.min_bound[idx].min(*val);
+        //             right.max_bound[idx] = right.max_bound[idx].max(*val);
+        //         }
+        //     })
+        // );
+
 
         *orig = left;
         self.leaves.push(right);
@@ -147,22 +187,20 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
 
 #[cfg(test)]
 mod tests {
-    use fixed::types::extra::U16;
-    use fixed::FixedU16;
+    use rand::Rng;
+    use crate::float::kdtree::KdTree;
 
-    use crate::tuned::u16::dn::kdtree::KdTree;
+    type FLT = f32;
 
-    type FXD = FixedU16<U16>;
-
-    fn n(num: f32) -> FXD {
-        FXD::from_num(num)
+    fn n(num: FLT) -> FLT {
+        num
     }
 
     #[test]
     fn can_add_an_item() {
-        let mut tree: KdTree<FXD, u32, 4, 32, u32> = KdTree::new();
+        let mut tree: KdTree<FLT, u32, 4, 32, u32> = KdTree::new();
 
-        let point: [FXD; 4] = [
+        let point: [FLT; 4] = [
             n(0.1f32), n(0.2f32), n(0.3f32), n(0.4f32)
         ];
         let item = 123;
@@ -174,9 +212,9 @@ mod tests {
 
     #[test]
     fn can_add_enough_items_to_cause_a_split() {
-        let mut tree: KdTree<FXD, u32, 4, 4, u32> = KdTree::new();
+        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::new();
 
-        let content_to_add: [([FXD; 4], u32); 16] = [
+        let content_to_add: [([FLT; 4], u32); 16] = [
             ([n(0.9f32), n(0.0f32), n(0.9f32), n(0.0f32)], 9),
             ([n(0.4f32), n(0.5f32), n(0.4f32), n(0.5f32)], 4),
             ([n(0.12f32), n(0.3f32), n(0.12f32), n(0.3f32)], 12),
@@ -200,5 +238,24 @@ mod tests {
         }
 
         assert_eq!(tree.size(), 16);
+    }
+
+    #[test]
+    fn can_add_shitloads_of_points() {
+        let mut tree: KdTree<FLT, u32, 4, 5, u32> = KdTree::new();
+
+        let mut rng = rand::thread_rng();
+        for i in 0..1000 {
+            let point = [
+                n(rng.gen_range(0f32..0.99998f32)),
+                n(rng.gen_range(0f32..0.99998f32)),
+                n(rng.gen_range(0f32..0.99998f32)),
+                n(rng.gen_range(0f32..0.99998f32)),
+            ];
+
+            tree.add(&point, i);
+        }
+
+        assert_eq!(tree.size(), 1000);
     }
 }

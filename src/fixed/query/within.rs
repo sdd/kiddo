@@ -1,9 +1,9 @@
-use crate::tuned::u16::dn::heap_element::HeapElement;
+use crate::fixed::heap_element::HeapElement;
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 use az::{Az, Cast};
 
-use crate::tuned::u16::dn::kdtree::{KdTree, Axis, Index, Content};
+use crate::fixed::kdtree::{KdTree, Axis, Index, Content};
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> KdTree<A, T, K, B, IDX> where usize: Cast<IDX> {
     #[inline]
@@ -94,8 +94,8 @@ mod tests {
     use fixed::types::extra::U14;
     use fixed::FixedU16;
     use rand::Rng;
-    use crate::tuned::u16::dn::distance::manhattan;
-    use crate::tuned::u16::dn::kdtree::{Axis, KdTree};
+    use crate::fixed::distance::manhattan;
+    use crate::fixed::kdtree::{Axis, KdTree};
 
     type FXD = FixedU16<U14>;
 
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn can_query_items_within_radius() {
-        let mut tree: KdTree<FXD, u32, 4, 32, u32> = KdTree::new();
+        let mut tree: KdTree<FXD, u32, 4, 4, u32> = KdTree::new();
 
         let content_to_add: [([FXD; 4], u32); 16] = [
             ([n(0.9f32), n(0.0f32), n(0.9f32), n(0.0f32)], 9),

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 pub(crate) type IDX = u32;
 
 // A: Axis, ie points
-pub(crate) type A = FixedU16<U16>;
+pub type A = FixedU16<U16>;
 // T: Content
 pub(crate) type T = u32;
 // K: Dimensions

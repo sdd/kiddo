@@ -1,5 +1,5 @@
-use sok::tuned::u16::dn::distance::manhattan;
-use sok::tuned::u16::dn::kdtree::KdTree;
+use sok::fixed::distance::manhattan;
+use sok::fixed::kdtree::KdTree;
 
 use fixed::types::extra::U16;
 use fixed::FixedU16;

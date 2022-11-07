@@ -99,73 +99,62 @@ impl KdTree {
 
 #[cfg(test)]
 mod tests {
-    use crate::distance::squared_euclidean;
     use crate::tuned::f32::d4::kdtree::{KdTree, A, PT, T};
-    // use crate::tuned::f32::d4::distance::squared_euclidean_simd_f32_d4;
     use rand::Rng;
+    use crate::float::distance::manhattan;
 
     #[test]
     fn can_query_nearest_one_item() {
-        let mut tree: KdTree = KdTree::new();
+        let mut tree: KdTree = KdTree::with_capacity(4);
 
         let content_to_add: [(PT, T); 16] = [
-            ([9f32, 0f32, 9f32, 0f32], 9),
-            ([4f32, 500f32, 4f32, 500f32], 4),
-            ([12f32, -300f32, 12f32, -300f32], 12),
-            ([7f32, 200f32, 7f32, 200f32], 7),
-            ([13f32, -400f32, 13f32, -400f32], 13),
-            ([6f32, 300f32, 6f32, 300f32], 6),
-            ([2f32, 700f32, 2f32, 700f32], 2),
-            ([14f32, -500f32, 14f32, -500f32], 14),
-            ([3f32, 600f32, 3f32, 600f32], 3),
-            ([10f32, -100f32, 10f32, -100f32], 10),
-            ([16f32, -700f32, 16f32, -700f32], 16),
-            ([1f32, 800f32, 1f32, 800f32], 1),
-            ([15f32, -600f32, 15f32, -600f32], 15),
-            ([5f32, 400f32, 5f32, 400f32], 5),
-            ([8f32, 100f32, 8f32, 100f32], 8),
-            ([11f32, -200f32, 11f32, -200f32], 11),
+            ([0.9f32, 0.0f32, 0.9f32, 0.0f32], 9),
+            ([0.4f32, 0.5f32, 0.4f32, 0.5f32], 4),
+            ([0.12f32, 0.3f32, 0.12f32, 0.3f32], 12),
+            ([0.7f32, 0.2f32, 0.7f32, 0.2f32], 7),
+            ([0.13f32, 0.4f32, 0.13f32, 0.4f32], 13),
+            ([0.6f32, 0.3f32, 0.6f32, 0.3f32], 6),
+            ([0.2f32, 0.7f32, 0.2f32, 0.7f32], 2),
+            ([0.14f32, 0.5f32, 0.14f32, 0.5f32], 14),
+            ([0.3f32, 0.6f32, 0.3f32, 0.6f32], 3),
+            ([0.10f32, 0.1f32, 0.10f32, 0.1f32], 10),
+            ([0.16f32, 0.7f32, 0.16f32, 0.7f32], 16),
+            ([0.1f32, 0.8f32, 0.1f32, 0.8f32], 1),
+            ([0.15f32, 0.6f32, 0.15f32, 0.6f32], 15),
+            ([0.5f32, 0.4f32, 0.5f32, 0.4f32], 5),
+            ([0.8f32, 0.1f32, 0.8f32, 0.1f32], 8),
+            ([0.11f32, 0.2f32, 0.11f32, 0.2f32], 11),
         ];
 
         for (point, item) in content_to_add {
             tree.add(&point, item);
         }
-
         assert_eq!(tree.size(), 16);
 
         let query_point = [
-            4.788542420397475f32,
-            -780.5537885546596f32,
-            4.788542420397475f32,
-            -780.5537885546596f32,
+            0.78f32,
+            0.55f32,
+            0.78f32,
+            0.55f32,
         ];
-        let expected = (13229.214, 16);
-
-        let result = tree.nearest_one(&query_point, &squared_euclidean);
+        let expected = (0.8599999, 6);
+        let result = tree.nearest_one(&query_point, &manhattan);
         assert_eq!(result, expected);
 
         let mut rng = rand::thread_rng();
-        for i in 0..1000 {
+        for _i in 0..1000 {
             let query_point = [
-                rng.gen_range(-10f32..20f32),
-                rng.gen_range(-1000f32..1000f32),
-                rng.gen_range(-10f32..20f32),
-                rng.gen_range(-1000f32..1000f32),
+                rng.gen_range(0f32..1f32),
+                rng.gen_range(0f32..1f32),
+                rng.gen_range(0f32..1f32),
+                rng.gen_range(0f32..1f32),
             ];
             let expected = linear_search(&content_to_add, &query_point);
 
-            let result = tree.nearest_one(&query_point, &squared_euclidean);
-
-            if result.1 != expected.1 || (result.0 - expected.0).abs() > 0.25f32 {
-                println!(
-                    "Bad: #{:?}. Query: {:?}, Expected: {:?}, Actual: {:?}",
-                    i, &query_point, &expected, &result
-                );
-            }
+            let result = tree.nearest_one(&query_point, &manhattan);
 
             assert!((result.0 - expected.0).abs() < 0.25f32);
             assert_eq!(result.1, expected.1);
-            // println!("Good: {:?}", i);
         }
     }
 
@@ -174,7 +163,7 @@ mod tests {
         let mut best_item: T = T::MAX;
 
         for &(p, item) in content {
-            let dist = squared_euclidean(query_point, &p);
+            let dist = manhattan(query_point, &p);
             if dist < best_dist {
                 best_item = item;
                 best_dist = dist;

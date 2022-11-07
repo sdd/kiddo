@@ -5,8 +5,7 @@
 // #[cfg(any(target_arch = "x86_64"))]
 // use std::arch::x86_64::*;
 
-use fixed::traits::Fixed;
-use crate::tuned::u16::dn::kdtree::Axis;
+use crate::fixed::kdtree::Axis;
 
 /// Returns the squared euclidean distance between two points. When you only
 /// need to compare distances, rather than having the exact distance between
@@ -18,7 +17,7 @@ use crate::tuned::u16::dn::kdtree::Axis;
 /// ```rust
 /// use fixed::types::extra::U0;
 /// use fixed::FixedU16;
-/// use sok::tuned::u16::dn::distance::manhattan;
+/// use sok::fixed::distance::manhattan;
 /// type FXD = FixedU16<U0>;
 ///
 /// let ZERO = FXD::from_num(0);
@@ -29,7 +28,7 @@ use crate::tuned::u16::dn::kdtree::Axis;
 /// assert!(ONE == manhattan(&[ZERO, ZERO], &[ONE, ZERO]));
 /// assert!(TWO == manhattan(&[ZERO, ZERO], &[ONE, ONE]));
 /// ```
-#[inline(never)]
+// #[inline(never)]
 pub fn manhattan<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A {
     a.iter()
         .zip(b.iter())
@@ -55,8 +54,8 @@ pub fn squared_euclidean<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A {
             // } else {
             //     b_val - a_val
             // };
-            // let diff: A = a_val.dist(b_val);
-            let diff = a_val - b_val;
+            let diff: A = a_val.dist(b_val);
+            //let diff = a_val - b_val;
             //let diff = diff / A::from_num(4);
 
             //let res = diff.saturating_mul(diff);

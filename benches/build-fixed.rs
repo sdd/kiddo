@@ -4,7 +4,7 @@ use fixed::types::extra::{U16, U14};
 use fixed::FixedU16;
 
 use sok::tuned::u16::d4::kdtree::KdTree;
-use sok::tuned::u16::dn::kdtree::KdTree as KdTreeFixed;
+use sok::fixed::kdtree::KdTree as KdTreeFixed;
 
 const K: usize = 4;
 const BUCKET_SIZE: usize = 32;
