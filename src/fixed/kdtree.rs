@@ -18,8 +18,8 @@ pub trait AxisRK: Zero + Default + Debug + rkyv::Archive {}
 #[cfg(feature = "serialize_rkyv")]
 impl<T: Zero + Default + Debug + rkyv::Archive> AxisRK for T {}
 
-pub trait Content: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug {}
-impl<T: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug> Content for T {}
+pub trait Content: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign {}
+impl<T: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign> Content for T {}
 
 pub trait Index: PrimInt + Unsigned + Zero + Cast<usize> {
     type T: Cast<usize>;
