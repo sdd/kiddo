@@ -55,6 +55,48 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
         self.size = self.size + T::one();
     }
 
+    #[inline]
+    pub fn remove(&mut self, query: &[A; K], item: T) -> usize {
+        let mut stem_idx = self.root_index;
+        let mut split_dim = 0;
+        let mut removed: usize = 0;
+
+        while KdTree::<A, T, K, B, IDX>::is_stem_index(stem_idx) {
+            let Some(stem_node) = self.stems.get_mut(stem_idx.az::<usize>()) else {
+                return removed;
+            };
+
+            stem_idx = if query[split_dim] < stem_node.split_val {
+                stem_node.left
+            } else {
+                stem_node.right
+            };
+
+            split_dim = (split_dim + 1).rem(K);
+        }
+
+        let leaf_idx = stem_idx - IDX::leaf_offset();
+
+        if let Some(mut leaf_node) = self.leaves.get_mut(leaf_idx.az::<usize>()) {
+            let mut p_index = 0;
+            while p_index < leaf_node.size.az::<usize>() {
+                if &leaf_node.content_points[p_index] == query && leaf_node.content_items[p_index] == item {
+
+                    leaf_node.content_points[p_index] = leaf_node.content_points[leaf_node.size.az::<usize>() - 1];
+                    leaf_node.content_items[p_index] = leaf_node.content_items[leaf_node.size.az::<usize>() - 1];
+
+                    self.size -= T::one();
+                    removed += 1;
+                    leaf_node.size = leaf_node.size - IDX::one();
+                } else {
+                    p_index += 1;
+                }
+            }
+        }
+
+        return removed;
+    }
+
     unsafe fn split(
         &mut self,
         leaf_idx: IDX,
@@ -238,6 +280,43 @@ mod tests {
         }
 
         assert_eq!(tree.size(), 16);
+    }
+
+    #[test]
+    fn can_remove_an_item() {
+        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::new();
+
+        let content_to_add: [([FLT; 4], u32); 16] = [
+            ([n(0.9f32), n(0.0f32), n(0.9f32), n(0.0f32)], 9),
+            ([n(0.4f32), n(0.5f32), n(0.4f32), n(0.5f32)], 4),
+            ([n(0.12f32), n(0.3f32), n(0.12f32), n(0.3f32)], 12),
+            ([n(0.7f32), n(0.2f32), n(0.7f32), n(0.2f32)], 7),
+            ([n(0.13f32), n(0.4f32), n(0.13f32), n(0.4f32)], 13),
+            ([n(0.6f32), n(0.3f32), n(0.6f32), n(0.3f32)], 6),
+            ([n(0.2f32), n(0.7f32), n(0.2f32), n(0.7f32)], 2),
+            ([n(0.14f32), n(0.5f32), n(0.14f32), n(0.5f32)], 14),
+            ([n(0.3f32), n(0.6f32), n(0.3f32), n(0.6f32)], 3),
+            ([n(0.10f32), n(0.1f32), n(0.10f32), n(0.1f32)], 10),
+            ([n(0.16f32), n(0.7f32), n(0.16f32), n(0.7f32)], 16),
+            ([n(0.1f32), n(0.8f32), n(0.1f32), n(0.8f32)], 1),
+            ([n(0.15f32), n(0.6f32), n(0.15f32), n(0.6f32)], 15),
+            ([n(0.5f32), n(0.4f32), n(0.5f32), n(0.4f32)], 5),
+            ([n(0.8f32), n(0.1f32), n(0.8f32), n(0.1f32)], 8),
+            ([n(0.11f32), n(0.2f32), n(0.11f32), n(0.2f32)], 11),
+        ];
+
+        for (point, item) in content_to_add {
+            tree.add(&point, item);
+        }
+
+        assert_eq!(tree.size(), 16);
+
+        let removed = tree.remove(
+            &[n(0.9f32), n(0.0f32), n(0.9f32), n(0.0f32)], 9
+        );
+
+        assert_eq!(removed, 1);
+        assert_eq!(tree.size(), 15);
     }
 
     #[test]
