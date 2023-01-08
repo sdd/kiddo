@@ -337,4 +337,28 @@ mod tests {
 
         assert_eq!(tree.size(), 1000);
     }
+
+    #[test]
+    fn can_add_shitloads_of_random_points() {
+        fn rand_data_2d() -> ([f64; 2], u32) {
+            rand::random()
+        }
+
+        let points_to_add: Vec<([f64; 2], u32)> =
+            (0..100_000).into_iter().map(|_| rand_data_2d()).collect();
+
+        let mut points = vec![];
+        let mut kdtree =
+            KdTree::<f64, u32, 2, 32, u32>::with_capacity(200_000);
+        for _ in 0..100_000 {
+            points.push(rand_data_2d());
+        }
+        for i in 0..points.len() {
+            kdtree.add(&points[i].0, points[i].1);
+        }
+
+        points_to_add
+            .iter()
+            .for_each(|point| kdtree.add(&point.0, point.1));
+    }
 }
