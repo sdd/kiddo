@@ -1,7 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use fixed::types::extra::U14;
 
-use fixed::FixedU16;
 use sok::tuned::u16::d4::distance::squared_euclidean;
 use sok::tuned::u16::d4::kdtree::{A, KdTree};
 
