@@ -13,6 +13,7 @@ use sok::fixed::distance::squared_euclidean as squared_euclidean_fixedpoint;
 use sok::float::kdtree::{Axis, Content, Index, KdTree};
 use sok::fixed::kdtree::{Content as ContentFixed, Index as IndexFixed, KdTree as FixedKdTree};
 
+const K: usize = 3;
 const BUCKET_SIZE: usize = 32;
 const QUERY_POINTS_PER_LOOP: usize = 1000;
 
