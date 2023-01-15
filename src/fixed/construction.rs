@@ -1,7 +1,8 @@
 use az::{Az, Cast};
 use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
 use std::ops::Rem;
-use crate::fixed::kdtree::{Axis, Content, Index, KdTree, LeafNode, StemNode};
+use crate::types::{Content, Index};
+use crate::fixed::kdtree::{Axis, KdTree, LeafNode, StemNode};
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> KdTree<A, T, K, B, IDX> where usize: Cast<IDX> {
     #[inline]

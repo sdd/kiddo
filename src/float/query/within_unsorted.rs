@@ -1,7 +1,8 @@
 use std::ops::Rem;
 use az::{Az, Cast};
 
-use crate::float::kdtree::{KdTree, Axis, Index, Content};
+use crate::float::kdtree::{Axis, KdTree};
+use crate::types::{Content, Index};
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> KdTree<A, T, K, B, IDX> where usize: Cast<IDX> {
     #[inline]

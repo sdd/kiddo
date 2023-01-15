@@ -2,7 +2,8 @@ use std::collections::BinaryHeap;
 use std::ops::Rem;
 use az::{Az, Cast};
 
-use crate::float::{kdtree::{KdTree, Axis, Index, Content}, heap_element::HeapElement};
+use crate::float::{heap_element::HeapElement, kdtree::{Axis, KdTree}};
+use crate::types::{Content, Index};
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> KdTree<A, T, K, B, IDX> where usize: Cast<IDX> {
     #[inline]

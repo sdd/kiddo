@@ -1,8 +1,9 @@
-use crate::fixed::kdtree::{KdTree, Axis, Index, Content, LeafNode};
-
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 use az::{Az, Cast};
+
+use crate::types::{Content, Index};
+use crate::fixed::kdtree::{Axis, KdTree, LeafNode};
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> KdTree<A, T, K, B, IDX> where usize: Cast<IDX> {
     #[inline]

@@ -1,11 +1,12 @@
 use az::Cast;
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput, BenchmarkGroup};
+use criterion::{BenchmarkGroup, BenchmarkId, black_box, Criterion, criterion_group, criterion_main, Throughput};
 use criterion::measurement::WallTime;
 
 use rand_distr::Distribution;
 use rand_distr::UnitSphere as SPHERE;
 use sok::distance::squared_euclidean;
-use sok::float::kdtree::{Index, KdTree};
+use sok::float::kdtree::KdTree;
+use sok::types::Index;
 
 const BUCKET_SIZE: usize = 32;
 
