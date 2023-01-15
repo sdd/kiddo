@@ -1,30 +1,20 @@
 use az::Cast;
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput, BenchmarkGroup, BatchSize, PlotConfiguration, AxisScale};
+use criterion::{AxisScale, BatchSize, BenchmarkGroup, BenchmarkId, black_box, Criterion, criterion_group, criterion_main, PlotConfiguration, Throughput};
 use criterion::measurement::WallTime;
 use fixed::FixedU16;
-use fixed::types::extra::U16;
+use fixed::types::extra::{U16, Unsigned};
 use rand::distributions::{Distribution, Standard};
 
-use sok::float::kdtree::{Axis, Content, Index, KdTree};
-use sok::fixed::kdtree::{Content as ContentFixed, Index as IndexFixed, KdTree as FixedKdTree};
+use sok::batch_benches;
+use sok::float::kdtree::{Axis, KdTree};
+use sok::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
+use sok::test_utils::rand_data_fixed_u16_entry;
+use sok::types::{Content, Index};
 
 const BUCKET_SIZE: usize = 32;
 const QTY_TO_ADD_TO_POPULATED: u64 = 100;
 
-type FXP = FixedU16<U16>;
-
-fn rand_data_fxp() -> FXP {
-    let val: u16 = rand::random();
-    unsafe { std::mem::transmute(val) }
-}
-
-fn rand_data_fixed_u16_3d_point<T: ContentFixed>() -> [FXP; 3] {
-    [rand_data_fxp(), rand_data_fxp(), rand_data_fxp()]
-}
-
-fn rand_data_fixed_u16_3d_entry<T: ContentFixed>() -> ([FXP; 3], T) where Standard: Distribution<T> {
-    (rand_data_fixed_u16_3d_point::<T>(), rand::random())
-}
+type FXP = U16; // FixedU16<U16>;
 
 macro_rules! bench_empty_float {
     ($group:ident, $a:ty, $t:ty, $k:tt, $idx: ty, $size:tt, $subtype: expr) => {
@@ -34,7 +24,7 @@ macro_rules! bench_empty_float {
 
 macro_rules! bench_empty_fixed {
     ($group:ident, $a:ty, $t:ty, $k:tt, $idx:ty, $size:tt, $subtype: expr) => {
-        bench_add_to_empty_fixed::<$t, $idx>(&mut $group, $size, $subtype);
+        bench_add_to_empty_fixed_u16::<$a, $t, $k, $idx>(&mut $group, $size, $subtype);
     }
 }
 
@@ -46,19 +36,7 @@ macro_rules! bench_populated_float {
 
 macro_rules! bench_populated_fixed {
     ($group:ident, $a:ty, $t:ty, $k:tt, $idx:ty, $size:tt, $subtype: expr) => {
-        bench_add_to_populated_fixed::<$t, $idx>(&mut $group, $size, $subtype);
-    }
-}
-
-macro_rules! size_t_idx {
-    ( $group:ident; $callee:ident; $a:ty|$k:tt; [$(($size:tt,$t:ty,$idx:ty)),+] ) => {
-        { $($callee!($group, $a, $t, $k, $idx, $size, concat!($k, "D ", stringify!($a)));)* }
-    }
-}
-
-macro_rules! batch_benches {
-    ($group:ident, $callee:ident, [$(($a:ty, $k:tt)),+], $s_t_idx_list:tt ) => {
-        { $(size_t_idx!($group; $callee; $a|$k; $s_t_idx_list );)* }
+        bench_add_to_populated_fixed_u16::<$a, $t, $k, $idx>(&mut $group, $size, $subtype);
     }
 }
 
@@ -149,15 +127,15 @@ fn bench_add_to_populated_float<A: Axis, T: Content, const K: usize, IDX: Index<
     });
 }
 
-fn bench_add_to_empty_fixed<T: ContentFixed, IDX: IndexFixed<T = IDX>>(group: &mut BenchmarkGroup<WallTime>, qty_to_add: usize, subtype: &str) where usize: Cast<IDX>, Standard: Distribution<T>  {
+fn bench_add_to_empty_fixed_u16<A: Unsigned, T: Content, const K: usize, IDX: Index<T = IDX>>(group: &mut BenchmarkGroup<WallTime>, qty_to_add: usize, subtype: &str) where usize: Cast<IDX>, Standard: Distribution<T>, FixedU16<A>: AxisFixed {
     group.bench_with_input(BenchmarkId::new(subtype, qty_to_add), &qty_to_add, |b, &size| {
         b.iter_batched(|| {
             let mut points_to_add = vec![];
             for _ in 0..size {
-                points_to_add.push(rand_data_fixed_u16_3d_entry::<T>());
+                points_to_add.push(rand_data_fixed_u16_entry::<A, T, K>());
             }
             let kdtree =
-                FixedKdTree::<FXP, T, 3, BUCKET_SIZE, IDX>::with_capacity(size + points_to_add.len());
+                FixedKdTree::<FixedU16<A>, T, K, BUCKET_SIZE, IDX>::with_capacity(size + points_to_add.len());
 
             (kdtree, points_to_add)
         }, |(mut kdtree, points_to_add)| {
@@ -168,25 +146,25 @@ fn bench_add_to_empty_fixed<T: ContentFixed, IDX: IndexFixed<T = IDX>>(group: &m
     });
 }
 
-fn bench_add_to_populated_fixed<T: ContentFixed, IDX: IndexFixed<T = IDX>>(group: &mut BenchmarkGroup<WallTime>, initial_size: usize, subtype: &str) where usize: Cast<IDX>, Standard: Distribution<T>  {
+fn bench_add_to_populated_fixed_u16<A: Unsigned, T: Content, const K: usize, IDX: Index<T = IDX>>(group: &mut BenchmarkGroup<WallTime>, initial_size: usize, subtype: &str) where usize: Cast<IDX>, Standard: Distribution<T>, FixedU16<A>: AxisFixed {
     group.bench_with_input(BenchmarkId::new(subtype, initial_size), &initial_size, |b, &size| {
         b.iter_batched(|| {
-            let mut points_to_add = vec![];
-            for _ in 0..QTY_TO_ADD_TO_POPULATED {
-                points_to_add.push(rand_data_fixed_u16_3d_entry::<T>());
-            }
-
             let mut points = vec![];
-            let mut kdtree =
-                FixedKdTree::<FXP, T, 3, BUCKET_SIZE, IDX>::with_capacity(size + points_to_add.len());
-            for _ in 0..size {
-                points.push(rand_data_fixed_u16_3d_entry::<T>());
-            }
-            for i in 0..points.len() {
-                kdtree.add(&points[i].0, points[i].1);
+            for _ in 0..QTY_TO_ADD_TO_POPULATED {
+                points.push(rand_data_fixed_u16_entry::<A, T, K>());
             }
 
-            (kdtree, points_to_add)
+            let mut initial_points = vec![];
+            for _ in 0..size {
+                initial_points.push(rand_data_fixed_u16_entry::<A, T, K>());
+            }
+            let mut kdtree =
+                FixedKdTree::<FixedU16<A>, T, K, BUCKET_SIZE, IDX>::with_capacity(size + points.len());
+            for i in 0..initial_points.len() {
+                kdtree.add(&initial_points[i].0, initial_points[i].1);
+            }
+
+            (kdtree, points)
         }, |(mut kdtree, points_to_add)| {
             points_to_add
                 .iter()

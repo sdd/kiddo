@@ -1,7 +1,8 @@
 use az::{Az, Cast};
 use std::ops::Rem;
 use min_max_heap::MinMaxHeap;
-use crate::fixed::kdtree::{KdTree, Axis, Index, Content};
+use crate::types::{Content, Index};
+use crate::fixed::kdtree::{Axis, KdTree};
 use crate::fixed::heap_element::HeapElement;
 
 pub struct NearestIter<

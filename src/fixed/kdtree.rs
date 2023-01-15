@@ -2,69 +2,29 @@ use az::{Az, Cast};
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 use fixed::traits::Fixed;
-use num_traits::{One, PrimInt, Unsigned, Zero};
 
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;
 use crate::fixed::util::{distance_to_bounds, extend};
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
+use crate::types::{Content, Index};
 
 pub trait Axis: Fixed + Default + Debug + Copy {}
 impl<T: Fixed + Default + Debug + Copy> Axis for T {}
 
 #[cfg(feature = "serialize_rkyv")]
-pub trait AxisRK: Zero + Default + Debug + rkyv::Archive {}
+pub trait AxisRK: num_traits::Zero + Default + Debug + rkyv::Archive {}
 #[cfg(feature = "serialize_rkyv")]
-impl<T: Zero + Default + Debug + rkyv::Archive> AxisRK for T {}
+impl<T: num_traits::Zero + Default + Debug + rkyv::Archive> AxisRK for T {}
 
-pub trait Content: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign {}
-impl<T: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign> Content for T {}
-
-pub trait Index: PrimInt + Unsigned + Zero + Cast<usize> {
-    type T: Cast<usize>;
-    fn max() -> Self;
-    fn min() -> Self;
-    fn leaf_offset() -> Self;
-    fn ilog2(self) -> Self;
-    fn div_ceil(self, b: Self::T) -> Self;
-}
-
-impl Index for u32 {
-    type T = u32;
-    fn max() -> u32 {
-        u32::MAX
-    }
-    fn min() -> u32 {
-        0u32
-    }
-    fn leaf_offset() -> u32 {
-        u32::MAX.overflowing_shr(1).0
-    }
-    fn ilog2(self) -> u32 { u32::ilog2(self) }
-    fn div_ceil(self, b: u32) -> u32 { u32::div_ceil(self, b) }
-}
-impl Index for u16 {
-    type T = u16;
-    fn max() -> u16 {
-        u16::MAX
-    }
-    fn min() -> u16 {
-        0u16
-    }
-    fn leaf_offset() -> u16 {
-        u16::MAX.overflowing_shr(1).0
-    }
-    fn ilog2(self) -> u16 { u16::ilog2(self) as u16 }
-    fn div_ceil(self, b: u16) -> u16 { u16::div_ceil(self, b) }
-}
 
 #[cfg_attr(
 feature = "serialize_rkyv",
 derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[cfg(feature = "serialize_rkyv")]
-pub struct KdTreeRK<A: PrimInt, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
+pub struct KdTreeRK<A: num_traits::PrimInt, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
     pub leaves: Vec<LeafNodeRK<A, T, K, B, IDX>>,
     pub stems: Vec<StemNodeRK<A, K, IDX>>,
     pub(crate) root_index: IDX,
@@ -85,7 +45,7 @@ feature = "serialize_rkyv",
 derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[cfg(feature = "serialize_rkyv")]
-pub struct StemNodeRK<A: PrimInt, const K: usize, IDX: Index<T = IDX>> {
+pub struct StemNodeRK<A: num_traits::PrimInt, const K: usize, IDX: Index<T = IDX>> {
     pub(crate) min_bound: [A; K],
     pub(crate) max_bound: [A; K],
 
@@ -112,7 +72,7 @@ feature = "serialize_rkyv",
 derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[cfg(feature = "serialize_rkyv")]
-pub struct LeafNodeRK<A: PrimInt, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
+pub struct LeafNodeRK<A: num_traits::PrimInt, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
     // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
     pub(crate) content_points: [[A; K]; B],
     pub(crate) content_items: [T; B],

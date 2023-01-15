@@ -19,5 +19,7 @@ pub mod tuned;
 pub mod float;
 pub mod fixed;
 mod mirror_select_nth_unstable_by;
+pub mod test_utils;
+pub mod types;
 
 // pub use crate::sok::KdTree;
