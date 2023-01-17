@@ -143,38 +143,5 @@ fn bench_query_nearest_n_fixed<A: Unsigned, T: Content, const K: usize, IDX: Ind
     });
 }
 
-/*fn bench_query_nearest_n_float<A: Axis, T: Content, const K: usize, IDX: Index<T = IDX>>(group: &mut BenchmarkGroup<WallTime>, initial_size: usize, nearest_qty: usize, subtype: &str) where usize: Cast<IDX>, Standard: Distribution<([A; K], T)> {
-    group.bench_with_input(BenchmarkId::new(subtype, initial_size), &initial_size, |b, &size| {
-        let mut res: Vec<(A, T)> = Vec::with_capacity(nearest_qty);
-        b.iter_batched(|| {
-            let points_to_query: Vec<[A; K]> =
-                (0..qty_to_add).into_iter().map(|_| rand::random::<[A; K]>()).collect();
-
-            let mut initial_points = vec![];
-            for _ in 0..size {
-                initial_points.push(rand::random::<([A; K], T)>());
-            }
-            let mut kdtree =
-                KdTree::<A, T, K, BUCKET_SIZE, IDX>::with_capacity(size);
-
-            for i in 0..initial_points.len() {
-                kdtree.add(&initial_points[i].0, initial_points[i].1);
-            }
-
-            res.clear();
-
-            (kdtree, points_to_query)
-        }, |(mut kdtree, points_to_query)| {
-            black_box(points_to_query
-                .iter()
-                .for_each(|point| {
-                    res.extend(kdtree.nearest_n(&point, nearest_qty, &squared_euclidean));
-                }))
-        }, BatchSize::SmallInput);
-    });
-}*/
-
-
-
 criterion_group!(benches, nearest_10, nearest_100);
 criterion_main!(benches);

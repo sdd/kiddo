@@ -1,10 +1,13 @@
 use std::array;
+use std::hint::black_box;
+use az::Cast;
 use fixed::FixedU16;
 use fixed::types::extra::Unsigned;
 use rand::distributions::{Distribution, Standard};
 
-use crate::types::Content;
-use crate::fixed::kdtree::{Axis as AxisFixed};
+use crate::types::{Content, Index};
+use crate::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
+use crate::float::kdtree::{Axis, KdTree};
 
 // use rand_distr::UnitSphere as SPHERE;
 
@@ -41,4 +44,69 @@ macro_rules! batch_benches {
     ($group:ident, $callee:ident, [$(($a:ty, $k:tt)),+], $s_t_idx_list:tt ) => {
         { $($crate::size_t_idx!($group; $callee; $a|$k; $s_t_idx_list );)* }
     }
+}
+
+pub fn build_populated_tree_fixed<A: Unsigned, T: Content, const K: usize, const B: usize, IDX: Index<T=IDX>>(size: usize, spare_capacity: usize) -> FixedKdTree<FixedU16<A>, T, K, B, IDX> where usize: Cast<IDX>, Standard: Distribution<T>, FixedU16<A>: AxisFixed {
+    let mut kdtree =
+        FixedKdTree::<FixedU16<A>, T, K, B, IDX>::with_capacity(size + spare_capacity);
+
+    for _ in 0..size {
+        let entry = rand_data_fixed_u16_entry::<A, T, K>();
+        kdtree.add(&entry.0, entry.1);
+    }
+
+    kdtree
+}
+
+pub fn build_populated_tree_float<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T=IDX>>(size: usize, spare_capacity: usize) -> KdTree<A, T, K, B, IDX> where usize: Cast<IDX>, Standard: Distribution<T>, Standard: Distribution<([A; K], T)>, Standard: Distribution<[A; K]> {
+    let mut kdtree =
+        KdTree::<A, T, K, B, IDX>::with_capacity(size + spare_capacity);
+
+    for _ in 0..size {
+        let entry = rand::random::<([A; K], T)>();
+        kdtree.add(&entry.0, entry.1);
+    }
+
+    kdtree
+}
+
+pub fn build_query_points_fixed<A: Unsigned, const K: usize>(points_qty: usize) -> Vec<[FixedU16<A>; K]> where FixedU16<A>: AxisFixed {
+    (0..points_qty).into_iter().map(|_| rand_data_fixed_u16_point::<A, K>()).collect()
+}
+
+pub fn build_populated_tree_and_query_points_fixed<A: Unsigned, T: Content, const K: usize, const B: usize, IDX: Index<T=IDX>>(size: usize, query_point_qty: usize) -> (FixedKdTree<FixedU16<A>, T, K, B, IDX>, Vec<[FixedU16<A>; K]>) where usize: Cast<IDX>, Standard: Distribution<T>, FixedU16<A>: AxisFixed {
+    (build_populated_tree_fixed(size, 0), build_query_points_fixed(query_point_qty))
+}
+
+pub fn process_queries_fixed<A: Unsigned, T: Content, const K: usize, const B: usize, IDX: Index<T=IDX>, F>(query: F) -> Box<dyn Fn((FixedKdTree<FixedU16<A>, T, K, B, IDX>, Vec<[FixedU16<A>; K]>))>
+    where usize: Cast<IDX>,
+          FixedU16<A>: AxisFixed,
+        F: Fn(&FixedKdTree<FixedU16<A>, T, K, B, IDX>, &[FixedU16<A>; K]) + 'static,
+{
+    Box::new(move |(kdtree, points_to_query): (FixedKdTree<FixedU16<A>, T, K, B, IDX>, Vec<[FixedU16<A>; K]>)| {
+        black_box(points_to_query
+            .iter()
+            .for_each(|point| black_box(query(&kdtree, point))))
+    })
+}
+
+pub fn build_query_points_float<A: Axis, const K: usize>(points_qty: usize) -> Vec<[A; K]> where Standard: Distribution<[A; K]> {
+    (0..points_qty).into_iter().map(|_| rand::random::<[A; K]>()).collect()
+}
+
+pub fn build_populated_tree_and_query_points_float<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T=IDX>>(size: usize, query_point_qty: usize) -> (KdTree<A, T, K, B, IDX>, Vec<[A; K]>) where usize: Cast<IDX>, Standard: Distribution<T>, Standard: Distribution<[A; K]> {
+    (build_populated_tree_float(size, 0), build_query_points_float(query_point_qty))
+}
+
+pub fn process_queries_float<A: Axis + 'static, T: Content, const K: usize, const B: usize, IDX: Index<T=IDX>, F>(query: F) -> Box<dyn Fn((KdTree<A, T, K, B, IDX>, Vec<[A; K]>))>
+    where usize: Cast<IDX>,
+            Standard: Distribution<T>,
+          Standard: Distribution<[A; K]>,
+          F: Fn(&KdTree<A, T, K, B, IDX>, &[A; K]) + 'static,
+{
+    Box::new(move |(kdtree, points_to_query): (KdTree<A, T, K, B, IDX>, Vec<[A; K]>)| {
+        black_box(points_to_query
+            .iter()
+            .for_each(|point| black_box(query(&kdtree, point))))
+    })
 }
