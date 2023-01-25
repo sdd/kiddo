@@ -56,7 +56,6 @@ optional = true
 default-features = false
 features = ["alloc", "copy_unsafe", "size_64"]
 
-
 [features]
 serialize = ["serde", "serde_derive", "serde_with"]
 serialize_rkyv = ["rkyv"]
@@ -86,43 +85,7 @@ name = "within_unsorted"
 harness = false
 
 [[bench]]
-name = "best_n_within_into_iter"
-harness = false
-
-[[bench]]
-name = "build"
-harness = false
-
-[[bench]]
-name = "query"
-harness = false
-
-[[bench]]
-name = "build-simd-f32-d4"
-harness = false
-
-[[bench]]
-name = "build-float-f32-d4"
-harness = false
-
-[[bench]]
-name = "query-simd-f32-d4"
-harness = false
-
-[[bench]]
-name = "build-simd-u16-d4"
-harness = false
-
-[[bench]]
-name = "query-simd-u16-d4"
-harness = false
-
-[[bench]]
-name = "query-float-f32-d4"
-harness = false
-
-[[bench]]
-name = "within-simd-u16-d4"
+name = "best_n"
 harness = false
 
 [[bin]]

@@ -1,22 +1,22 @@
 use az::{Az, Cast};
+use num_traits::Float;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
-use num_traits::Float;
 
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;
 use crate::float::util::{distance_to_bounds, extend};
+use crate::types::{Content, Index};
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
-use crate::types::{Content, Index};
 
 pub trait Axis: Float + Default + Debug + Copy {}
 impl<T: Float + Default + Debug + Copy> Axis for T {}
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
-feature = "serialize_rkyv",
-derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
+    feature = "serialize_rkyv",
+    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[derive(Clone, Debug, PartialEq)]
 pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
@@ -28,8 +28,8 @@ pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize, IDX: Inde
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
-feature = "serialize_rkyv",
-derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
+    feature = "serialize_rkyv",
+    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[derive(Clone, Debug, PartialEq)]
 pub struct StemNode<A: Axis, const K: usize, IDX: Index<T = IDX>> {
@@ -45,8 +45,8 @@ pub struct StemNode<A: Axis, const K: usize, IDX: Index<T = IDX>> {
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
-feature = "serialize_rkyv",
-derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
+    feature = "serialize_rkyv",
+    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
@@ -94,13 +94,15 @@ pub struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize, IDX: In
     pub(crate) size: IDX,
 }
 
-impl<A: Axis, const K: usize, IDX: Index<T = IDX>> StemNode<A, K, IDX>  {
+impl<A: Axis, const K: usize, IDX: Index<T = IDX>> StemNode<A, K, IDX> {
     pub(crate) fn extend(&mut self, point: &[A; K]) {
         extend(&mut self.min_bound, &mut self.max_bound, point);
     }
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> LeafNode<A, T, K, B, IDX> {
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    LeafNode<A, T, K, B, IDX>
+{
     pub(crate) fn new() -> Self {
         Self {
             min_bound: [A::max_value(); K],
@@ -116,7 +118,11 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> L
     }
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> KdTree<A, T, K, B, IDX> where usize: Cast<IDX> {
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
     #[inline]
     pub fn new() -> Self {
         KdTree::with_capacity(B * 10)

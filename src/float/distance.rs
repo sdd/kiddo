@@ -26,20 +26,14 @@ use crate::float::kdtree::Axis;
 pub fn manhattan<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A {
     a.iter()
         .zip(b.iter())
-        .map(|(&a_val, &b_val)|
-            (a_val - b_val).abs()
-        )
+        .map(|(&a_val, &b_val)| (a_val - b_val).abs())
         .fold(A::zero(), std::ops::Add::add)
 }
-
 
 // #[inline(never)]
 pub fn squared_euclidean<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A {
     a.iter()
         .zip(b.iter())
-        .map(|(&a_val, &b_val)| {
-            (a_val - b_val) * (a_val - b_val)
-        })
+        .map(|(&a_val, &b_val)| (a_val - b_val) * (a_val - b_val))
         .fold(A::zero(), std::ops::Add::add)
 }
-

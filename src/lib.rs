@@ -15,9 +15,9 @@ extern crate serde_derive;
 #[cfg(feature = "serialize")]
 mod custom_serde;
 pub mod distance;
-pub mod tuned;
-pub mod float;
+
 pub mod fixed;
+pub mod float;
 mod mirror_select_nth_unstable_by;
 pub mod test_utils;
 pub mod types;

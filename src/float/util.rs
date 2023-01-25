@@ -1,7 +1,12 @@
 use crate::float::kdtree::Axis;
 
 #[allow(dead_code)]
-pub(crate) fn distance_to_bounds<A: Axis, const K: usize, F>(p1: &[A; K], min_bound: &[A; K], max_bound: &[A; K], distance: &F) -> A
+pub(crate) fn distance_to_bounds<A: Axis, const K: usize, F>(
+    p1: &[A; K],
+    min_bound: &[A; K],
+    max_bound: &[A; K],
+    distance: &F,
+) -> A
 where
     F: Fn(&[A; K], &[A; K]) -> A,
 {
@@ -44,8 +49,11 @@ where
 //     }
 // }
 
-
-pub(crate) fn extend<A: Axis, const K: usize>(min_bound: &mut [A; K], max_bound: &mut [A; K], point: &[A; K]) {
+pub(crate) fn extend<A: Axis, const K: usize>(
+    min_bound: &mut [A; K],
+    max_bound: &mut [A; K],
+    point: &[A; K],
+) {
     min_bound.iter_mut().enumerate().for_each(|(dim, bound)| {
         if point[dim] < *bound {
             *bound = point[dim];

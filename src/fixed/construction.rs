@@ -1,10 +1,14 @@
-use az::{Az, Cast};
-use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
-use std::ops::Rem;
-use crate::types::{Content, Index};
 use crate::fixed::kdtree::{Axis, KdTree, LeafNode, StemNode};
+use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
+use crate::types::{Content, Index};
+use az::{Az, Cast};
+use std::ops::Rem;
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> KdTree<A, T, K, B, IDX> where usize: Cast<IDX> {
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
     #[inline]
     pub fn add(&mut self, query: &[A; K], item: T) {
         unsafe {
@@ -47,8 +51,12 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
                 leaf_node = self.leaves.get_unchecked_mut(leaf_idx.az::<usize>());
             }
 
-            *leaf_node.content_points.get_unchecked_mut(leaf_node.size.az::<usize>()) = *query;
-            *leaf_node.content_items.get_unchecked_mut(leaf_node.size.az::<usize>()) = item;
+            *leaf_node
+                .content_points
+                .get_unchecked_mut(leaf_node.size.az::<usize>()) = *query;
+            *leaf_node
+                .content_items
+                .get_unchecked_mut(leaf_node.size.az::<usize>()) = item;
 
             leaf_node.size = leaf_node.size + IDX::one();
             leaf_node.extend(query);
@@ -81,10 +89,13 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
         if let Some(mut leaf_node) = self.leaves.get_mut(leaf_idx.az::<usize>()) {
             let mut p_index = 0;
             while p_index < leaf_node.size.az::<usize>() {
-                if &leaf_node.content_points[p_index] == query && leaf_node.content_items[p_index] == item {
-
-                    leaf_node.content_points[p_index] = leaf_node.content_points[leaf_node.size.az::<usize>() - 1];
-                    leaf_node.content_items[p_index] = leaf_node.content_items[leaf_node.size.az::<usize>() - 1];
+                if &leaf_node.content_points[p_index] == query
+                    && leaf_node.content_items[p_index] == item
+                {
+                    leaf_node.content_points[p_index] =
+                        leaf_node.content_points[leaf_node.size.az::<usize>() - 1];
+                    leaf_node.content_items[p_index] =
+                        leaf_node.content_items[leaf_node.size.az::<usize>() - 1];
 
                     self.size -= T::one();
                     removed += 1;
@@ -95,7 +106,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
             }
         }
 
-        return removed;
+        removed
     }
 
     unsafe fn split(
@@ -114,42 +125,81 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
             &mut orig.content_points,
             &mut orig.content_items,
             pivot_idx.az::<usize>(),
-            |a, b| {
-                unsafe { a.get_unchecked(split_dim)
+            |a, b| unsafe {
+                a.get_unchecked(split_dim)
                     .partial_cmp(b.get_unchecked(split_dim))
-                    .expect("Leaf node sort failed.") }
+                    .expect("Leaf node sort failed.")
             },
         );
 
-        let split_val = *orig.content_points.get_unchecked(pivot_idx.az::<usize>()).get_unchecked(split_dim);
+        let split_val = *orig
+            .content_points
+            .get_unchecked(pivot_idx.az::<usize>())
+            .get_unchecked(split_dim);
 
         let mut left = LeafNode::new();
         let mut right = LeafNode::new();
 
         if B.rem(2) == 1 {
-            left.content_points.get_unchecked_mut(..(pivot_idx.az::<usize>()))
-                .copy_from_slice(&orig.content_points.get_unchecked(..(pivot_idx.az::<usize>())));
-            left.content_items.get_unchecked_mut(..(pivot_idx.az::<usize>()))
-                .copy_from_slice(&orig.content_items.get_unchecked(..(pivot_idx.az::<usize>())));
+            left.content_points
+                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
+                .copy_from_slice(
+                    orig.content_points
+                        .get_unchecked(..(pivot_idx.az::<usize>())),
+                );
+            left.content_items
+                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
+                .copy_from_slice(
+                    orig.content_items
+                        .get_unchecked(..(pivot_idx.az::<usize>())),
+                );
             left.size = pivot_idx;
 
-            right.content_points.get_unchecked_mut(..((pivot_idx + IDX::one()).az::<usize>()))
-                .copy_from_slice(&orig.content_points.get_unchecked((pivot_idx.az::<usize>())..));
-            right.content_items.get_unchecked_mut(..((pivot_idx + IDX::one()).az::<usize>()))
-                .copy_from_slice(&orig.content_items.get_unchecked((pivot_idx.az::<usize>())..));
+            right
+                .content_points
+                .get_unchecked_mut(..((pivot_idx + IDX::one()).az::<usize>()))
+                .copy_from_slice(
+                    orig.content_points
+                        .get_unchecked((pivot_idx.az::<usize>())..),
+                );
+            right
+                .content_items
+                .get_unchecked_mut(..((pivot_idx + IDX::one()).az::<usize>()))
+                .copy_from_slice(
+                    orig.content_items
+                        .get_unchecked((pivot_idx.az::<usize>())..),
+                );
 
             right.size = (B.az::<IDX>()) - pivot_idx;
         } else {
-            left.content_points.get_unchecked_mut(..(pivot_idx.az::<usize>()))
-                .copy_from_slice(&orig.content_points.get_unchecked(..(pivot_idx.az::<usize>())));
-            left.content_items.get_unchecked_mut(..(pivot_idx.az::<usize>()))
-                .copy_from_slice(&orig.content_items.get_unchecked(..(pivot_idx.az::<usize>())));
+            left.content_points
+                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
+                .copy_from_slice(
+                    orig.content_points
+                        .get_unchecked(..(pivot_idx.az::<usize>())),
+                );
+            left.content_items
+                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
+                .copy_from_slice(
+                    orig.content_items
+                        .get_unchecked(..(pivot_idx.az::<usize>())),
+                );
             left.size = pivot_idx;
 
-            right.content_points.get_unchecked_mut(..(pivot_idx.az::<usize>()))
-                .copy_from_slice(&orig.content_points.get_unchecked((pivot_idx.az::<usize>())..));
-            right.content_items.get_unchecked_mut(..(pivot_idx.az::<usize>()))
-                .copy_from_slice(&orig.content_items.get_unchecked((pivot_idx.az::<usize>())..));
+            right
+                .content_points
+                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
+                .copy_from_slice(
+                    orig.content_points
+                        .get_unchecked((pivot_idx.az::<usize>())..),
+                );
+            right
+                .content_items
+                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
+                .copy_from_slice(
+                    orig.content_items
+                        .get_unchecked((pivot_idx.az::<usize>())..),
+                );
 
             right.size = (B.az::<IDX>()) - pivot_idx;
         }
@@ -158,18 +208,25 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
         left.max_bound = [A::ZERO; K];
         right.min_bound = [A::MAX; K];
         right.max_bound = [A::ZERO; K];
-        left.content_points.iter().take(left.size.az::<usize>()).for_each(
-            |a| a.iter().enumerate().for_each(|(idx, val)| {
-                left.min_bound[idx] = left.min_bound[idx].min(*val);
-                left.max_bound[idx] = left.max_bound[idx].max(*val);
-            })
-        );
-        right.content_points.iter().take(right.size.az::<usize>()).for_each(
-            |a| a.iter().enumerate().for_each(|(idx, val)| {
-                right.min_bound[idx] = right.min_bound[idx].min(*val);
-                right.max_bound[idx] = right.max_bound[idx].max(*val);
-            })
-        );
+        left.content_points
+            .iter()
+            .take(left.size.az::<usize>())
+            .for_each(|a| {
+                a.iter().enumerate().for_each(|(idx, val)| {
+                    left.min_bound[idx] = left.min_bound[idx].min(*val);
+                    left.max_bound[idx] = left.max_bound[idx].max(*val);
+                })
+            });
+        right
+            .content_points
+            .iter()
+            .take(right.size.az::<usize>())
+            .for_each(|a| {
+                a.iter().enumerate().for_each(|(idx, val)| {
+                    right.min_bound[idx] = right.min_bound[idx].min(*val);
+                    right.max_bound[idx] = right.max_bound[idx].max(*val);
+                })
+            });
 
         *orig = left;
         self.leaves.push(right);
@@ -215,9 +272,7 @@ mod tests {
     fn can_add_an_item() {
         let mut tree: KdTree<FXD, u32, 4, 32, u32> = KdTree::new();
 
-        let point: [FXD; 4] = [
-            n(0.1f32), n(0.2f32), n(0.3f32), n(0.4f32)
-        ];
+        let point: [FXD; 4] = [n(0.1f32), n(0.2f32), n(0.3f32), n(0.4f32)];
         let item = 123;
 
         tree.add(&point, item);
@@ -284,9 +339,7 @@ mod tests {
 
         assert_eq!(tree.size(), 16);
 
-        let removed = tree.remove(
-            &[n(0.9f32), n(0.0f32), n(0.9f32), n(0.0f32)], 9
-        );
+        let removed = tree.remove(&[n(0.9f32), n(0.0f32), n(0.9f32), n(0.0f32)], 9);
 
         assert_eq!(removed, 1);
         assert_eq!(tree.size(), 15);

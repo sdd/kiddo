@@ -1,11 +1,15 @@
 use crate::float::kdtree::{Axis, KdTree, LeafNode};
 
+use crate::types::{Content, Index};
+use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
-use az::{Az, Cast};
-use crate::types::{Content, Index};
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> KdTree<A, T, K, B, IDX> where usize: Cast<IDX> {
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
     #[inline]
     pub fn best_n_within_into_iter<F>(
         &self,
@@ -72,7 +76,9 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
                 }
             }
         } else {
-            let leaf_node = self.leaves.get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
+            let leaf_node = self
+                .leaves
+                .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
 
             Self::process_leaf_node(query, radius, max_qty, distance_fn, best_items, leaf_node);
         }
@@ -85,16 +91,15 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
         max_qty: usize,
         distance_fn: &F,
         best_items: &mut BinaryHeap<T>,
-        leaf_node: &LeafNode<A, T, K, B, IDX>
+        leaf_node: &LeafNode<A, T, K, B, IDX>,
     ) where
-        F: Fn(&[A; K], &[A; K]) -> A, {
+        F: Fn(&[A; K], &[A; K]) -> A,
+    {
         leaf_node
             .content_points
             .iter()
             .take(leaf_node.size.az::<usize>())
-            .map(|entry| {
-                distance_fn(query, &entry)
-            })
+            .map(|entry| distance_fn(query, entry))
             .enumerate()
             .filter(|(_, distance)| *distance <= radius)
             .for_each(|(idx, _)| {
@@ -103,7 +108,12 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
     }
 
     // #[inline(never)]
-    unsafe fn get_item_and_add_if_good(max_qty: usize, best_items: &mut BinaryHeap<T>, leaf_node: &LeafNode<A, T, K, B, IDX>, idx: usize) {
+    unsafe fn get_item_and_add_if_good(
+        max_qty: usize,
+        best_items: &mut BinaryHeap<T>,
+        leaf_node: &LeafNode<A, T, K, B, IDX>,
+        idx: usize,
+    ) {
         let item = *leaf_node.content_items.get_unchecked(idx.az::<usize>());
         if best_items.len() < max_qty {
             best_items.push(item);
@@ -118,9 +128,9 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
 
 #[cfg(test)]
 mod tests {
-    use rand::Rng;
     use crate::float::distance::squared_euclidean;
     use crate::float::kdtree::KdTree;
+    use rand::Rng;
 
     type AX = f64;
 

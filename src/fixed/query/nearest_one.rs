@@ -1,16 +1,22 @@
-use std::ops::Rem;
 use az::{Az, Cast};
+use std::ops::Rem;
 
-use crate::types::{Content, Index};
 use crate::fixed::kdtree::{Axis, KdTree, LeafNode};
+use crate::types::{Content, Index};
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> KdTree<A, T, K, B, IDX> where usize: Cast<IDX>  {
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
     #[inline]
     pub fn nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> (A, T)
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
-        unsafe { self.nearest_one_recurse(query, distance_fn, self.root_index, 0, T::zero(), A::MAX) }
+        unsafe {
+            self.nearest_one_recurse(query, distance_fn, self.root_index, 0, T::zero(), A::MAX)
+        }
     }
 
     #[inline]
@@ -55,7 +61,9 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
                 }
             }
         } else {
-            let leaf_node = self.leaves.get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
+            let leaf_node = self
+                .leaves
+                .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
 
             Self::search_content_for_best(
                 query,
@@ -84,7 +92,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
             .enumerate()
             .take(leaf_node.size.az::<usize>())
             .for_each(|(idx, entry)| {
-                let dist = distance_fn(query, &entry);
+                let dist = distance_fn(query, entry);
                 if dist < *best_dist {
                     *best_dist = dist;
                     *best_item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
@@ -95,10 +103,10 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
 
 #[cfg(test)]
 mod tests {
+    use crate::fixed::distance::manhattan;
+    use crate::fixed::kdtree::{Axis, KdTree};
     use fixed::types::extra::U14;
     use fixed::FixedU16;
-    use crate::fixed::distance::manhattan;
-    use crate::fixed::kdtree::{KdTree, Axis};
     use rand::Rng;
 
     type FXD = FixedU16<U14>;
@@ -136,12 +144,7 @@ mod tests {
 
         assert_eq!(tree.size(), 16);
 
-        let query_point = [
-            n(0.78f32),
-            n(0.55f32),
-            n(0.78f32),
-            n(0.55f32),
-        ];
+        let query_point = [n(0.78f32), n(0.55f32), n(0.78f32), n(0.55f32)];
         let expected = (n(0.86), 7);
 
         let result = tree.nearest_one(&query_point, &manhattan);
