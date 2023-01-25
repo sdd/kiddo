@@ -8,60 +8,44 @@ use fixed::types::extra::{LeEqU16, Unsigned, U16};
 use fixed::FixedU16;
 use rand::distributions::Standard;
 use rand_distr::Distribution;
-use sok::batch_benches_parameterized;
+use sok::batch_benches;
 use sok::distance::squared_euclidean;
 use sok::fixed::distance::squared_euclidean as squared_euclidean_fixedpoint;
 use sok::fixed::kdtree::{Axis as AxisFixed, KdTree as KdTreeFixed};
 use sok::float::kdtree::{Axis, KdTree};
 use sok::test_utils::{
     build_populated_tree_and_query_points_fixed, build_populated_tree_and_query_points_float,
-    process_queries_fixed_parameterized, process_queries_float_parameterized,
+    process_queries_fixed, process_queries_float,
 };
 use sok::types::{Content, Index};
 
 const BUCKET_SIZE: usize = 32;
 const QUERY_POINTS_PER_LOOP: usize = 100;
-const RADIUS_SMALL: f64 = 0.01;
-const RADIUS_MEDIUM: f64 = 0.05;
-const RADIUS_LARGE: f64 = 0.25;
 
 type FXP = U16; // FixedU16<U16>;
 
-macro_rules! bench_float {
-    ($group:ident, $a:ty, $t:ty, $k:tt, $idx: ty, $size:tt, $radius:tt,  $subtype: expr) => {
-        bench_query_float::<$a, $t, $k, $idx>(&mut $group, $size, $radius, $subtype);
+macro_rules! bench_float_10 {
+    ($group:ident, $a:ty, $t:ty, $k:tt, $idx: ty, $size:tt, $subtype: expr) => {
+        bench_query_float_10::<$a, $t, $k, $idx>(&mut $group, $size, $subtype);
     };
 }
 
-macro_rules! bench_fixed {
-    ($group:ident, $a:ty, $t:ty, $k:tt, $idx:ty, $size:tt, $radius:tt, $subtype: expr) => {
-        bench_query_fixed::<$a, $t, $k, $idx>(&mut $group, $size, $radius, $subtype);
+macro_rules! bench_fixed_10 {
+    ($group:ident, $a:ty, $t:ty, $k:tt, $idx:ty, $size:tt, $subtype: expr) => {
+        bench_query_fixed_10::<$a, $t, $k, $idx>(&mut $group, $size, $subtype);
     };
 }
 
-pub fn within_small(c: &mut Criterion) {
-    within(c, RADIUS_SMALL, "small");
-}
-
-pub fn within_medium(c: &mut Criterion) {
-    within(c, RADIUS_MEDIUM, "medium");
-}
-
-pub fn within_large(c: &mut Criterion) {
-    within(c, RADIUS_LARGE, "large");
-}
-
-fn within(c: &mut Criterion, radius: f64, radius_name: &str) {
-    let mut group = c.benchmark_group(format!("Query: within, {} radius", radius_name));
+pub fn best_10(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Query: Best 10");
     group.throughput(Throughput::Elements(QUERY_POINTS_PER_LOOP as u64));
 
     let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
     group.plot_config(plot_config);
 
-    batch_benches_parameterized!(
+    batch_benches!(
         group,
-        bench_float,
-        radius,
+        bench_float_10,
         [(f64, 2), (f64, 3), (f64, 4), (f32, 3)],
         [
             (100, u16, u16),
@@ -71,10 +55,9 @@ fn within(c: &mut Criterion, radius: f64, radius_name: &str) {
             (1_000_000, u32, u32)
         ]
     );
-    batch_benches_parameterized!(
+    batch_benches!(
         group,
-        bench_fixed,
-        radius,
+        bench_fixed_10,
         [(FXP, 3)],
         [
             (100, u16, u16),
@@ -88,7 +71,7 @@ fn within(c: &mut Criterion, radius: f64, radius_name: &str) {
     group.finish();
 }
 
-fn perform_query_float<
+fn perform_query_float_10<
     A: Axis,
     T: Content + 'static,
     const K: usize,
@@ -97,20 +80,20 @@ fn perform_query_float<
 >(
     kdtree: &KdTree<A, T, K, BUCKET_SIZE, IDX>,
     point: &[A; K],
-    radius: f64,
 ) where
     usize: Cast<IDX>,
     f64: Cast<A>,
 {
-    let _res = kdtree.within(&point, radius.az::<A>(), &squared_euclidean);
-    // .for_each(|res_item| {
-    //     black_box({
-    //         let _x = res_item;
-    //     });
-    // })
+    kdtree
+        .best_n_within_into_iter(&point, 0.05f64.az::<A>(), 10, &squared_euclidean)
+        .for_each(|res_item| {
+            black_box({
+                let _x = res_item;
+            });
+        })
 }
 
-fn perform_query_fixed<
+fn perform_query_fixed_10<
     A: Unsigned,
     T: Content + 'static,
     const K: usize,
@@ -119,25 +102,26 @@ fn perform_query_fixed<
 >(
     kdtree: &KdTreeFixed<FixedU16<A>, T, K, BUCKET_SIZE, IDX>,
     point: &[FixedU16<A>; K],
-    radius: f64,
 ) where
     usize: Cast<IDX>,
     FixedU16<A>: AxisFixed,
     A: LeEqU16,
 {
-    let _res = kdtree.within(
-        &point,
-        FixedU16::<A>::from_num(radius),
-        &squared_euclidean_fixedpoint,
-    );
-    // .for_each(|res_item| {
-    //     black_box({
-    //         let _x = res_item;
-    //     });
-    // })
+    kdtree
+        .best_n_within_into_iter(
+            &point,
+            FixedU16::<A>::from_num(0.05f64),
+            10,
+            &squared_euclidean_fixedpoint,
+        )
+        .for_each(|res_item| {
+            black_box({
+                let _x = res_item;
+            });
+        })
 }
 
-fn bench_query_float<
+fn bench_query_float_10<
     'a,
     A: Axis + 'static,
     T: Content + 'static,
@@ -146,7 +130,6 @@ fn bench_query_float<
 >(
     group: &'a mut BenchmarkGroup<WallTime>,
     initial_size: usize,
-    radius: f64,
     subtype: &str,
 ) where
     usize: Cast<IDX>,
@@ -165,17 +148,14 @@ fn bench_query_float<
                         QUERY_POINTS_PER_LOOP,
                     )
                 },
-                process_queries_float_parameterized(
-                    perform_query_float::<A, T, K, BUCKET_SIZE, IDX>,
-                    radius,
-                ),
+                process_queries_float(perform_query_float_10::<A, T, K, BUCKET_SIZE, IDX>),
                 BatchSize::SmallInput,
             );
         },
     );
 }
 
-fn bench_query_fixed<
+fn bench_query_fixed_10<
     'a,
     A: Unsigned,
     T: Content + 'static,
@@ -184,7 +164,6 @@ fn bench_query_fixed<
 >(
     group: &'a mut BenchmarkGroup<WallTime>,
     initial_size: usize,
-    radius: f64,
     subtype: &str,
 ) where
     usize: Cast<IDX>,
@@ -203,15 +182,12 @@ fn bench_query_fixed<
                         QUERY_POINTS_PER_LOOP,
                     )
                 },
-                process_queries_fixed_parameterized(
-                    perform_query_fixed::<A, T, K, BUCKET_SIZE, IDX>,
-                    radius,
-                ),
+                process_queries_fixed(perform_query_fixed_10::<A, T, K, BUCKET_SIZE, IDX>),
                 BatchSize::SmallInput,
             );
         },
     );
 }
 
-criterion_group!(benches, within_small, within_medium, within_large);
+criterion_group!(benches, best_10);
 criterion_main!(benches);

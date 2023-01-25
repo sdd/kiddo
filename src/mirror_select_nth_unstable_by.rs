@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::cmp::Ordering::Less;
-use std::{cmp, mem, ptr};
 use std::mem::MaybeUninit;
+use std::{cmp, mem, ptr};
 
 // performs select_nth_unstable_by on target,
 // but all the operations performed in the sort are applied to mirror as well
@@ -46,7 +46,7 @@ fn mirror_partition_at_index_loop<'a, AA, BB, F>(
                 // Otherwise, continue sorting elements greater than the pivot.
                 target = &mut target[mid..];
                 mirror = &mut mirror[mid..];
-                index = index - mid;
+                index -= mid;
                 pred = None;
                 continue;
             }
@@ -84,8 +84,8 @@ fn mirror_partition_equal<AA, BB, F>(
     pivot: usize,
     is_less: &mut F,
 ) -> usize
-    where
-        F: FnMut(&AA, &AA) -> bool,
+where
+    F: FnMut(&AA, &AA) -> bool,
 {
     // Place the pivot at the beginning of slice.
     target.swap(0, pivot);
@@ -162,8 +162,8 @@ fn mirror_partition<AA, BB, F>(
     pivot: usize,
     is_less: &mut F,
 ) -> (usize, bool)
-    where
-        F: FnMut(&AA, &AA) -> bool,
+where
+    F: FnMut(&AA, &AA) -> bool,
 {
     let (mid, was_partitioned) = {
         // Place the pivot at the beginning of slice.
@@ -236,8 +236,8 @@ fn mirror_partition_in_blocks<AA, BB, F>(
     pivot: &AA,
     is_less: &mut F,
 ) -> usize
-    where
-        F: FnMut(&AA, &AA) -> bool,
+where
+    F: FnMut(&AA, &AA) -> bool,
 {
     // Number of elements in a typical block.
     const BLOCK: usize = 128;
@@ -567,8 +567,8 @@ fn mirror_partition_in_blocks<AA, BB, F>(
 
 //// UNCHANGED FROM sort.rs
 fn choose_pivot<AA, BB, F>(v: &mut [AA], w: &mut [BB], is_less: &mut F) -> (usize, bool)
-    where
-        F: FnMut(&AA, &AA) -> bool,
+where
+    F: FnMut(&AA, &AA) -> bool,
 {
     // Minimum length to choose the median-of-medians method.
     // Shorter slices use the simple median-of-three method.
@@ -579,7 +579,7 @@ fn choose_pivot<AA, BB, F>(v: &mut [AA], w: &mut [BB], is_less: &mut F) -> (usiz
     let len = v.len();
 
     // Three indices near which we are going to choose a pivot.
-    let mut a = len / 4 * 1;
+    let mut a = len / 4;
     let mut b = len / 4 * 2;
     let mut c = len / 4 * 3;
 
@@ -678,14 +678,14 @@ fn test_mirror_select_nth_unstable_by() {
                 let mut v = orig.clone();
                 let mut w = orig_mirror.clone();
                 // let (left, pivot, right) = mirror_select_nth_unstable_by(&mut v, &mut w,pivot, |a, b| a.cmp(b));
-                let f = |a: &i32, b :&i32| a.cmp(b);
-                mirror_select_nth_unstable_by(&mut v, &mut w,pivot, f);
+                let f = |a: &i32, b: &i32| a.cmp(b);
+                mirror_select_nth_unstable_by(&mut v, &mut w, pivot, f);
 
                 //assert_eq!(left.len() + right.len(), LEN - 1);
 
                 for l in 0..pivot {
                     assert!(v[l] <= v[pivot]);
-                    for r in (pivot+1)..LEN {
+                    for r in (pivot + 1)..LEN {
                         assert!(v[pivot] <= v[r]);
                     }
                 }
@@ -706,7 +706,7 @@ fn test_mirror_select_nth_unstable_by() {
             for pivot in 0..LEN {
                 let mut v = orig.clone();
                 let mut w = orig_mirror.clone();
-                mirror_select_nth_unstable_by(&mut v,&mut w, pivot, sort_descending_comparator);
+                mirror_select_nth_unstable_by(&mut v, &mut w, pivot, sort_descending_comparator);
 
                 assert_eq!(v_sorted_descending[pivot], v[pivot]);
                 for i in 0..pivot {
@@ -729,7 +729,9 @@ fn test_mirror_select_nth_unstable_by() {
     }
 
     for pivot in 0..v.len() {
-        mirror_select_nth_unstable_by(&mut v, &mut w,pivot, |_, _| *[Less, Equal, Greater].choose(&mut rng).unwrap());
+        mirror_select_nth_unstable_by(&mut v, &mut w, pivot, |_, _| {
+            *[Less, Equal, Greater].choose(&mut rng).unwrap()
+        });
         v.sort();
         w.sort();
         for i in 0..v.len() {

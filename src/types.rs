@@ -1,9 +1,15 @@
+use az::Cast;
 use num_traits::{One, PrimInt, Unsigned, Zero};
 use std::fmt::Debug;
-use az::Cast;
 
-pub trait Content: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign {}
-impl<T: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign> Content for T {}
+pub trait Content:
+    Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign
+{
+}
+impl<T: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign> Content
+    for T
+{
+}
 
 pub trait Index: PrimInt + Unsigned + Zero + Cast<usize> {
     type T: Cast<usize>;
@@ -25,8 +31,12 @@ impl Index for u32 {
     fn leaf_offset() -> u32 {
         u32::MAX.overflowing_shr(1).0
     }
-    fn ilog2(self) -> u32 { u32::ilog2(self) }
-    fn div_ceil(self, b: u32) -> u32 { u32::div_ceil(self, b) }
+    fn ilog2(self) -> u32 {
+        u32::ilog2(self)
+    }
+    fn div_ceil(self, b: u32) -> u32 {
+        u32::div_ceil(self, b)
+    }
 }
 
 impl Index for u16 {
@@ -40,6 +50,10 @@ impl Index for u16 {
     fn leaf_offset() -> u16 {
         u16::MAX.overflowing_shr(1).0
     }
-    fn ilog2(self) -> u16 { u16::ilog2(self) as u16 }
-    fn div_ceil(self, b: u16) -> u16 { u16::div_ceil(self, b) }
+    fn ilog2(self) -> u16 {
+        u16::ilog2(self) as u16
+    }
+    fn div_ceil(self, b: u16) -> u16 {
+        u16::div_ceil(self, b)
+    }
 }

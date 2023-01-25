@@ -1,5 +1,5 @@
-use std::cmp::Ordering;
 use crate::float::kdtree::Axis;
+use std::cmp::Ordering;
 
 pub struct HeapElement<A, T> {
     pub distance: A,

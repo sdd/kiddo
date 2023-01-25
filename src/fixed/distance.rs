@@ -39,7 +39,7 @@ pub fn manhattan<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A {
                 b_val - a_val
             }
         })
-        .fold(A::ZERO, |a, b|a.saturating_add(b))
+        .fold(A::ZERO, |a, b| a.saturating_add(b))
 }
 
 // TODO: sat_mul and sat_add are preventing vectorisation. Need to
@@ -59,23 +59,22 @@ pub fn squared_euclidean<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A {
             //let diff = diff / A::from_num(4);
 
             //let res = diff.saturating_mul(diff);
-            let res = diff * diff;
+            diff * diff
 
             // let res = (diff * A::from_num(0.5)).saturating_mul(diff); // / (A::from_num(K))
             // if res == A::MAX {
             //     println!("Dist saturated at mult (a={}, b={}, diff={})", &a_val, &b_val, &diff);
             // }
-            res
+            //res
         })
         .fold(A::ZERO, |a, b| {
             // let res = a.saturating_add(b);
-            let res = a + b;
+            a + b
+
             // let res = a.saturating_add(b.shr(2) );
             // if res == A::MAX {
             //     println!("Dist saturated at add")
             // }
-
-            res
+            //res
         })
 }
-

@@ -19,7 +19,6 @@ fn rand_data_4d() -> ([f32; 4], u32) {
     rand::random()
 }
 
-
 /*fn main() {
     let points_to_add: Vec<([f32; K], usize)> =
         (0..100).into_iter().map(|_| rand_data_4d_f32()).collect();
@@ -33,13 +32,14 @@ fn rand_data_4d() -> ([f32; 4], u32) {
 }*/
 
 fn main() {
-    let points_to_add: Vec<([FXD; K], u32)> =
-        (0..100).into_iter()
-            .map(|_| rand_data_4d())
-            .map(|(p, i)| (unsafe { std::mem::transmute(n(p)) }, i))
-            .collect();
+    let points_to_add: Vec<([FXD; K], u32)> = (0..100)
+        .into_iter()
+        .map(|_| rand_data_4d())
+        .map(|(p, i)| (unsafe { std::mem::transmute(n(p)) }, i))
+        .collect();
 
-    let mut kdtree: KdTree<FXD, u32, K, BUCKET_SIZE, u32> = KdTree::with_capacity(points_to_add.len());
+    let mut kdtree: KdTree<FXD, u32, K, BUCKET_SIZE, u32> =
+        KdTree::with_capacity(points_to_add.len());
 
     for i in 0..points_to_add.len() {
         kdtree.add(&points_to_add[i].0, i as u32);

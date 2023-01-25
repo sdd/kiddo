@@ -1,12 +1,16 @@
+use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
-use az::{Az, Cast};
 
-use crate::types::{Content, Index};
 use crate::fixed::heap_element::HeapElement;
 use crate::fixed::kdtree::{Axis, KdTree};
+use crate::types::{Content, Index};
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> KdTree<A, T, K, B, IDX> where usize: Cast<IDX> {
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
     #[inline]
     pub fn within<F>(&self, query: &[A; K], radius: A, distance_fn: &F) -> Vec<(A, T)>
     where
@@ -67,7 +71,9 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
                 }
             }
         } else {
-            let leaf_node = self.leaves.get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
+            let leaf_node = self
+                .leaves
+                .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
             // println!("Leaf node: {:?}", (curr_node_idx - LEAF_OFFSET) as usize);
 
             leaf_node
@@ -76,12 +82,12 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
                 .enumerate()
                 .take(leaf_node.size.az::<usize>())
                 .for_each(|(idx, entry)| {
-                    let distance = distance_fn(query, &entry);
+                    let distance = distance_fn(query, entry);
 
                     if distance < radius {
                         matching_items.push(HeapElement {
                             distance,
-                            item: *leaf_node.content_items.get_unchecked(idx.az::<usize>())
+                            item: *leaf_node.content_items.get_unchecked(idx.az::<usize>()),
                         })
                     }
                 });
@@ -91,12 +97,12 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
 
 #[cfg(test)]
 mod tests {
-    use std::cmp::Ordering;
+    use crate::fixed::distance::manhattan;
+    use crate::fixed::kdtree::{Axis, KdTree};
     use fixed::types::extra::U14;
     use fixed::FixedU16;
     use rand::Rng;
-    use crate::fixed::distance::manhattan;
-    use crate::fixed::kdtree::{Axis, KdTree};
+    use std::cmp::Ordering;
 
     type FXD = FixedU16<U14>;
 
@@ -133,12 +139,7 @@ mod tests {
 
         assert_eq!(tree.size(), 16);
 
-        let query_point = [
-            n(0.78f32),
-            n(0.55f32),
-            n(0.78f32),
-            n(0.55f32),
-        ];
+        let query_point = [n(0.78f32), n(0.55f32), n(0.78f32), n(0.55f32)];
 
         let radius = n(0.2);
         let expected = linear_search(&content_to_add, &query_point, radius);
@@ -164,7 +165,7 @@ mod tests {
         }
     }
 
-    fn linear_search<A: Axis, const K: usize,>(
+    fn linear_search<A: Axis, const K: usize>(
         content: &[([A; K], u32)],
         query_point: &[A; K],
         radius: A,

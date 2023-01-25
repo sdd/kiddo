@@ -1,15 +1,28 @@
 use crate::float::kdtree::{Axis, KdTree, LeafNode};
-use std::ops::Rem;
-use az::{Az, Cast};
 use crate::types::{Content, Index};
+use az::{Az, Cast};
+use std::ops::Rem;
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> KdTree<A, T, K, B, IDX> where usize: Cast<IDX>  {
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
     #[inline]
     pub fn nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> (A, T)
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
-        unsafe { self.nearest_one_recurse(query, distance_fn, self.root_index, 0, T::zero(), A::max_value()) }
+        unsafe {
+            self.nearest_one_recurse(
+                query,
+                distance_fn,
+                self.root_index,
+                0,
+                T::zero(),
+                A::max_value(),
+            )
+        }
     }
 
     #[inline]
@@ -54,7 +67,9 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
                 }
             }
         } else {
-            let leaf_node = self.leaves.get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
+            let leaf_node = self
+                .leaves
+                .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
 
             Self::search_content_for_best(
                 query,
@@ -83,7 +98,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
             .enumerate()
             .take(leaf_node.size.az::<usize>())
             .for_each(|(idx, entry)| {
-                let dist = distance_fn(query, &entry);
+                let dist = distance_fn(query, entry);
                 if dist < *best_dist {
                     *best_dist = dist;
                     *best_item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
@@ -94,9 +109,9 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> K
 
 #[cfg(test)]
 mod tests {
-    use rand::Rng;
     use crate::float::distance::manhattan;
     use crate::float::kdtree::{Axis, KdTree};
+    use rand::Rng;
 
     type AX = f32;
 
@@ -105,21 +120,21 @@ mod tests {
         let mut tree: KdTree<AX, u32, 4, 8, u32> = KdTree::new();
 
         let content_to_add: [([AX; 4], u32); 16] = [
-            ([0.9f32, 0.0f32, 0.9f32, 0.0f32], 9), // 1.34
-            ([0.4f32, 0.5f32, 0.4f32, 0.51f32], 4), // 0.86
+            ([0.9f32, 0.0f32, 0.9f32, 0.0f32], 9),    // 1.34
+            ([0.4f32, 0.5f32, 0.4f32, 0.51f32], 4),   // 0.86
             ([0.12f32, 0.3f32, 0.12f32, 0.3f32], 12), // 1.82
-            ([0.7f32, 0.2f32, 0.7f32, 0.22f32], 7), // 0.86
+            ([0.7f32, 0.2f32, 0.7f32, 0.22f32], 7),   // 0.86
             ([0.13f32, 0.4f32, 0.13f32, 0.4f32], 13), // 1.56
-            ([0.6f32, 0.3f32, 0.6f32, 0.33f32], 6), // 0.86
-            ([0.2f32, 0.7f32, 0.2f32, 0.7f32], 2), // 1.46
+            ([0.6f32, 0.3f32, 0.6f32, 0.33f32], 6),   // 0.86
+            ([0.2f32, 0.7f32, 0.2f32, 0.7f32], 2),    // 1.46
             ([0.14f32, 0.5f32, 0.14f32, 0.5f32], 14), // 1.38
-            ([0.3f32, 0.6f32, 0.3f32, 0.6f32], 3), // 1.06
+            ([0.3f32, 0.6f32, 0.3f32, 0.6f32], 3),    // 1.06
             ([0.10f32, 0.1f32, 0.10f32, 0.1f32], 10), // 2.26
             ([0.16f32, 0.7f32, 0.16f32, 0.7f32], 16), // 1.54
-            ([0.1f32, 0.8f32, 0.1f32, 0.8f32], 1), // 1.86
+            ([0.1f32, 0.8f32, 0.1f32, 0.8f32], 1),    // 1.86
             ([0.15f32, 0.6f32, 0.15f32, 0.6f32], 15), // 1.36
-            ([0.5f32, 0.4f32, 0.5f32, 0.44f32], 5), // 0.86
-            ([0.8f32, 0.1f32, 0.8f32, 0.15f32], 8), // 0.86
+            ([0.5f32, 0.4f32, 0.5f32, 0.44f32], 5),   // 0.86
+            ([0.8f32, 0.1f32, 0.8f32, 0.15f32], 8),   // 0.86
             ([0.11f32, 0.2f32, 0.11f32, 0.2f32], 11), // 2.04
         ];
 
@@ -129,12 +144,7 @@ mod tests {
 
         assert_eq!(tree.size(), 16);
 
-        let query_point = [
-            0.78f32,
-            0.55f32,
-            0.78f32,
-            0.55f32,
-        ];
+        let query_point = [0.78f32, 0.55f32, 0.78f32, 0.55f32];
 
         let expected = (0.819999933, 5);
 
