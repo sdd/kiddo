@@ -3,15 +3,16 @@ use num_traits::{One, PrimInt, Unsigned, Zero};
 use std::fmt::Debug;
 
 pub trait Content:
-    Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign
+    Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync
 {
 }
-impl<T: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign> Content
-    for T
+impl<
+        T: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync,
+    > Content for T
 {
 }
 
-pub trait Index: PrimInt + Unsigned + Zero + Cast<usize> {
+pub trait Index: PrimInt + Unsigned + Zero + Cast<usize> + Sync {
     type T: Cast<usize>;
     fn max() -> Self;
     fn min() -> Self;

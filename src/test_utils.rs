@@ -261,6 +261,7 @@ where
     )
 }
 
+#[inline]
 pub fn process_queries_float<
     A: Axis + 'static,
     T: Content,

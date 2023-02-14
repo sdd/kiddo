@@ -10,8 +10,8 @@ use crate::types::{Content, Index};
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
 
-pub trait Axis: Float + Default + Debug + Copy {}
-impl<T: Float + Default + Debug + Copy> Axis for T {}
+pub trait Axis: Float + Default + Debug + Copy + Sync {}
+impl<T: Float + Default + Debug + Copy + Sync> Axis for T {}
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(

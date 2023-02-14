@@ -10,8 +10,8 @@ use crate::types::{Content, Index};
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
 
-pub trait Axis: Fixed + Default + Debug + Copy {}
-impl<T: Fixed + Default + Debug + Copy> Axis for T {}
+pub trait Axis: Fixed + Default + Debug + Copy + Sync {}
+impl<T: Fixed + Default + Debug + Copy + Sync> Axis for T {}
 
 #[cfg(feature = "serialize_rkyv")]
 pub trait AxisRK: num_traits::Zero + Default + Debug + rkyv::Archive {}
