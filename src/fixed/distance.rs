@@ -17,7 +17,7 @@ use crate::fixed::kdtree::Axis;
 /// ```rust
 /// use fixed::types::extra::U0;
 /// use fixed::FixedU16;
-/// use sok::fixed::distance::manhattan;
+/// use kiddo::fixed::distance::manhattan;
 /// type FXD = FixedU16<U0>;
 ///
 /// let ZERO = FXD::from_num(0);

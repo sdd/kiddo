@@ -1,3 +1,6 @@
+//! Floating point KD Tree, for use when the co-ordinates of the points being stored in the tree
+//! are floats. f64 or f32 are supported currently
+
 use az::{Az, Cast};
 use num_traits::Float;
 use std::cmp::PartialEq;
@@ -20,8 +23,8 @@ impl<T: Float + Default + Debug + Copy + Sync> Axis for T {}
 )]
 #[derive(Clone, Debug, PartialEq)]
 pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
-    pub leaves: Vec<LeafNode<A, T, K, B, IDX>>,
-    pub stems: Vec<StemNode<A, K, IDX>>,
+    pub(crate) leaves: Vec<LeafNode<A, T, K, B, IDX>>,
+    pub(crate) stems: Vec<StemNode<A, K, IDX>>,
     pub(crate) root_index: IDX,
     pub(crate) size: T,
 }

@@ -6,18 +6,18 @@ use criterion::{
 };
 use fixed::types::extra::{Unsigned, U16};
 use fixed::FixedU16;
-use rand::distributions::Standard;
-use rand_distr::Distribution;
-use sok::batch_benches;
-use sok::distance::squared_euclidean;
-use sok::fixed::distance::squared_euclidean as squared_euclidean_fixedpoint;
-use sok::fixed::kdtree::{Axis as AxisFixed, KdTree as KdTreeFixed};
-use sok::float::kdtree::{Axis, KdTree};
-use sok::test_utils::{
+use kiddo::batch_benches;
+use kiddo::distance::squared_euclidean;
+use kiddo::fixed::distance::squared_euclidean as squared_euclidean_fixedpoint;
+use kiddo::fixed::kdtree::{Axis as AxisFixed, KdTree as KdTreeFixed};
+use kiddo::float::kdtree::{Axis, KdTree};
+use kiddo::test_utils::{
     build_populated_tree_and_query_points_fixed, build_populated_tree_and_query_points_float,
     process_queries_fixed, process_queries_float,
 };
-use sok::types::{Content, Index};
+use kiddo::types::{Content, Index};
+use rand::distributions::Standard;
+use rand_distr::Distribution;
 
 const BUCKET_SIZE: usize = 32;
 const QUERY_POINTS_PER_LOOP: usize = 100;

@@ -15,7 +15,7 @@ use crate::float::kdtree::Axis;
 /// # Examples
 ///
 /// ```rust
-/// use sok::float::distance::manhattan;
+/// use kiddo::float::distance::manhattan;
 ///
 /// assert_eq!(0f32, manhattan(&[0f32, 0f32], &[0f32, 0f32]));
 /// assert_eq!(1f32, manhattan(&[0f32, 0f32], &[1f32, 0f32]));

@@ -1,4 +1,4 @@
-use crate::sok::Axis;
+use crate::kiddo::Axis;
 
 // pub (crate) struct BoundsChecker<'a, F, A, const K: usize> where
 //     F: Fn(&[A; K], &[A; K]) -> A,

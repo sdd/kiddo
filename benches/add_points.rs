@@ -8,11 +8,11 @@ use fixed::types::extra::{Unsigned, U16};
 use fixed::FixedU16;
 use rand::distributions::{Distribution, Standard};
 
-use sok::batch_benches;
-use sok::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
-use sok::float::kdtree::{Axis, KdTree};
-use sok::test_utils::rand_data_fixed_u16_entry;
-use sok::types::{Content, Index};
+use kiddo::batch_benches;
+use kiddo::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
+use kiddo::float::kdtree::{Axis, KdTree};
+use kiddo::test_utils::rand_data_fixed_u16_entry;
+use kiddo::types::{Content, Index};
 
 const BUCKET_SIZE: usize = 32;
 const QTY_TO_ADD_TO_POPULATED: u64 = 100;

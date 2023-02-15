@@ -21,7 +21,7 @@ union SimdToArray {
 /// # Examples
 ///
 /// ```rust
-/// use sok::distance::squared_euclidean;
+/// use kiddo::distance::squared_euclidean;
 ///
 /// assert!(0.0 == squared_euclidean(&[0.0, 0.0], &[0.0, 0.0]));
 /// assert!(2.0 == squared_euclidean(&[0.0, 0.0], &[1.0, 1.0]));

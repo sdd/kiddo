@@ -39,8 +39,8 @@ pub struct KdTreeRK<
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
-    pub leaves: Vec<LeafNode<A, T, K, B, IDX>>,
-    pub stems: Vec<StemNode<A, K, IDX>>,
+    pub(crate) leaves: Vec<LeafNode<A, T, K, B, IDX>>,
+    pub(crate) stems: Vec<StemNode<A, K, IDX>>,
     pub(crate) root_index: IDX,
     pub(crate) size: T,
 }
