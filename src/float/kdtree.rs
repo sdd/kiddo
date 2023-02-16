@@ -1,5 +1,5 @@
 //! Floating point KD Tree, for use when the co-ordinates of the points being stored in the tree
-//! are floats. f64 or f32 are supported currently
+//! are floats. f64 or f32 are supported currently.
 
 use az::{Az, Cast};
 use num_traits::Float;

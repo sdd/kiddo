@@ -93,6 +93,8 @@ The `Nearest n Items` tests query the tree for the nearest 1, 100 and 1,000 poin
 
 #### Methodology
 
+*NB*: This section is out-of-date and pertains to kiddo v1. I'll update it soon.
+
 The results and charts below were created via the following process:
 
 * check out the original-kdtree-criterion branch. This branch is the same code as kdtree@0.6.0, with criterion benchmarks added that perform the same operations as the criterion tests in kiddo. For functions that are present in kiddo but not in kdtree, the criterion tests for kdtree contain extra code to post-process the results from kdtree calls to perform the same actions as the new methods in kiddo.
@@ -109,7 +111,7 @@ cargo criterion --message-format json > criterion-kdtree.ndjson
 
 ```bash
 cargo criterion --message-format json --all-features > criterion-kiddo.ndjson
-``` 
+```
 
 * the graphs are generated in python using matplotlib. Ensure you have python installed, as well as the matplotlib and ndjdon python lbraries. Then run the following:
 
@@ -119,41 +121,7 @@ python ./generate_benchmark_charts.py
 
 #### Results
 
-The following results were obtained with the above methodology on a machine with these specs:
-
-* AMD Ryzen 5 2500X @ 3600MHz
-* 32Gb DDR4 @ 3200MHz
-
-The results are stored inside this repo as `criterion-kiddo.ndjson` and `criterion-kdtree.ndjson`, should you wish
-to perform your own analysis.
-
-##### Adding items to the tree
-Kiddo generally has a very small performance lead over kdtree@0.6.0 at larger tree sizes, with their performance being similar on smaller trees.
-
-![Charts showing benchmark results for adding items](https://raw.githubusercontent.com/sdd/kiddo/master/benchmark_adding.png)
-
-
-##### Retrieving the nearest n items
-
-Kiddo's optimised `nearest_one()` method gives a huge performance advantage for single item queries, with up to 9x faster performance.
-Kiddo's standard `nearest()` method also outperforms kdtree@0.6.0.
-
-![Charts showing benchmark results for retrieving the nearest n items](https://raw.githubusercontent.com/sdd/kiddo/master/benchmark_nearest_n.png)
-
-##### Retrieving all items within a distance, sorted
-Things look closer here at first glance but the logarithmic nature of the charted data may obscure the fact that Kiddo is often up to twice as fast as kdtree@0.6.0 here.
-
-![Charts showing benchmark results for retrieving all items within a specified distance](https://raw.githubusercontent.com/sdd/kiddo/master/benchmark_within.png)
-
-##### Retrieving all items within a distance, unsorted
-kdtree@0.6.0 does not have a `within_unsorted()` method, so we are comparing kiddo's `within_unsorted()` to kdtree@0.6.0's `within()` here, with kiddo up to 5x faster on the million-item tree.
-
-![Charts showing benchmark results for retrieving all items within a specified distance](https://raw.githubusercontent.com/sdd/kiddo/master/benchmark_within_unsorted.png)
-
-##### Retrieving the best n items within a specified distance
-Kiddo's performance advantage here ranges from twice as fast for hundred-item trees up to as much as 20x faster for trees with a million items.
-
-![Charts showing benchmark results for retrieving the best n items within a specified distance](https://raw.githubusercontent.com/sdd/kiddo/master/benchmark_best_n_within.png)
+Updated benchmark results will be published soon.
 
 ## License
 

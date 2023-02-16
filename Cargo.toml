@@ -1,6 +1,6 @@
 [package]
 name = "kiddo"
-version = "2.0.0"
+version = "2.0.0-beta.0"
 edition = "2021"
 authors = ["Scott Donnelly <scott@donnel.ly>"]
 description = "next-generation kd tree library. Generic over number of dimensions, bucket size, stored items, and axes values. Ideal for geo- and astro- NN queries"

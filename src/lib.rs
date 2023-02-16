@@ -4,10 +4,10 @@
 #![feature(stdsimd)]
 #![feature(strict_provenance)]
 #![feature(maybe_uninit_slice)]
-#![doc(html_root_url = "https://docs.rs/kiddo/2.0.0")]
+#![doc(html_root_url = "https://docs.rs/kiddo/2.0.0-beta.0")]
 #![doc(issue_tracker_base_url = "https://github.com/sdd/kiddo/issues/")]
 
-//! # kiddo
+//! # Kiddo
 //!
 //! A flexible, high-performance kd-tree library.
 //!
@@ -24,7 +24,7 @@
 //! Add `kiddo` to `Cargo.toml`
 //! ```toml
 //! [dependencies]
-//! kiddo = "2.0.0"
+//! kiddo = "2.0.0-beta.0"
 //! ```
 //!
 //! ## Usage
