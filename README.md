@@ -1,7 +1,6 @@
 # Kiddo
 
 > A flexible, high-performance kd-tree library.
-> Thanks and kudos to mrhooray for the original kdtree library on which kiddo is based.
 
 * [Crate](https://crates.io/crates/kiddo)
 * [Documentation](https://docs.rs/kiddo)
