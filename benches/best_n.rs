@@ -108,7 +108,7 @@ fn perform_query_fixed_10<
     A: LeEqU16,
 {
     kdtree
-        .best_n_within_into_iter(
+        .best_n_within(
             &point,
             FixedU16::<A>::from_num(0.05f64),
             10,
