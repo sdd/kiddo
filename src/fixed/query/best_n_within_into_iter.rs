@@ -11,7 +11,7 @@ where
     usize: Cast<IDX>,
 {
     #[inline]
-    pub fn best_n_within_into_iter<F>(
+    pub fn best_n_within<F>(
         &self,
         query: &[A; K],
         radius: A,
@@ -24,23 +24,21 @@ where
         // TODO: switch to https://docs.rs/min-max-heap/1.3.0/min_max_heap/struct.MinMaxHeap.html
         let mut best_items: BinaryHeap<T> = BinaryHeap::new();
 
-        unsafe {
-            self.best_n_within_recurse(
-                query,
-                radius,
-                max_qty,
-                distance_fn,
-                self.root_index,
-                0,
-                &mut best_items,
-            );
-        }
+        self.best_n_within_recurse(
+            query,
+            radius,
+            max_qty,
+            distance_fn,
+            self.root_index,
+            0,
+            &mut best_items,
+        );
 
         best_items.into_iter()
     }
 
     #[allow(clippy::too_many_arguments)]
-    unsafe fn best_n_within_recurse<F>(
+    fn best_n_within_recurse<F>(
         &self,
         query: &[A; K],
         radius: A,
@@ -53,9 +51,9 @@ where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
         if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
-            let node = self.stems.get_unchecked(curr_node_idx.az::<usize>());
+            let node = unsafe { self.stems.get_unchecked(curr_node_idx.az::<usize>()) };
 
-            let child_node_indices = if *query.get_unchecked(split_dim) < node.split_val {
+            let child_node_indices = if unsafe { *query.get_unchecked(split_dim) } < node.split_val {
                 [node.left, node.right]
             } else {
                 [node.right, node.left]
@@ -77,16 +75,17 @@ where
                 }
             }
         } else {
-            let leaf_node = self
-                .leaves
-                .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
+            let leaf_node = unsafe {
+                self
+                    .leaves
+                    .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>())
+            };
 
             Self::process_leaf_node(query, radius, max_qty, distance_fn, best_items, leaf_node);
         }
     }
 
-    // #[inline(never)]
-    unsafe fn process_leaf_node<F>(
+    fn process_leaf_node<F>(
         query: &[A; K],
         radius: A,
         max_qty: usize,
@@ -104,11 +103,12 @@ where
             .enumerate()
             .filter(|(_, distance)| *distance <= radius)
             .for_each(|(idx, _)| {
-                Self::get_item_and_add_if_good(max_qty, best_items, leaf_node, idx)
+                unsafe {
+                    Self::get_item_and_add_if_good(max_qty, best_items, leaf_node, idx)
+                }
             });
     }
 
-    // #[inline(never)]
     unsafe fn get_item_and_add_if_good(
         max_qty: usize,
         best_items: &mut BinaryHeap<T>,
@@ -176,7 +176,7 @@ mod tests {
         let expected = vec![6, 5, 3, 2, 4];
 
         let result: Vec<_> = tree
-            .best_n_within_into_iter(&query, radius, max_qty, &squared_euclidean)
+            .best_n_within(&query, radius, max_qty, &squared_euclidean)
             .collect();
         assert_eq!(result, expected);
 
@@ -191,7 +191,7 @@ mod tests {
             let expected = linear_search(&content_to_add, &query, radius, max_qty);
 
             let mut result: Vec<_> = tree
-                .best_n_within_into_iter(&query, radius, max_qty, &squared_euclidean)
+                .best_n_within(&query, radius, max_qty, &squared_euclidean)
                 .collect();
             result.sort_unstable();
             assert_eq!(result, expected);
