@@ -1,10 +1,17 @@
-#![feature(int_log)]
 #![feature(int_roundings)]
 #![feature(min_specialization)]
 #![feature(stdsimd)]
 #![feature(strict_provenance)]
 #![feature(maybe_uninit_slice)]
-#![doc(html_root_url = "https://docs.rs/kiddo/2.0.0-beta.1")]
+#![doc(html_root_url = "https://docs.rs/kiddo/2.0.0-beta.2")]
+#![feature(rustdoc_missing_doc_code_examples)]
+#![warn(rustdoc::missing_crate_level_docs)]
+#![deny(rustdoc::invalid_codeblock_attributes)]
+#![warn(missing_docs)]
+#![warn(rustdoc::missing_doc_code_examples)]
+#![warn(rustdoc::broken_intra_doc_links)]
+#![warn(rustdoc::private_intra_doc_links)]
+#![doc(html_root_url = "https://docs.rs/kiddo/2.0.0-beta.2")]
 #![doc(issue_tracker_base_url = "https://github.com/sdd/kiddo/issues/")]
 
 //! # Kiddo
@@ -24,7 +31,7 @@
 //! Add `kiddo` to `Cargo.toml`
 //! ```toml
 //! [dependencies]
-//! kiddo = "2.0.0-beta.1"
+//! kiddo = "2.0.0-beta.2"
 //! ```
 //!
 //! ## Usage

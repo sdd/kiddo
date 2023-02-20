@@ -22,6 +22,26 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
+    /// Finds the nearest `qty` elements to `query`, using the specified
+    /// distance metric function.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use kiddo::KdTree;
+    /// use kiddo::distance::squared_euclidean;
+    ///
+    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+    ///
+    /// tree.add(&[1.0, 2.0, 5.0], 100);
+    /// tree.add(&[2.0, 3.0, 6.0], 101);
+    ///
+    /// let nearest: Vec<_> = tree.nearest_n(&[1.0, 2.0, 5.1], 1, &squared_euclidean).collect();
+    ///
+    /// assert_eq!(nearest.len(), 1);
+    /// assert!((nearest[0].0 - 0.01f64).abs() < f64::EPSILON);
+    /// assert_eq!(nearest[0].1, 100);
+    /// ```
     #[inline]
     pub fn nearest_n<F>(
         &self,

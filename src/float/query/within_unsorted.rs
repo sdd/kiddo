@@ -9,6 +9,26 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
+    /// Finds all elements within `radius` of `query`.
+    ///
+    /// Results are returned in arbitrary order. Faster than `within`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use kiddo::KdTree;
+    /// use kiddo::distance::squared_euclidean;
+    ///
+    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+    ///
+    /// tree.add(&[1.0, 2.0, 5.0], 100);
+    /// tree.add(&[2.0, 3.0, 6.0], 101);
+    /// tree.add(&[200.0, 300.0, 600.0], 102);
+    ///
+    /// let within = tree.within(&[1.0, 2.0, 5.0], 10f64, &squared_euclidean);
+    ///
+    /// assert_eq!(within.len(), 2);
+    /// ```
     #[inline]
     pub fn within_unsorted<F>(&self, query: &[A; K], radius: A, distance_fn: &F) -> Vec<(A, T)>
     where

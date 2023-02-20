@@ -85,7 +85,7 @@ fn perform_query_float_10<
     f64: Cast<A>,
 {
     kdtree
-        .best_n_within_into_iter(&point, 0.05f64.az::<A>(), 10, &squared_euclidean)
+        .best_n_within(&point, 0.05f64.az::<A>(), 10, &squared_euclidean)
         .for_each(|res_item| {
             black_box({
                 let _x = res_item;

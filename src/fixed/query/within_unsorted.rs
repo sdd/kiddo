@@ -9,6 +9,31 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
+    /// Finds all elements within `radius` of `query`.
+    ///
+    /// Results are returned in arbitrary order. Faster than `within`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fixed::FixedU16;
+    /// use fixed::types::extra::U0;
+    /// use kiddo::FixedKdTree;
+    /// use kiddo::fixed::distance::squared_euclidean;
+    ///
+    /// type FXD = FixedU16<U0>;
+
+    ///
+    /// let mut tree: FixedKdTree<FXD, u32, 3, 32, u32> = FixedKdTree::new();
+    ///
+    /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
+    /// tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
+    /// tree.add(&[FXD::from_num(20), FXD::from_num(30), FXD::from_num(60)], 102);
+    ///
+    /// let within = tree.within(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], FXD::from_num(10), &squared_euclidean);
+    ///
+    /// assert_eq!(within.len(), 2);
+    /// ```
     #[inline]
     pub fn within_unsorted<F>(&self, query: &[A; K], radius: A, distance_fn: &F) -> Vec<(A, T)>
     where
