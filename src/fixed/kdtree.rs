@@ -1,3 +1,8 @@
+//! Fixed point KD Tree, for use when the co-ordinates of the points being stored in the tree
+//! are fixed point or integers. `u8`, `u16`, `u32`, and `u64` based fixed-point / integers are supported
+//! via the Fixed crate, eg `FixedU16<U14>` for a 16-bit fixed point number with 14 bits after the
+//! decimal point.
+
 use az::{Az, Cast};
 use fixed::traits::Fixed;
 use std::cmp::PartialEq;
@@ -10,6 +15,10 @@ use crate::types::{Content, Index};
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
 
+/// Axis trait represents the traits that must be implemented
+/// by the type that is used as the first generic parameter, `A`,
+/// on `FixedKdTree`. A type from the `Fixed` crate will implement
+/// all of the traits required by Axis. For example `FixedU16<U14>`.
 pub trait Axis: Fixed + Default + Debug + Copy + Sync {}
 impl<T: Fixed + Default + Debug + Copy + Sync> Axis for T {}
 
@@ -36,6 +45,12 @@ pub struct KdTreeRK<
     size: T,
 }
 
+/// Fixed point KD Tree
+///
+/// For use when the co-ordinates of the points being stored in the tree
+/// are fixed point or integers. `u8`, `u16`, `u32`, and `u64` based fixed-point / integers are supported
+/// via the Fixed crate, eg `FixedU16<U14>` for a 16-bit fixed point number with 14 bits after the
+/// decimal point.
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
@@ -50,7 +65,7 @@ pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize, IDX: Inde
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[cfg(feature = "serialize_rkyv")]
-pub struct StemNodeRK<A: num_traits::PrimInt, const K: usize, IDX: Index<T = IDX>> {
+pub(crate) struct StemNodeRK<A: num_traits::PrimInt, const K: usize, IDX: Index<T = IDX>> {
     pub(crate) min_bound: [A; K],
     pub(crate) max_bound: [A; K],
 
@@ -61,7 +76,7 @@ pub struct StemNodeRK<A: num_traits::PrimInt, const K: usize, IDX: Index<T = IDX
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
-pub struct StemNode<A: Axis, const K: usize, IDX: Index<T = IDX>> {
+pub(crate) struct StemNode<A: Axis, const K: usize, IDX: Index<T = IDX>> {
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
     pub(crate) min_bound: [A; K],
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
@@ -77,7 +92,7 @@ pub struct StemNode<A: Axis, const K: usize, IDX: Index<T = IDX>> {
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[cfg(feature = "serialize_rkyv")]
-pub struct LeafNodeRK<
+pub(crate) struct LeafNodeRK<
     A: num_traits::PrimInt,
     T: Content,
     const K: usize,
@@ -94,7 +109,7 @@ pub struct LeafNodeRK<
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
-pub struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
+pub(crate) struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
     #[cfg_attr(
         feature = "serialize",
@@ -168,19 +183,46 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
+    /// Creates a new fixed-point/int KdTree.
+    ///
+    /// Capacity is set by default to 10x the bucket size (32 in this case).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fixed::FixedU16;
+    /// use fixed::types::extra::U14;
+    /// use kiddo::FixedKdTree;
+    ///
+    /// let mut tree: FixedKdTree<FixedU16<U14>, u32, 3, 32, u32> = FixedKdTree::new();
+    ///
+    /// assert_eq!(tree.size(), 0);
+    /// ```
     #[inline]
     pub fn new() -> Self {
         KdTree::with_capacity(B * 10)
     }
 
+    /// Creates a new fixed-point/integer KdTree and reserves capacity for a specific number of items.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fixed::FixedU16;
+    /// use fixed::types::extra::U14;
+    /// use kiddo::FixedKdTree;
+    ///
+    /// let mut tree: FixedKdTree<FixedU16<U14>, u32, 3, 32, u32> = FixedKdTree::with_capacity(1_000_000);
+    ///
+    /// assert_eq!(tree.size(), 0);
+    /// ```
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
-        debug_assert!((capacity.az::<IDX>()) < <IDX as Index>::max());
-        let capacity: IDX = capacity.az::<IDX>();
+        assert!(capacity <= <IDX as Index>::capacity_with_bucket_size(B));
         let mut tree = Self {
             size: T::zero(),
-            stems: Vec::with_capacity(capacity.ilog2().az::<usize>()),
-            leaves: Vec::with_capacity(capacity.div_ceil(B.az::<IDX>()).az::<usize>()),
+            stems: Vec::with_capacity(capacity.ilog2() as usize),
+            leaves: Vec::with_capacity(capacity.div_ceil(B.az::<usize>())),
             root_index: <IDX as Index>::leaf_offset(),
         };
 
@@ -189,6 +231,24 @@ where
         tree
     }
 
+    /// Returns the current number of elements stored in the tree
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fixed::FixedU16;
+    /// use fixed::types::extra::U0;
+    /// use kiddo::FixedKdTree;
+    ///
+    /// type FXD = FixedU16<U0>;
+    ///
+    /// let mut tree: FixedKdTree<FXD, u32, 3, 32, u32> = FixedKdTree::with_capacity(1_000_000);
+    ///
+    /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
+    /// tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
+    ///
+    /// assert_eq!(tree.size(), 2);
+    /// ```
     #[inline]
     pub fn size(&self) -> T {
         self.size

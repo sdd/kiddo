@@ -8,6 +8,28 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
+    /// Queries the tree to find the nearest element to `query`, using the specified
+    /// distance metric function.
+    ///
+    /// Faster than querying for nearest_n(point, 1, ...) due
+    /// to not needing to allocate memory or maintain sorted results.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use kiddo::KdTree;
+    /// use kiddo::distance::squared_euclidean;
+    ///
+    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+    ///
+    /// tree.add(&[1.0, 2.0, 5.0], 100);
+    /// tree.add(&[2.0, 3.0, 6.0], 101);
+    ///
+    /// let nearest = tree.nearest_one(&[1.0, 2.0, 5.1], &squared_euclidean);
+    ///
+    /// assert!((nearest.0 - 0.01f64).abs() < f64::EPSILON);
+    /// assert_eq!(nearest.1, 100);
+    /// ```
     #[inline]
     pub fn nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> (A, T)
     where

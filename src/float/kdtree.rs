@@ -13,9 +13,16 @@ use crate::types::{Content, Index};
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
 
+/// Axis trait represents the traits that must be implemented
+/// by the type that is used as the first generic parameter, `A`,
+/// on the float `KdTree`. This will be `f64` or `f32`.
 pub trait Axis: Float + Default + Debug + Copy + Sync {}
 impl<T: Float + Default + Debug + Copy + Sync> Axis for T {}
 
+/// Floating point KD Tree
+///
+/// For use when the co-ordinates of the points being stored in the tree
+/// are floats. f64 or f32 are supported currently
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "serialize_rkyv",
@@ -35,7 +42,7 @@ pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize, IDX: Inde
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[derive(Clone, Debug, PartialEq)]
-pub struct StemNode<A: Axis, const K: usize, IDX: Index<T = IDX>> {
+pub(crate) struct StemNode<A: Axis, const K: usize, IDX: Index<T = IDX>> {
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
     pub(crate) min_bound: [A; K],
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
@@ -52,7 +59,7 @@ pub struct StemNode<A: Axis, const K: usize, IDX: Index<T = IDX>> {
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[derive(Clone, Debug, PartialEq)]
-pub struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
+pub(crate) struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
     #[cfg_attr(
         feature = "serialize",
@@ -126,19 +133,40 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
+    /// Creates a new float KdTree. Capacity is set by default to 10x the bucket size (32 in this case).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use kiddo::KdTree;
+    ///
+    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+    ///
+    /// tree.add(&[1.0, 2.0, 5.0], 100);
+    /// ```
     #[inline]
     pub fn new() -> Self {
         KdTree::with_capacity(B * 10)
     }
 
+    /// Creates a new float KdTree and reserve capacity for a specific number of items.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use kiddo::KdTree;
+    ///
+    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
+    ///
+    /// tree.add(&[1.0, 2.0, 5.0], 100);
+    /// ```
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
-        debug_assert!((capacity.az::<IDX>()) < <IDX as Index>::max());
-        let capacity: IDX = capacity.az::<IDX>();
+        assert!(capacity <= <IDX as Index>::capacity_with_bucket_size(B));
         let mut tree = Self {
             size: T::zero(),
-            stems: Vec::with_capacity(capacity.ilog2().az::<usize>()),
-            leaves: Vec::with_capacity(capacity.div_ceil(B.az::<IDX>()).az::<usize>()),
+            stems: Vec::with_capacity(capacity.ilog2() as usize),
+            leaves: Vec::with_capacity(capacity.div_ceil(B.az::<usize>())),
             root_index: <IDX as Index>::leaf_offset(),
         };
 
@@ -147,6 +175,20 @@ where
         tree
     }
 
+    /// Returns the current number of elements stored in the tree
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use kiddo::KdTree;
+    ///
+    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+    ///
+    /// tree.add(&[1.0, 2.0, 5.0], 100);
+    /// tree.add(&[1.1, 2.1, 5.1], 101);
+    ///
+    /// assert_eq!(tree.size(), 2);
+    /// ```
     #[inline]
     pub fn size(&self) -> T {
         self.size
