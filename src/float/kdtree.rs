@@ -29,20 +29,21 @@ impl<T: Float + Default + Debug + Copy + Sync> Axis for T {}
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[derive(Clone, Debug, PartialEq)]
-pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
+pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
     pub(crate) leaves: Vec<LeafNode<A, T, K, B, IDX>>,
     pub(crate) stems: Vec<StemNode<A, K, IDX>>,
     pub(crate) root_index: IDX,
     pub(crate) size: T,
 }
 
+#[doc(hidden)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "serialize_rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct StemNode<A: Axis, const K: usize, IDX: Index<T = IDX>> {
+pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
     pub(crate) min_bound: [A; K],
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
@@ -53,19 +54,20 @@ pub(crate) struct StemNode<A: Axis, const K: usize, IDX: Index<T = IDX>> {
     pub(crate) split_val: A,
 }
 
+#[doc(hidden)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "serialize_rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
-    #[cfg_attr(feature = "serialize", serde(with = "array"))]
+pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
+    #[cfg_attr(feature = "serialize", serde(with = "array_of_arrays"))]
     #[cfg_attr(
         feature = "serialize",
         serde(bound(
-            serialize = "A: Serialize, T: Serialize",
-            deserialize = "A: Deserialize<'de>, T: Deserialize<'de> + Copy + Default"
+            serialize = "A: Serialize",
+            deserialize = "A: Deserialize<'de>"
         ))
     )]
     // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
@@ -104,14 +106,22 @@ pub(crate) struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize, 
     pub(crate) size: IDX,
 }
 
-impl<A: Axis, const K: usize, IDX: Index<T = IDX>> StemNode<A, K, IDX> {
+impl<A, const K: usize, IDX> StemNode<A, K, IDX>
+where
+    A: Axis,
+    IDX: Index<T = IDX>
+{
     pub(crate) fn extend(&mut self, point: &[A; K]) {
         extend(&mut self.min_bound, &mut self.max_bound, point);
     }
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+impl<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX>
     LeafNode<A, T, K, B, IDX>
+where
+    A: Axis,
+    T: Content,
+    IDX: Index<T = IDX>
 {
     pub(crate) fn new() -> Self {
         Self {
@@ -128,12 +138,17 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     }
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+impl<A, T, const K: usize, const B: usize, IDX>
     KdTree<A, T, K, B, IDX>
 where
+    A: Axis,
+    T: Content,
+    IDX: Index<T = IDX>,
     usize: Cast<IDX>,
 {
-    /// Creates a new float KdTree. Capacity is set by default to 10x the bucket size (32 in this case).
+    /// Creates a new float KdTree.
+    ///
+    /// Capacity is set by default to 10x the bucket size (32 in this case).
     ///
     /// # Examples
     ///
@@ -143,6 +158,8 @@ where
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
     ///
     /// tree.add(&[1.0, 2.0, 5.0], 100);
+    ///
+    /// assert_eq!(tree.size(), 1);
     /// ```
     #[inline]
     pub fn new() -> Self {
@@ -159,6 +176,8 @@ where
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
     ///
     /// tree.add(&[1.0, 2.0, 5.0], 100);
+    ///
+    /// assert_eq!(tree.size(), 1);
     /// ```
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {

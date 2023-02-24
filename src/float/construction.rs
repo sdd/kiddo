@@ -9,6 +9,22 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
+    /// Adds an item to the tree.
+    ///
+    /// The first argument specifies co-ordinates of the point where the item is located.
+    /// The second argument is an integer identifier / index for the item being stored.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use kiddo::KdTree;
+    ///
+    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+    ///
+    /// tree.add(&[1.0, 2.0, 5.0], 100);
+    ///
+    /// assert_eq!(tree.size(), 1);
+    /// ```
     #[inline]
     pub fn add(&mut self, query: &[A; K], item: T) {
         unsafe {
@@ -64,6 +80,28 @@ where
         self.size = self.size + T::one();
     }
 
+    /// Removes an item from the tree.
+    ///
+    /// The first argument specifies co-ordinates of the point where the item is located.
+    /// The second argument is the integer identifier / index for the stored item.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use kiddo::KdTree;
+    ///
+    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+    ///
+    /// tree.add(&[1.0, 2.0, 5.0], 100);
+    /// tree.add(&[1.0, 2.0, 5.0], 200);
+    /// assert_eq!(tree.size(), 2);
+    ///
+    /// tree.remove(&[1.0, 2.0, 5.0], 100);
+    /// assert_eq!(tree.size(), 1);
+    ///
+    /// tree.remove(&[1.0, 2.0, 5.0], 200);
+    /// assert_eq!(tree.size(), 0);
+    /// ```
     #[inline]
     pub fn remove(&mut self, query: &[A; K], item: T) -> usize {
         let mut stem_idx = self.root_index;

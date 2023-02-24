@@ -9,6 +9,27 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
+    /// Adds an item to the tree.
+    ///
+    /// The first argument specifies co-ordinates of the point where the item is located.
+    /// The second argument is an integer identifier / index for the item being stored.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fixed::FixedU16;
+    /// use fixed::types::extra::U0;
+    /// use kiddo::FixedKdTree;
+    ///
+    /// type FXD = FixedU16<U0>;
+    ///
+    /// let mut tree: FixedKdTree<FXD, u32, 3, 32, u32> = FixedKdTree::with_capacity(1_000_000);
+    ///
+    /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
+    /// tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
+    ///
+    /// assert_eq!(tree.size(), 2);
+    /// ```
     #[inline]
     pub fn add(&mut self, query: &[A; K], item: T) {
         unsafe {
@@ -64,6 +85,32 @@ where
         self.size = self.size + T::one();
     }
 
+    /// Removes an item from the tree.
+    ///
+    /// The first argument specifies co-ordinates of the point where the item is located.
+    /// The second argument is the integer identifier / index for the stored item.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fixed::FixedU16;
+    /// use fixed::types::extra::U0;
+    /// use kiddo::FixedKdTree;
+    ///
+    /// type FXD = FixedU16<U0>;
+    ///
+    /// let mut tree: FixedKdTree<FXD, u32, 3, 32, u32> = FixedKdTree::with_capacity(1_000_000);
+    ///
+    /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
+    /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 101);
+    /// assert_eq!(tree.size(), 2);
+    ///
+    /// tree.remove(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
+    /// assert_eq!(tree.size(), 1);
+    ///
+    /// tree.remove(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 101);
+    /// assert_eq!(tree.size(), 0);
+    /// ```
     #[inline]
     pub fn remove(&mut self, query: &[A; K], item: T) -> usize {
         let mut stem_idx = self.root_index;
