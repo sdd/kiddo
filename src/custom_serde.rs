@@ -138,3 +138,74 @@ pub(crate) mod array_of_2ples {
         deserializer.deserialize_tuple(N * 2, Array2PleVisitor::<T, N>(PhantomData))
     }
 }
+
+#[cfg(feature = "serialize")]
+pub(crate) mod array_of_arrays {
+    use core::option::Option::None;
+    use serde::{
+        de::{SeqAccess, Visitor},
+        ser::SerializeTuple,
+        Deserialize, Deserializer, Serialize, Serializer,
+    };
+    use std::marker::PhantomData;
+
+    pub fn serialize<S: Serializer, T: Serialize, const N: usize, const K: usize>(
+        data: &[[T; K]; N],
+        ser: S,
+    ) -> Result<S::Ok, S::Error> {
+        let mut s = ser.serialize_tuple(N * K)?;
+        for item in data {
+            for x in 0..K {
+                s.serialize_element(&item[x])?;
+            }
+        }
+        s.end()
+    }
+
+    struct ArrayArrayVisitor<T, const N: usize, const K: usize>(PhantomData<T>);
+
+    impl<'de, T, const N: usize, const K: usize> Visitor<'de> for ArrayArrayVisitor<T, N, K>
+    where
+        T: Copy + Default + Deserialize<'de>,
+    {
+        type Value = [[T; K]; N];
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str(&format!("an array of arrays, dimensions of {}x{}", K, N))
+        }
+
+        #[inline]
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            // can be optimized using MaybeUninit
+            // let mut data: Vec<(T, T)> = Vec::with_capacity(N);
+            let mut data = [[T::default(); K]; N];
+
+            for idx in 0..N {
+                for x in 0..K {
+                    match (seq.next_element::<T>())? {
+                        Some(val) => {
+                            data[idx][x] = val;
+                        },
+                        None => return Err(serde::de::Error::invalid_length(N, &self)),
+                    }
+                }
+            }
+            // match data.try_into() {
+            //     Ok(arr) => Ok(arr),
+            //     Err(_) => unreachable!(),
+            // }
+
+            Ok(data)
+        }
+    }
+    pub fn deserialize<'de, D, T, const N: usize, const K: usize>(deserializer: D) -> Result<[[T; K]; N], D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Copy + Default + Deserialize<'de>,
+    {
+        deserializer.deserialize_tuple(N * K, ArrayArrayVisitor::<T, N, K>(PhantomData))
+    }
+}

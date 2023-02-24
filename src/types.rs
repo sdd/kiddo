@@ -13,14 +13,11 @@ use std::fmt::Debug;
 /// a Vec, and try switching tqo a smaller type and benchmarking to see if you get better
 /// performance.
 pub trait Content:
-    Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync
-{
-}
+    Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync {}
 impl<
         T: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync,
-    > Content for T
-{
-}
+    > Content for T {}
+
 
 /// Implemented on u16 and u32 so that they can be used internally to index the
 /// `Vec`s of Stem and Leaf nodes.

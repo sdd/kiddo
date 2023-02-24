@@ -22,11 +22,20 @@ use serde::{Deserialize, Serialize};
 pub trait Axis: Fixed + Default + Debug + Copy + Sync {}
 impl<T: Fixed + Default + Debug + Copy + Sync> Axis for T {}
 
+
+/// Rkyv-serializable equivalent of `kiddo::fixed::kdtree::Axis`
 #[cfg(feature = "serialize_rkyv")]
 pub trait AxisRK: num_traits::Zero + Default + Debug + rkyv::Archive {}
 #[cfg(feature = "serialize_rkyv")]
 impl<T: num_traits::Zero + Default + Debug + rkyv::Archive> AxisRK for T {}
 
+/// Rkyv-serializable fixed point kd-ree
+///
+/// This is only required when using Rkyv to serialize to / deserialize from
+/// a FixedKdTree. The types in the `Fixed`  crate do not support `Rkyv` yet.
+/// As a workaround, we need to `std::mem::transmute` a `kiddo::fixed::kdtree::KdTree` into
+/// an equivalent `kiddo::fixed::kdtree::KdTreeRK` before serializing via Rkyv,
+/// and vice-versa when deserializing.
 #[cfg_attr(
     feature = "serialize_rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
@@ -39,8 +48,8 @@ pub struct KdTreeRK<
     const B: usize,
     IDX: Index<T = IDX>,
 > {
-    pub leaves: Vec<LeafNodeRK<A, T, K, B, IDX>>,
-    pub stems: Vec<StemNodeRK<A, K, IDX>>,
+    leaves: Vec<LeafNodeRK<A, T, K, B, IDX>>,
+    stems: Vec<StemNodeRK<A, K, IDX>>,
     pub(crate) root_index: IDX,
     size: T,
 }
@@ -53,19 +62,20 @@ pub struct KdTreeRK<
 /// decimal point.
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
-pub struct KdTree<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
+pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
     pub(crate) leaves: Vec<LeafNode<A, T, K, B, IDX>>,
     pub(crate) stems: Vec<StemNode<A, K, IDX>>,
     pub(crate) root_index: IDX,
     pub(crate) size: T,
 }
 
+#[doc(hidden)]
 #[cfg_attr(
     feature = "serialize_rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[cfg(feature = "serialize_rkyv")]
-pub(crate) struct StemNodeRK<A: num_traits::PrimInt, const K: usize, IDX: Index<T = IDX>> {
+pub struct StemNodeRK<A: num_traits::PrimInt, const K: usize, IDX: Index<T = IDX>> {
     pub(crate) min_bound: [A; K],
     pub(crate) max_bound: [A; K],
 
@@ -76,7 +86,7 @@ pub(crate) struct StemNodeRK<A: num_traits::PrimInt, const K: usize, IDX: Index<
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct StemNode<A: Axis, const K: usize, IDX: Index<T = IDX>> {
+pub(crate) struct StemNode<A: Copy + Default, const K: usize, IDX> {
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
     pub(crate) min_bound: [A; K],
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
@@ -87,12 +97,13 @@ pub(crate) struct StemNode<A: Axis, const K: usize, IDX: Index<T = IDX>> {
     pub(crate) split_val: A,
 }
 
+#[doc(hidden)]
 #[cfg_attr(
     feature = "serialize_rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[cfg(feature = "serialize_rkyv")]
-pub(crate) struct LeafNodeRK<
+pub struct LeafNodeRK<
     A: num_traits::PrimInt,
     T: Content,
     const K: usize,
@@ -109,13 +120,13 @@ pub(crate) struct LeafNodeRK<
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> {
-    #[cfg_attr(feature = "serialize", serde(with = "array"))]
+pub(crate) struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
+    #[cfg_attr(feature = "serialize", serde(with = "array_of_arrays"))]
     #[cfg_attr(
         feature = "serialize",
         serde(bound(
-            serialize = "A: Serialize, T: Serialize",
-            deserialize = "A: Deserialize<'de>, T: Deserialize<'de> + Copy + Default"
+            serialize = "A: Serialize",
+            deserialize = "A: Deserialize<'de> + Copy + Default"
         ))
     )]
     // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
@@ -154,14 +165,22 @@ pub(crate) struct LeafNode<A: Axis, T: Content, const K: usize, const B: usize, 
     pub(crate) size: IDX,
 }
 
-impl<A: Axis, const K: usize, IDX: Index<T = IDX>> StemNode<A, K, IDX> {
+impl<A, const K: usize, IDX> StemNode<A, K, IDX>
+where
+    A: Axis,
+    IDX: Index<T = IDX>
+{
     pub(crate) fn extend(&mut self, point: &[A; K]) {
         extend(&mut self.min_bound, &mut self.max_bound, point);
     }
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+impl<A, T, const K: usize, const B: usize, IDX>
     LeafNode<A, T, K, B, IDX>
+where
+    A: Axis,
+    T: Content,
+    IDX: Index<T = IDX>,
 {
     pub(crate) fn new() -> Self {
         Self {
@@ -178,9 +197,12 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     }
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+impl<A, T, const K: usize, const B: usize, IDX>
     KdTree<A, T, K, B, IDX>
 where
+    A: Axis,
+    T: Content,
+    IDX: Index<T = IDX>,
     usize: Cast<IDX>,
 {
     /// Creates a new fixed-point/int KdTree.
