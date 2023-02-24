@@ -10,11 +10,10 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
-
     /// Finds the "best" `n` elements within `radius` of `query`.
     ///
     /// Results are returned in arbitrary order. 'Best' is determined by
-    /// performing a comparison of the elements using < (ie, std::ord::lt).
+    /// performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt`]).
     /// Returns an iterator.
     ///
     /// # Examples

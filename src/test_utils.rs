@@ -128,7 +128,6 @@ where
     FixedU16<A>: AxisFixed,
 {
     (0..points_qty)
-        .into_iter()
         .map(|_| rand_data_fixed_u16_point::<A, K>())
         .collect()
 }

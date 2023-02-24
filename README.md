@@ -1,6 +1,6 @@
 # Kiddo
 
-> A flexible, high-performance kd-tree library.
+> A high-performance, versatile kd-tree library.
 
 * [Crate](https://crates.io/crates/kiddo)
 * [Documentation](https://docs.rs/kiddo)

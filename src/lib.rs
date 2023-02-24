@@ -4,11 +4,9 @@
 #![feature(strict_provenance)]
 #![feature(maybe_uninit_slice)]
 #![doc(html_root_url = "https://docs.rs/kiddo/2.0.0-beta.2")]
-#![feature(rustdoc_missing_doc_code_examples)]
 #![warn(rustdoc::missing_crate_level_docs)]
 #![deny(rustdoc::invalid_codeblock_attributes)]
 #![warn(missing_docs)]
-#![warn(rustdoc::missing_doc_code_examples)]
 #![warn(rustdoc::broken_intra_doc_links)]
 #![warn(rustdoc::private_intra_doc_links)]
 #![doc(html_root_url = "https://docs.rs/kiddo/2.0.0-beta.2")]
@@ -16,12 +14,13 @@
 
 //! # Kiddo
 //!
-//! A flexible, high-performance kd-tree library.
+//! A high-performance, versatile kd-tree library.
 //!
 //! v2 is a complete rewrite from the ground up, with a new internal architecture for
 //! much-improved performance. As well as the existing floating point capability, Kiddo v2
-//! now also supports fixed point / integers via the Fixed library. v2 also supports instant
-//! zero-copy serialization and deserialization via Rkyv, as well as Serde.
+//! now also supports fixed point / integers via the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate. v2 also supports instant
+//! zero-copy serialization and deserialization via [`Rkyv`](https://crates.io/crates/rkyv/0.7.39), as well as the usual [`Serde`](https://crates.io/crates/serde)-based
+//! serialisation / deserialisation.
 //!
 //! Kiddo is ideal for super-fast spatial / geospatial lookups and nearest-neighbour / KNN
 //! queries for low-ish numbers of dimensions.
@@ -75,6 +74,8 @@ extern crate serde_derive;
 
 #[cfg(feature = "serialize")]
 mod custom_serde;
+
+#[doc(hidden)]
 pub mod distance;
 
 pub mod fixed;
@@ -84,5 +85,7 @@ mod mirror_select_nth_unstable_by;
 pub mod test_utils;
 pub mod types;
 
+#[doc(inline)]
 pub use crate::fixed::kdtree::KdTree as FixedKdTree;
+#[doc(inline)]
 pub use crate::float::kdtree::KdTree;

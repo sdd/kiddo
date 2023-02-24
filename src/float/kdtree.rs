@@ -1,5 +1,5 @@
-//! Floating point KD Tree, for use when the co-ordinates of the points being stored in the tree
-//! are floats. f64 or f32 are supported currently.
+//! Floating point kd-tree, for use when the co-ordinates of the points being stored in the tree
+//! are floats. [`f64`] or [`f32`] are the types that are supported for use as co-ordinates.
 
 use az::{Az, Cast};
 use num_traits::Float;
@@ -15,14 +15,14 @@ use serde::{Deserialize, Serialize};
 
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
-/// on the float `KdTree`. This will be `f64` or `f32`.
+/// on the float [`KdTree`]. This will be [`f64`] or [`f32`].
 pub trait Axis: Float + Default + Debug + Copy + Sync {}
 impl<T: Float + Default + Debug + Copy + Sync> Axis for T {}
 
-/// Floating point KD Tree
+/// Floating point kd-tree
 ///
 /// For use when the co-ordinates of the points being stored in the tree
-/// are floats. f64 or f32 are supported currently
+/// are floats. [`f64`] or [`f32`] are supported currently for use as co-ordinates.
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "serialize_rkyv",
@@ -65,10 +65,7 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
     #[cfg_attr(feature = "serialize", serde(with = "array_of_arrays"))]
     #[cfg_attr(
         feature = "serialize",
-        serde(bound(
-            serialize = "A: Serialize",
-            deserialize = "A: Deserialize<'de>"
-        ))
+        serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
     )]
     // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
     pub(crate) content_points: [[A; K]; B],
@@ -109,7 +106,7 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
 impl<A, const K: usize, IDX> StemNode<A, K, IDX>
 where
     A: Axis,
-    IDX: Index<T = IDX>
+    IDX: Index<T = IDX>,
 {
     pub(crate) fn extend(&mut self, point: &[A; K]) {
         extend(&mut self.min_bound, &mut self.max_bound, point);
@@ -121,7 +118,7 @@ impl<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX>
 where
     A: Axis,
     T: Content,
-    IDX: Index<T = IDX>
+    IDX: Index<T = IDX>,
 {
     pub(crate) fn new() -> Self {
         Self {
@@ -138,8 +135,19 @@ where
     }
 }
 
-impl<A, T, const K: usize, const B: usize, IDX>
-    KdTree<A, T, K, B, IDX>
+impl<A, T, const K: usize, const B: usize, IDX> Default for KdTree<A, T, K, B, IDX>
+where
+    A: Axis,
+    T: Content,
+    IDX: Index<T = IDX>,
+    usize: Cast<IDX>,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<A, T, const K: usize, const B: usize, IDX> KdTree<A, T, K, B, IDX>
 where
     A: Axis,
     T: Content,
@@ -243,12 +251,6 @@ where
         }
     }
 }
-
-// impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index> Default for KdTree<A, T, K, B, IDX> where usize: Cast<IDX> {
-//     fn default() -> Self {
-//         Self::new()
-//     }
-// }
 
 #[cfg(test)]
 mod tests {

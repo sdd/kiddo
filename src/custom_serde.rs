@@ -188,7 +188,7 @@ pub(crate) mod array_of_arrays {
                     match (seq.next_element::<T>())? {
                         Some(val) => {
                             data[idx][x] = val;
-                        },
+                        }
                         None => return Err(serde::de::Error::invalid_length(N, &self)),
                     }
                 }
@@ -201,7 +201,9 @@ pub(crate) mod array_of_arrays {
             Ok(data)
         }
     }
-    pub fn deserialize<'de, D, T, const N: usize, const K: usize>(deserializer: D) -> Result<[[T; K]; N], D::Error>
+    pub fn deserialize<'de, D, T, const N: usize, const K: usize>(
+        deserializer: D,
+    ) -> Result<[[T; K]; N], D::Error>
     where
         D: Deserializer<'de>,
         T: Copy + Default + Deserialize<'de>,

@@ -10,9 +10,10 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
-    /// Queries the tree to find the best `n` elements within `radius` of `point`, using the specified
-    /// distance metric function. Results are returned in arbitrary order. 'Best' is determined by
-    /// performing a comparison of the elements using < (ie, std::ord::lt). Returns an iterator.
+    /// Queries the tree to find the best `n` elements within `radius` of `point`.
+    ///
+    /// Results are returned in arbitrary order. 'Best' is determined by
+    /// performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt`]). Returns an iterator.
     ///
     /// # Examples
     ///
@@ -78,7 +79,8 @@ where
         if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
             let node = unsafe { self.stems.get_unchecked(curr_node_idx.az::<usize>()) };
 
-            let child_node_indices = if unsafe { *query.get_unchecked(split_dim) } < node.split_val {
+            let child_node_indices = if unsafe { *query.get_unchecked(split_dim) } < node.split_val
+            {
                 [node.left, node.right]
             } else {
                 [node.right, node.left]
@@ -101,8 +103,7 @@ where
             }
         } else {
             let leaf_node = unsafe {
-                self
-                    .leaves
+                self.leaves
                     .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>())
             };
 
@@ -127,10 +128,8 @@ where
             .map(|entry| distance_fn(query, entry))
             .enumerate()
             .filter(|(_, distance)| *distance <= radius)
-            .for_each(|(idx, _)| {
-                unsafe {
-                    Self::get_item_and_add_if_good(max_qty, best_items, leaf_node, idx)
-                }
+            .for_each(|(idx, _)| unsafe {
+                Self::get_item_and_add_if_good(max_qty, best_items, leaf_node, idx)
             });
     }
 

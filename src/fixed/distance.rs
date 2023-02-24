@@ -7,8 +7,9 @@
 
 use crate::fixed::kdtree::Axis;
 
-/// Returns the squared euclidean distance between two points. When you only
-/// need to compare distances, rather than having the exact distance between
+/// Returns the squared euclidean distance between two points.
+///
+/// When you only need to compare distances, rather than having the exact distance between
 /// the points, this metric is beneficial because it avoids the expensive square
 /// root computation.
 ///

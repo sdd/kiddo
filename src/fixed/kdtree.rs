@@ -1,6 +1,6 @@
 //! Fixed point KD Tree, for use when the co-ordinates of the points being stored in the tree
-//! are fixed point or integers. `u8`, `u16`, `u32`, and `u64` based fixed-point / integers are supported
-//! via the Fixed crate, eg `FixedU16<U14>` for a 16-bit fixed point number with 14 bits after the
+//! are fixed point or integers. [`u8`], [`u16`], [`u32`], and [`u64`] based fixed-point / integers are supported
+//! via the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate, eg [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html) for a 16-bit fixed point number with 14 bits after the
 //! decimal point.
 
 use az::{Az, Cast};
@@ -17,11 +17,10 @@ use serde::{Deserialize, Serialize};
 
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
-/// on `FixedKdTree`. A type from the `Fixed` crate will implement
-/// all of the traits required by Axis. For example `FixedU16<U14>`.
+/// on [`FixedKdTree`](crate::FixedKdTree). A type from the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate will implement
+/// all of the traits required by Axis. For example [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html).
 pub trait Axis: Fixed + Default + Debug + Copy + Sync {}
 impl<T: Fixed + Default + Debug + Copy + Sync> Axis for T {}
-
 
 /// Rkyv-serializable equivalent of `kiddo::fixed::kdtree::Axis`
 #[cfg(feature = "serialize_rkyv")]
@@ -32,9 +31,9 @@ impl<T: num_traits::Zero + Default + Debug + rkyv::Archive> AxisRK for T {}
 /// Rkyv-serializable fixed point kd-ree
 ///
 /// This is only required when using Rkyv to serialize to / deserialize from
-/// a FixedKdTree. The types in the `Fixed`  crate do not support `Rkyv` yet.
-/// As a workaround, we need to `std::mem::transmute` a `kiddo::fixed::kdtree::KdTree` into
-/// an equivalent `kiddo::fixed::kdtree::KdTreeRK` before serializing via Rkyv,
+/// a [`FixedKdTree`](crate::FixedKdTree). The types in the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed)  crate do not support [`Rkyv`](https://crates.io/crates/rkyv/0.7.39) yet.
+/// As a workaround, we need to [`std::mem::transmute`] a [`crate::FixedKdTree`] into
+/// an equivalent [`crate::fixed::kdtree::KdTreeRK`] before serializing via Rkyv,
 /// and vice-versa when deserializing.
 #[cfg_attr(
     feature = "serialize_rkyv",
@@ -54,11 +53,11 @@ pub struct KdTreeRK<
     size: T,
 }
 
-/// Fixed point KD Tree
+/// Fixed point kd-tree
 ///
 /// For use when the co-ordinates of the points being stored in the tree
-/// are fixed point or integers. `u8`, `u16`, `u32`, and `u64` based fixed-point / integers are supported
-/// via the Fixed crate, eg `FixedU16<U14>` for a 16-bit fixed point number with 14 bits after the
+/// are fixed point or integers. [`u8`], [`u16`], [`u32`], and [`u64`] based fixed-point / integers are supported
+/// via the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate, eg [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html) for a 16-bit fixed point number with 14 bits after the
 /// decimal point.
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
@@ -120,7 +119,13 @@ pub struct LeafNodeRK<
 
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
+pub(crate) struct LeafNode<
+    A: Copy + Default,
+    T: Copy + Default,
+    const K: usize,
+    const B: usize,
+    IDX,
+> {
     #[cfg_attr(feature = "serialize", serde(with = "array_of_arrays"))]
     #[cfg_attr(
         feature = "serialize",
@@ -168,15 +173,14 @@ pub(crate) struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize,
 impl<A, const K: usize, IDX> StemNode<A, K, IDX>
 where
     A: Axis,
-    IDX: Index<T = IDX>
+    IDX: Index<T = IDX>,
 {
     pub(crate) fn extend(&mut self, point: &[A; K]) {
         extend(&mut self.min_bound, &mut self.max_bound, point);
     }
 }
 
-impl<A, T, const K: usize, const B: usize, IDX>
-    LeafNode<A, T, K, B, IDX>
+impl<A, T, const K: usize, const B: usize, IDX> LeafNode<A, T, K, B, IDX>
 where
     A: Axis,
     T: Content,
@@ -197,8 +201,19 @@ where
     }
 }
 
-impl<A, T, const K: usize, const B: usize, IDX>
-    KdTree<A, T, K, B, IDX>
+impl<A, T, const K: usize, const B: usize, IDX> Default for KdTree<A, T, K, B, IDX>
+where
+    A: Axis,
+    T: Content,
+    IDX: Index<T = IDX>,
+    usize: Cast<IDX>,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<A, T, const K: usize, const B: usize, IDX> KdTree<A, T, K, B, IDX>
 where
     A: Axis,
     T: Content,
@@ -306,12 +321,6 @@ where
         }
     }
 }
-
-// impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index> Default for KdTree<A, T, K, B, IDX> where usize: Cast<IDX> {
-//     fn default() -> Self {
-//         Self::new()
-//     }
-// }
 
 #[cfg(test)]
 mod tests {

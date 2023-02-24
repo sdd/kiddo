@@ -61,23 +61,26 @@ fn mirror_partition_at_index_loop<'a, AA, BB, F>(
         let (left_mirror, right_mirror) = mirror.split_at_mut(mid);
         let (_, right_mirror) = right_mirror.split_at_mut(1);
 
-        if mid < index {
-            target = right;
-            mirror = right_mirror;
-            index = index - mid - 1;
-            pred = Some(pivot);
-        } else if mid > index {
-            target = left;
-            mirror = left_mirror;
-        } else {
-            // If mid == index, then we're done, since partition() guaranteed that all elements
-            // after mid are greater than or equal to mid.
-            return;
-        }
+        match mid.cmp(&index) {
+            Ordering::Less => {
+                target = right;
+                mirror = right_mirror;
+                index = index - mid - 1;
+                pred = Some(pivot);
+            }
+            Ordering::Greater => {
+                target = left;
+                mirror = left_mirror;
+            }
+            Ordering::Equal => {
+                // If mid == index, then we're done, since partition() guaranteed that all elements
+                // after mid are greater than or equal to mid.
+                return;
+            }
+        };
     }
 }
 
-// TODO: apply target ops to mirror
 fn mirror_partition_equal<AA, BB, F>(
     target: &mut [AA],
     mirror: &mut [BB],
