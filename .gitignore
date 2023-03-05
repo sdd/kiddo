@@ -4,3 +4,6 @@
 /perf.data*
 /flamegraph.svg
 .coverage
+worldcities.csv
+cities.zip
+target/
