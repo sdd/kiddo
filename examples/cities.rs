@@ -5,40 +5,36 @@
 /// nearest neighbour (NN) and k-nearest-neighbour (KNN) queries.
 
 use std::error::Error;
+use std::fmt::Formatter;
 use std::fs::File;
 
 use csv::Reader;
 use kiddo::{float::distance::squared_euclidean, KdTree};
-use log::info;
 use serde::Deserialize;
 
-const EARTH_RADIUS_IN_KM: f32 = 6371.0;
+#[allow(dead_code)]
+pub const EARTH_RADIUS_IN_KM: f32 = 6371.0;
 
 /// Each `CityCsvRecord` corresponds to 1 row in our city source data CSV.
 ///
 /// Serde uses this to deserialize the CSV into a convenient format for us to work with.
 #[derive(Debug, Deserialize)]
 pub struct CityCsvRecord {
+    #[allow(dead_code)]
     #[serde(rename = "city")]
     name: String,
-
-    #[serde(rename = "city_ascii")]
-    name_ascii: String,
 
     lat: f32,
     lng: f32,
 
     country: String,
-    iso2: String,
-    iso3: String,
-
-    #[serde(deserialize_with = "csv::invalid_option")]
-    admin_name: Option<String>,
-
-    #[serde(deserialize_with = "csv::invalid_option")]
-    capital: Option<String>,
-
     population: u32,
+}
+
+impl std::fmt::Display for CityCsvRecord {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}, {} (pop. {})", self.name, self.country, self.population)
+    }
 }
 
 impl CityCsvRecord {
@@ -60,23 +56,14 @@ pub fn degrees_lat_lng_to_unit_sphere(lat: f32, lng: f32) -> [f32; 3] {
     [lat.cos() * lng.cos(), lat.cos() * lng.sin(), lat.sin()]
 }
 
-pub enum CapitalStatus {
-    Primary,
-    Admin,
-    Minor,
-    None,
-}
-
+#[allow(dead_code)]
 fn main() -> Result<(), Box<dyn Error>> {
-    // Open the CSV file
-    let csv_file = File::open("./examples/worldcities.csv")?;
-
     // parse the CSV file into a `Vec` of `CityCsvRecord`s. We'll keep hold of this Vec,
     // since Kiddo is intended to store indexes alongside points, rather than storing
     // all the data for each point. Our queries will return indexes into this `Vec`.
     // This design choice helps keep the size of the internal leaf nodes down within
     // Kiddo, which helps with performance.
-    let cities = parse_csv_file(csv_file);
+    let cities: Vec<CityCsvRecord> = parse_csv_file("./examples/worldcities.csv")?;
 
     // Construct an empty KdTree to hold the positions of the cities.
     // The positions of our Cities will be converted from lat/lng to 3D positions
@@ -134,12 +121,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     // now we perform the actual nearest neighbour query. We need to specify a
     // distance metric: we use `squared_euclidean` in this case, which is a good
     // default. See the `distance` module docs for a discussion o distance metrics.
-    let (dist, nearest_idx) = kdtree.nearest_one(&query, &squared_euclidean);
+    let (_, nearest_idx) = kdtree.nearest_one(&query, &squared_euclidean);
 
     // since the result of the query is an index, we need to use this index
     // on the `cities` `Vec` in order to retrieve the original record.
     let nearest = &cities[nearest_idx as usize];
-    println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest);
+    println!("\nNearest city to 52.5N, 1.9W: {}", nearest);
 
     // ### Find the nearest five cities to 52.5N, 1.9W
     // Let's try something similar, but a K-nearest-neighbour (KNN) query instead.
@@ -204,6 +191,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 /// Converts a squared euclidean unit sphere distance (like what we'd get back from
 /// our kd-tree) into kilometres for user convenience.
+#[allow(dead_code)]
 pub fn unit_sphere_squared_euclidean_to_kilometres(sq_euc_dist: f32) -> f32 {
     sq_euc_dist.sqrt() * EARTH_RADIUS_IN_KM
 }
@@ -215,14 +203,15 @@ pub fn kilometres_to_unit_sphere_squared_euclidean(km_dist: f32) -> f32 {
     (km_dist / EARTH_RADIUS_IN_KM).powi(2)
 }
 
-/// Parses CSV data from `file` into a `Vec` of `CityCsvRecord`s
-pub fn parse_csv_file(file: File) -> Vec<CityCsvRecord> {
-    let cities: Vec<CityCsvRecord> = Reader::from_reader(file)
+/// Parses CSV data from `file` into a `Vec` of `R`
+pub fn parse_csv_file<R: for<'de> serde::Deserialize<'de>>(filename: &str) -> Result<Vec<R>, std::io::Error> {
+    let file = File::open(filename)?;
+    let cities: Vec<R> = Reader::from_reader(file)
         .deserialize()
         .filter_map(Result::ok)
         .collect();
 
     println!("Cities successfully parsed from CSV: {:?}", cities.len());
 
-    cities
+    Ok(cities)
 }
