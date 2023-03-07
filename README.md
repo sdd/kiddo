@@ -5,7 +5,9 @@
 * [Crate](https://crates.io/crates/kiddo)
 * [Documentation](https://docs.rs/kiddo)
 * [Usage](#usage)
+* [Examples](https://github.com/sdd/kiddo/blob/master/examples/Readme.md)
 * [Benchmarks](#benchmarks)
+* [Change Log](https://github.com/sdd/kiddo/blob/master/CHANGELOG.md)
 * [License](#license)
 
 
@@ -17,7 +19,7 @@ v2 is a complete rewrite from the ground up, with a new internal architecture fo
 Add `kiddo` to `Cargo.toml`
 ```toml
 [dependencies]
-kiddo = "2"
+kiddo = "2.0.0-beta.4"
 ```
 
 Add points to kdtree and query nearest n points with distance function
