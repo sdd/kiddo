@@ -1,4 +1,4 @@
-//! Fixed point KD Tree, for use when the co-ordinates of the points being stored in the tree
+//! Fixed point k-d tree, for use when the co-ordinates of the points being stored in the tree
 //! are fixed point or integers. `u8`, `u16`, `u32`, and `u64` based fixed-point / integers are supported
 //! via the Fixed crate, eg `FixedU16<U14>` for a 16-bit fixed point number with 14 bits after the
 //! decimal point.
@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
-/// on `FixedKdTree`. A type from the `Fixed` crate will implement
+/// on `KdTree`. A type from the `Fixed` crate will implement
 /// all of the traits required by Axis. For example `FixedU16<U14>`.
 pub trait Axis: Fixed + Default + Debug + Copy + Sync {}
 impl<T: Fixed + Default + Debug + Copy + Sync> Axis for T {}
@@ -29,10 +29,10 @@ pub trait AxisRK: num_traits::Zero + Default + Debug + rkyv::Archive {}
 #[cfg(feature = "serialize_rkyv")]
 impl<T: num_traits::Zero + Default + Debug + rkyv::Archive> AxisRK for T {}
 
-/// Rkyv-serializable fixed point kd-ree
+/// Rkyv-serializable fixed point k-d tree
 ///
 /// This is only required when using Rkyv to serialize to / deserialize from
-/// a FixedKdTree. The types in the `Fixed`  crate do not support `Rkyv` yet.
+/// a KdTree. The types in the `Fixed`  crate do not support `Rkyv` yet.
 /// As a workaround, we need to `std::mem::transmute` a `kiddo::fixed::kdtree::KdTree` into
 /// an equivalent `kiddo::fixed::kdtree::KdTreeRK` before serializing via Rkyv,
 /// and vice-versa when deserializing.
@@ -54,7 +54,7 @@ pub struct KdTreeRK<
     size: T,
 }
 
-/// Fixed point KD Tree
+/// Fixed point k-d tree
 ///
 /// For use when the co-ordinates of the points being stored in the tree
 /// are fixed point or integers. `u8`, `u16`, `u32`, and `u64` based fixed-point / integers are supported
@@ -214,9 +214,9 @@ where
     /// ```rust
     /// use fixed::FixedU16;
     /// use fixed::types::extra::U14;
-    /// use kiddo::FixedKdTree;
+    /// use kiddo::fixed::kdtree::KdTree;
     ///
-    /// let mut tree: FixedKdTree<FixedU16<U14>, u32, 3, 32, u32> = FixedKdTree::new();
+    /// let mut tree: KdTree<FixedU16<U14>, u32, 3, 32, u32> = KdTree::new();
     ///
     /// assert_eq!(tree.size(), 0);
     /// ```
@@ -232,9 +232,9 @@ where
     /// ```rust
     /// use fixed::FixedU16;
     /// use fixed::types::extra::U14;
-    /// use kiddo::FixedKdTree;
+    /// use kiddo::fixed::kdtree::KdTree;
     ///
-    /// let mut tree: FixedKdTree<FixedU16<U14>, u32, 3, 32, u32> = FixedKdTree::with_capacity(1_000_000);
+    /// let mut tree: KdTree<FixedU16<U14>, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
     ///
     /// assert_eq!(tree.size(), 0);
     /// ```
@@ -260,11 +260,11 @@ where
     /// ```rust
     /// use fixed::FixedU16;
     /// use fixed::types::extra::U0;
-    /// use kiddo::FixedKdTree;
+    /// use kiddo::fixed::kdtree::KdTree;
     ///
     /// type FXD = FixedU16<U0>;
     ///
-    /// let mut tree: FixedKdTree<FXD, u32, 3, 32, u32> = FixedKdTree::with_capacity(1_000_000);
+    /// let mut tree: KdTree<FXD, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
     ///
     /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
     /// tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);

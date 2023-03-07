@@ -53,9 +53,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Parsed {} rows from the CSV: ({})", cities.len(), ElapsedDuration::new(start.elapsed()));
 
     let start = Instant::now();
-    let mut kdtree: KdTree<f32, u32, 3, 32, u32> = KdTree::with_capacity(cities.len());
+    let mut kdtree: KdTree<f32, 3> = KdTree::with_capacity(cities.len());
     cities.iter().enumerate().for_each(|(idx, city)| {
-        kdtree.add(&city.as_xyz(), idx as u32);
+        kdtree.add(&city.as_xyz(), idx);
     });
     println!("Populated kd-tree with {} items ({})", kdtree.size(), ElapsedDuration::new(start.elapsed()));
 
@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let start = Instant::now();
     let file = File::open("./examples/geonames-tree.rkyv")?;
-    let deserialized_tree: KdTree<f32, u32, 3, 32, u32> = deserialize_from_rkyv(file)?;
+    let deserialized_tree: KdTree<f32, 3> = deserialize_from_rkyv(file)?;
     println!("Deserialized rkyv file back into a kd-tree ({})", ElapsedDuration::new(start.elapsed()));
 
     // Test that the deserialization worked
@@ -84,7 +84,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn serialize_to_rkyv(file: &mut File, tree: KdTree<f32, u32, 3, 32, u32>) {
+fn serialize_to_rkyv(file: &mut File, tree: KdTree<f32, 3>) {
     let mut serialize_buffer = AlignedVec::with_capacity(BUFFER_LEN);
     let mut serialize_scratch = AlignedVec::with_capacity(SCRATCH_LEN);
     unsafe {
@@ -101,12 +101,12 @@ fn serialize_to_rkyv(file: &mut File, tree: KdTree<f32, u32, 3, 32, u32>) {
     file.write(&buf).expect("Could not write serialized rkyv to file");
 }
 
-fn deserialize_from_rkyv(mut file: File) -> Result<KdTree<f32, u32, 3, 32, u32>, Box<dyn Error>> {
+fn deserialize_from_rkyv(mut file: File) -> Result<KdTree<f32, 3>, Box<dyn Error>> {
     let mut buffer: Vec<u8> = Vec::new();
     file.read_to_end(&mut buffer)?;
 
-    let archived = unsafe { rkyv::archived_root::<KdTree<f32, u32, 3, 32, u32>>(&buffer) };
-    let tree: KdTree<f32, u32, 3, 32, u32> = archived.deserialize(&mut rkyv::Infallible).unwrap();
+    let archived = unsafe { rkyv::archived_root::<KdTree<f32, 3>>(&buffer) };
+    let tree: KdTree<f32, 3> = archived.deserialize(&mut rkyv::Infallible).unwrap();
 
     Ok(tree)
 }

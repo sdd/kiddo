@@ -49,9 +49,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Parsed {} rows from the CSV: ({})", cities.len(), ElapsedDuration::new(start.elapsed()));
 
     let start = Instant::now();
-    let mut kdtree: KdTree<f32, u32, 3, 32, u32> = KdTree::with_capacity(cities.len());
+    let mut kdtree: KdTree<f32, 3> = KdTree::with_capacity(cities.len());
     cities.iter().enumerate().for_each(|(idx, city)| {
-        kdtree.add(&city.as_xyz(), idx as u32);
+        kdtree.add(&city.as_xyz(), idx);
     });
     println!("Populated kd-tree with {} items ({})", kdtree.size(), ElapsedDuration::new(start.elapsed()));
 
@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     let file = File::open("./examples/geonames-tree.bincode.gz")?;
     let decompressor = GzDecoder::new(file);
-    let deserialized_tree: KdTree<f32, u32, 3, 32, u32> = bincode::deserialize_from(decompressor)?;
+    let deserialized_tree: KdTree<f32, 3> = bincode::deserialize_from(decompressor)?;
     println!("Deserialized gzipped bincode file back into a kd-tree ({})", ElapsedDuration::new(start.elapsed()));
 
     // Test that the deserialization worked

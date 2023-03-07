@@ -1,4 +1,4 @@
-//! Floating point KD Tree, for use when the co-ordinates of the points being stored in the tree
+//! Floating point k-d tree, for use when the co-ordinates of the points being stored in the tree
 //! are floats. f64 or f32 are supported currently.
 
 use az::{Az, Cast};
@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 pub trait Axis: Float + Default + Debug + Copy + Sync {}
 impl<T: Float + Default + Debug + Copy + Sync> Axis for T {}
 
-/// Floating point KD Tree
+/// Floating point k-d tree
 ///
 /// For use when the co-ordinates of the points being stored in the tree
 /// are floats. f64 or f32 are supported currently
@@ -153,7 +153,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::KdTree;
+    /// use kiddo::float::kdtree::KdTree;
     ///
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
     ///
@@ -171,7 +171,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::KdTree;
+    /// use kiddo::float::kdtree::KdTree;
     ///
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
     ///
@@ -199,7 +199,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::KdTree;
+    /// use kiddo::float::kdtree::KdTree;
     ///
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
     ///
@@ -241,6 +241,20 @@ where
                 distance_fn,
             )
         }
+    }
+}
+
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> From<&Vec<[A; K]>> for KdTree<A, T, K, B, IDX>
+    where usize: Cast<IDX>, usize: Cast<T>
+{
+    fn from(vec: &Vec<[A; K]>) -> Self {
+        let mut tree: KdTree<A, T, K, B, IDX> = KdTree::with_capacity(vec.len());
+
+        vec.iter().enumerate().for_each(|(idx, pos)|{
+           tree.add(pos, idx.az::<T>());
+        });
+
+        tree
     }
 }
 

@@ -16,7 +16,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::KdTree;
+    /// use kiddo::float::kdtree::KdTree;
     /// use kiddo::distance::squared_euclidean;
     ///
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
