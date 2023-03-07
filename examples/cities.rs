@@ -96,7 +96,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     //    good starting point - feel free to experiment with this if you want to eke
     //    out the most performance, but I've found 32 to be a good choice most of the time.
     // 5) `IDX`: u16 -
-    let mut kdtree: KdTree<f32, u16, 3, 32, u16> = KdTree::with_capacity(cities.len());
+    let mut kdtree: KdTree<f32, 3> = KdTree::with_capacity(cities.len());
 
     // Now we populate the newly-created empty kd tree with data about our cities.
     // Our `CityCsvRecord`s store their position as latitude and longitude, so we
@@ -104,7 +104,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // into 3D xyz co-ordinates. Our kd-tree uses `u16` indices so we need to cast
     // our `usize`s from `enumerate` into `u16`s for storage into the tree.
     cities.iter().enumerate().for_each(|(idx, city)| {
-        kdtree.add(&city.as_xyz(), idx as u16);
+        kdtree.add(&city.as_xyz(), idx);
     });
 
     println!("Loaded {} items into Kiddo kd-tree", kdtree.size());

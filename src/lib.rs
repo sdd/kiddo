@@ -3,12 +3,9 @@
 #![feature(stdsimd)]
 #![feature(strict_provenance)]
 #![feature(maybe_uninit_slice)]
-#![doc(html_root_url = "https://docs.rs/kiddo/2.0.0-beta.4")]
-#![feature(rustdoc_missing_doc_code_examples)]
 #![warn(rustdoc::missing_crate_level_docs)]
 #![deny(rustdoc::invalid_codeblock_attributes)]
 #![warn(missing_docs)]
-#![warn(rustdoc::missing_doc_code_examples)]
 #![warn(rustdoc::broken_intra_doc_links)]
 #![warn(rustdoc::private_intra_doc_links)]
 #![doc(html_root_url = "https://docs.rs/kiddo/2.0.0-beta.4")]
@@ -16,15 +13,19 @@
 
 //! # Kiddo
 //!
-//! A flexible, high-performance kd-tree library.
+//! A high-performance, flexible, ergonomic [k-d tree](https://en.wikipedia.org/wiki/K-d_tree) library.
 //!
-//! v2 is a complete rewrite from the ground up, with a new internal architecture for
-//! much-improved performance. As well as the existing floating point capability, Kiddo v2
-//! now also supports fixed point / integers via the Fixed library. v2 also supports instant
-//! zero-copy serialization and deserialization via Rkyv, as well as Serde.
+//! Version 2.x is a complete rewrite, providing:
+//! - a new internal architecture for **much-improved performance**;
+//! - Added **integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) library;
+//! - **instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
+//! - See the [changelog](https://github.com/sdd/kiddo/blob/master/CHANGELOG.md) for a detailed run-down on all the changes made in v2.
 //!
 //! Kiddo is ideal for super-fast spatial / geospatial lookups and nearest-neighbour / KNN
-//! queries for low-ish numbers of dimensions.
+//! queries for low-ish numbers of dimensions, where you want to ask questions such as:
+//!  - Find the [nearest_n](`float::kdtree::KdTree::nearest_n`) item(s) to a query point, ordered by distance;
+//!  - Find all items [within](`float::kdtree::KdTree::within`) a specified radius of a query point;
+//!  - Find the ["best" n item(s) within](`float::kdtree::KdTree::best_n_within`) a specified distance of a query point, for some definition of "best"
 //!
 //! ## Installation
 //!
@@ -38,34 +39,35 @@
 //! ```rust
 //! use kiddo::KdTree;
 //! use kiddo::distance::squared_euclidean;
-//! use kiddo::types::Index;
 //!
-//! let a: ([f64; 2], u32) = ([0f64, 0f64], 0);
-//! let b: ([f64; 2], u32) = ([1f64, 1f64], 1);
-//! let c: ([f64; 2], u32) = ([2f64, 2f64], 2);
-//! let d: ([f64; 2], u32) = ([3f64, 3f64], 3);
+//! let entries = vec![
+//!     [0f64, 0f64],
+//!     [1f64, 1f64],
+//!     [2f64, 2f64],
+//!     [3f64, 3f64]
+//! ];
 //!
-//! let mut kdtree: KdTree<f64, u32, 2, 32, u32> = KdTree::new();
+//! // use the kiddo::KdTree type to get up and running quickly with default settings
+//! let mut kdtree: KdTree<_, 2> = (&entries).into();
 //!
-//! kdtree.add(&a.0, a.1);
-//! kdtree.add(&b.0, b.1);
-//! kdtree.add(&c.0, c.1);
-//! kdtree.add(&d.0, d.1);
-//!
+//! // How many items are in tree?
 //! assert_eq!(kdtree.size(), 4);
+//!
+//! // find the nearest item to [0f64, 0f64].
+//! // returns a tuple of (dist, index)
 //! assert_eq!(
-//!     kdtree.nearest_n(&a.0, 1, &squared_euclidean).collect::<Vec<_>>(),
-//!     vec![(0f64, 0)]
+//!     kdtree.nearest_one(&[0f64, 0f64], &squared_euclidean),
+//!     (0f64, 0)
 //! );
+//!
+//! // find the nearest 3 items to [0f64, 0f64], and collect into a `Vec`
 //! assert_eq!(
-//!     kdtree.nearest_n(&a.0, 2, &squared_euclidean).collect::<Vec<_>>(),
-//!     vec![(0f64, 0), (2f64, 1)]
-//! );
-//! assert_eq!(
-//!     kdtree.nearest_n(&a.0, 3, &squared_euclidean).collect::<Vec<_>>(),
+//!     kdtree.nearest_n(&[0f64, 0f64], 3, &squared_euclidean).collect::<Vec<_>>(),
 //!     vec![(0f64, 0), (2f64, 1), (8f64, 2)]
 //! );
 //! ```
+//!
+//! See the [examples documentation](https://github.com/sdd/kiddo/tree/master/examples) for some more in-depth examples.
 
 #[cfg(feature = "serialize")]
 extern crate serde;
@@ -83,5 +85,11 @@ mod mirror_select_nth_unstable_by;
 pub mod test_utils;
 pub mod types;
 
-pub use crate::fixed::kdtree::KdTree as FixedKdTree;
-pub use crate::float::kdtree::KdTree;
+/// A floating-point k-d tree with default parameters.
+///
+/// `A` is the floating point type (`f32` or `f64`).
+/// `K` is the number of dimensions. See [`float::kdtree::KdTree`] for details of how to use.
+///
+/// To manually specify more advanced parameters, use [`float::kdtree::KdTree`] directly.
+/// To store positions using integer or fixed-point types, use [`fixed::kdtree::KdTree`].
+pub type KdTree<A, const K: usize> = float::kdtree::KdTree<A, usize, K, 32, u32>;

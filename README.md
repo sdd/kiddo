@@ -1,6 +1,6 @@
 # Kiddo
 
-> A flexible, high-performance kd-tree library.
+> A high-performance, flexible, ergonomic [k-d tree](https://en.wikipedia.org/wiki/K-d_tree) library.
 
 * [Crate](https://crates.io/crates/kiddo)
 * [Documentation](https://docs.rs/kiddo)
@@ -10,10 +10,18 @@
 * [Change Log](https://github.com/sdd/kiddo/blob/master/CHANGELOG.md)
 * [License](#license)
 
+Kiddo is ideal for super-fast spatial / geospatial lookups and nearest-neighbour / KNN queries for low-ish numbers of dimensions, where you want to ask questions such as:
+ - Find the [nearest_n](`float::kdtree::KdTree::nearest_n`) item(s) to a query point, ordered by distance;
+ - Find all items [within](`float::kdtree::KdTree::within`) a specified radius of a query point;
+ - Find the ["best" n item(s) within](`float::kdtree::KdTree::best_n_within`) a specified distance of a query point, for some definition of "best"
 
 ## Differences vs Kiddo v1.x
 
-v2 is a complete rewrite from the ground up, with a new internal architecture for much-improved performance. As well as the existing floating point capability, Kiddo v2 now also supports fixed point / integers via the Fixed library. v2 also supports instant zero-copy serialization and deserialization via Rkyv, as well as Serde. See the changelog for a detailed run-down of the changes made since v1.
+Version 2.x is a complete rewrite, providing:
+- a new internal architecture for **much-improved performance**;
+- Added **integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) library;
+- **instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
+- See the [changelog](https://github.com/sdd/kiddo/blob/master/CHANGELOG.md) for a detailed run-down on all the changes made in v2.
 
 ## Usage
 Add `kiddo` to `Cargo.toml`
@@ -27,50 +35,33 @@ Add points to kdtree and query nearest n points with distance function
 use kiddo::KdTree;
 use kiddo::distance::squared_euclidean;
 
-let a: ([f64; 2], usize) = ([0f64, 0f64], 0);
-let b: ([f64; 2], usize) = ([1f64, 1f64], 1);
-let c: ([f64; 2], usize) = ([2f64, 2f64], 2);
-let d: ([f64; 2], usize) = ([3f64, 3f64], 3);
+let entries = vec![
+    [0f64, 0f64],
+    [1f64, 1f64],
+    [2f64, 2f64],
+    [3f64, 3f64]
+];
 
-let mut kdtree = KdTree::new()?;
+// use the kiddo::KdTree type to get up and running quickly with default settings
+let mut kdtree: KdTree<_, 2> = (&entries).into();
 
-kdtree.add(&a.0, a.1)?;
-kdtree.add(&b.0, b.1)?;
-kdtree.add(&c.0, c.1)?;
-kdtree.add(&d.0, d.1)?;
-
+// How many items are in tree?
 assert_eq!(kdtree.size(), 4);
 
+// find the nearest item to [0f64, 0f64].
+// returns a tuple of (dist, index)
+assert_eq!(
+    kdtree.nearest_one(&[0f64, 0f64], &squared_euclidean),
+    (0f64, 0)
+);
 
+// find the nearest 3 items to [0f64, 0f64], and collect into a `Vec`
 assert_eq!(
-    kdtree.nearest(&a.0, 0, &squared_euclidean).unwrap(),
-    vec![]
-);
-assert_eq!(
-    kdtree.nearest(&a.0, 1, &squared_euclidean).unwrap(),
-    vec![(0f64, &0)]
-);
-assert_eq!(
-    kdtree.nearest(&a.0, 2, &squared_euclidean).unwrap(),
-    vec![(0f64, &0), (2f64, &1)]
-);
-assert_eq!(
-    kdtree.nearest(&a.0, 3, &squared_euclidean).unwrap(),
-    vec![(0f64, &0), (2f64, &1), (8f64, &2)]
-);
-assert_eq!(
-    kdtree.nearest(&a.0, 4, &squared_euclidean).unwrap(),
-    vec![(0f64, &0), (2f64, &1), (8f64, &2), (18f64, &3)]
-);
-assert_eq!(
-    kdtree.nearest(&a.0, 5, &squared_euclidean).unwrap(),
-    vec![(0f64, &0), (2f64, &1), (8f64, &2), (18f64, &3)]
-);
-assert_eq!(
-    kdtree.nearest(&b.0, 4, &squared_euclidean).unwrap(),
-    vec![(0f64, &1), (2f64, &0), (2f64, &2), (8f64, &3)]
+    kdtree.nearest_n(&[0f64, 0f64], 3, &squared_euclidean).collect::<Vec<_>>(),
+    vec![(0f64, 0), (2f64, 1), (8f64, 2)]
 );
 ```
+See the [examples documentation](https://github.com/sdd/kiddo/tree/master/examples) for some more detailed examples.
 
 ## Benchmarks
 
@@ -92,7 +83,7 @@ The `Nearest n Items` tests query the tree for the nearest 1, 100 and 1,000 poin
 
 
 
-#### Methodology
+#### Benchmarking Methodology
 
 *NB*: This section is out-of-date and pertains to kiddo v1. I'll update it soon.
 
@@ -120,7 +111,7 @@ cargo criterion --message-format json --all-features > criterion-kiddo.ndjson
 python ./generate_benchmark_charts.py
 ```
 
-#### Results
+#### Benchmarking Results
 
 Updated benchmark results will be published soon.
 

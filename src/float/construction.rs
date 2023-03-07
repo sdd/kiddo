@@ -17,7 +17,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::KdTree;
+    /// use kiddo::float::kdtree::KdTree;
     ///
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
     ///
@@ -88,7 +88,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::KdTree;
+    /// use kiddo::float::kdtree::KdTree;
     ///
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
     ///
