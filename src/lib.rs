@@ -65,7 +65,6 @@
 //!     kdtree.nearest_n(&a.0, 3, &squared_euclidean).collect::<Vec<_>>(),
 //!     vec![(0f64, 0), (2f64, 1), (8f64, 2)]
 //! );
-//! # Ok::<(), std::io::ErrorKind>(())
 //! ```
 
 #[cfg(feature = "serialize")]

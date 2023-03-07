@@ -50,10 +50,6 @@ pub(crate) mod array {
                 }
             }
 
-            // match data.try_into() {
-            //     Ok(arr) => Ok(arr),
-            //     Err(_) => unreachable!(),
-            // }
             Ok(data)
         }
     }
@@ -66,7 +62,7 @@ pub(crate) mod array {
     }
 }
 
-#[cfg(feature = "serialize")]
+/*#[cfg(feature = "serialize")]
 pub(crate) mod array_of_2ples {
     use core::option::Option::None;
     use serde::{
@@ -137,7 +133,7 @@ pub(crate) mod array_of_2ples {
     {
         deserializer.deserialize_tuple(N * 2, Array2PleVisitor::<T, N>(PhantomData))
     }
-}
+}*/
 
 #[cfg(feature = "serialize")]
 pub(crate) mod array_of_arrays {
@@ -193,10 +189,6 @@ pub(crate) mod array_of_arrays {
                     }
                 }
             }
-            // match data.try_into() {
-            //     Ok(arr) => Ok(arr),
-            //     Err(_) => unreachable!(),
-            // }
 
             Ok(data)
         }
