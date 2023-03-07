@@ -7,3 +7,9 @@
 worldcities.csv
 cities.zip
 target/
+examples/*.txt
+examples/*.zip
+examples/*.csv
+examples/*.json
+examples/*.rkyv
+examples/*.bincode.gz
