@@ -11,9 +11,9 @@
 * [License](#license)
 
 Kiddo is ideal for super-fast spatial / geospatial lookups and nearest-neighbour / KNN queries for low-ish numbers of dimensions, where you want to ask questions such as:
- - Find the [nearest_n](`float::kdtree::KdTree::nearest_n`) item(s) to a query point, ordered by distance;
- - Find all items [within](`float::kdtree::KdTree::within`) a specified radius of a query point;
- - Find the ["best" n item(s) within](`float::kdtree::KdTree::best_n_within`) a specified distance of a query point, for some definition of "best"
+ - Find the [nearest_n](https://docs.rs/kiddo/2.0.0-beta.5/kiddo/float/kdtree/struct.KdTree.html#method.nearest_n) item(s) to a query point, ordered by distance;
+ - Find all items [within](https://docs.rs/kiddo/2.0.0-beta.5/kiddo/float/kdtree/struct.KdTree.html#method.within) a specified radius of a query point;
+ - Find the ["best" n item(s) within](https://docs.rs/kiddo/2.0.0-beta.5/kiddo/float/kdtree/struct.KdTree.html#method.best_n_within) a specified distance of a query point, for some definition of "best"
 
 ## Differences vs Kiddo v1.x
 
