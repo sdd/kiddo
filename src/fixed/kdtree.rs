@@ -243,7 +243,7 @@ where
         assert!(capacity <= <IDX as Index>::capacity_with_bucket_size(B));
         let mut tree = Self {
             size: T::zero(),
-            stems: Vec::with_capacity(capacity.ilog2() as usize),
+            stems: Vec::with_capacity(capacity.max(1).ilog2() as usize),
             leaves: Vec::with_capacity(capacity.div_ceil(B.az::<usize>())),
             root_index: <IDX as Index>::leaf_offset(),
         };
@@ -332,6 +332,13 @@ mod tests {
     #[test]
     fn it_can_be_constructed_with_a_defined_capacity() {
         let tree: KdTree<FXD, u32, 4, 32, u32> = KdTree::with_capacity(10);
+
+        assert_eq!(tree.size(), 0);
+    }
+
+    #[test]
+    fn it_can_be_constructed_with_a_capacity_of_zero() {
+        let tree: KdTree<FXD, u32, 4, 32, u32> = KdTree::with_capacity(0);
 
         assert_eq!(tree.size(), 0);
     }
