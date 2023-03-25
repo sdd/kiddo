@@ -40,7 +40,7 @@ where
 
                 stem_node.extend(query);
 
-                stem_idx = if *query.get_unchecked(split_dim) < stem_node.split_val {
+                stem_idx = if *query.get_unchecked(split_dim) <= stem_node.split_val {
                     is_left_child = true;
                     stem_node.left
                 } else {
@@ -113,7 +113,7 @@ where
                 return removed;
             };
 
-            stem_idx = if query[split_dim] < stem_node.split_val {
+            stem_idx = if query[split_dim] <= stem_node.split_val {
                 stem_node.left
             } else {
                 stem_node.right
@@ -449,5 +449,54 @@ mod tests {
         points_to_add
             .iter()
             .for_each(|point| kdtree.add(&point.0, point.1));
+    }
+
+    #[test]
+    fn test_can_handle_remove_edge_case_from_issue_12() {
+        // See: https://github.com/sdd/kiddo/issues/12
+        let pts = vec![
+            [19.2023, 7.1812],
+            [7.6427, 22.5779],
+            [26.6314, 34.8920],
+            [36.7890, 27.2663],
+            [28.3226, 8.5047],
+            [5.3914, 28.1360],
+            [5.0978, 3.6814],
+            [0.5114, 11.6552],
+            [4.7981, 21.6210],
+            [29.0030, 9.6799],
+            [35.5580, 1.8891],
+            [3.9160, 25.5702],
+            [22.2497, 31.6140],
+            [30.7110, 36.7514],
+            [0.2828, 12.4298],
+            [20.0206, 3.0635],
+            [30.6153, 2.8582],
+            [23.7179, 6.2048],
+            [13.0438, 4.2319],
+            [4.6433, 30.9660],
+            [5.0588, 5.2028],
+            [19.2023, 23.7406],
+            [37.3171, 32.7523],
+            [12.6957, 15.7080],
+            [15.6001, 14.3995],
+            [36.0203, 21.0366],
+            [6.3956, 2.7644],
+            [3.1719, 8.7039],
+            [0.9159, 12.2299],
+            [23.8157, 14.0699],
+            [27.7757, 7.3597],
+            [28.4198, 31.3427],
+            [2.3290, 6.2364],
+            [10.1126, 7.7009],
+        ];
+
+        let mut tree = KdTree::<f64, usize, 2, 32, u32>::new();
+
+        for (i, pt) in pts.iter().enumerate() {
+            tree.add(pt, i);
+        }
+
+        assert_eq!(tree.remove(&pts[0], 0), 1);
     }
 }
