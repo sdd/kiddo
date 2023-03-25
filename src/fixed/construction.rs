@@ -45,7 +45,7 @@ where
 
                 stem_node.extend(query);
 
-                stem_idx = if *query.get_unchecked(split_dim) < stem_node.split_val {
+                stem_idx = if *query.get_unchecked(split_dim) <= stem_node.split_val {
                     is_left_child = true;
                     stem_node.left
                 } else {
@@ -122,7 +122,7 @@ where
                 return removed;
             };
 
-            stem_idx = if query[split_dim] < stem_node.split_val {
+            stem_idx = if query[split_dim] <= stem_node.split_val {
                 stem_node.left
             } else {
                 stem_node.right

@@ -30,7 +30,7 @@ The output below was run on a Ryzen 5900X with 32Gb DDR4-3600.
 
 ```
 > cargo run --release --example serde --features="serialize"
-   Compiling kiddo v2.0.0-beta.6 (~/kiddo)
+   Compiling kiddo v2.0.0-beta.7 (~/kiddo)
     Finished release [optimized + debuginfo] target(s) in 5.18s
      Running `target/release/examples/serde`
 Cities successfully parsed from CSV: 11061987
@@ -55,7 +55,7 @@ Rkyv for serialization / deserialization
 
 ```
 > cargo run --release --example rkyv --features="serialize_rkyv"
-   Compiling kiddo v2.0.0-beta.6 (~/kiddo)
+   Compiling kiddo v2.0.0-beta.7 (~/kiddo)
     Finished release [optimized + debuginfo] target(s) in 3.91s
      Running `target/release/examples/rkyv`
 Cities successfully parsed from CSV: 11061987

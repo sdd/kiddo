@@ -1,6 +1,6 @@
 # Kiddo Changelog
 
-## 2.0.0-beta.6
+## 2.0.0-beta.7
 
 Version 2 is a complete rewrite and rearchitecting of Kiddo. The same methods have been provided (except periodic boundary conditions, for now), but large performance improvements have been made across the board, and some improvements have been made to the ergonomics of the library also.
 Needless to say, this is a breaking change, but I hope you find the upgrade not too difficult as the improvements are significant.
