@@ -8,7 +8,6 @@ use std::fmt::Debug;
 
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;
-use crate::float::util::{distance_to_bounds, extend};
 use crate::types::{Content, Index};
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
@@ -44,11 +43,6 @@ pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B:
 )]
 #[derive(Clone, Debug, PartialEq)]
 pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
-    #[cfg_attr(feature = "serialize", serde(with = "array"))]
-    pub(crate) min_bound: [A; K],
-    #[cfg_attr(feature = "serialize", serde(with = "array"))]
-    pub(crate) max_bound: [A; K],
-
     pub(crate) left: IDX,
     pub(crate) right: IDX,
     pub(crate) split_val: A,
@@ -65,10 +59,7 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
     #[cfg_attr(feature = "serialize", serde(with = "array_of_arrays"))]
     #[cfg_attr(
         feature = "serialize",
-        serde(bound(
-            serialize = "A: Serialize",
-            deserialize = "A: Deserialize<'de>"
-        ))
+        serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
     )]
     // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
     pub(crate) content_points: [[A; K]; B],
@@ -83,37 +74,7 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
     )]
     pub(crate) content_items: [T; B],
 
-    #[cfg_attr(feature = "serialize", serde(with = "array"))]
-    #[cfg_attr(
-        feature = "serialize",
-        serde(bound(
-            serialize = "A: Serialize",
-            deserialize = "A: Deserialize<'de> + Copy + Default"
-        ))
-    )]
-    pub(crate) min_bound: [A; K],
-
-    #[cfg_attr(feature = "serialize", serde(with = "array"))]
-    #[cfg_attr(
-        feature = "serialize",
-        serde(bound(
-            serialize = "A: Serialize",
-            deserialize = "A: Deserialize<'de> + Copy + Default"
-        ))
-    )]
-    pub(crate) max_bound: [A; K],
-
     pub(crate) size: IDX,
-}
-
-impl<A, const K: usize, IDX> StemNode<A, K, IDX>
-where
-    A: Axis,
-    IDX: Index<T = IDX>
-{
-    pub(crate) fn extend(&mut self, point: &[A; K]) {
-        extend(&mut self.min_bound, &mut self.max_bound, point);
-    }
 }
 
 impl<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX>
@@ -121,25 +82,18 @@ impl<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX>
 where
     A: Axis,
     T: Content,
-    IDX: Index<T = IDX>
+    IDX: Index<T = IDX>,
 {
     pub(crate) fn new() -> Self {
         Self {
-            min_bound: [A::max_value(); K],
-            max_bound: [A::min_value(); K],
             content_points: [[A::zero(); K]; B],
             content_items: [T::zero(); B],
             size: IDX::zero(),
         }
     }
-
-    pub(crate) fn extend(&mut self, point: &[A; K]) {
-        extend(&mut self.min_bound, &mut self.max_bound, point);
-    }
 }
 
-impl<A, T, const K: usize, const B: usize, IDX>
-    KdTree<A, T, K, B, IDX>
+impl<A, T, const K: usize, const B: usize, IDX> KdTree<A, T, K, B, IDX>
 where
     A: Axis,
     T: Content,
@@ -216,53 +170,24 @@ where
     pub(crate) fn is_stem_index(x: IDX) -> bool {
         x < <IDX as Index>::leaf_offset()
     }
-
-    pub(crate) fn child_dist_to_bounds<F>(
-        &self,
-        query: &[A; K],
-        child_node_idx: IDX,
-        distance_fn: &F,
-    ) -> A
-    where
-        F: Fn(&[A; K], &[A; K]) -> A,
-    {
-        if KdTree::<A, T, K, B, IDX>::is_stem_index(child_node_idx) {
-            distance_to_bounds(
-                query,
-                &self.stems[child_node_idx.az::<usize>()].min_bound,
-                &self.stems[child_node_idx.az::<usize>()].max_bound,
-                distance_fn,
-            )
-        } else {
-            distance_to_bounds(
-                query,
-                &self.leaves[(child_node_idx - IDX::leaf_offset()).az::<usize>()].min_bound,
-                &self.leaves[(child_node_idx - IDX::leaf_offset()).az::<usize>()].max_bound,
-                distance_fn,
-            )
-        }
-    }
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> From<&Vec<[A; K]>> for KdTree<A, T, K, B, IDX>
-    where usize: Cast<IDX>, usize: Cast<T>
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> From<&Vec<[A; K]>>
+    for KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+    usize: Cast<T>,
 {
     fn from(vec: &Vec<[A; K]>) -> Self {
         let mut tree: KdTree<A, T, K, B, IDX> = KdTree::with_capacity(vec.len());
 
-        vec.iter().enumerate().for_each(|(idx, pos)|{
-           tree.add(pos, idx.az::<T>());
+        vec.iter().enumerate().for_each(|(idx, pos)| {
+            tree.add(pos, idx.az::<T>());
         });
 
         tree
     }
 }
-
-// impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index> Default for KdTree<A, T, K, B, IDX> where usize: Cast<IDX> {
-//     fn default() -> Self {
-//         Self::new()
-//     }
-// }
 
 #[cfg(test)]
 mod tests {

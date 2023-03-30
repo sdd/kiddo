@@ -35,6 +35,7 @@ where
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
+        let mut off = [A::zero(); K];
         unsafe {
             self.nearest_one_recurse(
                 query,
@@ -43,6 +44,8 @@ where
                 0,
                 T::zero(),
                 A::max_value(),
+                &mut off,
+                A::zero(),
             )
         }
     }
@@ -56,6 +59,8 @@ where
         split_dim: usize,
         mut best_item: T,
         mut best_dist: A,
+        off: &mut [A; K],
+        rd: A,
     ) -> (A, T)
     where
         F: Fn(&[A; K], &[A; K]) -> A,
@@ -63,29 +68,54 @@ where
         if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
             let node = &self.stems.get_unchecked(curr_node_idx.az::<usize>());
 
-            let child_node_indices = if *query.get_unchecked(split_dim) < node.split_val {
-                [node.left, node.right]
-            } else {
-                [node.right, node.left]
-            };
+            let mut rd = rd;
+            let old_off = off[split_dim];
+            let new_off = query[split_dim] - node.split_val;
+
+            let [closer_node_idx, further_node_idx] =
+                if *query.get_unchecked(split_dim) < node.split_val {
+                    [node.left, node.right]
+                } else {
+                    [node.right, node.left]
+                };
             let next_split_dim = (split_dim + 1).rem(K);
 
-            for node_idx in child_node_indices {
-                let child_node_dist = self.child_dist_to_bounds(query, node_idx, distance_fn);
-                if child_node_dist <= best_dist {
-                    let (dist, item) = self.nearest_one_recurse(
-                        query,
-                        distance_fn,
-                        node_idx,
-                        next_split_dim,
-                        best_item,
-                        best_dist,
-                    );
+            let (dist, item) = self.nearest_one_recurse(
+                query,
+                distance_fn,
+                closer_node_idx,
+                next_split_dim,
+                best_item,
+                best_dist,
+                off,
+                rd,
+            );
 
-                    if dist < best_dist {
-                        best_dist = dist;
-                        best_item = item;
-                    }
+            if dist < best_dist {
+                best_dist = dist;
+                best_item = item;
+            }
+
+            // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
+            //       so that updating rd is not hardcoded to sq euclidean
+            rd = rd + new_off * new_off - old_off * old_off;
+            if rd <= best_dist {
+                off[split_dim] = new_off;
+                let (dist, item) = self.nearest_one_recurse(
+                    query,
+                    distance_fn,
+                    further_node_idx,
+                    next_split_dim,
+                    best_item,
+                    best_dist,
+                    off,
+                    rd,
+                );
+                off[split_dim] = old_off;
+
+                if dist < best_dist {
+                    best_dist = dist;
+                    best_item = item;
                 }
             }
         } else {
@@ -186,7 +216,35 @@ mod tests {
             let result = tree.nearest_one(&query_point, &manhattan);
 
             assert_eq!(result.0, expected.0);
-            //assert_eq!(result.1, expected.1);
+        }
+    }
+
+    #[test]
+    fn can_query_nearest_one_item_large_scale() {
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 100;
+
+        let content_to_add: Vec<([f32; 4], u32)> = (0..TREE_SIZE)
+            .map(|_| rand::random::<([f32; 4], u32)>())
+            .collect();
+
+        let mut tree: KdTree<AX, u32, 4, 32, u32> = KdTree::with_capacity(TREE_SIZE);
+        content_to_add
+            .iter()
+            .for_each(|(point, content)| tree.add(point, *content));
+        assert_eq!(tree.size(), TREE_SIZE as u32);
+
+        let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)
+            .map(|_| rand::random::<[f32; 4]>())
+            .collect();
+
+        for query_point in query_points {
+            let expected = linear_search(&content_to_add, &query_point);
+
+            let result = tree.nearest_one(&query_point, &manhattan);
+
+            assert_eq!(result.0, expected.0);
+            assert_eq!(result.1, expected.1);
         }
     }
 

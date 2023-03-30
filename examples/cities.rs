@@ -3,7 +3,6 @@
 /// This example walks through the basics of using Kiddo to
 /// populate a kd-tree from CSV data and then use it to perform
 /// nearest neighbour (NN) and k-nearest-neighbour (KNN) queries.
-
 use std::error::Error;
 use std::fmt::Formatter;
 use std::fs::File;
@@ -33,7 +32,11 @@ pub struct CityCsvRecord {
 
 impl std::fmt::Display for CityCsvRecord {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}, {} (pop. {})", self.name, self.country, self.population)
+        write!(
+            f,
+            "{}, {} (pop. {})",
+            self.name, self.country, self.population
+        )
     }
 }
 
@@ -163,7 +166,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // 1000km of 0N 0W.
     let query = degrees_lat_lng_to_unit_sphere(0f32, 0f32);
     let dist = kilometres_to_unit_sphere_squared_euclidean(1000.0);
-    let all_within = kdtree.within(&query, dist, &squared_euclidean)
+    let all_within = kdtree
+        .within(&query, dist, &squared_euclidean)
         .iter()
         .map(|&(_, idx)| &cities[idx as usize].name)
         .collect::<Vec<_>>();
@@ -208,7 +212,9 @@ pub fn kilometres_to_unit_sphere_squared_euclidean(km_dist: f32) -> f32 {
 }
 
 /// Parses CSV data from `file` into a `Vec` of `R`
-pub fn parse_csv_file<R: for<'de> serde::Deserialize<'de>>(filename: &str) -> Result<Vec<R>, std::io::Error> {
+pub fn parse_csv_file<R: for<'de> serde::Deserialize<'de>>(
+    filename: &str,
+) -> Result<Vec<R>, std::io::Error> {
     let file = File::open(filename)?;
     let cities: Vec<R> = Reader::from_reader(file)
         .deserialize()
