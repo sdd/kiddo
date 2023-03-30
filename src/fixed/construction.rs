@@ -43,8 +43,6 @@ where
                 parent_idx = stem_idx;
                 stem_node = self.stems.get_unchecked_mut(stem_idx.az::<usize>());
 
-                stem_node.extend(query);
-
                 stem_idx = if *query.get_unchecked(split_dim) <= stem_node.split_val {
                     is_left_child = true;
                     stem_node.left
@@ -80,7 +78,6 @@ where
                 .get_unchecked_mut(leaf_node.size.az::<usize>()) = item;
 
             leaf_node.size = leaf_node.size + IDX::one();
-            leaf_node.extend(query);
         }
         self.size = self.size + T::one();
     }
@@ -164,8 +161,6 @@ where
         was_parents_left: bool,
     ) -> IDX {
         let orig = self.leaves.get_unchecked_mut(leaf_idx.az::<usize>());
-        let orig_min_bound = orig.min_bound;
-        let orig_max_bound = orig.max_bound;
         let pivot_idx: IDX = B.div_floor(2).az::<IDX>();
 
         mirror_select_nth_unstable_by(
@@ -251,30 +246,6 @@ where
             right.size = (B.az::<IDX>()) - pivot_idx;
         }
 
-        left.min_bound = [A::MAX; K];
-        left.max_bound = [A::ZERO; K];
-        right.min_bound = [A::MAX; K];
-        right.max_bound = [A::ZERO; K];
-        left.content_points
-            .iter()
-            .take(left.size.az::<usize>())
-            .for_each(|a| {
-                a.iter().enumerate().for_each(|(idx, val)| {
-                    left.min_bound[idx] = left.min_bound[idx].min(*val);
-                    left.max_bound[idx] = left.max_bound[idx].max(*val);
-                })
-            });
-        right
-            .content_points
-            .iter()
-            .take(right.size.az::<usize>())
-            .for_each(|a| {
-                a.iter().enumerate().for_each(|(idx, val)| {
-                    right.min_bound[idx] = right.min_bound[idx].min(*val);
-                    right.max_bound[idx] = right.max_bound[idx].max(*val);
-                })
-            });
-
         *orig = left;
         self.leaves.push(right);
 
@@ -282,8 +253,6 @@ where
             left: leaf_idx + IDX::leaf_offset(),
             right: (self.leaves.len().az::<IDX>()) - IDX::one() + IDX::leaf_offset(),
             split_val,
-            min_bound: orig_min_bound,
-            max_bound: orig_max_bound,
         });
         let new_stem_index: IDX = (self.stems.len().az::<IDX>()) - IDX::one();
 

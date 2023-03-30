@@ -301,7 +301,7 @@ where
         if is_done {
             // Number of remaining elements (still not compared to the pivot).
             let mut rem = width(l, r);
-            let mut mirror_rem = width(mirror_l, mirror_r);
+            let mut mirror_rem = width(mirror_l, mirror_r); // TODO: remove, same as rem
             if start_l < end_l || start_r < end_r {
                 rem -= BLOCK;
                 mirror_rem -= BLOCK;

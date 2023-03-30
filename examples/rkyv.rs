@@ -4,20 +4,17 @@
 /// by demonstrating serialization to/from JSON and gzipped Bincode
 mod cities;
 
+use elapsed::ElapsedDuration;
 use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::time::Instant;
-use elapsed::ElapsedDuration;
-
-
-
 
 use kiddo::{float::distance::squared_euclidean, KdTree};
 
-use rkyv::{AlignedVec, Deserialize, Infallible};
-use rkyv::ser::Serializer;
 use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
+use rkyv::ser::Serializer;
+use rkyv::{AlignedVec, Deserialize, Infallible};
 
 use cities::{degrees_lat_lng_to_unit_sphere, parse_csv_file};
 
@@ -27,7 +24,7 @@ const SCRATCH_LEN: usize = 300_000_000;
 /// Each `CityCsvRecord` corresponds to 1 row in our city source data CSV.
 ///
 /// Serde uses this to deserialize the CSV into a convenient format for us to work with.
-#[derive(Debug,serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct CityCsvRecord {
     #[allow(dead_code)]
     name: String,
@@ -45,19 +42,26 @@ impl CityCsvRecord {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-
     // Load in the cities data from the CSV and use it to populate a kd-tree, as per
     // the cities.rs example
     let start = Instant::now();
     let cities: Vec<CityCsvRecord> = parse_csv_file("./examples/geonames.csv")?;
-    println!("Parsed {} rows from the CSV: ({})", cities.len(), ElapsedDuration::new(start.elapsed()));
+    println!(
+        "Parsed {} rows from the CSV: ({})",
+        cities.len(),
+        ElapsedDuration::new(start.elapsed())
+    );
 
     let start = Instant::now();
     let mut kdtree: KdTree<f32, 3> = KdTree::with_capacity(cities.len());
     cities.iter().enumerate().for_each(|(idx, city)| {
         kdtree.add(&city.as_xyz(), idx);
     });
-    println!("Populated kd-tree with {} items ({})", kdtree.size(), ElapsedDuration::new(start.elapsed()));
+    println!(
+        "Populated kd-tree with {} items ({})",
+        kdtree.size(),
+        ElapsedDuration::new(start.elapsed())
+    );
 
     // Test query on the newly created tree
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
@@ -68,12 +72,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     let mut file = File::create("./examples/geonames-tree.rkyv")?;
     serialize_to_rkyv(&mut file, kdtree);
-    println!("Serialized kd-tree to rkyv file ({})", ElapsedDuration::new(start.elapsed()));
+    println!(
+        "Serialized kd-tree to rkyv file ({})",
+        ElapsedDuration::new(start.elapsed())
+    );
 
     let start = Instant::now();
     let file = File::open("./examples/geonames-tree.rkyv")?;
     let deserialized_tree: KdTree<f32, 3> = deserialize_from_rkyv(file)?;
-    println!("Deserialized rkyv file back into a kd-tree ({})", ElapsedDuration::new(start.elapsed()));
+    println!(
+        "Deserialized rkyv file back into a kd-tree ({})",
+        ElapsedDuration::new(start.elapsed())
+    );
 
     // Test that the deserialization worked
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
@@ -96,9 +106,12 @@ fn serialize_to_rkyv(file: &mut File, tree: KdTree<f32, 3>) {
         BufferScratch::new(&mut serialize_scratch),
         Infallible,
     );
-    serializer.serialize_value(&tree).expect("Could not serialize with rkyv");
+    serializer
+        .serialize_value(&tree)
+        .expect("Could not serialize with rkyv");
     let buf = serializer.into_serializer().into_inner();
-    file.write(&buf).expect("Could not write serialized rkyv to file");
+    file.write(&buf)
+        .expect("Could not write serialized rkyv to file");
 }
 
 fn deserialize_from_rkyv(mut file: File) -> Result<KdTree<f32, 3>, Box<dyn Error>> {

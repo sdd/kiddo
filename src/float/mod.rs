@@ -8,4 +8,3 @@ mod heap_element;
 pub mod kdtree;
 #[doc(hidden)]
 pub mod query;
-mod util;

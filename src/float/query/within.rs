@@ -38,6 +38,7 @@ where
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
+        let mut off = [A::zero(); K];
         let mut matching_items: BinaryHeap<HeapElement<A, T>> = BinaryHeap::new();
 
         unsafe {
@@ -48,6 +49,8 @@ where
                 self.root_index,
                 0,
                 &mut matching_items,
+                &mut off,
+                A::zero(),
             );
         }
 
@@ -66,37 +69,59 @@ where
         curr_node_idx: IDX,
         split_dim: usize,
         matching_items: &mut BinaryHeap<HeapElement<A, T>>,
+        off: &mut [A; K],
+        rd: A,
     ) where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
         if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
             let node = self.stems.get_unchecked(curr_node_idx.az::<usize>());
 
-            let child_node_indices = if *query.get_unchecked(split_dim) < node.split_val {
-                [node.left, node.right]
-            } else {
-                [node.right, node.left]
-            };
+            let mut rd = rd;
+            let old_off = off[split_dim];
+            let new_off = query[split_dim] - node.split_val;
+
+            let [closer_node_idx, further_node_idx] =
+                if *query.get_unchecked(split_dim) < node.split_val {
+                    [node.left, node.right]
+                } else {
+                    [node.right, node.left]
+                };
             let next_split_dim = (split_dim + 1).rem(K);
 
-            for node_idx in child_node_indices {
-                let child_node_dist = self.child_dist_to_bounds(query, node_idx, distance_fn);
-                if child_node_dist <= radius {
-                    self.within_recurse(
-                        query,
-                        radius,
-                        distance_fn,
-                        node_idx,
-                        next_split_dim,
-                        matching_items,
-                    );
-                }
+            self.within_recurse(
+                query,
+                radius,
+                distance_fn,
+                closer_node_idx,
+                next_split_dim,
+                matching_items,
+                off,
+                rd,
+            );
+
+            // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
+            //       so that updating rd is not hardcoded to sq euclidean
+            rd = rd + new_off * new_off - old_off * old_off;
+
+            if rd <= radius {
+                off[split_dim] = new_off;
+                self.within_recurse(
+                    query,
+                    radius,
+                    distance_fn,
+                    further_node_idx,
+                    next_split_dim,
+                    matching_items,
+                    off,
+                    rd,
+                );
+                off[split_dim] = old_off;
             }
         } else {
             let leaf_node = self
                 .leaves
                 .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
-            // println!("Leaf node: {:?}", (curr_node_idx - LEAF_OFFSET) as usize);
 
             leaf_node
                 .content_points
@@ -176,6 +201,35 @@ mod tests {
 
             let mut result = tree.within(&query_point, radius, &manhattan);
             stabilize_sort(&mut result);
+
+            assert_eq!(result, expected);
+        }
+    }
+
+    #[test]
+    fn can_query_items_within_radius_large_scale() {
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 100;
+        const RADIUS: f32 = 0.2;
+
+        let content_to_add: Vec<([f32; 4], u32)> = (0..TREE_SIZE)
+            .map(|_| rand::random::<([f32; 4], u32)>())
+            .collect();
+
+        let mut tree: KdTree<AX, u32, 4, 32, u32> = KdTree::with_capacity(TREE_SIZE);
+        content_to_add
+            .iter()
+            .for_each(|(point, content)| tree.add(point, *content));
+        assert_eq!(tree.size(), TREE_SIZE as u32);
+
+        let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)
+            .map(|_| rand::random::<[f32; 4]>())
+            .collect();
+
+        for query_point in query_points {
+            let expected = linear_search(&content_to_add, &query_point, RADIUS);
+
+            let result = tree.within(&query_point, RADIUS, &manhattan);
 
             assert_eq!(result, expected);
         }

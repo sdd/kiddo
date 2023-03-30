@@ -52,9 +52,20 @@ where
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
+        let mut off = [A::zero(); K];
         let mut result: MinMaxHeap<HeapElement<A, T>> = MinMaxHeap::with_capacity(qty);
 
-        unsafe { self.nearest_n_recurse(query, distance_fn, self.root_index, 0, &mut result) }
+        unsafe {
+            self.nearest_n_recurse(
+                query,
+                distance_fn,
+                self.root_index,
+                0,
+                &mut result,
+                &mut off,
+                A::zero(),
+            )
+        }
 
         NearestIter { result }
     }
@@ -66,24 +77,51 @@ where
         curr_node_idx: IDX,
         split_dim: usize,
         results: &mut MinMaxHeap<HeapElement<A, T>>,
+        off: &mut [A; K],
+        rd: A,
     ) where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
         if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
             let node = &self.stems.get_unchecked(curr_node_idx.az::<usize>());
 
-            let child_node_indices = if *query.get_unchecked(split_dim) < node.split_val {
-                [node.left, node.right]
-            } else {
-                [node.right, node.left]
-            };
+            let mut rd = rd;
+            let old_off = off[split_dim];
+            let new_off = query[split_dim] - node.split_val;
+
+            let [closer_node_idx, further_node_idx] =
+                if *query.get_unchecked(split_dim) < node.split_val {
+                    [node.left, node.right]
+                } else {
+                    [node.right, node.left]
+                };
             let next_split_dim = (split_dim + 1).rem(K);
 
-            for node_idx in child_node_indices {
-                let child_node_dist = self.child_dist_to_bounds(query, node_idx, distance_fn);
-                if Self::dist_belongs_in_heap(child_node_dist, results) {
-                    self.nearest_n_recurse(query, distance_fn, node_idx, next_split_dim, results);
-                }
+            self.nearest_n_recurse(
+                query,
+                distance_fn,
+                closer_node_idx,
+                next_split_dim,
+                results,
+                off,
+                rd,
+            );
+
+            // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
+            //       so that updating rd is not hardcoded to sq euclidean
+            rd = rd + new_off * new_off - old_off * old_off;
+            if Self::dist_belongs_in_heap(rd, results) {
+                off[split_dim] = new_off;
+                self.nearest_n_recurse(
+                    query,
+                    distance_fn,
+                    further_node_idx,
+                    next_split_dim,
+                    results,
+                    off,
+                    rd,
+                );
+                off[split_dim] = old_off;
             }
         } else {
             let leaf_node = self
@@ -117,14 +155,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::manhattan;
+    use crate::float::distance::squared_euclidean;
     use crate::float::kdtree::{Axis, KdTree};
     use rand::Rng;
 
     type AX = f32;
 
     #[test]
-    fn can_query_nearest_one_item() {
+    fn can_query_nearest_n_item() {
         let mut tree: KdTree<AX, u32, 4, 8, u32> = KdTree::new();
 
         let content_to_add: [([AX; 4], u32); 16] = [
@@ -154,9 +192,11 @@ mod tests {
 
         let query_point = [0.78f32, 0.55f32, 0.78f32, 0.55f32];
 
-        let expected = vec![(0.81999993, 5), (0.8299999, 6), (0.84000003, 7)];
+        let expected = vec![(0.17569996, 6), (0.19139998, 5), (0.24420004, 7)];
 
-        let result: Vec<_> = tree.nearest_n(&query_point, 3, &manhattan).collect();
+        let result: Vec<_> = tree
+            .nearest_n(&query_point, 3, &squared_euclidean)
+            .collect();
         assert_eq!(result, expected);
 
         let qty = 10;
@@ -170,7 +210,43 @@ mod tests {
             ];
             let expected = linear_search(&content_to_add, qty, &query_point);
 
-            let result: Vec<_> = tree.nearest_n(&query_point, qty, &manhattan).collect();
+            let result: Vec<_> = tree
+                .nearest_n(&query_point, qty, &squared_euclidean)
+                .collect();
+
+            let result_dists: Vec<_> = result.iter().map(|(d, _)| d).collect();
+            let expected_dists: Vec<_> = expected.iter().map(|(d, _)| d).collect();
+
+            assert_eq!(result_dists, expected_dists);
+        }
+    }
+
+    #[test]
+    fn can_query_nearest_10_items_large_scale() {
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 100;
+        const N: usize = 10;
+
+        let content_to_add: Vec<([f32; 4], u32)> = (0..TREE_SIZE)
+            .map(|_| rand::random::<([f32; 4], u32)>())
+            .collect();
+
+        let mut tree: KdTree<AX, u32, 4, 32, u32> = KdTree::with_capacity(TREE_SIZE);
+        content_to_add
+            .iter()
+            .for_each(|(point, content)| tree.add(point, *content));
+        assert_eq!(tree.size(), TREE_SIZE as u32);
+
+        let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)
+            .map(|_| rand::random::<[f32; 4]>())
+            .collect();
+
+        for query_point in query_points {
+            let expected = linear_search(&content_to_add, N, &query_point);
+
+            let result: Vec<_> = tree
+                .nearest_n(&query_point, N, &squared_euclidean)
+                .collect();
 
             let result_dists: Vec<_> = result.iter().map(|(d, _)| d).collect();
             let expected_dists: Vec<_> = expected.iter().map(|(d, _)| d).collect();
@@ -187,7 +263,7 @@ mod tests {
         let mut results = vec![];
 
         for &(p, item) in content {
-            let dist = manhattan(query_point, &p);
+            let dist = squared_euclidean(query_point, &p);
             if results.len() < qty {
                 results.push((dist, item));
                 results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(&b_dist).unwrap());
