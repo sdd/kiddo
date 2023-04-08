@@ -87,7 +87,7 @@ where
 
             let mut rd = rd;
             let old_off = off[split_dim];
-            let new_off = query[split_dim].saturating_sub(node.split_val);
+            let new_off = query[split_dim].dist(node.split_val);
 
             let [closer_node_idx, further_node_idx] =
                 if *query.get_unchecked(split_dim) < node.split_val {

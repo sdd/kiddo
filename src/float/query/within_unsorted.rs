@@ -1,3 +1,4 @@
+use crate::float::neighbour::Neighbour;
 use az::{Az, Cast};
 use std::ops::Rem;
 
@@ -30,7 +31,12 @@ where
     /// assert_eq!(within.len(), 2);
     /// ```
     #[inline]
-    pub fn within_unsorted<F>(&self, query: &[A; K], radius: A, distance_fn: &F) -> Vec<(A, T)>
+    pub fn within_unsorted<F>(
+        &self,
+        query: &[A; K],
+        radius: A,
+        distance_fn: &F,
+    ) -> Vec<Neighbour<A, T>>
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
@@ -60,7 +66,7 @@ where
         distance_fn: &F,
         curr_node_idx: IDX,
         split_dim: usize,
-        matching_items: &mut Vec<(A, T)>,
+        matching_items: &mut Vec<Neighbour<A, T>>,
         off: &mut [A; K],
         rd: A,
     ) where
@@ -124,10 +130,10 @@ where
                     let distance = distance_fn(query, entry);
 
                     if distance < radius {
-                        matching_items.push((
+                        matching_items.push(Neighbour {
                             distance,
-                            *leaf_node.content_items.get_unchecked(idx.az::<usize>()),
-                        ));
+                            item: *leaf_node.content_items.get_unchecked(idx.az::<usize>()),
+                        });
                     }
                 });
         }
@@ -177,7 +183,11 @@ mod tests {
         let radius = 0.2;
         let expected = linear_search(&content_to_add, &query_point, radius);
 
-        let result = tree.within_unsorted(&query_point, radius, &squared_euclidean);
+        let result: Vec<_> = tree
+            .within_unsorted(&query_point, radius, &squared_euclidean)
+            .into_iter()
+            .map(|n| (n.distance, n.item))
+            .collect();
         assert_eq!(result, expected);
 
         let mut rng = rand::thread_rng();
@@ -191,7 +201,11 @@ mod tests {
             let radius = 0.2;
             let expected = linear_search(&content_to_add, &query_point, radius);
 
-            let mut result = tree.within_unsorted(&query_point, radius, &squared_euclidean);
+            let mut result: Vec<_> = tree
+                .within_unsorted(&query_point, radius, &squared_euclidean)
+                .into_iter()
+                .map(|n| (n.distance, n.item))
+                .collect();
             stabilize_sort(&mut result);
 
             assert_eq!(result, expected);
@@ -221,7 +235,11 @@ mod tests {
         for query_point in query_points {
             let expected = linear_search(&content_to_add, &query_point, RADIUS);
 
-            let mut result = tree.within_unsorted(&query_point, RADIUS, &squared_euclidean);
+            let mut result: Vec<_> = tree
+                .within_unsorted(&query_point, RADIUS, &squared_euclidean)
+                .into_iter()
+                .map(|n| (n.distance, n.item))
+                .collect();
 
             stabilize_sort(&mut result);
             assert_eq!(result, expected);

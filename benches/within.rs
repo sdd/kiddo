@@ -1,8 +1,8 @@
 use az::{Az, Cast};
 use criterion::measurement::WallTime;
 use criterion::{
-    criterion_group, criterion_main, AxisScale, BatchSize, BenchmarkGroup, BenchmarkId,
-    Criterion, PlotConfiguration, Throughput,
+    criterion_group, criterion_main, AxisScale, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
+    PlotConfiguration, Throughput,
 };
 use fixed::types::extra::{LeEqU16, Unsigned, U16};
 use fixed::FixedU16;

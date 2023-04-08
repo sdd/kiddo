@@ -147,12 +147,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     // results, possibly avoiding the memory allocation required to store
     // the results in a new `Vec`. We're just `collect`ing into a `Vec` here.
     let nearest_5 = nearest_5_idx
-        .map(|(dist, idx)| {
+        .into_iter()
+        .map(|neighbour| {
             (
-                &cities[idx as usize].name,
+                &cities[neighbour.item as usize].name,
                 format!(
                     "{dist:.1}km",
-                    dist = unit_sphere_squared_euclidean_to_kilometres(dist)
+                    dist = unit_sphere_squared_euclidean_to_kilometres(neighbour.distance)
                 ),
             )
         })
@@ -169,7 +170,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let all_within = kdtree
         .within(&query, dist, &squared_euclidean)
         .iter()
-        .map(|&(_, idx)| &cities[idx as usize].name)
+        .map(|neighbour| &cities[neighbour.item as usize].name)
         .collect::<Vec<_>>();
     println!("\nAll cities within 1000km of 0N, 0W: {:?}", all_within);
 
