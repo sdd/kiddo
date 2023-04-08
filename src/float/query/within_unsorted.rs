@@ -10,7 +10,8 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
-    /// Finds all elements within `radius` of `query`.
+    /// Finds all elements within `dist` of `query`, using the specified
+    /// distance metric function.
     ///
     /// Results are returned in arbitrary order. Faster than `within`.
     ///
@@ -34,7 +35,7 @@ where
     pub fn within_unsorted<F>(
         &self,
         query: &[A; K],
-        radius: A,
+        dist: A,
         distance_fn: &F,
     ) -> Vec<Neighbour<A, T>>
     where
@@ -46,7 +47,7 @@ where
         unsafe {
             self.within_unsorted_recurse(
                 query,
-                radius,
+                dist,
                 distance_fn,
                 self.root_index,
                 0,

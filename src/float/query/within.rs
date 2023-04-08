@@ -13,7 +13,8 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
-    /// Finds all elements within `radius` of `query`.
+    /// Finds all elements within `dist` of `query`, using the specified
+    /// distance metric function.
     ///
     /// Results are returned sorted nearest-first
     ///
@@ -34,7 +35,7 @@ where
     /// assert_eq!(within.len(), 2);
     /// ```
     #[inline]
-    pub fn within<F>(&self, query: &[A; K], radius: A, distance_fn: &F) -> Vec<Neighbour<A, T>>
+    pub fn within<F>(&self, query: &[A; K], dist: A, distance_fn: &F) -> Vec<Neighbour<A, T>>
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
@@ -44,7 +45,7 @@ where
         unsafe {
             self.within_recurse(
                 query,
-                radius,
+                dist,
                 distance_fn,
                 self.root_index,
                 0,

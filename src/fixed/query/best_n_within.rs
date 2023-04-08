@@ -10,9 +10,10 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
-    /// Queries the tree to find the best `n` elements within `radius` of `point`, using the specified
+    /// Queries the tree to find the best `n` elements within `dist` of `point`, using the specified
     /// distance metric function. Results are returned in arbitrary order. 'Best' is determined by
     /// performing a comparison of the elements using < (ie, std::ord::lt). Returns an iterator.
+    ///
     ///
     /// # Examples
     ///
@@ -39,7 +40,7 @@ where
     pub fn best_n_within<F>(
         &self,
         query: &[A; K],
-        radius: A,
+        dist: A,
         max_qty: usize,
         distance_fn: &F,
     ) -> impl Iterator<Item = T>
@@ -53,7 +54,7 @@ where
         unsafe {
             self.best_n_within_recurse(
                 query,
-                radius,
+                dist,
                 max_qty,
                 distance_fn,
                 self.root_index,
