@@ -9,7 +9,7 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::broken_intra_doc_links)]
 #![warn(rustdoc::private_intra_doc_links)]
-#![doc(html_root_url = "https://docs.rs/kiddo/2.0.0-beta.8")]
+#![doc(html_root_url = "https://docs.rs/kiddo/2.0.0-beta.9")]
 #![doc(issue_tracker_base_url = "https://github.com/sdd/kiddo/issues/")]
 
 //! # Kiddo
@@ -33,7 +33,7 @@
 //! Add `kiddo` to `Cargo.toml`
 //! ```toml
 //! [dependencies]
-//! kiddo = "2.0.0-beta.8"
+//! kiddo = "2.0.0-beta.9"
 //! ```
 //!
 //! ## Usage
