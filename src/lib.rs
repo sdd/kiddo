@@ -3,6 +3,7 @@
 #![feature(stdsimd)]
 #![feature(strict_provenance)]
 #![feature(maybe_uninit_slice)]
+#![feature(binary_heap_into_iter_sorted)]
 #![warn(rustdoc::missing_crate_level_docs)]
 #![deny(rustdoc::invalid_codeblock_attributes)]
 #![warn(missing_docs)]
@@ -39,6 +40,7 @@
 //! ```rust
 //! use kiddo::KdTree;
 //! use kiddo::distance::squared_euclidean;
+//! use kiddo::float::neighbour::Neighbour;
 //!
 //! let entries = vec![
 //!     [0f64, 0f64],
@@ -62,8 +64,8 @@
 //!
 //! // find the nearest 3 items to [0f64, 0f64], and collect into a `Vec`
 //! assert_eq!(
-//!     kdtree.nearest_n(&[0f64, 0f64], 3, &squared_euclidean).collect::<Vec<_>>(),
-//!     vec![(0f64, 0), (2f64, 1), (8f64, 2)]
+//!     kdtree.nearest_n(&[0f64, 0f64], 3, &squared_euclidean),
+//!     vec![Neighbour { distance: 0f64, item: 0 }, Neighbour { distance: 2f64, item: 1 }, Neighbour { distance: 8f64, item: 2 }]
 //! );
 //! ```
 //!

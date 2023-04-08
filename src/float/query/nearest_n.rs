@@ -1,21 +1,9 @@
-use crate::float::heap_element::HeapElement;
 use crate::float::kdtree::{Axis, KdTree};
+use crate::float::neighbour::Neighbour;
 use crate::types::{Content, Index};
 use az::{Az, Cast};
-use min_max_heap::MinMaxHeap;
+use std::collections::BinaryHeap;
 use std::ops::Rem;
-
-pub struct NearestIter<A: Axis, T: Content> {
-    result: MinMaxHeap<HeapElement<A, T>>,
-}
-
-impl<A: Axis, T: Content> Iterator for NearestIter<A, T> {
-    type Item = (A, T);
-
-    fn next(&mut self) -> Option<(A, T)> {
-        self.result.pop_min().map(|a| (a.distance, a.item))
-    }
-}
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
@@ -36,24 +24,19 @@ where
     /// tree.add(&[1.0, 2.0, 5.0], 100);
     /// tree.add(&[2.0, 3.0, 6.0], 101);
     ///
-    /// let nearest: Vec<_> = tree.nearest_n(&[1.0, 2.0, 5.1], 1, &squared_euclidean).collect();
+    /// let nearest: Vec<_> = tree.nearest_n(&[1.0, 2.0, 5.1], 1, &squared_euclidean);
     ///
     /// assert_eq!(nearest.len(), 1);
-    /// assert!((nearest[0].0 - 0.01f64).abs() < f64::EPSILON);
-    /// assert_eq!(nearest[0].1, 100);
+    /// assert!((nearest[0].distance - 0.01f64).abs() < f64::EPSILON);
+    /// assert_eq!(nearest[0].item, 100);
     /// ```
     #[inline]
-    pub fn nearest_n<F>(
-        &self,
-        query: &[A; K],
-        qty: usize,
-        distance_fn: &F,
-    ) -> impl Iterator<Item = (A, T)>
+    pub fn nearest_n<F>(&self, query: &[A; K], qty: usize, distance_fn: &F) -> Vec<Neighbour<A, T>>
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
         let mut off = [A::zero(); K];
-        let mut result: MinMaxHeap<HeapElement<A, T>> = MinMaxHeap::with_capacity(qty);
+        let mut result: BinaryHeap<Neighbour<A, T>> = BinaryHeap::with_capacity(qty);
 
         unsafe {
             self.nearest_n_recurse(
@@ -67,7 +50,7 @@ where
             )
         }
 
-        NearestIter { result }
+        result.into_sorted_vec()
     }
 
     unsafe fn nearest_n_recurse<F>(
@@ -76,7 +59,7 @@ where
         distance_fn: &F,
         curr_node_idx: IDX,
         split_dim: usize,
-        results: &mut MinMaxHeap<HeapElement<A, T>>,
+        results: &mut BinaryHeap<Neighbour<A, T>>,
         off: &mut [A; K],
         rd: A,
     ) where
@@ -137,19 +120,22 @@ where
                     let distance: A = distance_fn(query, entry);
                     if Self::dist_belongs_in_heap(distance, results) {
                         let item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
-                        let element = HeapElement { distance, item };
+                        let element = Neighbour { distance, item };
                         if results.len() < results.capacity() {
                             results.push(element)
                         } else {
-                            results.replace_max(element);
+                            let mut top = results.peek_mut().unwrap();
+                            if element.distance < top.distance {
+                                *top = element;
+                            }
                         }
                     }
                 });
         }
     }
 
-    fn dist_belongs_in_heap(dist: A, heap: &MinMaxHeap<HeapElement<A, T>>) -> bool {
-        heap.is_empty() || dist < heap.peek_max().unwrap().distance || heap.len() < heap.capacity()
+    fn dist_belongs_in_heap(dist: A, heap: &BinaryHeap<Neighbour<A, T>>) -> bool {
+        heap.is_empty() || dist < heap.peek().unwrap().distance || heap.len() < heap.capacity()
     }
 }
 
@@ -196,6 +182,8 @@ mod tests {
 
         let result: Vec<_> = tree
             .nearest_n(&query_point, 3, &squared_euclidean)
+            .into_iter()
+            .map(|n| (n.distance, n.item))
             .collect();
         assert_eq!(result, expected);
 
@@ -212,6 +200,8 @@ mod tests {
 
             let result: Vec<_> = tree
                 .nearest_n(&query_point, qty, &squared_euclidean)
+                .into_iter()
+                .map(|n| (n.distance, n.item))
                 .collect();
 
             let result_dists: Vec<_> = result.iter().map(|(d, _)| d).collect();
@@ -246,6 +236,8 @@ mod tests {
 
             let result: Vec<_> = tree
                 .nearest_n(&query_point, N, &squared_euclidean)
+                .into_iter()
+                .map(|n| (n.distance, n.item))
                 .collect();
 
             let result_dists: Vec<_> = result.iter().map(|(d, _)| d).collect();

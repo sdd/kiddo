@@ -2,8 +2,8 @@ use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
-use crate::fixed::heap_element::HeapElement;
 use crate::fixed::kdtree::{Axis, KdTree};
+use crate::fixed::neighbour::Neighbour;
 use crate::types::{Content, Index};
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
@@ -36,12 +36,12 @@ where
     /// assert_eq!(within.len(), 2);
     /// ```
     #[inline]
-    pub fn within<F>(&self, query: &[A; K], radius: A, distance_fn: &F) -> Vec<(A, T)>
+    pub fn within<F>(&self, query: &[A; K], radius: A, distance_fn: &F) -> Vec<Neighbour<A, T>>
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
         let mut off = [A::ZERO; K];
-        let mut matching_items: BinaryHeap<HeapElement<A, T>> = BinaryHeap::new();
+        let mut matching_items: BinaryHeap<Neighbour<A, T>> = BinaryHeap::new();
 
         unsafe {
             self.within_recurse(
@@ -56,11 +56,7 @@ where
             );
         }
 
-        matching_items
-            .into_sorted_vec()
-            .into_iter()
-            .map(Into::into)
-            .collect()
+        matching_items.into_sorted_vec()
     }
 
     unsafe fn within_recurse<F>(
@@ -70,7 +66,7 @@ where
         distance_fn: &F,
         curr_node_idx: IDX,
         split_dim: usize,
-        matching_items: &mut BinaryHeap<HeapElement<A, T>>,
+        matching_items: &mut BinaryHeap<Neighbour<A, T>>,
         off: &mut [A; K],
         rd: A,
     ) where
@@ -81,7 +77,7 @@ where
 
             let mut rd = rd;
             let old_off = off[split_dim];
-            let new_off = query[split_dim].saturating_sub(node.split_val);
+            let new_off = query[split_dim].dist(node.split_val);
 
             let [closer_node_idx, further_node_idx] =
                 if *query.get_unchecked(split_dim) < node.split_val {
@@ -137,7 +133,7 @@ where
                     let distance = distance_fn(query, entry);
 
                     if distance < radius {
-                        matching_items.push(HeapElement {
+                        matching_items.push(Neighbour {
                             distance,
                             item: *leaf_node.content_items.get_unchecked(idx.az::<usize>()),
                         })
@@ -197,7 +193,12 @@ mod tests {
         let radius = n(0.2);
         let expected = linear_search(&content_to_add, &query_point, radius);
 
-        let result = tree.within(&query_point, radius, &manhattan);
+        let mut result: Vec<_> = tree
+            .within(&query_point, radius, &manhattan)
+            .into_iter()
+            .map(|n| (n.distance, n.item))
+            .collect();
+        stabilize_sort(&mut result);
         assert_eq!(result, expected);
 
         let mut rng = rand::thread_rng();
@@ -211,7 +212,11 @@ mod tests {
             let radius = n(0.2);
             let expected = linear_search(&content_to_add, &query_point, radius);
 
-            let mut result = tree.within(&query_point, radius, &manhattan);
+            let mut result: Vec<_> = tree
+                .within(&query_point, radius, &manhattan)
+                .into_iter()
+                .map(|n| (n.distance, n.item))
+                .collect();
             stabilize_sort(&mut result);
 
             assert_eq!(result, expected);
@@ -241,8 +246,11 @@ mod tests {
         for query_point in query_points {
             let expected = linear_search(&content_to_add, &query_point, radius);
 
-            let result = tree.within(&query_point, radius, &manhattan);
-
+            let result: Vec<_> = tree
+                .within(&query_point, radius, &manhattan)
+                .into_iter()
+                .map(|n| (n.distance, n.item))
+                .collect();
             assert_eq!(result, expected);
         }
     }

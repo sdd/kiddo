@@ -6,7 +6,7 @@
 #[doc(hidden)]
 pub mod construction;
 pub mod distance;
-mod heap_element;
 pub mod kdtree;
+pub mod neighbour;
 #[doc(hidden)]
 pub mod query;
