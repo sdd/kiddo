@@ -5,6 +5,7 @@ use az::{Az, Cast};
 use num_traits::Float;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
+use divrem::DivCeil;
 
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;
@@ -139,7 +140,7 @@ where
         let mut tree = Self {
             size: T::zero(),
             stems: Vec::with_capacity(capacity.max(1).ilog2() as usize),
-            leaves: Vec::with_capacity(capacity.div_ceil(B.az::<usize>())),
+            leaves: Vec::with_capacity(DivCeil::div_ceil(capacity, B.az::<usize>())),
             root_index: <IDX as Index>::leaf_offset(),
         };
 

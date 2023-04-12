@@ -161,7 +161,7 @@ where
         was_parents_left: bool,
     ) -> IDX {
         let orig = self.leaves.get_unchecked_mut(leaf_idx.az::<usize>());
-        let pivot_idx: IDX = B.div_floor(2).az::<IDX>();
+        let pivot_idx: IDX = (B / 2).az::<IDX>();
 
         mirror_select_nth_unstable_by(
             &mut orig.content_points,
