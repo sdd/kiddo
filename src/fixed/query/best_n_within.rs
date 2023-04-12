@@ -48,7 +48,6 @@ where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
         let mut off = [A::ZERO; K];
-        // TODO: switch to https://docs.rs/min-max-heap/1.3.0/min_max_heap/struct.MinMaxHeap.html
         let mut best_items: BinaryHeap<T> = BinaryHeap::new();
 
         unsafe {

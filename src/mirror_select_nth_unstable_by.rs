@@ -77,7 +77,6 @@ fn mirror_partition_at_index_loop<'a, AA, BB, F>(
     }
 }
 
-// TODO: apply target ops to mirror
 fn mirror_partition_equal<AA, BB, F>(
     target: &mut [AA],
     mirror: &mut [BB],

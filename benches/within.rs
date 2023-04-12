@@ -103,11 +103,6 @@ fn perform_query_float<
     f64: Cast<A>,
 {
     let _res = kdtree.within(&point, radius.az::<A>(), &squared_euclidean);
-    // .for_each(|res_item| {
-    //     black_box({
-    //         let _x = res_item;
-    //     });
-    // })
 }
 
 fn perform_query_fixed<
@@ -130,11 +125,6 @@ fn perform_query_fixed<
         FixedU16::<A>::from_num(radius),
         &squared_euclidean_fixedpoint,
     );
-    // .for_each(|res_item| {
-    //     black_box({
-    //         let _x = res_item;
-    //     });
-    // })
 }
 
 fn bench_query_float<

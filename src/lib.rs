@@ -9,12 +9,14 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::broken_intra_doc_links)]
 #![warn(rustdoc::private_intra_doc_links)]
-#![doc(html_root_url = "https://docs.rs/kiddo/2.0.0-beta.9")]
+#![doc(html_root_url = "https://docs.rs/kiddo/2.0.0")]
 #![doc(issue_tracker_base_url = "https://github.com/sdd/kiddo/issues/")]
 
 //! # Kiddo
 //!
 //! A high-performance, flexible, ergonomic [k-d tree](https://en.wikipedia.org/wiki/K-d_tree) library.
+//!
+//! Possibly the fastest k-d tree library in the world? [See for yourself](https://sdd.github.io/kd-tree-comparison-webapp/).
 //!
 //! Version 2.x is a complete rewrite, providing:
 //! - a new internal architecture for **much-improved performance**;
@@ -33,7 +35,7 @@
 //! Add `kiddo` to `Cargo.toml`
 //! ```toml
 //! [dependencies]
-//! kiddo = "2.0.0-beta.9"
+//! kiddo = "2.0.0"
 //! ```
 //!
 //! ## Usage
