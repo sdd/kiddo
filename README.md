@@ -1,6 +1,6 @@
 # Kiddo
 
-> A high-performance, flexible, ergonomic [k-d tree](https://en.wikipedia.org/wiki/K-d_tree) library.
+> A high-performance, flexible, ergonomic [k-d tree](https://en.wikipedia.org/wiki/K-d_tree) library. Possibly the fastest k-d tree library in the world? [See for yourself](https://sdd.github.io/kd-tree-comparison-webapp/).
 
 * [Crate](https://crates.io/crates/kiddo)
 * [Documentation](https://docs.rs/kiddo)
@@ -11,9 +11,9 @@
 * [License](#license)
 
 Kiddo is ideal for super-fast spatial / geospatial lookups and nearest-neighbour / KNN queries for low-ish numbers of dimensions, where you want to ask questions such as:
- - Find the [nearest_n](https://docs.rs/kiddo/2.0.0-beta.9/kiddo/float/kdtree/struct.KdTree.html#method.nearest_n) item(s) to a query point, ordered by distance;
- - Find all items [within](https://docs.rs/kiddo/2.0.0-beta.9/kiddo/float/kdtree/struct.KdTree.html#method.within) a specified radius of a query point;
- - Find the ["best" n item(s) within](https://docs.rs/kiddo/2.0.0-beta.9/kiddo/float/kdtree/struct.KdTree.html#method.best_n_within) a specified distance of a query point, for some definition of "best"
+ - Find the [nearest_n](https://docs.rs/kiddo/2.0.0/kiddo/float/kdtree/struct.KdTree.html#method.nearest_n) item(s) to a query point, ordered by distance;
+ - Find all items [within](https://docs.rs/kiddo/2.0.0/kiddo/float/kdtree/struct.KdTree.html#method.within) a specified radius of a query point;
+ - Find the ["best" n item(s) within](https://docs.rs/kiddo/2.0.0/kiddo/float/kdtree/struct.KdTree.html#method.best_n_within) a specified distance of a query point, for some definition of "best".
 
 ## Differences vs Kiddo v1.x
 
@@ -27,7 +27,7 @@ Version 2.x is a complete rewrite, providing:
 Add `kiddo` to `Cargo.toml`
 ```toml
 [dependencies]
-kiddo = "2.0.0-beta.9"
+kiddo = "2.0.0"
 ```
 
 Add points to kdtree and query nearest n points with distance function
@@ -65,55 +65,29 @@ See the [examples documentation](https://github.com/sdd/kiddo/tree/master/exampl
 
 ## Benchmarks
 
-Criterion is used to perform a series of benchmarks. We compare Kiddo v2 to:
- - Kiddo v1
- - kdtree
- - FNNTW
- - pykdtree
+The results of all the below benchmarks are viewable in an interactive webapp over at [https://sdd.github.io/kd-tree-comparison-webapp/](https://sdd.github.io/kd-tree-comparison-webapp/).
 
+The comparative benchmark suite is located in another project, [https://github.com/sdd/kd-tree-comparison](https://github.com/sdd/kd-tree-comparison).
 
-Each action is benchmarked against trees that contain 100, 1,000, 10,000, 100,000, 1,000,000 and in some cases 10,000,000 nodes and charted below.
+Criterion was used to perform a series of benchmarks. We compare Kiddo v2 to:
+* [Kiddo v1.x / v0.2.x](https://github.com/sdd/kiddo_v1)
+* [FNNTW](https://crates.io/crates/fnntw) v0.2.3
+* [nabo-rs](https://crates.io/crates/nabo) v0.2.1
+* [pykdtree](https://github.com/storpipfugl/pykdtree) v1.3.4
+* [sklearn.neighbours.KDTree](https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KDTree.html) v1.2.2
+* [scipy.spatial.KDTree](https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.KDTree.html) v1.10.1
 
-The `Adding Items` benchmarks are repeated against 2d, 3d and 4d trees. The 3d benchmarks are ran with points that are both of type `f32` and of type `f64`, as well as a 16-bit fixed point use case.
+The following activities are benchmarked:
+* Construction of a k-d tree from a list of points and indexes
+* Querying the nearest one, ten, or one hundred points to a given query point
+* Querying all points within a set radius of a given point (both unsorted results, and results sorted by distance)
 
-All of the remaining tests are only performed against 3d trees, for expediency. The trees are populated with random source data whose points are all on a unit sphere. This use case is representative of common kd-tree usages in geospatial and astronomical contexts.
+Each action is benchmarked against trees that contain 100, 1,000, 10,000, 100,000, 1,000,000 and in some cases 10,000,000 nodes.
 
-The `Nearest n Items` tests query the tree for the nearest 1, 100 and 1,000 points at each tree size. The test for the common case of the nearest one point uses kiddo's `nearest_one()` method, which is an optimised method for this specific common use case.
+The benchmarks are repeated against 2d, 3d and 4d trees, as well as with points that are both of type `f32` and of type `f64`, as well as a 16-bit fixed point use case for Kiddo v2.
 
+The trees are populated with random source data whose points are all on a unit sphere. This use case is representative of common kd-tree usages in geospatial and astronomical contexts.
 
-
-
-#### Benchmarking Methodology
-
-*NB*: This section is out-of-date and pertains to kiddo v1. I'll update it soon.
-
-The results and charts below were created via the following process:
-
-* check out the original-kdtree-criterion branch. This branch is the same code as kdtree@0.6.0, with criterion benchmarks added that perform the same operations as the criterion tests in kiddo. For functions that are present in kiddo but not in kdtree, the criterion tests for kdtree contain extra code to post-process the results from kdtree calls to perform the same actions as the new methods in kiddo.
-
-* use the following command to run the criterion benchmarks for kdtree and generate NDJSON encoded test results:
-
-```bash
-cargo criterion --message-format json > criterion-kdtree.ndjson
-```
-
-* check out the master branch.
-
-* use the following command to run the criterion benchmarks for kiddo and generate NDJSON encoded test results:
-
-```bash
-cargo criterion --message-format json --all-features > criterion-kiddo.ndjson
-```
-
-* the graphs are generated in python using matplotlib. Ensure you have python installed, as well as the matplotlib and ndjdon python lbraries. Then run the following:
-
-```bash
-python ./generate_benchmark_charts.py
-```
-
-#### Benchmarking Results
-
-Updated benchmark results will be published soon.
 
 ## License
 
