@@ -1,5 +1,6 @@
 use az::{Az, Cast};
 use std::ops::Rem;
+use crate::fixed::distance::DistanceMetric;
 
 use crate::fixed::kdtree::{Axis, KdTree, LeafNode};
 use crate::types::{Content, Index};
@@ -21,7 +22,7 @@ where
     /// use fixed::FixedU16;
     /// use fixed::types::extra::U0;
     /// use kiddo::fixed::kdtree::KdTree;
-    /// use kiddo::fixed::distance::squared_euclidean;
+    /// use kiddo::fixed::distance::SquaredEuclidean;
     ///
     /// type FXD = FixedU16<U0>;
     ///
@@ -30,21 +31,20 @@ where
     /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
     /// tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
     ///
-    /// let nearest = tree.nearest_one(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], &squared_euclidean);
+    /// let nearest = tree.nearest_one::<SquaredEuclidean>(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)]);
     ///
     /// assert_eq!(nearest.0, FXD::from_num(0));
     /// assert_eq!(nearest.1, 100);
     /// ```
     #[inline]
-    pub fn nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> (A, T)
+    pub fn nearest_one<D>(&self, query: &[A; K]) -> (A, T)
     where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>
     {
         let mut off = [A::ZERO; K];
         unsafe {
-            self.nearest_one_recurse(
+            self.nearest_one_recurse::<D>(
                 query,
-                distance_fn,
                 self.root_index,
                 0,
                 T::zero(),
@@ -56,10 +56,9 @@ where
     }
 
     #[inline]
-    unsafe fn nearest_one_recurse<F>(
+    unsafe fn nearest_one_recurse<D>(
         &self,
         query: &[A; K],
-        distance_fn: &F,
         curr_node_idx: IDX,
         split_dim: usize,
         mut best_item: T,
@@ -68,7 +67,7 @@ where
         rd: A,
     ) -> (A, T)
     where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>
     {
         if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
             let node = &self.stems.get_unchecked(curr_node_idx.az::<usize>());
@@ -85,9 +84,8 @@ where
                 };
             let next_split_dim = (split_dim + 1).rem(K);
 
-            let (dist, item) = self.nearest_one_recurse(
+            let (dist, item) = self.nearest_one_recurse::<D>(
                 query,
-                distance_fn,
                 closer_node_idx,
                 next_split_dim,
                 best_item,
@@ -101,17 +99,12 @@ where
                 best_item = item;
             }
 
-            // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-            //       so that updating rd is not hardcoded to sq euclidean
-            rd = rd.saturating_add(
-                (new_off.saturating_mul(new_off)).saturating_sub(old_off.saturating_mul(old_off)),
-            );
+            rd = rd + D::dist1(new_off, old_off);
 
             if rd <= best_dist {
                 off[split_dim] = new_off;
-                let (dist, item) = self.nearest_one_recurse(
+                let (dist, item) = self.nearest_one_recurse::<D>(
                     query,
-                    distance_fn,
                     further_node_idx,
                     next_split_dim,
                     best_item,
@@ -131,9 +124,8 @@ where
                 .leaves
                 .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
 
-            Self::search_content_for_best(
+            Self::search_content_for_best::<D>(
                 query,
-                distance_fn,
                 &mut best_item,
                 &mut best_dist,
                 leaf_node,
@@ -143,14 +135,13 @@ where
         (best_dist, best_item)
     }
 
-    fn search_content_for_best<F>(
+    fn search_content_for_best<D>(
         query: &[A; K],
-        distance_fn: &F,
         best_item: &mut T,
         best_dist: &mut A,
         leaf_node: &LeafNode<A, T, K, B, IDX>,
     ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>
     {
         leaf_node
             .content_points
@@ -158,7 +149,7 @@ where
             .enumerate()
             .take(leaf_node.size.az::<usize>())
             .for_each(|(idx, entry)| {
-                let dist = distance_fn(query, entry);
+                let dist = D::dist(query, entry);
                 if dist < *best_dist {
                     *best_dist = dist;
                     *best_item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
@@ -169,7 +160,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::fixed::distance::manhattan;
+    use crate::fixed::distance::{DistanceMetric, Manhattan};
     use crate::fixed::kdtree::{Axis, KdTree};
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
     use fixed::types::extra::U14;
@@ -214,7 +205,7 @@ mod tests {
         let query_point = [n(0.78f32), n(0.55f32), n(0.78f32), n(0.55f32)];
         let expected = (n(0.86), 7);
 
-        let result = tree.nearest_one(&query_point, &manhattan);
+        let result = tree.nearest_one::<Manhattan>(&query_point);
         assert_eq!(result, expected);
 
         let mut rng = rand::thread_rng();
@@ -227,7 +218,7 @@ mod tests {
             ];
             let expected = linear_search(&content_to_add, &query_point);
 
-            let result = tree.nearest_one(&query_point, &manhattan);
+            let result = tree.nearest_one::<Manhattan>(&query_point);
 
             assert_eq!(result.0, expected.0);
         }
@@ -255,7 +246,7 @@ mod tests {
         for query_point in query_points {
             let expected = linear_search(&content_to_add, &query_point);
 
-            let result = tree.nearest_one(&query_point, &manhattan);
+            let result = tree.nearest_one::<Manhattan>(&query_point);
 
             assert_eq!(result.0, expected.0);
         }
@@ -269,7 +260,7 @@ mod tests {
         let mut best_item: u32 = u32::MAX;
 
         for &(p, item) in content {
-            let dist = manhattan(query_point, &p);
+            let dist = Manhattan::dist(query_point, &p);
             if dist < best_dist {
                 best_item = item;
                 best_dist = dist;

@@ -1,9 +1,10 @@
 use crate::fixed::kdtree::{Axis, KdTree};
-use crate::fixed::neighbour::Neighbour;
+use crate::neighbour::Neighbour;
 use crate::types::{Content, Index};
 use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
+use crate::fixed::distance::DistanceMetric;
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
@@ -19,7 +20,7 @@ where
     /// use fixed::FixedU16;
     /// use fixed::types::extra::U0;
     /// use kiddo::fixed::kdtree::KdTree;
-    /// use kiddo::fixed::distance::squared_euclidean;
+    /// use kiddo::fixed::distance::SquaredEuclidean;
     ///
     /// type FXD = FixedU16<U0>;
     ///
@@ -28,24 +29,23 @@ where
     /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
     /// tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
     ///
-    /// let nearest: Vec<_> = tree.nearest_n(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 1, &squared_euclidean);
+    /// let nearest: Vec<_> = tree.nearest_n::<SquaredEuclidean>(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 1);
     ///
     /// assert_eq!(nearest.len(), 1);
     /// assert_eq!(nearest[0].distance, FXD::from_num(0));
     /// assert_eq!(nearest[0].item, 100);
     /// ```
     #[inline]
-    pub fn nearest_n<F>(&self, query: &[A; K], qty: usize, distance_fn: &F) -> Vec<Neighbour<A, T>>
+    pub fn nearest_n<D>(&self, query: &[A; K], qty: usize) -> Vec<Neighbour<A, T>>
     where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>
     {
         let mut off = [A::ZERO; K];
         let mut result: BinaryHeap<Neighbour<A, T>> = BinaryHeap::with_capacity(qty);
 
         unsafe {
-            self.nearest_n_recurse(
+            self.nearest_n_recurse::<D>(
                 query,
-                distance_fn,
                 self.root_index,
                 0,
                 &mut result,
@@ -57,17 +57,16 @@ where
         result.into_sorted_vec()
     }
 
-    unsafe fn nearest_n_recurse<F>(
+    unsafe fn nearest_n_recurse<D>(
         &self,
         query: &[A; K],
-        distance_fn: &F,
         curr_node_idx: IDX,
         split_dim: usize,
         results: &mut BinaryHeap<Neighbour<A, T>>,
         off: &mut [A; K],
         rd: A,
     ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>
     {
         if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
             let node = &self.stems.get_unchecked(curr_node_idx.az::<usize>());
@@ -84,9 +83,8 @@ where
                 };
             let next_split_dim = (split_dim + 1).rem(K);
 
-            self.nearest_n_recurse(
+            self.nearest_n_recurse::<D>(
                 query,
-                distance_fn,
                 closer_node_idx,
                 next_split_dim,
                 results,
@@ -94,17 +92,12 @@ where
                 rd,
             );
 
-            // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-            //       so that updating rd is not hardcoded to sq euclidean
-            rd = rd.saturating_add(
-                (new_off.saturating_mul(new_off)).saturating_sub(old_off.saturating_mul(old_off)),
-            );
+            rd = rd + D::dist1(new_off, old_off);
 
             if Self::dist_belongs_in_heap(rd, results) {
                 off[split_dim] = new_off;
-                self.nearest_n_recurse(
+                self.nearest_n_recurse::<D>(
                     query,
-                    distance_fn,
                     further_node_idx,
                     next_split_dim,
                     results,
@@ -124,7 +117,7 @@ where
                 .take(leaf_node.size.az::<usize>())
                 .enumerate()
                 .for_each(|(idx, entry)| {
-                    let distance: A = distance_fn(query, entry);
+                    let distance: A = D::dist(query, entry);
                     if Self::dist_belongs_in_heap(distance, results) {
                         let item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
                         let element = Neighbour { distance, item };
@@ -148,7 +141,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::fixed::distance::manhattan;
+    use crate::fixed::distance::{DistanceMetric, Manhattan};
     use crate::fixed::kdtree::{Axis, KdTree};
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
     use fixed::types::extra::U14;
@@ -195,7 +188,7 @@ mod tests {
         let expected = vec![(n(0.86), 7), (n(0.86), 4), (n(0.86), 5)];
 
         let result: Vec<_> = tree
-            .nearest_n(&query_point, 3, &manhattan)
+            .nearest_n::<Manhattan>(&query_point, 3)
             .into_iter()
             .map(|n| (n.distance, n.item))
             .collect();
@@ -213,7 +206,7 @@ mod tests {
             let expected = linear_search(&content_to_add, qty, &query_point);
 
             let result: Vec<_> = tree
-                .nearest_n(&query_point, qty, &manhattan)
+                .nearest_n::<Manhattan>(&query_point, qty)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -249,7 +242,7 @@ mod tests {
             let expected = linear_search(&content_to_add, N, &query_point);
 
             let result: Vec<_> = tree
-                .nearest_n(&query_point, N, &manhattan)
+                .nearest_n::<Manhattan>(&query_point, N)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -269,7 +262,7 @@ mod tests {
         let mut results = vec![];
 
         for &(p, item) in content {
-            let dist = manhattan(query_point, &p);
+            let dist = Manhattan::dist(query_point, &p);
             if results.len() < qty {
                 results.push((dist, item));
                 results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(b_dist).unwrap());

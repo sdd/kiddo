@@ -1,11 +1,11 @@
 use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
-
-use crate::float::{
-    kdtree::{Axis, KdTree},
+use crate::{
+    float::{kdtree::{Axis, KdTree}},
     neighbour::Neighbour,
 };
+use crate::float::distance::DistanceMetric;
 use crate::types::{Content, Index};
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
@@ -21,8 +21,8 @@ where
     /// # Examples
     ///
     /// ```rust
+    /// use kiddo::float::distance::SquaredEuclidean;
     /// use kiddo::float::kdtree::KdTree;
-    /// use kiddo::distance::squared_euclidean;
     ///
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
     ///
@@ -30,23 +30,22 @@ where
     /// tree.add(&[2.0, 3.0, 6.0], 101);
     /// tree.add(&[200.0, 300.0, 600.0], 102);
     ///
-    /// let within = tree.within(&[1.0, 2.0, 5.0], 10f64, &squared_euclidean);
+    /// let within = tree.within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64);
     ///
     /// assert_eq!(within.len(), 2);
     /// ```
     #[inline]
-    pub fn within<F>(&self, query: &[A; K], dist: A, distance_fn: &F) -> Vec<Neighbour<A, T>>
+    pub fn within<D>(&self, query: &[A; K], dist: A) -> Vec<Neighbour<A, T>>
     where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>
     {
         let mut off = [A::zero(); K];
         let mut matching_items: BinaryHeap<Neighbour<A, T>> = BinaryHeap::new();
 
         unsafe {
-            self.within_recurse(
+            self.within_recurse::<D>(
                 query,
                 dist,
-                distance_fn,
                 self.root_index,
                 0,
                 &mut matching_items,
@@ -58,18 +57,17 @@ where
         matching_items.into_sorted_vec()
     }
 
-    unsafe fn within_recurse<F>(
+    unsafe fn within_recurse<D>(
         &self,
         query: &[A; K],
         radius: A,
-        distance_fn: &F,
         curr_node_idx: IDX,
         split_dim: usize,
         matching_items: &mut BinaryHeap<Neighbour<A, T>>,
         off: &mut [A; K],
         rd: A,
     ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>
     {
         if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
             let node = self.stems.get_unchecked(curr_node_idx.az::<usize>());
@@ -86,10 +84,9 @@ where
                 };
             let next_split_dim = (split_dim + 1).rem(K);
 
-            self.within_recurse(
+            self.within_recurse::<D>(
                 query,
                 radius,
-                distance_fn,
                 closer_node_idx,
                 next_split_dim,
                 matching_items,
@@ -97,16 +94,13 @@ where
                 rd,
             );
 
-            // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-            //       so that updating rd is not hardcoded to sq euclidean
-            rd = rd + new_off * new_off - old_off * old_off;
+            rd = rd + D::dist1(old_off, new_off);
 
             if rd <= radius {
                 off[split_dim] = new_off;
-                self.within_recurse(
+                self.within_recurse::<D>(
                     query,
                     radius,
-                    distance_fn,
                     further_node_idx,
                     next_split_dim,
                     matching_items,
@@ -126,7 +120,7 @@ where
                 .enumerate()
                 .take(leaf_node.size.az::<usize>())
                 .for_each(|(idx, entry)| {
-                    let distance = distance_fn(query, entry);
+                    let distance = D::dist(query, entry);
 
                     if distance < radius {
                         matching_items.push(Neighbour {
@@ -141,10 +135,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::manhattan;
     use crate::float::kdtree::{Axis, KdTree};
     use rand::Rng;
     use std::cmp::Ordering;
+    use crate::float::distance::DistanceMetric;
+    use crate::float::distance::Manhattan;
 
     type AX = f32;
 
@@ -183,7 +178,7 @@ mod tests {
         let expected = linear_search(&content_to_add, &query_point, radius);
 
         let mut result: Vec<_> = tree
-            .within(&query_point, radius, &manhattan)
+            .within::<Manhattan>(&query_point, radius)
             .into_iter()
             .map(|n| (n.distance, n.item))
             .collect();
@@ -202,7 +197,7 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, radius);
 
             let mut result: Vec<_> = tree
-                .within(&query_point, radius, &manhattan)
+                .within::<Manhattan>(&query_point, radius)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -236,7 +231,7 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, RADIUS);
 
             let result: Vec<_> = tree
-                .within(&query_point, RADIUS, &manhattan)
+                .within::<Manhattan>(&query_point, RADIUS)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -253,7 +248,7 @@ mod tests {
         let mut matching_items = vec![];
 
         for &(p, item) in content {
-            let dist = manhattan(query_point, &p);
+            let dist = Manhattan::dist(query_point, &p);
             if dist < radius {
                 matching_items.push((dist, item));
             }

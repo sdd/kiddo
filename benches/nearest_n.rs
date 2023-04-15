@@ -84,12 +84,7 @@ fn perform_query_float_10<
     usize: Cast<IDX>,
 {
     kdtree
-        .nearest_n(&point, 10, &squared_euclidean)
-        .for_each(|res_item| {
-            black_box({
-                let _x = res_item;
-            });
-        })
+        .nearest_n(&point, 10, &squared_euclidean);
 }
 
 fn perform_query_fixed_10<
@@ -106,12 +101,7 @@ fn perform_query_fixed_10<
     FixedU16<A>: AxisFixed,
 {
     kdtree
-        .nearest_n(&point, 10, &squared_euclidean_fixedpoint)
-        .for_each(|res_item| {
-            black_box({
-                let _x = res_item;
-            });
-        })
+        .nearest_n(&point, 10, &squared_euclidean_fixedpoint);
 }
 
 fn bench_query_nearest_n_float_10<
@@ -240,12 +230,7 @@ fn perform_query_float_100<
     usize: Cast<IDX>,
 {
     kdtree
-        .nearest_n(&point, 100, &squared_euclidean)
-        .for_each(|res_item| {
-            black_box({
-                let _x = res_item;
-            });
-        })
+        .nearest_n(&point, 100, &squared_euclidean);
 }
 
 fn perform_query_fixed_100<
@@ -262,12 +247,7 @@ fn perform_query_fixed_100<
     FixedU16<A>: AxisFixed,
 {
     kdtree
-        .nearest_n(&point, 100, &squared_euclidean_fixedpoint)
-        .for_each(|res_item| {
-            black_box({
-                let _x = res_item;
-            });
-        })
+        .nearest_n(&point, 100, &squared_euclidean_fixedpoint);
 }
 
 fn bench_query_nearest_n_float_100<

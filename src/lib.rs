@@ -35,8 +35,8 @@
 //! ## Usage
 //! ```rust
 //! use kiddo::KdTree;
-//! use kiddo::distance::squared_euclidean;
-//! use kiddo::float::neighbour::Neighbour;
+//! use kiddo::float::distance::SquaredEuclidean;
+//! use kiddo::neighbour::Neighbour;
 //!
 //! let entries = vec![
 //!     [0f64, 0f64],
@@ -54,13 +54,13 @@
 //! // find the nearest item to [0f64, 0f64].
 //! // returns a tuple of (dist, index)
 //! assert_eq!(
-//!     kdtree.nearest_one(&[0f64, 0f64], &squared_euclidean),
-//!     (0f64, 0)
+//!     kdtree.nearest_one::<SquaredEuclidean>(&[0f64, 0f64]).unwrap(),
+//!     Neighbour { distance: 0f64, item: 0usize }
 //! );
 //!
 //! // find the nearest 3 items to [0f64, 0f64], and collect into a `Vec`
 //! assert_eq!(
-//!     kdtree.nearest_n(&[0f64, 0f64], 3, &squared_euclidean),
+//!     kdtree.nearest_n::<SquaredEuclidean>(&[0f64, 0f64], 3),
 //!     vec![Neighbour { distance: 0f64, item: 0 }, Neighbour { distance: 2f64, item: 1 }, Neighbour { distance: 8f64, item: 2 }]
 //! );
 //! ```
@@ -82,6 +82,9 @@ mod mirror_select_nth_unstable_by;
 #[doc(hidden)]
 pub mod test_utils;
 pub mod types;
+pub mod neighbour;
+mod best_neighbour;
+//mod macros;
 
 /// A floating-point k-d tree with default parameters.
 ///

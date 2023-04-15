@@ -1,6 +1,8 @@
 use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
+use crate::best_neighbour::BestNeighbour;
+use crate::fixed::distance::DistanceMetric;
 
 use crate::fixed::kdtree::{Axis, KdTree, LeafNode};
 use crate::types::{Content, Index};
@@ -20,8 +22,8 @@ where
     /// ```rust
     /// use fixed::FixedU16;
     /// use fixed::types::extra::U0;
+    /// use kiddo::fixed::distance::SquaredEuclidean;
     /// use kiddo::fixed::kdtree::KdTree;
-    /// use kiddo::fixed::distance::squared_euclidean;
     ///
     /// type FXD = FixedU16<U0>;
     ///
@@ -31,31 +33,28 @@ where
     /// tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 1);
     /// tree.add(&[FXD::from_num(20), FXD::from_num(30), FXD::from_num(60)], 102);
     ///
-    /// let mut best_n_within_iter = tree.best_n_within(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], FXD::from_num(10), 1, &squared_euclidean);
-    /// let first = best_n_within_iter.next().unwrap();
+    /// let mut best_n_within = tree.best_n_within::<SquaredEuclidean>(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], FXD::from_num(10), 1);
     ///
-    /// assert_eq!(first, 1);
+    /// assert_eq!(best_n_within[0].item, 1);
     /// ```
     #[inline]
-    pub fn best_n_within<F>(
+    pub fn best_n_within<D>(
         &self,
         query: &[A; K],
         dist: A,
         max_qty: usize,
-        distance_fn: &F,
-    ) -> impl Iterator<Item = T>
+    ) -> Vec<BestNeighbour<A, T>>
     where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>
     {
         let mut off = [A::ZERO; K];
-        let mut best_items: BinaryHeap<T> = BinaryHeap::new();
+        let mut best_items: BinaryHeap<BestNeighbour<A, T>> = BinaryHeap::new();
 
         unsafe {
-            self.best_n_within_recurse(
+            self.best_n_within_recurse::<D>(
                 query,
                 dist,
                 max_qty,
-                distance_fn,
                 self.root_index,
                 0,
                 &mut best_items,
@@ -64,23 +63,22 @@ where
             );
         }
 
-        best_items.into_iter()
+        best_items.into_sorted_vec()
     }
 
     #[allow(clippy::too_many_arguments)]
-    unsafe fn best_n_within_recurse<F>(
+    unsafe fn best_n_within_recurse<D>(
         &self,
         query: &[A; K],
         radius: A,
         max_qty: usize,
-        distance_fn: &F,
         curr_node_idx: IDX,
         split_dim: usize,
-        best_items: &mut BinaryHeap<T>,
+        best_items: &mut BinaryHeap<BestNeighbour<A, T>>,
         off: &mut [A; K],
         rd: A,
     ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>
     {
         if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
             let node = unsafe { self.stems.get_unchecked(curr_node_idx.az::<usize>()) };
@@ -97,11 +95,10 @@ where
                 };
             let next_split_dim = (split_dim + 1).rem(K);
 
-            self.best_n_within_recurse(
+            self.best_n_within_recurse::<D>(
                 query,
                 radius,
                 max_qty,
-                distance_fn,
                 closer_node_idx,
                 next_split_dim,
                 best_items,
@@ -109,19 +106,14 @@ where
                 rd,
             );
 
-            // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-            //       so that updating rd is not hardcoded to sq euclidean
-            rd = rd.saturating_add(
-                (new_off.saturating_mul(new_off)).saturating_sub(old_off.saturating_mul(old_off)),
-            );
+            rd = rd.saturating_add(D::dist1(old_off, new_off));
 
             if rd <= radius {
                 off[split_dim] = new_off;
-                self.best_n_within_recurse(
+                self.best_n_within_recurse::<D>(
                     query,
                     radius,
                     max_qty,
-                    distance_fn,
                     further_node_idx,
                     next_split_dim,
                     best_items,
@@ -136,45 +128,46 @@ where
                     .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>())
             };
 
-            Self::process_leaf_node(query, radius, max_qty, distance_fn, best_items, leaf_node);
+            Self::process_leaf_node::<D>(query, radius, max_qty, best_items, leaf_node);
         }
     }
 
-    fn process_leaf_node<F>(
+    unsafe fn process_leaf_node<D>(
         query: &[A; K],
         radius: A,
         max_qty: usize,
-        distance_fn: &F,
-        best_items: &mut BinaryHeap<T>,
+        best_items: &mut BinaryHeap<BestNeighbour<A, T>>,
         leaf_node: &LeafNode<A, T, K, B, IDX>,
     ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>
     {
         leaf_node
             .content_points
             .iter()
             .take(leaf_node.size.az::<usize>())
-            .map(|entry| distance_fn(query, entry))
+            .map(|entry| D::dist(query, entry))
             .enumerate()
             .filter(|(_, distance)| *distance <= radius)
-            .for_each(|(idx, _)| unsafe {
-                Self::get_item_and_add_if_good(max_qty, best_items, leaf_node, idx)
+            .for_each(|(idx, dist)| {
+                Self::get_item_and_add_if_good(max_qty, best_items, leaf_node, idx, dist)
             });
     }
 
     unsafe fn get_item_and_add_if_good(
         max_qty: usize,
-        best_items: &mut BinaryHeap<T>,
+        best_items: &mut BinaryHeap<BestNeighbour<A, T>>,
         leaf_node: &LeafNode<A, T, K, B, IDX>,
         idx: usize,
+        distance: A,
     ) {
         let item = *leaf_node.content_items.get_unchecked(idx.az::<usize>());
         if best_items.len() < max_qty {
-            best_items.push(item);
+            best_items.push(BestNeighbour { item, distance });
         } else {
             let mut top = best_items.peek_mut().unwrap();
-            if item < *top {
-                *top = item;
+            if item < top.item {
+                top.distance = distance;
+                top.item = item;
             }
         }
     }
@@ -182,12 +175,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::fixed::distance::manhattan;
+    use crate::fixed::distance::{Manhattan, SquaredEuclidean};
     use crate::fixed::kdtree::{Axis, KdTree};
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
     use fixed::types::extra::U14;
     use fixed::FixedU16;
     use rand::Rng;
+    use crate::best_neighbour::BestNeighbour;
+    use crate::fixed::distance::DistanceMetric;
 
     type FXD = FixedU16<U14>;
 
@@ -227,11 +222,16 @@ mod tests {
 
         let query = [n(0.9f32), n(0.7f32)];
         let radius = n(0.8f32);
-        let expected = vec![6, 5, 3, 2, 4];
+        let expected = vec![
+            BestNeighbour { item: 1, distance: n(0.65f32) },
+            BestNeighbour { item: 2, distance: n(0.49f32) },
+            BestNeighbour { item: 3, distance: n(0.36993f32) },
+            BestNeighbour { item: 4, distance: n(0.29f32) },
+            BestNeighbour { item: 5, distance: n(0.24994f32) },
+        ];
 
         let result: Vec<_> = tree
-            .best_n_within(&query, radius, max_qty, &manhattan)
-            .collect();
+            .best_n_within::<SquaredEuclidean>(&query, radius, max_qty);
         assert_eq!(result, expected);
 
         let mut rng = rand::thread_rng();
@@ -244,11 +244,8 @@ mod tests {
             let radius = n(0.1f32);
             let expected = linear_search(&content_to_add, &query, radius, max_qty);
 
-            let mut result: Vec<_> = tree
-                .best_n_within(&query, radius, max_qty, &manhattan)
-                .collect();
-
-            result.sort_unstable();
+            let result: Vec<_> = tree
+                .best_n_within::<Manhattan>(&query, radius, max_qty);
             assert_eq!(result, expected);
         }
     }
@@ -277,11 +274,8 @@ mod tests {
         for query_point in query_points {
             let expected = linear_search(&content_to_add, &query_point, radius, max_qty);
 
-            let mut result: Vec<_> = tree
-                .best_n_within(&query_point, radius, max_qty, &manhattan)
-                .collect();
-
-            result.sort_unstable();
+            let result: Vec<_> = tree
+                .best_n_within::<Manhattan>(&query_point, radius, max_qty);
             assert_eq!(result, expected);
         }
     }
@@ -291,18 +285,18 @@ mod tests {
         query_point: &[A; K],
         radius: A,
         max_qty: usize,
-    ) -> Vec<u32> {
+    ) -> Vec<BestNeighbour<A, u32>> {
         let mut best_items = Vec::with_capacity(max_qty);
 
         for &(p, item) in content {
-            let dist = manhattan(query_point, &p);
-            if dist <= radius {
+            let distance = Manhattan::dist(query_point, &p);
+            if distance <= radius {
                 if best_items.len() < max_qty {
-                    best_items.push(item);
+                    best_items.push(BestNeighbour{ item, distance });
                 } else {
-                    if item < *best_items.last().unwrap() {
+                    if item < best_items.last().unwrap().item {
                         best_items.pop().unwrap();
-                        best_items.push(item);
+                        best_items.push(BestNeighbour{ item, distance });
                     }
                 }
             }
