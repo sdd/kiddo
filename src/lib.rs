@@ -1,3 +1,6 @@
+#![feature(get_many_mut)]
+#![feature(allocator_api)]
+#![feature(int_roundings)]
 #![warn(rustdoc::missing_crate_level_docs)]
 #![deny(rustdoc::invalid_codeblock_attributes)]
 #![warn(missing_docs)]
@@ -78,6 +81,7 @@ mod custom_serde;
 pub mod distance_metric;
 pub mod fixed;
 pub mod float;
+pub mod float_sss;
 mod mirror_select_nth_unstable_by;
 pub mod nearest_neighbour;
 #[doc(hidden)]
