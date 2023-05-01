@@ -241,6 +241,9 @@ mod tests {
                 .map(|n| (n.distance, n.item))
                 .collect();
 
+            // TODO: ensure that adjacent results with the same dist are sorted in order of item val
+            //       to prevent occasional test failures due to the linear search returning items
+            //       with the same dist in a different order to the query
             assert_eq!(result, expected);
         }
     }
