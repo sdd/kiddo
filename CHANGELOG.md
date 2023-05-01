@@ -1,5 +1,9 @@
 # Kiddo Changelog
 
+## 2.0.2
+* fix: properly split buckets.
+  Previously, when a bucket had multiple items with the same value in the splitting dimension as the split plane, and these values straddled the pivot point, some items could end up in the wrong bucket after the split.
+
 ## 2.0.1
  * refactor: removed the requirement to use unstable features so that Kiddo should now work on Rust stable.
 
