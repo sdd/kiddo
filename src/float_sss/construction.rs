@@ -24,7 +24,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
-    /// Adds an item to the tree.
+    /// Adds an item to the tree
     ///
     /// The first argument specifies co-ordinates of the point where the item is located.
     /// The second argument is an integer identifier / index for the item being stored.
@@ -48,18 +48,18 @@ where
 
         loop {
             match trav_state {
-                TraverseState::ValidStem(mut idx, mut parent) => {
-                    let val = self.stems[idx.az::<usize>() - 1];
+                TraverseState::ValidStem(mut idx, parent) => {
+                    let val = self.stems[idx.az::<usize>()];
 
                     if val.is_nan() || idx > (self.stems.capacity() / 2 + 1).az::<IDX>() {
                         // if this stem value is NaN, we are a bottom-level stem
 
                         // corresponding leaf node will be leftmost child
-                        while idx < self.stems.capacity().az::<IDX>().div_ceil(2.az::<IDX>()) {
+                        while idx < (self.stems.capacity() + 0).az::<IDX>().div_ceil(2.az::<IDX>()) {
                             idx = idx * 2.az::<IDX>();
                         }
 
-                        trav_state = TraverseState::Leaf(idx * 2.az::<IDX>() - IDX::one() - self.stems.capacity().az::<IDX>(), parent);
+                        trav_state = TraverseState::Leaf(idx * 2.az::<IDX>() - self.stems.capacity().az::<IDX>(), parent);
                     } else {
 
                         let next = if query[split_dim] < val {
@@ -71,7 +71,7 @@ where
                         };
                         split_dim = (split_dim + 1).rem(K);
 
-                        if idx < (self.stems.capacity() / 2 + 1).az::<IDX>() {
+                        if idx < (self.stems.capacity() / 2).az::<IDX>() {
                             // non-nan stem val, not on bottom layer:
 
                             trav_state = TraverseState::ValidStem(next, LeafParent::Stem(idx, is_left_child));
@@ -80,9 +80,9 @@ where
                             let next = next - self.stems.capacity().az::<IDX>();
 
                             if (is_left_child && val.is_lsb_set()) || (!is_left_child && val.is_2lsb_set()) {
-                                trav_state = TraverseState::DStem(next - IDX::one());
+                                trav_state = TraverseState::DStem(next);// - IDX::one());
                             } else {
-                                trav_state = TraverseState::Leaf(next - IDX::one(), LeafParent::Stem(idx, is_left_child));
+                                trav_state = TraverseState::Leaf(next, LeafParent::Stem(idx, is_left_child));
                             }
                         }
                     }
@@ -123,7 +123,7 @@ where
                         node.content_items[node.size.az::<usize>()] = item;
 
                         node.size = node.size + IDX::one();
-                        self.size = self.size + T::one();
+                        self.size += 1;
 
                         return;
                     }
@@ -238,14 +238,14 @@ where
         let result: TraverseState<IDX>;
 
         match parent {
-            LeafParent::Stem(parent_idx , _) if parent_idx == IDX::one() && self.stems[0].is_nan() => {
+            LeafParent::Stem(parent_idx , _) if parent_idx == IDX::one() && self.stems[1].is_nan() => {
                 // parent is a static stem, root level, first split:
 
                 // 1) update stems to use the root static stem
                 //    as the first split plane
-                self.stems[0] = split_val;
-                self.stems[1] = A::nan();
+                self.stems[1] = split_val;
                 self.stems[2] = A::nan();
+                self.stems[3] = A::nan();
 
                 // 2) update the destination to copy the split
                 //    points to be the left leaf of the left-most
@@ -255,7 +255,7 @@ where
                 while right_idx <= self.stems.capacity().az::<IDX>() {
                     right_idx = right_idx * 2.az::<IDX>();
                 }
-                right_idx = right_idx - (self.stems.capacity() + 1).az::<IDX>();
+                right_idx = right_idx - self.stems.capacity().az::<IDX>();
 
                 result = TraverseState::ValidStem(IDX::one(), LeafParent::Stem(IDX::one(), true));
             },
@@ -279,12 +279,12 @@ where
                     //    active stem node
                     parent_idx.az::<usize>() * 2 + 1
                 };
-                self.stems[new_stem_idx - 1] = split_val;
+                self.stems[new_stem_idx] = split_val;
 
                 // if new stem is not bottom layer, add mode NaNs
                 if new_stem_idx < self.stems.capacity().div_ceil(2) {
-                    self.stems[new_stem_idx * 2 - 1] = A::nan();
                     self.stems[new_stem_idx * 2] = A::nan();
+                    self.stems[new_stem_idx * 2 + 1] = A::nan();
                 }
 
                 // 4) determine the index of the leaf node we need to
@@ -293,7 +293,7 @@ where
                 while right_idx <= self.stems.capacity().az::<IDX>() {
                     right_idx = right_idx *  2.az::<IDX>();
                 }
-                right_idx = right_idx - (self.stems.capacity() + 1).az::<IDX>();
+                right_idx = right_idx - (self.stems.capacity()).az::<IDX>();
 
                 result = TraverseState::ValidStem(new_stem_idx.az::<IDX>(), LeafParent::Stem(new_stem_idx.az::<IDX>(), is_left_child));
             },
@@ -301,12 +301,12 @@ where
                 // parent is a static stem, bottom level:
 
                 // check to see if the stem is already used:
-                if self.stems[parent_idx.az::<usize>() - 1].is_nan() {
+                if self.stems[parent_idx.az::<usize>()].is_nan() {
                     // 1) if it isn't, we will use it. Clear the split value
                     //    LSB.
 
                     split_val = split_val.with_lsb_clear().with_2lsb_clear();
-                    self.stems[parent_idx.az::<usize>() - 1] = split_val;
+                    self.stems[parent_idx.az::<usize>()] = split_val;
 
                     // 4) determine the index of the leaf node we need to
                     //    populate with the split-off points
@@ -323,11 +323,11 @@ where
                     }
 
                     // 2) update the parent's split value to set one of the lowest 2 bits as reqd
-                    let existing_split_val = self.stems[parent_idx.az::<usize>() - 1];
+                    let existing_split_val = self.stems[parent_idx.az::<usize>()];
                     if is_left_child {
-                        self.stems[parent_idx.az::<usize>() - 1] = existing_split_val.with_lsb_set();
+                        self.stems[parent_idx.az::<usize>()] = existing_split_val.with_lsb_set();
                     } else {
-                        self.stems[parent_idx.az::<usize>() - 1] = existing_split_val.with_2lsb_set();
+                        self.stems[parent_idx.az::<usize>()] = existing_split_val.with_2lsb_set();
                     }
                     //    TODO: check to see if this alters the pivot
                     //    position (perhaps re-run mirror-select-unstable)
@@ -354,8 +354,6 @@ where
             LeafParent::DStem(parent_idx, was_parents_left) => {
                 // parent is a dynamic stem:
 
-                // TODO: should be self.unreserved_leaf_idx
-                // let leaf_len = self.leaves.len();
                 let leaf_len = self.unreserved_leaf_idx;
                 let leaf_cap = self.leaves.capacity();
 
