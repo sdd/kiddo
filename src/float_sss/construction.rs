@@ -7,13 +7,13 @@ use std::ops::Rem;
 
 // TODO: change from usize to IDX
 enum LeafParent<T> {
-    Stem(T, bool),
+    Stem(usize, bool),
     DStem(T, bool)
 }
 
 // TODO: change from usizes to IDX?
 enum TraverseState<T> {
-    ValidStem(T, LeafParent<T>),
+    ValidStem(usize, LeafParent<T>),
     DStem(T),
     Leaf(T, LeafParent<T>)
 }
@@ -42,7 +42,7 @@ where
     /// ```
     #[inline]
     pub fn add(&mut self, query: &[A; K], item: T) {
-        let mut trav_state = TraverseState::ValidStem(IDX::one(), LeafParent::Stem(IDX::one(), true));
+        let mut trav_state = TraverseState::ValidStem(1, LeafParent::Stem(1, true));
         let mut split_dim = 0;
         let mut is_left_child: bool = false;
 
@@ -51,38 +51,38 @@ where
                 TraverseState::ValidStem(mut idx, parent) => {
                     let val = self.stems[idx.az::<usize>()];
 
-                    if val.is_nan() || idx > (self.stems.capacity() / 2 + 1).az::<IDX>() {
+                    if val.is_nan() || idx > (self.stems.capacity() / 2 + 1) {
                         // if this stem value is NaN, we are a bottom-level stem
 
                         // corresponding leaf node will be leftmost child
-                        while idx < (self.stems.capacity() + 0).az::<IDX>().div_ceil(2.az::<IDX>()) {
-                            idx = idx * 2.az::<IDX>();
+                        while idx < (self.stems.capacity() + 0).div_ceil(2) {
+                            idx = idx * 2;
                         }
 
-                        trav_state = TraverseState::Leaf(idx * 2.az::<IDX>() - self.stems.capacity().az::<IDX>(), parent);
+                        trav_state = TraverseState::Leaf((idx * 2).az::<IDX>() - self.stems.capacity().az::<IDX>(), parent);
                     } else {
 
                         let next = if query[split_dim] < val {
                             is_left_child = true;
-                            idx * 2.az::<IDX>()
+                            idx * 2
                         } else {
                             is_left_child = false;
-                            idx * 2.az::<IDX>() + IDX::one()
+                            idx * 2 + 1
                         };
                         split_dim = (split_dim + 1).rem(K);
 
-                        if idx < (self.stems.capacity() / 2).az::<IDX>() {
+                        if idx < self.stems.capacity() / 2 {
                             // non-nan stem val, not on bottom layer:
 
                             trav_state = TraverseState::ValidStem(next, LeafParent::Stem(idx, is_left_child));
                         } else {
                             // non-NaN stem val on bottom layer
-                            let next = next - self.stems.capacity().az::<IDX>();
+                            let next = next - self.stems.capacity();
 
                             if (is_left_child && val.is_lsb_set()) || (!is_left_child && val.is_2lsb_set()) {
-                                trav_state = TraverseState::DStem(next);// - IDX::one());
+                                trav_state = TraverseState::DStem(next.az::<IDX>());
                             } else {
-                                trav_state = TraverseState::Leaf(next, LeafParent::Stem(idx, is_left_child));
+                                trav_state = TraverseState::Leaf(next.az::<IDX>(), LeafParent::Stem(idx, is_left_child));
                             }
                         }
                     }
@@ -238,7 +238,7 @@ where
         let result: TraverseState<IDX>;
 
         match parent {
-            LeafParent::Stem(parent_idx , _) if parent_idx == IDX::one() && self.stems[1].is_nan() => {
+            LeafParent::Stem(parent_idx , _) if parent_idx == 1 && self.stems[1].is_nan() => {
                 // parent is a static stem, root level, first split:
 
                 // 1) update stems to use the root static stem
@@ -257,15 +257,15 @@ where
                 }
                 right_idx = right_idx - self.stems.capacity().az::<IDX>();
 
-                result = TraverseState::ValidStem(IDX::one(), LeafParent::Stem(IDX::one(), true));
+                result = TraverseState::ValidStem(1, LeafParent::Stem(1, true));
             },
 
-            LeafParent::Stem(parent_idx, is_left_child ) if parent_idx < (self.stems.capacity().div_ceil(2)).az::<IDX>() => {
+            LeafParent::Stem(parent_idx, is_left_child ) if parent_idx < self.stems.capacity().div_ceil(2) => {
                 // parent is a static stem, not first split, not bottom layer:
 
                 // 1) if the new stem is at base level, adjust the split
                 //    plane value to have it's LSB clear
-                if parent_idx >= (self.stems.capacity() / 4).az::<IDX>() {
+                if parent_idx >= self.stems.capacity() / 4 {
                     split_val = split_val.with_lsb_clear().with_2lsb_clear();
                 }
 
@@ -295,7 +295,7 @@ where
                 }
                 right_idx = right_idx - (self.stems.capacity()).az::<IDX>();
 
-                result = TraverseState::ValidStem(new_stem_idx.az::<IDX>(), LeafParent::Stem(new_stem_idx.az::<IDX>(), is_left_child));
+                result = TraverseState::ValidStem(new_stem_idx, LeafParent::Stem(new_stem_idx, is_left_child));
             },
             LeafParent::Stem(parent_idx, is_left_child) => {
                 // parent is a static stem, bottom level:
