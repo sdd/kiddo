@@ -96,8 +96,7 @@ pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B:
     pub(crate) leaves: Vec<LeafNode<A, T, K, B, IDX>>,
     pub(crate) stems: Vec<A>,
     pub(crate) dstems: Vec<StemNode<A, K, IDX>>,
-    // pub(crate) root_index: IDX,
-    pub(crate) size: T,
+    pub(crate) size: usize,
 
     pub(crate) unreserved_leaf_idx: usize,
 }
@@ -206,7 +205,7 @@ where
         assert!(capacity <= <IDX as Index>::capacity_with_bucket_size(B));
 
         let leaf_capacity = DivCeil::div_ceil(capacity, B.az::<usize>()).next_power_of_two();
-        let stem_capacity = (leaf_capacity - 1).max(1);
+        let stem_capacity = leaf_capacity.max(1);
 
         let layout = Layout::array::<A>(stem_capacity).unwrap();
         let stems = unsafe {
@@ -229,16 +228,20 @@ where
         };
 
         let mut tree = Self {
-            size: T::zero(),
+            size: 0,
             stems,
             dstems: Vec::with_capacity(0),
             leaves,
-            // root_index: <IDX as Index>::leaf_offset(),
             unreserved_leaf_idx: leaf_capacity
         };
 
         tree.leaves[0].size = IDX::zero();
-        tree.stems[0] = A::nan();
+
+        // Set this to infinity so that if it is accessed, things will break
+        tree.stems[0] = A::infinity();
+
+        // 1 is the true root, so that we can use *2 and *2+1 to traverse down
+        tree.stems[1] = A::nan();
 
         tree
     }
@@ -258,7 +261,7 @@ where
     /// assert_eq!(tree.size(), 2);
     /// ```
     #[inline]
-    pub fn size(&self) -> T {
+    pub fn size(&self) -> usize {
         self.size
     }
 
