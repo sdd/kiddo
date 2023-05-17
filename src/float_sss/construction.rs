@@ -5,19 +5,11 @@ use az::{Az, Cast};
 use std::ops::Rem;
 
 
-// TODO: change from usize to IDX
+#[derive(Clone)]
 enum LeafParent<T> {
     Stem(usize, bool),
     DStem(T, bool)
 }
-
-// TODO: change from usizes to IDX?
-enum TraverseState<T> {
-    ValidStem(usize, LeafParent<T>),
-    DStem(T),
-    Leaf(T, LeafParent<T>)
-}
-
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
@@ -42,94 +34,75 @@ where
     /// ```
     #[inline]
     pub fn add(&mut self, query: &[A; K], item: T) {
-        let mut trav_state = TraverseState::ValidStem(1, LeafParent::Stem(1, true));
         let mut split_dim = 0;
-        let mut is_left_child: bool = false;
+        let mut is_right_child: bool = false;
+        let mut stem_idx: usize = 1;
+        let mut parent_idx = 1;
+        let mut val: A = A::zero();
 
-        loop {
-            match trav_state {
-                TraverseState::ValidStem(mut idx, parent) => {
-                    let val = self.stems[idx.az::<usize>()];
+        while stem_idx < self.stems.capacity() {
+            val = *unsafe { self.stems.get_unchecked(stem_idx) };
 
-                    if val.is_nan() || idx > (self.stems.capacity() / 2 + 1) {
-                        // if this stem value is NaN, we are a bottom-level stem
+            if val.is_nan() { // if bottom-level stem
+                // corresponding leaf node will be leftmost child
+                while stem_idx < self.stems.capacity().div_ceil(2) {
+                    stem_idx = stem_idx << 1;
+                }
 
-                        // corresponding leaf node will be leftmost child
-                        while idx < (self.stems.capacity() + 0).div_ceil(2) {
-                            idx = idx * 2;
-                        }
-
-                        trav_state = TraverseState::Leaf((idx * 2).az::<IDX>() - self.stems.capacity().az::<IDX>(), parent);
-                    } else {
-
-                        let next = if query[split_dim] < val {
-                            is_left_child = true;
-                            idx * 2
-                        } else {
-                            is_left_child = false;
-                            idx * 2 + 1
-                        };
-                        split_dim = (split_dim + 1).rem(K);
-
-                        if idx < self.stems.capacity() / 2 {
-                            // non-nan stem val, not on bottom layer:
-
-                            trav_state = TraverseState::ValidStem(next, LeafParent::Stem(idx, is_left_child));
-                        } else {
-                            // non-NaN stem val on bottom layer
-                            let next = next - self.stems.capacity();
-
-                            if (is_left_child && val.is_lsb_set()) || (!is_left_child && val.is_2lsb_set()) {
-                                trav_state = TraverseState::DStem(next.az::<IDX>());
-                            } else {
-                                trav_state = TraverseState::Leaf(next.az::<IDX>(), LeafParent::Stem(idx, is_left_child));
-                            }
-                        }
-                    }
-                },
-
-                TraverseState::DStem(mut idx) => {
-                    let mut parent_idx = idx;
-
-                    while KdTree::<A, T, K, B, IDX>::is_stem_index(idx) {
-                        let node = &self.dstems[idx.az::<usize>()];
-
-                        parent_idx = idx;
-                        idx = if query[split_dim] <= node.split_val {
-                            is_left_child = true;
-                            node.left
-                        } else {
-                            is_left_child = false;
-                            node.right
-                        };
-
-                        split_dim = (split_dim + 1).rem(K);
-                    }
-
-                    trav_state = TraverseState::Leaf(idx - IDX::leaf_offset(), LeafParent::DStem(parent_idx, is_left_child));
-                },
-
-                TraverseState::Leaf(mut idx, parent) => {
-                    if idx >= IDX::leaf_offset() {
-                        idx = idx - IDX::leaf_offset();
-                    }
-
-                    let mut node = unsafe { self.leaves.get_unchecked_mut(idx.az::<usize>()) };
-
-                    if node.size == B.az::<IDX>() {
-                        trav_state = self.split(idx, split_dim, parent);
-                    } else {
-                        node.content_points[node.size.az::<usize>()] = *query;
-                        node.content_items[node.size.az::<usize>()] = item;
-
-                        node.size = node.size + IDX::one();
-                        self.size += 1;
-
-                        return;
-                    }
-                },
+                let leaf_idx: IDX = (stem_idx * 2 - self.stems.capacity()).az::<IDX>();
+                return self.add_to_leaf(query, item, split_dim, leaf_idx, LeafParent::Stem(parent_idx, is_right_child));
             }
+
+            parent_idx = stem_idx;
+            is_right_child = *unsafe { query.get_unchecked(split_dim) } > val;
+            stem_idx = (stem_idx << 1) + usize::from(is_right_child);
+            split_dim = (split_dim + 1).rem(K);
         }
+
+        // non-NaN stem val on bottom layer
+        if (!is_right_child && val.is_lsb_set()) || (is_right_child && val.is_2lsb_set()) {
+            // we're moving to the dstems
+            stem_idx = stem_idx - self.stems.capacity();
+
+            while KdTree::<A, T, K, B, IDX>::is_stem_index(stem_idx.az::<IDX>()) {
+                let node = unsafe { self.dstems.get_unchecked(stem_idx) };
+
+                parent_idx = stem_idx;
+                is_right_child = *unsafe { query.get_unchecked(split_dim) } > val;
+
+                stem_idx = (* unsafe {node.children.get_unchecked(usize::from(is_right_child))}).az::<usize>();
+                split_dim = (split_dim + 1).rem(K);
+            }
+            let leaf_idx: IDX = stem_idx.az::<IDX>() - IDX::leaf_offset();
+            return self.add_to_leaf(query, item, split_dim, leaf_idx, LeafParent::DStem(parent_idx.az::<IDX>(), is_right_child));
+
+        } else {
+            let leaf_idx: IDX = (stem_idx - self.stems.capacity()).az::<IDX>();
+            return self.add_to_leaf(query, item, split_dim, leaf_idx, LeafParent::Stem(parent_idx, is_right_child));
+        }
+    }
+
+    fn add_to_leaf(&mut self, query: &[A; K], item: T, split_dim: usize, leaf_idx: IDX, parent: LeafParent<IDX>) {
+        let mut node: &mut super::kdtree::LeafNode<A, T, K, B, IDX>;
+
+        let node_size = unsafe { self.leaves.get_unchecked_mut(leaf_idx.az::<usize>()) }.size;
+
+        if node_size == B.az::<IDX>() {
+            let (right_leaf_idx, split_val) = self.split(leaf_idx, split_dim, parent);
+            if query[split_dim] > split_val  {
+                node = unsafe { self.leaves.get_unchecked_mut(right_leaf_idx.az::<usize>()) };
+            } else {
+                node = unsafe { self.leaves.get_unchecked_mut(leaf_idx.az::<usize>()) };
+            }
+        } else {
+            node = unsafe { self.leaves.get_unchecked_mut(leaf_idx.az::<usize>()) };
+        }
+
+        *unsafe { node.content_points.get_unchecked_mut(node.size.az::<usize>()) } = *query;
+        *unsafe { node.content_items.get_unchecked_mut(node.size.az::<usize>()) } = item;
+
+        node.size = node.size + IDX::one();
+        self.size += 1;
     }
 
     /// Removes an item from the tree.
@@ -204,7 +177,7 @@ where
         leaf_idx: IDX,
         split_dim: usize,
         parent: LeafParent<IDX>,
-    ) -> TraverseState<IDX> {
+    ) -> (IDX, A) {
 
         let mut split_val: A;
         let pivot_idx: IDX;
@@ -235,7 +208,6 @@ where
 
         // determine where to copy the upper half of points to
         let mut right_idx;
-        let result: TraverseState<IDX>;
 
         match parent {
             LeafParent::Stem(parent_idx , _) if parent_idx == 1 && self.stems[1].is_nan() => {
@@ -256,11 +228,8 @@ where
                     right_idx = right_idx * 2.az::<IDX>();
                 }
                 right_idx = right_idx - self.stems.capacity().az::<IDX>();
-
-                result = TraverseState::ValidStem(1, LeafParent::Stem(1, true));
             },
-
-            LeafParent::Stem(parent_idx, is_left_child ) if parent_idx < self.stems.capacity().div_ceil(2) => {
+            LeafParent::Stem(parent_idx, is_right_child ) if parent_idx < self.stems.capacity().div_ceil(2) => {
                 // parent is a static stem, not first split, not bottom layer:
 
                 // 1) if the new stem is at base level, adjust the split
@@ -269,19 +238,10 @@ where
                     split_val = split_val.with_lsb_clear().with_2lsb_clear();
                 }
 
-                let new_stem_idx =  if is_left_child {
-                    // 2) if leaf was parent's left descendant, set the parents
-                    //    left child as a newly active stem node
-                    parent_idx.az::<usize>() * 2
-
-                } else {
-                    // 3) alternatively, set the parents right child as a newly
-                    //    active stem node
-                    parent_idx.az::<usize>() * 2 + 1
-                };
+                let new_stem_idx = (parent_idx << 1) + usize::from(is_right_child);
                 self.stems[new_stem_idx] = split_val;
 
-                // if new stem is not bottom layer, add mode NaNs
+                // if new stem is not bottom layer, add more NaNs
                 if new_stem_idx < self.stems.capacity().div_ceil(2) {
                     self.stems[new_stem_idx * 2] = A::nan();
                     self.stems[new_stem_idx * 2 + 1] = A::nan();
@@ -291,29 +251,25 @@ where
                 //    populate with the split-off points
                 right_idx = (new_stem_idx * 2 + 1).az::<IDX>();
                 while right_idx <= self.stems.capacity().az::<IDX>() {
-                    right_idx = right_idx *  2.az::<IDX>();
+                    right_idx = right_idx * 2.az::<IDX>();
                 }
                 right_idx = right_idx - (self.stems.capacity()).az::<IDX>();
-
-                result = TraverseState::ValidStem(new_stem_idx, LeafParent::Stem(new_stem_idx, is_left_child));
             },
-            LeafParent::Stem(parent_idx, is_left_child) => {
+            LeafParent::Stem(parent_idx, is_right_child) => {
                 // parent is a static stem, bottom level:
 
                 // check to see if the stem is already used:
-                if self.stems[parent_idx.az::<usize>()].is_nan() {
+                if self.stems[parent_idx].is_nan() {
                     // 1) if it isn't, we will use it. Clear the split value
                     //    LSB.
 
                     split_val = split_val.with_lsb_clear().with_2lsb_clear();
-                    self.stems[parent_idx.az::<usize>()] = split_val;
+                    self.stems[parent_idx] = split_val;
 
                     // 4) determine the index of the leaf node we need to
                     //    populate with the split-off points
-                    right_idx = (parent_idx.az::<usize>() * 2 + 1).az::<IDX>();
+                    right_idx = (parent_idx * 2 + 1).az::<IDX>();
                     right_idx = right_idx - (self.stems.capacity() + 1).az::<IDX>();
-
-                    result = TraverseState::ValidStem(parent_idx, LeafParent::Stem(parent_idx, is_left_child));
                 } else {
 
                     // 1) allocate space for twice as many dstem nodes
@@ -323,11 +279,11 @@ where
                     }
 
                     // 2) update the parent's split value to set one of the lowest 2 bits as reqd
-                    let existing_split_val = self.stems[parent_idx.az::<usize>()];
-                    if is_left_child {
-                        self.stems[parent_idx.az::<usize>()] = existing_split_val.with_lsb_set();
+                    let existing_split_val = self.stems[parent_idx];
+                    if is_right_child {
+                        self.stems[parent_idx] = existing_split_val.with_2lsb_set();
                     } else {
-                        self.stems[parent_idx.az::<usize>()] = existing_split_val.with_2lsb_set();
+                        self.stems[parent_idx] = existing_split_val.with_lsb_set();
                     }
                     //    TODO: check to see if this alters the pivot
                     //    position (perhaps re-run mirror-select-unstable)
@@ -338,7 +294,7 @@ where
                     //    be the index of a new leaf node & MSB.
                     let new_dstem = unsafe { self.dstems.get_unchecked_mut(leaf_idx.az::<usize>()) };
                     new_dstem.split_val = split_val;
-                    new_dstem.left = leaf_idx + IDX::leaf_offset();
+                    new_dstem.children[0] = leaf_idx + IDX::leaf_offset();
 
                     if self.leaves.capacity() < self.unreserved_leaf_idx + 1 {
                         self.leaves.reserve(1);
@@ -346,12 +302,10 @@ where
                     right_idx = self.unreserved_leaf_idx.az::<IDX>();
                     self.unreserved_leaf_idx += 1;
 
-                    new_dstem.right = right_idx + IDX::leaf_offset();
-
-                    result = TraverseState::DStem(leaf_idx);
+                    new_dstem.children[1] = right_idx + IDX::leaf_offset();
                 }
             },
-            LeafParent::DStem(parent_idx, was_parents_left) => {
+            LeafParent::DStem(parent_idx, is_right_child) => {
                 // parent is a dynamic stem:
 
                 let leaf_len = self.unreserved_leaf_idx;
@@ -359,17 +313,19 @@ where
 
                 // 1) insert a new dstem
                 self.dstems.push(StemNode {
-                    left: leaf_idx + IDX::leaf_offset(),
-                    right: (leaf_len.az::<IDX>()) /*- IDX::one()*/ + IDX::leaf_offset(),
+                    children: [
+                        leaf_idx + IDX::leaf_offset(),
+                        (leaf_len.az::<IDX>()) /*- IDX::one()*/ + IDX::leaf_offset()
+                    ],
                     split_val,
                 });
                 let new_stem_index: IDX = (self.dstems.len() - 1).az::<IDX>();
 
                 let parent_node = unsafe { self.dstems.get_unchecked_mut(parent_idx.az::<usize>()) };
-                if was_parents_left {
-                    parent_node.left = new_stem_index;
+                if is_right_child {
+                    parent_node.children[1] = new_stem_index;
                 } else {
-                    parent_node.right = new_stem_index;
+                    parent_node.children[0] = new_stem_index;
                 }
 
                 // 2) insert a new leaf, after any reserved or existing positions.
@@ -378,61 +334,38 @@ where
                 }
                 right_idx = self.unreserved_leaf_idx.az::<IDX>();
                 self.unreserved_leaf_idx += 1;
-
-                // 3) update right_idx to the new leaf.
-                result = TraverseState::DStem(new_stem_index)
             }
         }
 
         let [mut right, mut orig] =  unsafe { self.leaves.get_many_unchecked_mut([right_idx.az::<usize>(), leaf_idx.az::<usize>()]) };
 
         unsafe {
-            if B.rem(2) == 1 {
-
-                right
-                    .content_points
-                    .get_unchecked_mut(..((pivot_idx + IDX::one()).az::<usize>()))
-                    .copy_from_slice(
-                        orig.content_points
-                            .get_unchecked((pivot_idx.az::<usize>())..),
-                    );
-                right
-                    .content_items
-                    .get_unchecked_mut(..((pivot_idx + IDX::one()).az::<usize>()))
-                    .copy_from_slice(
-                        orig.content_items
-                            .get_unchecked((pivot_idx.az::<usize>())..),
-                    );
-
-            } else {
-
-                right
-                .content_points
-                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
-                .copy_from_slice(
-                    orig.content_points
-                    .get_unchecked((pivot_idx.az::<usize>())..),
-                );
-                right
-                .content_items
-                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
-                .copy_from_slice(
-                    orig.content_items
-                    .get_unchecked((pivot_idx.az::<usize>())..),
-                );
-            }
+            right
+            .content_points
+            .get_unchecked_mut(..(pivot_idx.az::<usize>()))
+            .copy_from_slice(
+                orig.content_points
+                .get_unchecked((pivot_idx.az::<usize>())..),
+            );
+            right
+            .content_items
+            .get_unchecked_mut(..(pivot_idx.az::<usize>()))
+            .copy_from_slice(
+                orig.content_items
+                .get_unchecked((pivot_idx.az::<usize>())..),
+            );
         }
 
         right.size = (B.az::<IDX>()) - pivot_idx;
         orig.size = pivot_idx;
 
-        result
+        (right_idx, split_val)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::float_sss::kdtree::KdTree;
+    use crate::{float_sss::kdtree::{KdTree, FloatLSB}, types::Index};
     use rand::Rng;
 
     type FLT = f32;
@@ -451,6 +384,190 @@ mod tests {
         tree.add(&point, item);
 
         assert_eq!(tree.size(), 1);
+
+        // adding to an empty tree with >0 stem nodes will
+        // always drop the point in leaf 0
+        assert_eq!(tree.leaves[0].content_items[0], 123);
+        assert_eq!(&tree.leaves[0].content_points[0], &point);
+    }
+
+    #[test]
+    fn can_add_items_root_stem_specified() {
+        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+
+       //      01      Stems
+       //   02    03   Stems
+       //  0  1  2  3  Leaves
+
+        let point_1: [FLT; 4] = [n(0.1f32), n(0.6f32), n(0.6f32), n(0.6f32)];
+        let item_1 = 123;
+
+        let point_2: [FLT; 4] = [n(0.6f32), n(0.1f32), n(0.1f32), n(0.1f32)];
+        let item_2 = 456;
+
+        tree.stems[1] = n(0.5f32);
+        tree.stems[2] = f32::NAN;
+        tree.stems[3] = f32::NAN;
+
+        tree.add(&point_1, item_1);
+        assert_eq!(tree.size(), 1);
+
+        // adding to a tree with a val in stem[1] and NaNs in
+        // the root's children will put the val in leaf[0] if
+        // query[0] < split_val
+        assert_eq!(tree.leaves[0].content_items[0], 123);
+        assert_eq!(&tree.leaves[0].content_points[0], &point_1);
+
+        tree.add(&point_2, item_2);
+        assert_eq!(tree.size(), 2);
+
+        // adding to a tree with a val in stem[1] and NaNs in
+        // the root's children will put the val in leaf[2] if
+        // query[0] > split_val
+        assert_eq!(tree.leaves[2].content_items[0], 456);
+        assert_eq!(&tree.leaves[2].content_points[0], &point_2);
+    }
+
+    #[test]
+    fn can_add_items_root_and_one_base_stem_specified() {
+        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+
+        //      01      Stems
+        //   02    03   Stems
+        //  0  1  2  3  Leaves
+
+        let point_1: [FLT; 4] = [n(0.1f32), n(0.6f32), n(0.6f32), n(0.6f32)];
+        let item_1 = 123;
+
+        let point_2: [FLT; 4] = [n(0.6f32), n(0.1f32), n(0.1f32), n(0.1f32)];
+        let item_2 = 456;
+
+        let point_3: [FLT; 4] = [n(0.6f32), n(0.6f32), n(0.1f32), n(0.1f32)];
+        let item_3 = 789;
+
+        tree.stems[1] = n(0.5f32);
+        tree.stems[2] = f32::NAN;
+
+        // clearing the 2 LSBs indicates that both the left child and the right
+        // child are leaves rather than dstems
+        tree.stems[3] = 0.5f32.with_lsb_clear().with_2lsb_clear();
+
+        tree.add(&point_1, item_1);
+        assert_eq!(tree.size(), 1);
+
+        // adding to a tree with a val in stem[1] and NaN in
+        // the root's left child will put the val in leaf[0] if
+        // query[0] < split_val
+        assert_eq!(tree.leaves[0].content_items[0], 123);
+        assert_eq!(&tree.leaves[0].content_points[0], &point_1);
+
+        tree.add(&point_2, item_2);
+        assert_eq!(tree.size(), 2);
+
+        // adding to a tree with a val in stem[1] and a val
+        // with clear LSBs in thr root's right child
+        // will put the val in leaf[2] if
+        // query[0] > stem[1] and query[1] < stem[3]
+        assert_eq!(tree.leaves[2].content_items[0], 456);
+        assert_eq!(&tree.leaves[2].content_points[0], &point_2);
+
+        tree.add(&point_3, item_3);
+        assert_eq!(tree.size(), 3);
+
+        // adding to a tree with a val in stem[1] and a val
+        // with clear LSBs in thr root's right child
+        // will put the val in leaf[3] if
+        // query[0] > stem[1] and query[1] > stem[3]
+        assert_eq!(tree.leaves[3].content_items[0], 789);
+        assert_eq!(&tree.leaves[3].content_points[0], &point_3);
+    }
+
+    #[test]
+    fn can_add_items_root_and_both_base_stem_specified_plus_dstems() {
+        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+
+        //      01      Stems
+        //   02    03   Stems
+        //  0  1  2  3  Leaves
+
+        let point_1: [FLT; 4] = [n(0.1f32), n(0.1f32), n(0.1f32), n(0.6f32)];
+        let item_1 = 111;
+
+        let point_2: [FLT; 4] = [n(0.1f32), n(0.1f32), n(0.6f32), n(0.1f32)];
+        let item_2 = 222;
+
+        let point_3: [FLT; 4] = [n(0.1f32), n(0.6f32), n(0.1f32), n(0.1f32)];
+        let item_3 = 333;
+
+        let point_4: [FLT; 4] = [n(0.6f32), n(0.6f32), n(0.1f32), n(0.6f32)];
+        let item_4 = 444;
+
+        let point_5: [FLT; 4] = [n(0.6f32), n(0.6f32), n(0.6f32), n(0.1f32)];
+        let item_5 = 555;
+
+        tree.stems[1] = n(0.5f32);
+
+        // children: left -> dstems, right -> leaves
+        tree.stems[2] = 0.5f32.with_lsb_set().with_2lsb_clear();
+
+        // children: left -> leaves, right -> dstems
+        tree.stems[3] = 0.5f32.with_lsb_clear().with_2lsb_set();
+
+        // TODO: set up the dstems
+        tree.initialise_dstems();
+        tree.dstems[0].split_val = 0.5f32;
+        tree.dstems[0].children = [
+            0 + <u32 as Index>::leaf_offset(),
+            5 + <u32 as Index>::leaf_offset()
+        ];
+
+        tree.dstems[3].split_val = 0.5f32;
+        tree.dstems[3].children = [
+            2 + <u32 as Index>::leaf_offset(),
+            2
+        ];
+
+        tree.dstems[2].split_val = 0.5f32;
+        tree.dstems[2].children = [
+            6 + <u32 as Index>::leaf_offset(),
+            7 + <u32 as Index>::leaf_offset()
+        ];
+
+        tree.add(&point_1, item_1);
+        assert_eq!(tree.size(), 1);
+
+        assert_eq!(tree.leaves[0].content_items[0], 111);
+        assert_eq!(&tree.leaves[0].content_points[0], &point_1);
+
+        tree.leaves.reserve(1);
+        tree.unreserved_leaf_idx += 1;
+
+        tree.add(&point_2, item_2);
+        assert_eq!(tree.size(), 2);
+
+        assert_eq!(unsafe { tree.leaves.get_unchecked(5) }.content_items[0], 222);
+        assert_eq!(&unsafe { tree.leaves.get_unchecked(5) }.content_points[0], &point_2);
+
+        tree.add(&point_3, item_3);
+        assert_eq!(tree.size(), 3);
+
+        assert_eq!(tree.leaves[1].content_items[0], 333);
+        assert_eq!(&tree.leaves[1].content_points[0], &point_3);
+
+        tree.add(&point_4, item_4);
+        assert_eq!(tree.size(), 4);
+
+        assert_eq!(tree.leaves[2].content_items[0], 444);
+        assert_eq!(&tree.leaves[2].content_points[0], &point_4);
+
+        tree.add(&point_5, item_5);
+        assert_eq!(tree.size(), 5);
+
+        tree.leaves.reserve(1);
+        tree.unreserved_leaf_idx += 1;
+
+        assert_eq!(unsafe { tree.leaves.get_unchecked(6) }.content_items[0], 555);
+        assert_eq!(&unsafe { tree.leaves.get_unchecked(6) }.content_points[0], &point_5);
     }
 
     #[test]
