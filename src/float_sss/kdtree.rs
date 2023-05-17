@@ -3,10 +3,9 @@
 
 use az::{Az, Cast};
 use num_traits::Float;
-use std::alloc::{alloc, dealloc, handle_alloc_error, Layout, Global, Allocator, AllocError};
+use std::alloc::{Layout, Global, Allocator, AllocError};
 use std::{cmp::PartialEq};
 use std::fmt::Debug;
-use std::mem::MaybeUninit;
 use divrem::DivCeil;
 
 #[cfg(feature = "serialize")]
@@ -110,8 +109,9 @@ pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B:
 )]
 #[derive(Clone, Debug, PartialEq)]
 pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
-    pub(crate) left: IDX,
-    pub(crate) right: IDX,
+    // pub(crate) left: IDX,
+    // pub(crate) right: IDX,
+    pub(crate) children: [IDX; 2],
     pub(crate) split_val: A,
 }
 
@@ -144,7 +144,7 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
     pub(crate) size: IDX,
 }
 
-impl<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX>
+/* impl<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX>
     LeafNode<A, T, K, B, IDX>
 where
     A: Axis,
@@ -158,7 +158,7 @@ where
             size: IDX::zero(),
         }
     }
-}
+} */
 
 impl<A, T, const K: usize, const B: usize, IDX> KdTree<A, T, K, B, IDX>
 where
@@ -265,6 +265,7 @@ where
         self.size
     }
 
+    #[inline]
     pub(crate) fn is_stem_index(x: IDX) -> bool {
         x < <IDX as Index>::leaf_offset()
     }
