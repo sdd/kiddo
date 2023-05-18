@@ -571,6 +571,400 @@ mod tests {
     }
 
     #[test]
+    fn can_handle_initial_split_new_item_to_original_bucket() {
+        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+
+        //      01      Stems
+        //   02    03   Stems
+        //  0  1  2  3  Leaves
+
+        let point_1: [FLT; 4] = [n(0.12f32), n(0.1f32), n(0.1f32), n(0.6f32)];
+        let item_1 = 111;
+
+        let point_2: [FLT; 4] = [n(0.11f32), n(0.1f32), n(0.6f32), n(0.1f32)];
+        let item_2 = 222;
+
+        let point_3: [FLT; 4] = [n(0.22f32), n(0.6f32), n(0.1f32), n(0.1f32)];
+        let item_3 = 333;
+
+        let point_4: [FLT; 4] = [n(0.21f32), n(0.6f32), n(0.1f32), n(0.6f32)];
+        let item_4 = 444;
+
+        // to be added
+        let point_5: [FLT; 4] = [n(0.13f32), n(0.6f32), n(0.1f32), n(0.6f32)];
+        let item_5 = 555;
+
+        tree.leaves[0].content_items[0] = item_1;
+        tree.leaves[0].content_items[1] = item_2;
+        tree.leaves[0].content_items[2] = item_3;
+        tree.leaves[0].content_items[3] = item_4;
+        tree.leaves[0].content_points[0] = point_1.clone();
+        tree.leaves[0].content_points[1] = point_2.clone();
+        tree.leaves[0].content_points[2] = point_3.clone();
+        tree.leaves[0].content_points[3] = point_4.clone();
+        tree.leaves[0].size = 4;
+        tree.size = 4;
+
+        tree.add(&point_5, item_5);
+
+        assert_eq!(tree.size, 5);
+
+        assert_eq!(tree.stems[1], 0.21f32);
+        assert!(tree.stems[2].is_nan());
+        assert!(tree.stems[3].is_nan());
+
+        assert_eq!(tree.leaves[0].content_items[0], item_1);
+        assert_eq!(tree.leaves[0].content_items[1], item_2);
+        assert_eq!(tree.leaves[0].content_items[2], item_5);
+        assert_eq!(&tree.leaves[0].content_points[0], &point_1);
+        assert_eq!(&tree.leaves[0].content_points[1], &point_2);
+        assert_eq!(&tree.leaves[0].content_points[2], &point_5);
+        assert_eq!(tree.leaves[0].size, 3);
+
+        assert_eq!(tree.leaves[2].content_items[0], item_4);
+        assert_eq!(tree.leaves[2].content_items[1], item_3);
+        assert_eq!(&tree.leaves[2].content_points[0], &point_4);
+        assert_eq!(&tree.leaves[2].content_points[1], &point_3);
+        assert_eq!(tree.leaves[2].size, 2);
+    }
+
+    #[test]
+    fn can_handle_initial_split_new_item_to_right_bucket() {
+        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+
+        //      01      Stems
+        //   02    03   Stems
+        //  0  1  2  3  Leaves
+
+        let point_1: [FLT; 4] = [n(0.12f32), n(0.1f32), n(0.1f32), n(0.6f32)];
+        let item_1 = 111;
+
+        let point_2: [FLT; 4] = [n(0.11f32), n(0.1f32), n(0.6f32), n(0.1f32)];
+        let item_2 = 222;
+
+        let point_3: [FLT; 4] = [n(0.22f32), n(0.6f32), n(0.1f32), n(0.1f32)];
+        let item_3 = 333;
+
+        let point_4: [FLT; 4] = [n(0.21f32), n(0.6f32), n(0.1f32), n(0.6f32)];
+        let item_4 = 444;
+
+        // to be added
+        let point_5: [FLT; 4] = [n(0.23f32), n(0.6f32), n(0.1f32), n(0.6f32)];
+        let item_5 = 555;
+
+        tree.leaves[0].content_items[0] = item_1;
+        tree.leaves[0].content_items[1] = item_2;
+        tree.leaves[0].content_items[2] = item_3;
+        tree.leaves[0].content_items[3] = item_4;
+        tree.leaves[0].content_points[0] = point_1.clone();
+        tree.leaves[0].content_points[1] = point_2.clone();
+        tree.leaves[0].content_points[2] = point_3.clone();
+        tree.leaves[0].content_points[3] = point_4.clone();
+        tree.leaves[0].size = 4;
+        tree.size = 4;
+
+        tree.add(&point_5, item_5);
+
+        assert_eq!(tree.size, 5);
+
+        assert_eq!(tree.stems[1], 0.21f32);
+        assert!(tree.stems[2].is_nan());
+        assert!(tree.stems[3].is_nan());
+
+        assert_eq!(tree.leaves[0].content_items[0], item_1);
+        assert_eq!(tree.leaves[0].content_items[1], item_2);
+        assert_eq!(&tree.leaves[0].content_points[0], &point_1);
+        assert_eq!(&tree.leaves[0].content_points[1], &point_2);
+        assert_eq!(tree.leaves[0].size, 2);
+
+        assert_eq!(tree.leaves[2].content_items[0], item_4);
+        assert_eq!(tree.leaves[2].content_items[1], item_3);
+        assert_eq!(tree.leaves[2].content_items[2], item_5);
+        assert_eq!(&tree.leaves[2].content_points[0], &point_4);
+        assert_eq!(&tree.leaves[2].content_points[1], &point_3);
+        assert_eq!(&tree.leaves[2].content_points[2], &point_5);
+        assert_eq!(tree.leaves[2].size, 3);
+    }
+
+    #[test]
+    fn can_handle_root_split_new_item_to_right_bucket() {
+        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+
+        //      01      Stems
+        //   02    03   Stems
+        //  0  1  2  3  Leaves
+
+        let point_1: [FLT; 4] = [n(0.12f32), n(0.2f32), n(0.1f32), n(0.6f32)];
+        let item_1 = 111;
+
+        let point_2: [FLT; 4] = [n(0.11f32), n(0.1f32), n(0.6f32), n(0.1f32)];
+        let item_2 = 222;
+
+        let point_3: [FLT; 4] = [n(0.16f32), n(0.6f32), n(0.1f32), n(0.1f32)];
+        let item_3 = 333;
+
+        let point_4: [FLT; 4] = [n(0.17f32), n(0.5f32), n(0.1f32), n(0.6f32)];
+        let item_4 = 444;
+
+        // to be added
+        let point_5: [FLT; 4] = [n(0.18f32), n(0.7f32), n(0.1f32), n(0.6f32)];
+        let item_5 = 555;
+
+        tree.stems[1] = 0.21f32;
+        tree.stems[2] = f32::NAN;
+        tree.stems[3] = f32::NAN;
+
+        tree.leaves[0].content_items[0] = item_1;
+        tree.leaves[0].content_items[1] = item_2;
+        tree.leaves[0].content_items[2] = item_3;
+        tree.leaves[0].content_items[3] = item_4;
+        tree.leaves[0].content_points[0] = point_1.clone();
+        tree.leaves[0].content_points[1] = point_2.clone();
+        tree.leaves[0].content_points[2] = point_3.clone();
+        tree.leaves[0].content_points[3] = point_4.clone();
+        tree.leaves[0].size = 4;
+        tree.size = 4;
+
+        tree.add(&point_5, item_5);
+
+        assert_eq!(tree.size, 5);
+
+        assert_eq!(tree.stems[1], 0.21f32);
+        assert_eq!(tree.stems[2], 0.5f32.with_lsb_clear().with_2lsb_clear());
+        assert!(tree.stems[3].is_nan());
+
+        assert_eq!(tree.leaves[0].content_items[0], item_1);
+        assert_eq!(tree.leaves[0].content_items[1], item_2);
+        assert_eq!(&tree.leaves[0].content_points[0], &point_1);
+        assert_eq!(&tree.leaves[0].content_points[1], &point_2);
+        assert_eq!(tree.leaves[0].size, 2);
+
+        assert_eq!(tree.leaves[1].content_items[0], item_4);
+        assert_eq!(tree.leaves[1].content_items[1], item_3);
+        assert_eq!(tree.leaves[1].content_items[2], item_5);
+        assert_eq!(&tree.leaves[1].content_points[0], &point_4);
+        assert_eq!(&tree.leaves[1].content_points[1], &point_3);
+        assert_eq!(&tree.leaves[1].content_points[2], &point_5);
+        assert_eq!(tree.leaves[1].size, 3);
+    }
+
+    #[test]
+    fn can_handle_base_split_new_item_to_right_bucket() {
+        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+
+        //      01      Stems
+        //   02    03   Stems
+        //  0  1  2  3  Leaves
+
+        let point_1: [FLT; 4] = [n(0.12f32), n(0.2f32), n(0.2f32), n(0.6f32)];
+        let item_1 = 111;
+
+        let point_2: [FLT; 4] = [n(0.11f32), n(0.1f32), n(0.1f32), n(0.1f32)];
+        let item_2 = 222;
+
+        let point_3: [FLT; 4] = [n(0.16f32), n(0.4f32), n(0.4f32), n(0.1f32)];
+        let item_3 = 333;
+
+        let point_4: [FLT; 4] = [n(0.17f32), n(0.3f32), n(0.3f32), n(0.6f32)];
+        let item_4 = 444;
+
+        // to be added
+        let point_5: [FLT; 4] = [n(0.18f32), n(0.45f32), n(0.7f32), n(0.6f32)];
+        let item_5 = 555;
+
+        tree.stems[1] = 0.21f32;
+        tree.stems[2] = 0.5f32.with_lsb_clear().with_2lsb_clear();
+        tree.stems[3] = f32::NAN;
+
+        tree.leaves[0].content_items[0] = item_1;
+        tree.leaves[0].content_items[1] = item_2;
+        tree.leaves[0].content_items[2] = item_3;
+        tree.leaves[0].content_items[3] = item_4;
+        tree.leaves[0].content_points[0] = point_1.clone();
+        tree.leaves[0].content_points[1] = point_2.clone();
+        tree.leaves[0].content_points[2] = point_3.clone();
+        tree.leaves[0].content_points[3] = point_4.clone();
+        tree.leaves[0].size = 4;
+        tree.size = 4;
+
+        tree.add(&point_5, item_5);
+
+        assert_eq!(tree.size, 5);
+
+        assert_eq!(tree.stems[1], 0.21f32);
+        assert_eq!(tree.stems[2], 0.5f32.with_lsb_set().with_2lsb_clear());
+        assert!(tree.stems[3].is_nan());
+
+        assert_eq!(tree.dstems[0].split_val, 0.3f32);
+        assert_eq!(tree.dstems[0].children, [0 + <u32 as Index>::leaf_offset(), 4 + <u32 as Index>::leaf_offset()]);
+
+        assert_eq!(tree.leaves[0].content_items[0], item_1);
+        assert_eq!(tree.leaves[0].content_items[1], item_2);
+        assert_eq!(&tree.leaves[0].content_points[0], &point_1);
+        assert_eq!(&tree.leaves[0].content_points[1], &point_2);
+        assert_eq!(tree.leaves[0].size, 2);
+
+        assert_eq!(unsafe { tree.leaves.get_unchecked(4) }.content_items[0], item_4);
+        assert_eq!(unsafe { tree.leaves.get_unchecked(4) }.content_items[1], item_3);
+        assert_eq!(unsafe { tree.leaves.get_unchecked(4) }.content_items[2], item_5);
+        assert_eq!(&unsafe { tree.leaves.get_unchecked(4) }.content_points[0], &point_4);
+        assert_eq!(&unsafe { tree.leaves.get_unchecked(4) }.content_points[1], &point_3);
+        assert_eq!(&unsafe { tree.leaves.get_unchecked(4) }.content_points[2], &point_5);
+        assert_eq!(unsafe { tree.leaves.get_unchecked(4) }.size, 3);
+    }
+
+    #[test]
+    fn can_handle_dstem_split_new_item_to_right_bucket() {
+        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+        ///// BEFORE /////////////////////////
+        //       01       Stems
+        //   02      03   Stems
+        //  D0   1  2  3  Dstems / Leaves
+        // 0  4           Leaves
+
+        ////// AFTER /////////////////////////
+        //           01       Stems
+        //       02      03   Stems
+        //    D0    1   2  3  Dstems / Leaves
+        //  D4   4            DStems / Leaves (D1-D3 reserved)
+        // 0  5               Leaves
+
+
+        let point_1: [FLT; 4] = [n(0.12f32), n(0.2f32), n(0.2f32), n(0.102f32)];
+        let item_1 = 111;
+
+        let point_2: [FLT; 4] = [n(0.11f32), n(0.1f32), n(0.1f32), n(0.101f32)];
+        let item_2 = 222;
+
+        let point_3: [FLT; 4] = [n(0.16f32), n(0.4f32), n(0.4f32), n(0.106f32)];
+        let item_3 = 333;
+
+        let point_4: [FLT; 4] = [n(0.17f32), n(0.3f32), n(0.3f32), n(0.107f32)];
+        let item_4 = 444;
+
+        // to be added
+        let point_5: [FLT; 4] = [n(0.18f32), n(0.45f32), n(0.45f32), n(0.108f32)];
+        let item_5 = 555;
+
+        tree.stems[1] = 0.21f32;
+        tree.stems[2] = 0.5f32.with_lsb_set().with_2lsb_clear();
+        tree.stems[3] = f32::NAN;
+
+        tree.initialise_dstems();
+        tree.dstems[0].split_val = 0.3f32;
+        tree.dstems[0].children = [0 + <u32 as Index>::leaf_offset(), 4 + <u32 as Index>::leaf_offset()];
+
+        tree.leaves.reserve(1);
+        tree.unreserved_leaf_idx += 1;
+
+        tree.leaves[0].content_items[0] = item_1;
+        tree.leaves[0].content_items[1] = item_2;
+        tree.leaves[0].content_items[2] = item_3;
+        tree.leaves[0].content_items[3] = item_4;
+        tree.leaves[0].content_points[0] = point_1.clone();
+        tree.leaves[0].content_points[1] = point_2.clone();
+        tree.leaves[0].content_points[2] = point_3.clone();
+        tree.leaves[0].content_points[3] = point_4.clone();
+        tree.leaves[0].size = 4;
+        tree.size = 4;
+
+        tree.add(&point_5, item_5);
+
+        assert_eq!(tree.size, 5);
+
+        assert_eq!(tree.stems[1], 0.21f32);
+        assert_eq!(tree.stems[2], 0.5f32.with_lsb_set().with_2lsb_clear());
+        assert!(tree.stems[3].is_nan());
+
+        assert_eq!(tree.dstems[0].split_val, 0.3f32);
+        assert_eq!(tree.dstems[0].children, [4, 4 + <u32 as Index>::leaf_offset()]);
+
+        assert_eq!(tree.dstems[4].split_val, 0.106f32);
+        assert_eq!(tree.dstems[4].children, [0 + <u32 as Index>::leaf_offset(), 5 + <u32 as Index>::leaf_offset()]);
+
+        assert_eq!(tree.leaves[0].content_items[0], item_1);
+        assert_eq!(tree.leaves[0].content_items[1], item_2);
+        assert_eq!(&tree.leaves[0].content_points[0], &point_1);
+        assert_eq!(&tree.leaves[0].content_points[1], &point_2);
+        assert_eq!(tree.leaves[0].size, 2);
+
+        assert_eq!(unsafe { tree.leaves.get_unchecked(5) }.content_items[0], item_3);
+        assert_eq!(unsafe { tree.leaves.get_unchecked(5) }.content_items[1], item_4);
+        assert_eq!(unsafe { tree.leaves.get_unchecked(5) }.content_items[2], item_5);
+        assert_eq!(&unsafe { tree.leaves.get_unchecked(5) }.content_points[0], &point_3);
+        assert_eq!(&unsafe { tree.leaves.get_unchecked(5) }.content_points[1], &point_4);
+        assert_eq!(&unsafe { tree.leaves.get_unchecked(5) }.content_points[2], &point_5);
+        assert_eq!(unsafe { tree.leaves.get_unchecked(5) }.size, 3);
+    }
+
+    #[test]
+    fn can_handle_interior_stem_split_new_item_to_right_bucket() {
+        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(32);
+
+        //             01              Stems
+        //      02            03       Stems
+        //  04     05     06     07    Stems
+        // 0  1   2  3   4  5   6  7   Leaves
+
+        let point_1: [FLT; 4] = [n(0.12f32), n(0.2f32), n(0.2f32), n(0.6f32)];
+        let item_1 = 111;
+
+        let point_2: [FLT; 4] = [n(0.11f32), n(0.1f32), n(0.1f32), n(0.1f32)];
+        let item_2 = 222;
+
+        let point_3: [FLT; 4] = [n(0.16f32), n(0.4f32), n(0.4f32), n(0.1f32)];
+        let item_3 = 333;
+
+        let point_4: [FLT; 4] = [n(0.17f32), n(0.3f32), n(0.3f32), n(0.6f32)];
+        let item_4 = 444;
+
+        // to be added
+        let point_5: [FLT; 4] = [n(0.18f32), n(0.45f32), n(0.7f32), n(0.6f32)];
+        let item_5 = 555;
+
+        tree.stems[1] = 0.21f32;
+        tree.stems[2] = 0.5f32;
+        tree.stems[3] = f32::NAN;
+        tree.stems[4] = f32::NAN;
+        tree.stems[5] = f32::NAN;
+
+        tree.leaves[0].content_items[0] = item_1;
+        tree.leaves[0].content_items[1] = item_2;
+        tree.leaves[0].content_items[2] = item_3;
+        tree.leaves[0].content_items[3] = item_4;
+        tree.leaves[0].content_points[0] = point_1.clone();
+        tree.leaves[0].content_points[1] = point_2.clone();
+        tree.leaves[0].content_points[2] = point_3.clone();
+        tree.leaves[0].content_points[3] = point_4.clone();
+        tree.leaves[0].size = 4;
+        tree.size = 4;
+
+        tree.add(&point_5, item_5);
+
+        assert_eq!(tree.size, 5);
+
+        assert_eq!(tree.stems[1], 0.21f32);
+        assert_eq!(tree.stems[2], 0.5f32);
+        assert!(tree.stems[3].is_nan());
+        assert_eq!(tree.stems[4], 0.3f32.with_lsb_clear().with_2lsb_clear());
+        assert!(tree.stems[5].is_nan());
+
+        assert_eq!(tree.leaves[0].content_items[0], item_1);
+        assert_eq!(tree.leaves[0].content_items[1], item_2);
+        assert_eq!(&tree.leaves[0].content_points[0], &point_1);
+        assert_eq!(&tree.leaves[0].content_points[1], &point_2);
+        assert_eq!(tree.leaves[0].size, 2);
+
+        assert_eq!(tree.leaves[1].content_items[0], item_4);
+        assert_eq!(tree.leaves[1].content_items[1], item_3);
+        assert_eq!(tree.leaves[1].content_items[2], item_5);
+        assert_eq!(&tree.leaves[1].content_points[0], &point_4);
+        assert_eq!(&tree.leaves[1].content_points[1], &point_3);
+        assert_eq!(&tree.leaves[1].content_points[2], &point_5);
+        assert_eq!(tree.leaves[1].size, 3);
+    }
+
+    #[test]
     fn can_add_enough_items_to_cause_a_split() {
         let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
 
