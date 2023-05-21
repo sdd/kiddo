@@ -276,6 +276,66 @@ where
     }
 }
 
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    FromIterator<([A; K], T)> for KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    #[inline]
+    fn from_iter<I: IntoIterator<Item = ([A; K], T)>>(iter: I) -> Self {
+        let iter = iter.into_iter();
+        let mut tree = Self::with_capacity(iter.size_hint().0);
+        for (point, item) in iter {
+            tree.add(&point, item);
+        }
+        tree
+    }
+}
+
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>, const N: usize>
+    From<[([A; K], T); N]> for KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    #[inline]
+    fn from(value: [([A; K], T); N]) -> Self {
+        value.into_iter().collect()
+    }
+}
+
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> Extend<([A; K], T)>
+    for KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    #[inline]
+    fn extend<I: IntoIterator<Item = ([A; K], T)>>(&mut self, iter: I) {
+        for (point, item) in iter {
+            self.add(&point, item);
+        }
+    }
+}
+
+impl<
+        'a,
+        't,
+        A: Axis + Copy,
+        T: Content + Copy,
+        const K: usize,
+        const B: usize,
+        IDX: Index<T = IDX>,
+    > Extend<(&'a [A; K], &'t T)> for KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    #[inline]
+    fn extend<I: IntoIterator<Item = (&'a [A; K], &'t T)>>(&mut self, iter: I) {
+        for (point, item) in iter.into_iter() {
+            self.add(point, *item);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::float::kdtree::KdTree;
