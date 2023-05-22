@@ -8,3 +8,6 @@ pub mod kdtree;
 pub mod neighbour;
 #[doc(hidden)]
 pub mod query;
+
+#[cfg(feature = "rkyv")]
+pub mod persistence;
