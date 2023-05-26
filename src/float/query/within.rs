@@ -8,32 +8,26 @@ use crate::float::{
 };
 use crate::types::{Content, Index};
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
-    KdTree<A, T, K, B, IDX>
-where
-    usize: Cast<IDX>,
-{
-    /// Finds all elements within `dist` of `query`, using the specified
-    /// distance metric function.
-    ///
-    /// Results are returned sorted nearest-first
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
-    /// use kiddo::distance::squared_euclidean;
-    ///
-    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
-    ///
-    /// tree.add(&[1.0, 2.0, 5.0], 100);
-    /// tree.add(&[2.0, 3.0, 6.0], 101);
-    /// tree.add(&[200.0, 300.0, 600.0], 102);
-    ///
-    /// let within = tree.within(&[1.0, 2.0, 5.0], 10f64, &squared_euclidean);
-    ///
-    /// assert_eq!(within.len(), 2);
-    /// ```
+
+macro_rules! generate_within {
+        ($kdtree:ident, $doctest_build_tree:tt) => {
+        doc_comment! {
+        concat!("Finds all elements within `dist` of `query`, using the specified
+distance metric function.
+
+Results are returned sorted nearest-first
+
+# Examples
+
+```rust
+use kiddo::float::kdtree::KdTree;
+use kiddo::distance::squared_euclidean;
+",  $doctest_build_tree, "
+
+let within = tree.within(&[1.0, 2.0, 5.0], 10f64, &squared_euclidean);
+
+assert_eq!(within.len(), 2);
+```"),
     #[inline]
     pub fn within<F>(&self, query: &[A; K], dist: A, distance_fn: &F) -> Vec<Neighbour<A, T>>
     where
@@ -137,6 +131,38 @@ where
                 });
         }
     }
+}}}
+
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    generate_within!(
+        KdTree,
+        "
+let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+tree.add(&[1.0, 2.0, 5.0], 100);
+tree.add(&[2.0, 3.0, 6.0], 101);"
+    );
+}
+
+#[cfg(feature = "rkyv")]
+use crate::float::kdtree::{ArchivedKdTree};
+#[cfg(feature = "rkyv")]
+impl<A: Axis + rkyv::Archive<Archived = A>, T: Content + rkyv::Archive<Archived = T>, const K: usize, const B: usize, IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>>
+ArchivedKdTree<A, T, K, B, IDX>
+    where
+        usize: Cast<IDX>,
+{
+    generate_within!(
+        ArchivedKdTree,
+        "use std::fs::File;
+use memmap::MmapOptions;
+
+let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/test-tree.rkyv\").unwrap()).unwrap() };
+let tree = unsafe { rkyv::archived_root::<KdTree<f64, u32, 3, 32, u32>>(&mmap) };"
+    );
 }
 
 #[cfg(test)]

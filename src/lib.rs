@@ -67,6 +67,9 @@
 //!
 //! See the [examples documentation](https://github.com/sdd/kiddo/tree/master/examples) for some more in-depth examples.
 
+#[macro_use]
+extern crate doc_comment;
+
 #[cfg(feature = "serialize")]
 extern crate serde;
 #[cfg(feature = "serialize")]
