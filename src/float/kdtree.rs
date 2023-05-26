@@ -148,7 +148,27 @@ where
 
         tree
     }
+}
 
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> From<&Vec<[A; K]>>
+    for KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+    usize: Cast<T>,
+{
+    fn from(vec: &Vec<[A; K]>) -> Self {
+        let mut tree: KdTree<A, T, K, B, IDX> = KdTree::with_capacity(vec.len());
+
+        vec.iter().enumerate().for_each(|(idx, pos)| {
+            tree.add(pos, idx.az::<T>());
+        });
+
+        tree
+    }
+}
+
+macro_rules! generate_common_methods {
+    ($kdtree:ident) => {
     /// Returns the current number of elements stored in the tree
     ///
     /// # Examples
@@ -171,23 +191,27 @@ where
     pub(crate) fn is_stem_index(x: IDX) -> bool {
         x < <IDX as Index>::leaf_offset()
     }
+    }
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> From<&Vec<[A; K]>>
-    for KdTree<A, T, K, B, IDX>
+impl<A, T, const K: usize, const B: usize, IDX> KdTree<A, T, K, B, IDX>
 where
+    A: Axis,
+    T: Content,
+    IDX: Index<T = IDX>,
     usize: Cast<IDX>,
-    usize: Cast<T>,
 {
-    fn from(vec: &Vec<[A; K]>) -> Self {
-        let mut tree: KdTree<A, T, K, B, IDX> = KdTree::with_capacity(vec.len());
+    generate_common_methods!(KdTree);
+}
 
-        vec.iter().enumerate().for_each(|(idx, pos)| {
-            tree.add(pos, idx.az::<T>());
-        });
 
-        tree
-    }
+#[cfg(feature = "rkyv")]
+impl<A: Axis + rkyv::Archive<Archived = A>, T: Content + rkyv::Archive<Archived = T>, const K: usize, const B: usize, IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>>
+ArchivedKdTree<A, T, K, B, IDX>
+    where
+        usize: Cast<IDX>,
+{
+    generate_common_methods!(ArchivedKdTree);
 }
 
 #[cfg(test)]

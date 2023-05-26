@@ -5,31 +5,26 @@ use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
-    KdTree<A, T, K, B, IDX>
-where
-    usize: Cast<IDX>,
-{
-    /// Finds the nearest `qty` elements to `query`, using the specified
-    /// distance metric function.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
-    /// use kiddo::distance::squared_euclidean;
-    ///
-    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
-    ///
-    /// tree.add(&[1.0, 2.0, 5.0], 100);
-    /// tree.add(&[2.0, 3.0, 6.0], 101);
-    ///
-    /// let nearest: Vec<_> = tree.nearest_n(&[1.0, 2.0, 5.1], 1, &squared_euclidean);
-    ///
-    /// assert_eq!(nearest.len(), 1);
-    /// assert!((nearest[0].distance - 0.01f64).abs() < f64::EPSILON);
-    /// assert_eq!(nearest[0].item, 100);
-    /// ```
+
+macro_rules! genreate_nearest_n {
+    ($kdtree:ident, $doctest_build_tree:tt) => {
+    doc_comment! {
+    concat!("Finds the nearest `qty` elements to `query`, using the specified
+distance metric function.
+# Examples
+
+```rust
+    use kiddo::float::kdtree::KdTree;
+    use kiddo::distance::squared_euclidean;
+
+    ",  $doctest_build_tree, "
+
+    let nearest: Vec<_> = tree.nearest_n(&[1.0, 2.0, 5.1], 1, &squared_euclidean);
+
+    assert_eq!(nearest.len(), 1);
+    assert!((nearest[0].distance - 0.01f64).abs() < f64::EPSILON);
+    assert_eq!(nearest[0].item, 100);
+```"),
     #[inline]
     pub fn nearest_n<F>(&self, query: &[A; K], qty: usize, distance_fn: &F) -> Vec<Neighbour<A, T>>
     where
@@ -65,7 +60,7 @@ where
     ) where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
-        if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
+        if $kdtree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
             let node = &self.stems.get_unchecked(curr_node_idx.az::<usize>());
 
             let mut rd = rd;
@@ -137,6 +132,38 @@ where
     fn dist_belongs_in_heap(dist: A, heap: &BinaryHeap<Neighbour<A, T>>) -> bool {
         heap.is_empty() || dist < heap.peek().unwrap().distance || heap.len() < heap.capacity()
     }
+}}}
+
+
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    genreate_nearest_n!(
+        KdTree,
+        "let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+    tree.add(&[1.0, 2.0, 5.0], 100);
+    tree.add(&[2.0, 3.0, 6.0], 101);"
+    );
+}
+
+#[cfg(feature = "rkyv")]
+use crate::float::kdtree::ArchivedKdTree;
+#[cfg(feature = "rkyv")]
+impl<A: Axis + rkyv::Archive<Archived = A>, T: Content + rkyv::Archive<Archived = T>, const K: usize, const B: usize, IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>>
+ArchivedKdTree<A, T, K, B, IDX>
+    where
+        usize: Cast<IDX>,
+{
+    genreate_nearest_n!(
+        ArchivedKdTree,
+        "use std::fs::File;
+    use memmap::MmapOptions;
+
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/test-tree.rkyv\").unwrap()).unwrap() };
+    let tree = unsafe { rkyv::archived_root::<KdTree<f64, u32, 3, 32, u32>>(&mmap) };"
+    );
 }
 
 #[cfg(test)]

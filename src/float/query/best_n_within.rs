@@ -5,34 +5,30 @@ use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
-    KdTree<A, T, K, B, IDX>
-where
-    usize: Cast<IDX>,
-{
-    /// Finds the "best" `n` elements within `dist` of `query`.
-    ///
-    /// Results are returned in arbitrary order. 'Best' is determined by
-    /// performing a comparison of the elements using < (ie, std::ord::lt).
-    /// Returns an iterator.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
-    /// use kiddo::distance::squared_euclidean;
-    ///
-    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
-    ///
-    /// tree.add(&[1.0, 2.0, 5.0], 100);
-    /// tree.add(&[2.0, 3.0, 6.0], 1);
-    /// tree.add(&[200.0, 300.0, 600.0], 102);
-    ///
-    /// let mut best_n_within = tree.best_n_within(&[1.0, 2.0, 5.0], 10f64, 1, &squared_euclidean);
-    /// let first = best_n_within.next().unwrap();
-    ///
-    /// assert_eq!(first, 1);
-    /// ```
+
+
+macro_rules! generate_best_n_within {
+        ($kdtree:ident, $leafnode:ident, $doctest_build_tree:tt) => {
+        doc_comment! {
+        concat!("Finds the \"best\" `n` elements within `dist` of `query`.
+
+Results are returned in arbitrary order. 'Best' is determined by
+performing a comparison of the elements using < (ie, std::ord::lt).
+Returns an iterator.
+
+# Examples
+
+```rust
+    use kiddo::float::kdtree::KdTree;
+    use kiddo::distance::squared_euclidean;
+
+    ",  $doctest_build_tree, "
+
+    let mut best_n_within = tree.best_n_within(&[1.0, 2.0, 5.0], 10f64, 1, &squared_euclidean);
+    let first = best_n_within.next().unwrap();
+
+    assert_eq!(first, 100);
+```"),
     #[inline]
     pub fn best_n_within<F>(
         &self,
@@ -140,7 +136,7 @@ where
         max_qty: usize,
         distance_fn: &F,
         best_items: &mut BinaryHeap<T>,
-        leaf_node: &LeafNode<A, T, K, B, IDX>,
+        leaf_node: &$leafnode<A, T, K, B, IDX>,
     ) where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
@@ -159,7 +155,7 @@ where
     unsafe fn get_item_and_add_if_good(
         max_qty: usize,
         best_items: &mut BinaryHeap<T>,
-        leaf_node: &LeafNode<A, T, K, B, IDX>,
+        leaf_node: &$leafnode<A, T, K, B, IDX>,
         idx: usize,
     ) {
         let item = *leaf_node.content_items.get_unchecked(idx.az::<usize>());
@@ -172,6 +168,39 @@ where
             }
         }
     }
+}}}
+
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    generate_best_n_within!(
+        KdTree,
+        LeafNode,
+        "let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+    tree.add(&[1.0, 2.0, 5.0], 100);
+    tree.add(&[2.0, 3.0, 6.0], 101);"
+    );
+}
+
+#[cfg(feature = "rkyv")]
+use crate::float::kdtree::{ArchivedKdTree,ArchivedLeafNode};
+#[cfg(feature = "rkyv")]
+impl<A: Axis + rkyv::Archive<Archived = A>, T: Content + rkyv::Archive<Archived = T>, const K: usize, const B: usize, IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>>
+ArchivedKdTree<A, T, K, B, IDX>
+    where
+        usize: Cast<IDX>,
+{
+    generate_best_n_within!(
+        ArchivedKdTree,
+        ArchivedLeafNode,
+        "use std::fs::File;
+    use memmap::MmapOptions;
+
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/test-tree.rkyv\").unwrap()).unwrap() };
+    let tree = unsafe { rkyv::archived_root::<KdTree<f64, u32, 3, 32, u32>>(&mmap) };"
+    );
 }
 
 #[cfg(test)]
