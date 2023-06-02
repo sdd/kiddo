@@ -92,3 +92,7 @@ impl Index for u16 {
         (u16::MAX - u16::MAX.overflowing_shr(1).0) as usize * bucket_size
     }
 }
+
+pub(crate) fn is_stem_index<IDX: Index<T = IDX>>(x: IDX) -> bool {
+    x < <IDX as Index>::leaf_offset()
+}

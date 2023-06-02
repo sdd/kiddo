@@ -5,8 +5,6 @@ use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
-
-
 macro_rules! generate_best_n_within {
         ($kdtree:ident, $leafnode:ident, $doctest_build_tree:tt) => {
         doc_comment! {
@@ -185,12 +183,17 @@ where
 }
 
 #[cfg(feature = "rkyv")]
-use crate::float::kdtree::{ArchivedKdTree,ArchivedLeafNode};
+use crate::float::kdtree::{ArchivedKdTree, ArchivedLeafNode};
 #[cfg(feature = "rkyv")]
-impl<A: Axis + rkyv::Archive<Archived = A>, T: Content + rkyv::Archive<Archived = T>, const K: usize, const B: usize, IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>>
-ArchivedKdTree<A, T, K, B, IDX>
-    where
-        usize: Cast<IDX>,
+impl<
+        A: Axis + rkyv::Archive<Archived = A>,
+        T: Content + rkyv::Archive<Archived = T>,
+        const K: usize,
+        const B: usize,
+        IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>,
+    > ArchivedKdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
 {
     generate_best_n_within!(
         ArchivedKdTree,

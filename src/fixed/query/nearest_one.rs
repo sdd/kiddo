@@ -2,7 +2,7 @@ use az::{Az, Cast};
 use std::ops::Rem;
 
 use crate::fixed::kdtree::{Axis, KdTree, LeafNode};
-use crate::types::{Content, Index};
+use crate::types::{Content, Index, is_stem_index};
 
 use crate::generate_nearest_one;
 
@@ -12,7 +12,6 @@ where
     usize: Cast<IDX>,
 {
     generate_nearest_one!(
-        KdTree,
         LeafNode,
         (r#"Queries the tree to find the nearest element to `query`, using the specified
 distance metric function.
@@ -39,7 +38,8 @@ to not needing to allocate memory or maintain sorted results.
 
     assert_eq!(nearest.0, FXD::from_num(0));
     assert_eq!(nearest.1, 100);
-```"#));
+```"#)
+    );
 }
 
 #[cfg(test)]

@@ -8,7 +8,6 @@ use crate::float::{
 };
 use crate::types::{Content, Index};
 
-
 macro_rules! generate_within {
         ($kdtree:ident, $doctest_build_tree:tt) => {
         doc_comment! {
@@ -148,12 +147,17 @@ tree.add(&[2.0, 3.0, 6.0], 101);"
 }
 
 #[cfg(feature = "rkyv")]
-use crate::float::kdtree::{ArchivedKdTree};
+use crate::float::kdtree::ArchivedKdTree;
 #[cfg(feature = "rkyv")]
-impl<A: Axis + rkyv::Archive<Archived = A>, T: Content + rkyv::Archive<Archived = T>, const K: usize, const B: usize, IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>>
-ArchivedKdTree<A, T, K, B, IDX>
-    where
-        usize: Cast<IDX>,
+impl<
+        A: Axis + rkyv::Archive<Archived = A>,
+        T: Content + rkyv::Archive<Archived = T>,
+        const K: usize,
+        const B: usize,
+        IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>,
+    > ArchivedKdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
 {
     generate_within!(
         ArchivedKdTree,

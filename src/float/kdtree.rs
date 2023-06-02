@@ -19,14 +19,14 @@ use serde::{Deserialize, Serialize};
 pub trait Axis: Float + Default + Debug + Copy + Sync {
     fn saturating_dist(self, other: Self) -> Self;
 
-    fn rd_update(self, old_off: Self,  new_off: Self) -> Self;
+    fn rd_update(self, old_off: Self, new_off: Self) -> Self;
 }
 impl<T: Float + Default + Debug + Copy + Sync> Axis for T {
     fn saturating_dist(self, other: Self) -> Self {
         (self - other).abs()
     }
 
-    fn rd_update(self, old_off: Self,  new_off: Self) -> Self {
+    fn rd_update(self, old_off: Self, new_off: Self) -> Self {
         self + new_off * new_off - old_off * old_off
     }
 }
@@ -181,29 +181,29 @@ where
 
 macro_rules! generate_common_methods {
     ($kdtree:ident) => {
-    /// Returns the current number of elements stored in the tree
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
-    ///
-    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
-    ///
-    /// tree.add(&[1.0, 2.0, 5.0], 100);
-    /// tree.add(&[1.1, 2.1, 5.1], 101);
-    ///
-    /// assert_eq!(tree.size(), 2);
-    /// ```
-    #[inline]
-    pub fn size(&self) -> T {
-        self.size
-    }
+        /// Returns the current number of elements stored in the tree
+        ///
+        /// # Examples
+        ///
+        /// ```rust
+        /// use kiddo::float::kdtree::KdTree;
+        ///
+        /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+        ///
+        /// tree.add(&[1.0, 2.0, 5.0], 100);
+        /// tree.add(&[1.1, 2.1, 5.1], 101);
+        ///
+        /// assert_eq!(tree.size(), 2);
+        /// ```
+        #[inline]
+        pub fn size(&self) -> T {
+            self.size
+        }
 
-    pub(crate) fn is_stem_index(x: IDX) -> bool {
-        x < <IDX as Index>::leaf_offset()
-    }
-    }
+        pub(crate) fn is_stem_index(x: IDX) -> bool {
+            x < <IDX as Index>::leaf_offset()
+        }
+    };
 }
 
 impl<A, T, const K: usize, const B: usize, IDX> KdTree<A, T, K, B, IDX>
@@ -216,12 +216,16 @@ where
     generate_common_methods!(KdTree);
 }
 
-
 #[cfg(feature = "rkyv")]
-impl<A: Axis + rkyv::Archive<Archived = A>, T: Content + rkyv::Archive<Archived = T>, const K: usize, const B: usize, IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>>
-ArchivedKdTree<A, T, K, B, IDX>
-    where
-        usize: Cast<IDX>,
+impl<
+        A: Axis + rkyv::Archive<Archived = A>,
+        T: Content + rkyv::Archive<Archived = T>,
+        const K: usize,
+        const B: usize,
+        IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>,
+    > ArchivedKdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
 {
     generate_common_methods!(ArchivedKdTree);
 }
