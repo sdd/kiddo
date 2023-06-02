@@ -3,8 +3,36 @@ use az::{Az, Cast};
 use std::ops::Rem;
 
 use crate::float::kdtree::{Axis, KdTree};
-use crate::types::{Content, Index};
+use crate::types::{is_stem_index, Content, Index};
 
+use crate::generate_within_unsorted;
+
+macro_rules! generate_float_within_unsorted {
+    ($doctest_build_tree:tt) => {
+        generate_within_unsorted!((
+            "Finds all elements within `dist` of `query`, using the specified
+distance metric function.
+
+Results are returned in arbitrary order. Faster than `within`.
+
+# Examples
+
+```rust
+use kiddo::float::kdtree::KdTree;
+use kiddo::distance::squared_euclidean;
+",
+            $doctest_build_tree,
+            "
+
+let within = tree.within_unsorted(&[1.0, 2.0, 5.0], 10f64, &squared_euclidean);
+
+assert_eq!(within.len(), 2);
+```"
+        ));
+    };
+}
+
+/*
 macro_rules! generate_within_unsorted {
     ($kdtree:ident, $doctest_build_tree:tt) => {
         doc_comment! {
@@ -135,14 +163,14 @@ assert_eq!(within.len(), 2);
         }
     };
 }
+ */
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {
-    generate_within_unsorted!(
-        KdTree,
+    generate_float_within_unsorted!(
         "
 let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
 tree.add(&[1.0, 2.0, 5.0], 100);
@@ -163,8 +191,7 @@ impl<
 where
     usize: Cast<IDX>,
 {
-    generate_within_unsorted!(
-        ArchivedKdTree,
+    generate_float_within_unsorted!(
         "use std::fs::File;
 use memmap::MmapOptions;
 
