@@ -20,8 +20,11 @@ use serde::{Deserialize, Serialize};
 /// on `KdTree`. A type from the `Fixed` crate will implement
 /// all of the traits required by Axis. For example `FixedU16<U14>`.
 pub trait Axis: Fixed + Default + Debug + Copy + Sync {
+    /// Returns the maximum value that the type implementing this trait can have
     fn max_value() -> Self;
+    /// returns the zero value for this type
     fn zero() -> Self;
+    /// used within query functions to update rd from old and new off
     fn rd_update(self, old_off: Self, new_off: Self) -> Self;
 }
 impl<T: Fixed + Default + Debug + Copy + Sync> Axis for T {
@@ -249,10 +252,6 @@ where
     #[inline]
     pub fn size(&self) -> T {
         self.size
-    }
-
-    pub(crate) fn is_stem_index(x: IDX) -> bool {
-        x < <IDX as Index>::leaf_offset()
     }
 }
 

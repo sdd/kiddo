@@ -86,7 +86,8 @@ mod mirror_select_nth_unstable_by;
 pub mod test_utils;
 pub mod types;
 
-pub mod common;
+#[doc(hidden)]
+pub(crate) mod common;
 
 /// A floating-point k-d tree with default parameters.
 ///
