@@ -2,7 +2,7 @@ use az::{Az, Cast};
 use std::ops::Rem;
 
 use crate::fixed::kdtree::{Axis, KdTree, LeafNode};
-use crate::types::{Content, Index, is_stem_index};
+use crate::types::{is_stem_index, Content, Index};
 
 use crate::generate_nearest_one;
 
