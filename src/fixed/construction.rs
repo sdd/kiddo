@@ -1,6 +1,6 @@
 use crate::fixed::kdtree::{Axis, KdTree, LeafNode, StemNode};
 use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
-use crate::types::{Content, Index};
+use crate::types::{is_stem_index, Content, Index};
 use az::{Az, Cast};
 use std::ops::Rem;
 
@@ -39,7 +39,7 @@ where
             let mut parent_idx = <IDX as Index>::max();
             let mut is_left_child: bool = false;
 
-            while KdTree::<A, T, K, B, IDX>::is_stem_index(stem_idx) {
+            while is_stem_index(stem_idx) {
                 parent_idx = stem_idx;
                 stem_node = self.stems.get_unchecked_mut(stem_idx.az::<usize>());
 
@@ -114,7 +114,7 @@ where
         let mut split_dim = 0;
         let mut removed: usize = 0;
 
-        while KdTree::<A, T, K, B, IDX>::is_stem_index(stem_idx) {
+        while is_stem_index(stem_idx) {
             let Some(stem_node) = self.stems.get_mut(stem_idx.az::<usize>()) else {
                 return removed;
             };

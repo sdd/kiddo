@@ -17,8 +17,10 @@ use serde::{Deserialize, Serialize};
 /// by the type that is used as the first generic parameter, `A`,
 /// on the float `KdTree`. This will be `f64` or `f32`.
 pub trait Axis: Float + Default + Debug + Copy + Sync {
+    /// returns absolute diff between two values of a type implementing this trait
     fn saturating_dist(self, other: Self) -> Self;
 
+    /// used within query functions to update rd from old and new off
     fn rd_update(self, old_off: Self, new_off: Self) -> Self;
 }
 impl<T: Float + Default + Debug + Copy + Sync> Axis for T {
@@ -30,6 +32,15 @@ impl<T: Float + Default + Debug + Copy + Sync> Axis for T {
         self + new_off * new_off - old_off * old_off
     }
 }
+
+// TODO: make LeafNode and StemNode `pub(crate)` so that they,
+//       and their Archived types, don't show up in docs.
+//       This is tricky due to encountering this problem:
+//       https://github.com/rkyv/rkyv/issues/275
+/* #[cfg_attr(
+    feature = "serialize_rkyv",
+    omit_bounds
+)] */
 
 /// Floating point k-d tree
 ///
@@ -198,10 +209,6 @@ macro_rules! generate_common_methods {
         #[inline]
         pub fn size(&self) -> T {
             self.size
-        }
-
-        pub(crate) fn is_stem_index(x: IDX) -> bool {
-            x < <IDX as Index>::leaf_offset()
         }
     };
 }
