@@ -1,6 +1,6 @@
 use crate::float::kdtree::{Axis, KdTree, LeafNode};
 use crate::generate_nearest_one;
-use crate::types::{Content, Index, is_stem_index};
+use crate::types::{is_stem_index, Content, Index};
 use az::{Az, Cast};
 use std::ops::Rem;
 

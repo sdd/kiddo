@@ -1,6 +1,6 @@
 use crate::float::kdtree::{Axis, KdTree};
 use crate::float::neighbour::Neighbour;
-use crate::types::{Content, Index, is_stem_index};
+use crate::types::{is_stem_index, Content, Index};
 use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;

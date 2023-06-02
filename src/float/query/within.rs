@@ -6,12 +6,14 @@ use crate::float::{
     kdtree::{Axis, KdTree},
     neighbour::Neighbour,
 };
-use crate::types::{Content, Index};
+use crate::types::{is_stem_index, Content, Index};
 
-macro_rules! generate_within {
-        ($kdtree:ident, $doctest_build_tree:tt) => {
-        doc_comment! {
-        concat!("Finds all elements within `dist` of `query`, using the specified
+use crate::generate_within;
+
+macro_rules! generate_float_within {
+    ($doctest_build_tree:tt) => {
+        generate_within!((
+            "Finds all elements within `dist` of `query`, using the specified
 distance metric function.
 
 Results are returned sorted nearest-first
@@ -19,126 +21,26 @@ Results are returned sorted nearest-first
 # Examples
 
 ```rust
-use kiddo::float::kdtree::KdTree;
-use kiddo::distance::squared_euclidean;
-",  $doctest_build_tree, "
+    use kiddo::float::kdtree::KdTree;
+    use kiddo::distance::squared_euclidean;
+    ",
+            $doctest_build_tree,
+            "
 
-let within = tree.within(&[1.0, 2.0, 5.0], 10f64, &squared_euclidean);
+    let within = tree.within(&[1.0, 2.0, 5.0], 10f64, &squared_euclidean);
 
-assert_eq!(within.len(), 2);
-```"),
-    #[inline]
-    pub fn within<F>(&self, query: &[A; K], dist: A, distance_fn: &F) -> Vec<Neighbour<A, T>>
-    where
-        F: Fn(&[A; K], &[A; K]) -> A,
-    {
-        let mut off = [A::zero(); K];
-        let mut matching_items: BinaryHeap<Neighbour<A, T>> = BinaryHeap::new();
-
-        unsafe {
-            self.within_recurse(
-                query,
-                dist,
-                distance_fn,
-                self.root_index,
-                0,
-                &mut matching_items,
-                &mut off,
-                A::zero(),
-            );
-        }
-
-        matching_items.into_sorted_vec()
-    }
-
-    unsafe fn within_recurse<F>(
-        &self,
-        query: &[A; K],
-        radius: A,
-        distance_fn: &F,
-        curr_node_idx: IDX,
-        split_dim: usize,
-        matching_items: &mut BinaryHeap<Neighbour<A, T>>,
-        off: &mut [A; K],
-        rd: A,
-    ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
-    {
-        if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
-            let node = self.stems.get_unchecked(curr_node_idx.az::<usize>());
-
-            let mut rd = rd;
-            let old_off = off[split_dim];
-            let new_off = query[split_dim] - node.split_val;
-
-            let [closer_node_idx, further_node_idx] =
-                if *query.get_unchecked(split_dim) < node.split_val {
-                    [node.left, node.right]
-                } else {
-                    [node.right, node.left]
-                };
-            let next_split_dim = (split_dim + 1).rem(K);
-
-            self.within_recurse(
-                query,
-                radius,
-                distance_fn,
-                closer_node_idx,
-                next_split_dim,
-                matching_items,
-                off,
-                rd,
-            );
-
-            // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-            //       so that updating rd is not hardcoded to sq euclidean
-            rd = rd + new_off * new_off - old_off * old_off;
-
-            if rd <= radius {
-                off[split_dim] = new_off;
-                self.within_recurse(
-                    query,
-                    radius,
-                    distance_fn,
-                    further_node_idx,
-                    next_split_dim,
-                    matching_items,
-                    off,
-                    rd,
-                );
-                off[split_dim] = old_off;
-            }
-        } else {
-            let leaf_node = self
-                .leaves
-                .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
-
-            leaf_node
-                .content_points
-                .iter()
-                .enumerate()
-                .take(leaf_node.size.az::<usize>())
-                .for_each(|(idx, entry)| {
-                    let distance = distance_fn(query, entry);
-
-                    if distance < radius {
-                        matching_items.push(Neighbour {
-                            distance,
-                            item: *leaf_node.content_items.get_unchecked(idx.az::<usize>()),
-                        })
-                    }
-                });
-        }
-    }
-}}}
+    assert_eq!(within.len(), 2);
+```"
+        ));
+    };
+}
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {
-    generate_within!(
-        KdTree,
+    generate_float_within!(
         "
 let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
 tree.add(&[1.0, 2.0, 5.0], 100);
@@ -159,8 +61,7 @@ impl<
 where
     usize: Cast<IDX>,
 {
-    generate_within!(
-        ArchivedKdTree,
+    generate_float_within!(
         "use std::fs::File;
 use memmap::MmapOptions;
 
