@@ -86,6 +86,8 @@ mod mirror_select_nth_unstable_by;
 pub mod test_utils;
 pub mod types;
 
+pub mod common;
+
 /// A floating-point k-d tree with default parameters.
 ///
 /// `A` is the floating point type (`f32` or `f64`).
