@@ -16,8 +16,20 @@ use serde::{Deserialize, Serialize};
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
 /// on the float `KdTree`. This will be `f64` or `f32`.
-pub trait Axis: Float + Default + Debug + Copy + Sync {}
-impl<T: Float + Default + Debug + Copy + Sync> Axis for T {}
+pub trait Axis: Float + Default + Debug + Copy + Sync {
+    fn saturating_dist(self, other: Self) -> Self;
+
+    fn rd_update(self, old_off: Self,  new_off: Self) -> Self;
+}
+impl<T: Float + Default + Debug + Copy + Sync> Axis for T {
+    fn saturating_dist(self, other: Self) -> Self {
+        (self - other).abs()
+    }
+
+    fn rd_update(self, old_off: Self,  new_off: Self) -> Self {
+        self + new_off * new_off - old_off * old_off
+    }
+}
 
 /// Floating point k-d tree
 ///

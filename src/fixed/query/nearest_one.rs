@@ -4,167 +4,42 @@ use std::ops::Rem;
 use crate::fixed::kdtree::{Axis, KdTree, LeafNode};
 use crate::types::{Content, Index};
 
+use crate::generate_nearest_one;
+
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {
-    /// Queries the tree to find the nearest element to `query`, using the specified
-    /// distance metric function.
-    ///
-    /// Faster than querying for nearest_n(point, 1, ...) due
-    /// to not needing to allocate memory or maintain sorted results.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use fixed::FixedU16;
-    /// use fixed::types::extra::U0;
-    /// use kiddo::fixed::kdtree::KdTree;
-    /// use kiddo::fixed::distance::squared_euclidean;
-    ///
-    /// type FXD = FixedU16<U0>;
-    ///
-    /// let mut tree: KdTree<FXD, u32, 3, 32, u32> = KdTree::new();
-    ///
-    /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
-    /// tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
-    ///
-    /// let nearest = tree.nearest_one(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], &squared_euclidean);
-    ///
-    /// assert_eq!(nearest.0, FXD::from_num(0));
-    /// assert_eq!(nearest.1, 100);
-    /// ```
-    #[inline]
-    pub fn nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> (A, T)
-    where
-        F: Fn(&[A; K], &[A; K]) -> A,
-    {
-        let mut off = [A::ZERO; K];
-        unsafe {
-            self.nearest_one_recurse(
-                query,
-                distance_fn,
-                self.root_index,
-                0,
-                T::zero(),
-                A::MAX,
-                &mut off,
-                A::ZERO,
-            )
-        }
-    }
+    generate_nearest_one!(
+        KdTree,
+        LeafNode,
+        (r#"Queries the tree to find the nearest element to `query`, using the specified
+distance metric function.
 
-    #[inline]
-    unsafe fn nearest_one_recurse<F>(
-        &self,
-        query: &[A; K],
-        distance_fn: &F,
-        curr_node_idx: IDX,
-        split_dim: usize,
-        mut best_item: T,
-        mut best_dist: A,
-        off: &mut [A; K],
-        rd: A,
-    ) -> (A, T)
-    where
-        F: Fn(&[A; K], &[A; K]) -> A,
-    {
-        if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
-            let node = &self.stems.get_unchecked(curr_node_idx.az::<usize>());
+Faster than querying for nearest_n(point, 1, ...) due
+to not needing to allocate memory or maintain sorted results.
 
-            let mut rd = rd;
-            let old_off = off[split_dim];
-            let new_off = query[split_dim].dist(node.split_val);
+# Examples
 
-            let [closer_node_idx, further_node_idx] =
-                if *query.get_unchecked(split_dim) < node.split_val {
-                    [node.left, node.right]
-                } else {
-                    [node.right, node.left]
-                };
-            let next_split_dim = (split_dim + 1).rem(K);
+```rust
+    use fixed::FixedU16;
+    use fixed::types::extra::U0;
+    use kiddo::fixed::kdtree::KdTree;
+    use kiddo::fixed::distance::squared_euclidean;
 
-            let (dist, item) = self.nearest_one_recurse(
-                query,
-                distance_fn,
-                closer_node_idx,
-                next_split_dim,
-                best_item,
-                best_dist,
-                off,
-                rd,
-            );
+    type FXD = FixedU16<U0>;
 
-            if dist < best_dist {
-                best_dist = dist;
-                best_item = item;
-            }
+    let mut tree: KdTree<FXD, u32, 3, 32, u32> = KdTree::new();
 
-            // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-            //       so that updating rd is not hardcoded to sq euclidean
-            rd = rd.saturating_add(
-                (new_off.saturating_mul(new_off)).saturating_sub(old_off.saturating_mul(old_off)),
-            );
+    tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
+    tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
 
-            if rd <= best_dist {
-                off[split_dim] = new_off;
-                let (dist, item) = self.nearest_one_recurse(
-                    query,
-                    distance_fn,
-                    further_node_idx,
-                    next_split_dim,
-                    best_item,
-                    best_dist,
-                    off,
-                    rd,
-                );
-                off[split_dim] = old_off;
+    let nearest = tree.nearest_one(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], &squared_euclidean);
 
-                if dist < best_dist {
-                    best_dist = dist;
-                    best_item = item;
-                }
-            }
-        } else {
-            let leaf_node = self
-                .leaves
-                .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
-
-            Self::search_content_for_best(
-                query,
-                distance_fn,
-                &mut best_item,
-                &mut best_dist,
-                leaf_node,
-            );
-        }
-
-        (best_dist, best_item)
-    }
-
-    fn search_content_for_best<F>(
-        query: &[A; K],
-        distance_fn: &F,
-        best_item: &mut T,
-        best_dist: &mut A,
-        leaf_node: &LeafNode<A, T, K, B, IDX>,
-    ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
-    {
-        leaf_node
-            .content_points
-            .iter()
-            .enumerate()
-            .take(leaf_node.size.az::<usize>())
-            .for_each(|(idx, entry)| {
-                let dist = distance_fn(query, entry);
-                if dist < *best_dist {
-                    *best_dist = dist;
-                    *best_item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
-                }
-            });
-    }
+    assert_eq!(nearest.0, FXD::from_num(0));
+    assert_eq!(nearest.1, 100);
+```"#));
 }
 
 #[cfg(test)]
@@ -265,7 +140,7 @@ mod tests {
         content: &[([A; K], u32)],
         query_point: &[A; K],
     ) -> (A, u32) {
-        let mut best_dist: A = A::MAX;
+        let mut best_dist: A = A::max_value();
         let mut best_item: u32 = u32::MAX;
 
         for &(p, item) in content {

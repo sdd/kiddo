@@ -19,8 +19,27 @@ use serde::{Deserialize, Serialize};
 /// by the type that is used as the first generic parameter, `A`,
 /// on `KdTree`. A type from the `Fixed` crate will implement
 /// all of the traits required by Axis. For example `FixedU16<U14>`.
-pub trait Axis: Fixed + Default + Debug + Copy + Sync {}
-impl<T: Fixed + Default + Debug + Copy + Sync> Axis for T {}
+pub trait Axis: Fixed + Default + Debug + Copy + Sync {
+    fn max_value() -> Self;
+    fn zero() -> Self;
+    fn rd_update(self, old_off: Self,  new_off: Self) -> Self;
+
+}
+impl<T: Fixed + Default + Debug + Copy + Sync> Axis for T {
+    fn max_value() -> Self {
+        Self::MAX
+    }
+
+    fn zero() -> Self {
+        Self::ZERO
+    }
+
+    fn rd_update(self, old_off: Self, new_off: Self) -> Self {
+        self.saturating_add(
+            (new_off.saturating_mul(new_off)).saturating_sub(old_off.saturating_mul(old_off))
+        )
+    }
+}
 
 /// Rkyv-serializable equivalent of `kiddo::fixed::kdtree::Axis`
 #[cfg(feature = "serialize_rkyv")]
@@ -47,10 +66,10 @@ pub struct KdTreeRK<
     const B: usize,
     IDX: Index<T = IDX>,
 > {
-    leaves: Vec<LeafNodeRK<A, T, K, B, IDX>>,
-    stems: Vec<StemNodeRK<A, K, IDX>>,
+    pub(crate) leaves: Vec<LeafNodeRK<A, T, K, B, IDX>>,
+    pub(crate) stems: Vec<StemNodeRK<A, K, IDX>>,
     pub(crate) root_index: IDX,
-    size: T,
+    pub(crate) size: T,
 }
 
 /// Fixed point k-d tree
