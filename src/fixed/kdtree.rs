@@ -22,8 +22,7 @@ use serde::{Deserialize, Serialize};
 pub trait Axis: Fixed + Default + Debug + Copy + Sync {
     fn max_value() -> Self;
     fn zero() -> Self;
-    fn rd_update(self, old_off: Self,  new_off: Self) -> Self;
-
+    fn rd_update(self, old_off: Self, new_off: Self) -> Self;
 }
 impl<T: Fixed + Default + Debug + Copy + Sync> Axis for T {
     fn max_value() -> Self {
@@ -36,7 +35,7 @@ impl<T: Fixed + Default + Debug + Copy + Sync> Axis for T {
 
     fn rd_update(self, old_off: Self, new_off: Self) -> Self {
         self.saturating_add(
-            (new_off.saturating_mul(new_off)).saturating_sub(old_off.saturating_mul(old_off))
+            (new_off.saturating_mul(new_off)).saturating_sub(old_off.saturating_mul(old_off)),
         )
     }
 }

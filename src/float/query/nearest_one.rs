@@ -1,14 +1,15 @@
+use crate::float::kdtree::{Axis, KdTree, LeafNode};
+use crate::generate_nearest_one;
+use crate::types::{Content, Index, is_stem_index};
 use az::{Az, Cast};
 use std::ops::Rem;
 
-use crate::float::kdtree::{Axis, KdTree, LeafNode};
-use crate::types::{Content, Index};
-
-use crate::generate_nearest_one;
-
 macro_rules! generate_float_nearest_one {
-    ($kdtree:ident, $leafnode:ident, $doctest_build_tree:tt) => {
-    generate_nearest_one!($kdtree, $leafnode, ("Finds the nearest element to `query`, using the specified
+    ($leafnode:ident, $doctest_build_tree:tt) => {
+        generate_nearest_one!(
+            $leafnode,
+            (
+                "Finds the nearest element to `query`, using the specified
 distance metric function.
 
 Faster than querying for nearest_n(point, 1, ...) due
@@ -20,14 +21,19 @@ to not needing to allocate memory or maintain sorted results.
     use kiddo::float::kdtree::KdTree;
     use kiddo::distance::squared_euclidean;
 
-    ",  $doctest_build_tree, "
+    ",
+                $doctest_build_tree,
+                "
 
     let nearest = tree.nearest_one(&[1.0, 2.0, 5.1], &squared_euclidean);
 
     assert!((nearest.0 - 0.01f64).abs() < f64::EPSILON);
     assert_eq!(nearest.1, 100);
-```"));
-}}
+```"
+            )
+        );
+    };
+}
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
@@ -35,7 +41,6 @@ where
     usize: Cast<IDX>,
 {
     generate_float_nearest_one!(
-        KdTree,
         LeafNode,
         "let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
     tree.add(&[1.0, 2.0, 5.0], 100);
@@ -44,15 +49,19 @@ where
 }
 
 #[cfg(feature = "rkyv")]
-use crate::float::kdtree::{ArchivedKdTree,ArchivedLeafNode};
+use crate::float::kdtree::{ArchivedKdTree, ArchivedLeafNode};
 #[cfg(feature = "rkyv")]
-impl<A: Axis + rkyv::Archive<Archived = A>, T: Content + rkyv::Archive<Archived = T>, const K: usize, const B: usize, IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>>
-ArchivedKdTree<A, T, K, B, IDX>
-    where
-        usize: Cast<IDX>,
+impl<
+        A: Axis + rkyv::Archive<Archived = A>,
+        T: Content + rkyv::Archive<Archived = T>,
+        const K: usize,
+        const B: usize,
+        IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>,
+    > ArchivedKdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
 {
     generate_float_nearest_one!(
-        ArchivedKdTree,
         ArchivedLeafNode,
         "use std::fs::File;
     use memmap::MmapOptions;

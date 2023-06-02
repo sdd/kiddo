@@ -100,9 +100,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (_, nearest_idx) = mm_zc_deserialized_tree.nearest_one(&query, &squared_euclidean);
     let nearest = &cities[nearest_idx as usize];
     println!("Nearest city to 52.5N, 1.9W: {:?}", nearest);
-    println!("total elapsed: {}\n\n", ElapsedDuration::new(start.elapsed()));
-
-
+    println!(
+        "total elapsed: {}\n\n",
+        ElapsedDuration::new(start.elapsed())
+    );
 
     /////// zero-copy non-memmapped deserialization ////////////////////////////////
     let start = Instant::now();
@@ -118,8 +119,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (_, nearest_idx) = zc_deserialized_tree.nearest_one(&query, &squared_euclidean);
     let nearest = &cities[nearest_idx as usize];
     println!("Nearest city to 52.5N, 1.9W: {:?}", nearest);
-    println!("total elapsed: {}\n\n", ElapsedDuration::new(start.elapsed()));
-
+    println!(
+        "total elapsed: {}\n\n",
+        ElapsedDuration::new(start.elapsed())
+    );
 
     /////// non-zero-copy memmapped deserialization ////////////////////////////////
     let start = Instant::now();
@@ -135,10 +138,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (_, nearest_idx) = mm_deserialized_tree.nearest_one(&query, &squared_euclidean);
     let nearest = &cities[nearest_idx as usize];
     println!("Nearest city to 52.5N, 1.9W: {:?}", nearest);
-    println!("total elapsed: {}\n\n", ElapsedDuration::new(start.elapsed()));
-
-
-
+    println!(
+        "total elapsed: {}\n\n",
+        ElapsedDuration::new(start.elapsed())
+    );
 
     ///////// non-zero-copy, non-memmapped deserialization ///////////////////////
     let start = Instant::now();
@@ -156,8 +159,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (_, nearest_idx) = deserialized_tree.nearest_one(&query, &squared_euclidean);
     let nearest = &cities[nearest_idx as usize];
     println!("Nearest city to 52.5N, 1.9W: {:?}", nearest);
-    println!("total elapsed: {}\n\n", ElapsedDuration::new(start.elapsed()));
-
+    println!(
+        "total elapsed: {}\n\n",
+        ElapsedDuration::new(start.elapsed())
+    );
 
     Ok(())
 }
