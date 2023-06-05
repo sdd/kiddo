@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
-/// on the float `KdTree`. This will be `f64` or `f32`.
+/// on the float [`KdTree`]. This will be [`f64`] or [`f32`].
 pub trait Axis: Float + Default + Debug + Copy + Sync {
     /// returns absolute diff between two values of a type implementing this trait
     fn saturating_dist(self, other: Self) -> Self;
@@ -45,7 +45,7 @@ impl<T: Float + Default + Debug + Copy + Sync> Axis for T {
 /// Floating point k-d tree
 ///
 /// For use when the co-ordinates of the points being stored in the tree
-/// are floats. f64 or f32 are supported currently
+/// on the float [`KdTree`]. This will be [`f64`] or [`f32`].
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "serialize_rkyv",

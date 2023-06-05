@@ -15,7 +15,7 @@ macro_rules! generate_float_best_n_within {
                 "Finds the \"best\" `n` elements within `dist` of `query`.
 
 Results are returned in arbitrary order. 'Best' is determined by
-performing a comparison of the elements using < (ie, std::ord::lt).
+performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt`]). Returns an iterator.
 Returns an iterator.
 
 # Examples
