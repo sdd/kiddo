@@ -13,7 +13,7 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use std::time::Instant;
 
-use kiddo::KdTree;
+use kiddo::float::kdtree::KdTree;
 
 use serde::Deserialize;
 
@@ -40,6 +40,14 @@ impl CityCsvRecord {
     }
 }
 
+// We need a large bucket size for this dataset as there are 11m items but
+// the positional precision of the source dataset is only 4DP in degrees
+// of lat / lon and so there are large numbers of points with the same value
+// on some axes. All values that are the same in one axis must fit in one bucket.
+const BUCKET_SIZE: usize = 1024;
+
+type Tree = KdTree<f32, usize, 3, BUCKET_SIZE, u32>;
+
 fn main() -> Result<(), Box<dyn Error>> {
     // Load in the cities data from the CSV and use it to populate a kd-tree, as per
     // the cities.rs example
@@ -52,7 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let start = Instant::now();
-    let mut kdtree: KdTree<f32, 3> = KdTree::with_capacity(cities.len());
+    let mut kdtree: Tree = KdTree::with_capacity(cities.len());
     cities.iter().enumerate().for_each(|(idx, city)| {
         kdtree.add(&city.as_xyz(), idx);
     });
@@ -80,7 +88,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     let file = File::open("./examples/geonames-tree.bincode.gz")?;
     let decompressor = GzDecoder::new(file);
-    let deserialized_tree: KdTree<f32, 3> = bincode::deserialize_from(decompressor)?;
+    let deserialized_tree: Tree = bincode::deserialize_from(decompressor)?;
     println!(
         "Deserialized gzipped bincode file back into a kd-tree ({})",
         ElapsedDuration::new(start.elapsed())
