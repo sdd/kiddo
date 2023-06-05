@@ -1,6 +1,32 @@
 # Kiddo Changelog
 
-## 2.0.0-beta.0
+## 2.1.0
+* feat: implement the main query methods plus `size` on `kiddo::float::kdtree::ArchivedKdTree` and improve the rkyv example.
+
+The previous Rkyv example was not really using Rkyv in the most efficient way (Thanks to @cavemanloverboy for spotting my mistakes!). In order to properly use rkyv'z zero-copy deserialization, you need to use `rkyv::archived_root` to transmute a buffer into an `ArchivedKdTree`. For `ArchivedKdTree` to be useful, it actually needs some methods though!
+
+v2.1.0 refactors the query code so that the method bodies of the queries are templated by macros, allowing them to be implemented on `KdTree` and `ArchivedKdTree` without completely duplicating the code.
+
+The updated rkyv example shows the difference that zero-copy usage of rkyv makes vs deserializing, as well as also showing the gains that can be made using mmap compared to standard file access. Combining both together results in absolutely mindblowing performance when measuring  time-from-binary-start-to-first-query-result.
+
+See for yourself by downloading the sample datasets mentioned in the examples readme and running:
+
+```sh
+cargo run --example rkyv --features=serialize_rkyv --release
+```
+
+On my machine, using the old technique of normal file access and deserialization into `KdTree`, the example code takes 348 milliseconds to load and query. The memmapped code that just transmutes to an `ArchivedKdTree` and then queries it takes 182 **micro** seconds(!) - an improvement by a factor of 1900x!!
+
+I'll follow up this release with equivalent methods for `Fixed`, and some more ergonomic methods for laoding and saving.
+
+## 2.0.2
+* fix: properly split buckets.
+  Previously, when a bucket had multiple items with the same value in the splitting dimension as the split plane, and these values straddled the pivot point, some items could end up in the wrong bucket after the split.
+
+## 2.0.1
+ * refactor: removed the requirement to use unstable features so that Kiddo should now work on Rust stable.
+
+## 2.0.0
 
 Version 2 is a complete rewrite and rearchitecting of Kiddo. The same methods have been provided (except periodic boundary conditions, for now), but large performance improvements have been made across the board, and some improvements have been made to the ergonomics of the library also.
 Needless to say, this is a breaking change, but I hope you find the upgrade not too difficult as the improvements are significant.
@@ -27,3 +53,4 @@ Needless to say, this is a breaking change, but I hope you find the upgrade not 
   * Stem nodes are all next to each other and accessed in ascending order, initially close to sequentially, again helping to improve cache utilisation during the stem traversal phase of a query.
   * Leaf nodes can now use arrays to store their contents rather than Vec<>s, cutting down on multiple indirection. Due to the previous implementation using an Enum for both node types, this would have wasted too much space.
 * Leaf nodes used to store a vec of structs, with each struct containing the coordinates and content for each item stored in the tree. With v2, leaf nodes now keeps two separate arrays to store their items - one for the points themselves, and one for the content. This means that the points are contiguous in memory which makes it easier for the compiler to autovectorise iteration across the points during queries, improving query performance.
+* Leaf and Stem nodes now no longer store max and min bounds of their contents. The same technique as nabo-rs is used instead, whereby the distance from the most distant current result point to the most recent 3 split planes is used. This massively reduces the size of the stem nodes, so that much more of them fit in the CPU cache. Construction time is also slightly quicker thanks to not needing to calculate bounds.

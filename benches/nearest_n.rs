@@ -85,6 +85,7 @@ fn perform_query_float_10<
 {
     kdtree
         .nearest_n(&point, 10, &squared_euclidean)
+        .into_iter()
         .for_each(|res_item| {
             black_box({
                 let _x = res_item;
@@ -107,6 +108,7 @@ fn perform_query_fixed_10<
 {
     kdtree
         .nearest_n(&point, 10, &squared_euclidean_fixedpoint)
+        .into_iter()
         .for_each(|res_item| {
             black_box({
                 let _x = res_item;
@@ -241,6 +243,7 @@ fn perform_query_float_100<
 {
     kdtree
         .nearest_n(&point, 100, &squared_euclidean)
+        .into_iter()
         .for_each(|res_item| {
             black_box({
                 let _x = res_item;
@@ -263,6 +266,7 @@ fn perform_query_fixed_100<
 {
     kdtree
         .nearest_n(&point, 100, &squared_euclidean_fixedpoint)
+        .into_iter()
         .for_each(|res_item| {
             black_box({
                 let _x = res_item;

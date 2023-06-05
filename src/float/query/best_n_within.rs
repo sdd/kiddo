@@ -1,153 +1,77 @@
 use crate::float::kdtree::{Axis, KdTree, LeafNode};
 
-use crate::types::{Content, Index};
+use crate::types::{is_stem_index, Content, Index};
 use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
+
+use crate::generate_best_n_within;
+
+macro_rules! generate_float_best_n_within {
+    ($leafnode:ident, $doctest_build_tree:tt) => {
+        generate_best_n_within!(
+            $leafnode,
+            (
+                "Finds the \"best\" `n` elements within `dist` of `query`.
+
+Results are returned in arbitrary order. 'Best' is determined by
+performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt`]). Returns an iterator.
+Returns an iterator.
+
+# Examples
+
+```rust
+    use kiddo::float::kdtree::KdTree;
+    use kiddo::distance::squared_euclidean;
+
+    ",
+                $doctest_build_tree,
+                "
+
+    let mut best_n_within = tree.best_n_within(&[1.0, 2.0, 5.0], 10f64, 1, &squared_euclidean);
+    let first = best_n_within.next().unwrap();
+
+    assert_eq!(first, 100);
+```"
+            )
+        );
+    };
+}
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {
+    generate_float_best_n_within!(
+        LeafNode,
+        "let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+    tree.add(&[1.0, 2.0, 5.0], 100);
+    tree.add(&[2.0, 3.0, 6.0], 101);"
+    );
+}
 
-    /// Finds the "best" `n` elements within `radius` of `query`.
-    ///
-    /// Results are returned in arbitrary order. 'Best' is determined by
-    /// performing a comparison of the elements using < (ie, std::ord::lt).
-    /// Returns an iterator.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use kiddo::KdTree;
-    /// use kiddo::distance::squared_euclidean;
-    ///
-    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
-    ///
-    /// tree.add(&[1.0, 2.0, 5.0], 100);
-    /// tree.add(&[2.0, 3.0, 6.0], 1);
-    /// tree.add(&[200.0, 300.0, 600.0], 102);
-    ///
-    /// let mut best_n_within = tree.best_n_within(&[1.0, 2.0, 5.0], 10f64, 1, &squared_euclidean);
-    /// let first = best_n_within.next().unwrap();
-    ///
-    /// assert_eq!(first, 1);
-    /// ```
-    #[inline]
-    pub fn best_n_within<F>(
-        &self,
-        query: &[A; K],
-        radius: A,
-        max_qty: usize,
-        distance_fn: &F,
-    ) -> impl Iterator<Item = T>
-    where
-        F: Fn(&[A; K], &[A; K]) -> A,
-    {
-        let mut best_items: BinaryHeap<T> = BinaryHeap::new();
+#[cfg(feature = "rkyv")]
+use crate::float::kdtree::{ArchivedKdTree, ArchivedLeafNode};
+#[cfg(feature = "rkyv")]
+impl<
+        A: Axis + rkyv::Archive<Archived = A>,
+        T: Content + rkyv::Archive<Archived = T>,
+        const K: usize,
+        const B: usize,
+        IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>,
+    > ArchivedKdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    generate_float_best_n_within!(
+        ArchivedLeafNode,
+        "use std::fs::File;
+    use memmap::MmapOptions;
 
-        unsafe {
-            self.best_n_within_recurse(
-                query,
-                radius,
-                max_qty,
-                distance_fn,
-                self.root_index,
-                0,
-                &mut best_items,
-            );
-        }
-
-        best_items.into_iter()
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    unsafe fn best_n_within_recurse<F>(
-        &self,
-        query: &[A; K],
-        radius: A,
-        max_qty: usize,
-        distance_fn: &F,
-        curr_node_idx: IDX,
-        split_dim: usize,
-        best_items: &mut BinaryHeap<T>,
-    ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
-    {
-        if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
-            let node = self.stems.get_unchecked(curr_node_idx.az::<usize>());
-
-            let child_node_indices = if *query.get_unchecked(split_dim) < node.split_val {
-                [node.left, node.right]
-            } else {
-                [node.right, node.left]
-            };
-            let next_split_dim = (split_dim + 1).rem(K);
-
-            for node_idx in child_node_indices {
-                let child_node_dist = self.child_dist_to_bounds(query, node_idx, distance_fn);
-                if child_node_dist <= radius {
-                    self.best_n_within_recurse(
-                        query,
-                        radius,
-                        max_qty,
-                        distance_fn,
-                        node_idx,
-                        next_split_dim,
-                        best_items,
-                    );
-                }
-            }
-        } else {
-            let leaf_node = self
-                .leaves
-                .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
-
-            Self::process_leaf_node(query, radius, max_qty, distance_fn, best_items, leaf_node);
-        }
-    }
-
-    // #[inline(never)]
-    unsafe fn process_leaf_node<F>(
-        query: &[A; K],
-        radius: A,
-        max_qty: usize,
-        distance_fn: &F,
-        best_items: &mut BinaryHeap<T>,
-        leaf_node: &LeafNode<A, T, K, B, IDX>,
-    ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
-    {
-        leaf_node
-            .content_points
-            .iter()
-            .take(leaf_node.size.az::<usize>())
-            .map(|entry| distance_fn(query, entry))
-            .enumerate()
-            .filter(|(_, distance)| *distance <= radius)
-            .for_each(|(idx, _)| {
-                Self::get_item_and_add_if_good(max_qty, best_items, leaf_node, idx)
-            });
-    }
-
-    // #[inline(never)]
-    unsafe fn get_item_and_add_if_good(
-        max_qty: usize,
-        best_items: &mut BinaryHeap<T>,
-        leaf_node: &LeafNode<A, T, K, B, IDX>,
-        idx: usize,
-    ) {
-        let item = *leaf_node.content_items.get_unchecked(idx.az::<usize>());
-        if best_items.len() < max_qty {
-            best_items.push(item);
-        } else {
-            let mut top = best_items.peek_mut().unwrap();
-            if item < *top {
-                *top = item;
-            }
-        }
-    }
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/test-tree.rkyv\").unwrap()).unwrap() };
+    let tree = unsafe { rkyv::archived_root::<KdTree<f64, u32, 3, 32, u32>>(&mmap) };"
+    );
 }
 
 #[cfg(test)]
@@ -210,6 +134,37 @@ mod tests {
 
             let result: Vec<_> = tree
                 .best_n_within(&query, radius, max_qty, &squared_euclidean)
+                .collect();
+            assert_eq!(result, expected);
+        }
+    }
+
+    #[test]
+    fn can_query_items_within_radius_large_scale() {
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 100;
+        let max_qty = 2;
+
+        let content_to_add: Vec<([AX; 2], i32)> = (0..TREE_SIZE)
+            .map(|_| rand::random::<([AX; 2], i32)>())
+            .collect();
+
+        let mut tree: KdTree<AX, i32, 2, 32, u32> = KdTree::with_capacity(TREE_SIZE);
+        content_to_add
+            .iter()
+            .for_each(|(point, content)| tree.add(point, *content));
+        assert_eq!(tree.size(), TREE_SIZE as i32);
+
+        let query_points: Vec<[AX; 2]> = (0..NUM_QUERIES)
+            .map(|_| rand::random::<[AX; 2]>())
+            .collect();
+
+        for query_point in query_points {
+            let radius = 100000f64;
+            let expected = linear_search(&content_to_add, &query_point, radius, max_qty);
+
+            let result: Vec<_> = tree
+                .best_n_within(&query_point, radius, max_qty, &squared_euclidean)
                 .collect();
             assert_eq!(result, expected);
         }

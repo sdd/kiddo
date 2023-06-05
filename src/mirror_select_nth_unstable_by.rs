@@ -77,7 +77,6 @@ fn mirror_partition_at_index_loop<'a, AA, BB, F>(
     }
 }
 
-// TODO: apply target ops to mirror
 fn mirror_partition_equal<AA, BB, F>(
     target: &mut [AA],
     mirror: &mut [BB],
@@ -290,7 +289,8 @@ where
         assert!(mem::size_of::<T>() > 0);
         // FIXME: this should *likely* use `offset_from`, but more
         // investigation is needed (including running tests in miri).
-        (r.addr() - l.addr()) / mem::size_of::<T>()
+
+        ((r as usize) - (l as usize)) / mem::size_of::<T>()
     }
 
     loop {
@@ -301,7 +301,7 @@ where
         if is_done {
             // Number of remaining elements (still not compared to the pivot).
             let mut rem = width(l, r);
-            let mut mirror_rem = width(mirror_l, mirror_r);
+            let mut mirror_rem = width(mirror_l, mirror_r); // TODO: remove, same as rem
             if start_l < end_l || start_r < end_r {
                 rem -= BLOCK;
                 mirror_rem -= BLOCK;
@@ -334,11 +334,18 @@ where
 
         if start_l == end_l {
             // Trace `block_l` elements from the left side.
-            start_l = MaybeUninit::slice_as_mut_ptr(&mut offsets_l);
+
+            // TODO: switch back to this once slice_as_mut_ptr is stable
+            // start_l = MaybeUninit::slice_as_mut_ptr(&mut offsets_l);
+            start_l = &mut offsets_l as *mut _ as *mut u8;
+
             end_l = start_l;
             let mut elem = l;
 
-            mirror_start_l = MaybeUninit::slice_as_mut_ptr(&mut mirror_offsets_l);
+            // TODO: switch back to this once slice_as_mut_ptr is stable
+            // mirror_start_l = MaybeUninit::slice_as_mut_ptr(&mut mirror_offsets_l);
+            mirror_start_l = &mut mirror_offsets_l as *mut _ as *mut u8;
+
             mirror_end_l = mirror_start_l;
             let mut mirror_elem = mirror_l;
 
@@ -371,11 +378,18 @@ where
 
         if start_r == end_r {
             // Trace `block_r` elements from the right side.
-            start_r = MaybeUninit::slice_as_mut_ptr(&mut offsets_r);
+
+            // TODO: switch back to this once slice_as_mut_ptr is stable
+            // start_r = MaybeUninit::slice_as_mut_ptr(&mut offsets_r);
+            start_r = &mut offsets_r as *mut _ as *mut u8;
+
             end_r = start_r;
             let mut elem = r;
 
-            mirror_start_r = MaybeUninit::slice_as_mut_ptr(&mut mirror_offsets_r);
+            // TODO: switch back to this once slice_as_mut_ptr is stable
+            //mirror_start_r = MaybeUninit::slice_as_mut_ptr(&mut mirror_offsets_r);
+            mirror_start_r = &mut mirror_offsets_r as *mut _ as *mut u8;
+
             mirror_end_r = mirror_start_r;
             let mut mirror_elem = mirror_r;
 

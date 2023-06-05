@@ -1,6 +1,6 @@
 use crate::fixed::kdtree::{Axis, KdTree, LeafNode, StemNode};
 use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
-use crate::types::{Content, Index};
+use crate::types::{is_stem_index, Content, Index};
 use az::{Az, Cast};
 use std::ops::Rem;
 
@@ -9,6 +9,27 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
+    /// Adds an item to the tree.
+    ///
+    /// The first argument specifies co-ordinates of the point where the item is located.
+    /// The second argument is an integer identifier / index for the item being stored.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fixed::FixedU16;
+    /// use fixed::types::extra::U0;
+    /// use kiddo::fixed::kdtree::KdTree;
+    ///
+    /// type FXD = FixedU16<U0>;
+    ///
+    /// let mut tree: KdTree<FXD, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
+    ///
+    /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
+    /// tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
+    ///
+    /// assert_eq!(tree.size(), 2);
+    /// ```
     #[inline]
     pub fn add(&mut self, query: &[A; K], item: T) {
         unsafe {
@@ -18,11 +39,9 @@ where
             let mut parent_idx = <IDX as Index>::max();
             let mut is_left_child: bool = false;
 
-            while KdTree::<A, T, K, B, IDX>::is_stem_index(stem_idx) {
+            while is_stem_index(stem_idx) {
                 parent_idx = stem_idx;
                 stem_node = self.stems.get_unchecked_mut(stem_idx.az::<usize>());
-
-                stem_node.extend(query);
 
                 stem_idx = if *query.get_unchecked(split_dim) < stem_node.split_val {
                     is_left_child = true;
@@ -59,18 +78,43 @@ where
                 .get_unchecked_mut(leaf_node.size.az::<usize>()) = item;
 
             leaf_node.size = leaf_node.size + IDX::one();
-            leaf_node.extend(query);
         }
         self.size = self.size + T::one();
     }
 
+    /// Removes an item from the tree.
+    ///
+    /// The first argument specifies co-ordinates of the point where the item is located.
+    /// The second argument is the integer identifier / index for the stored item.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fixed::FixedU16;
+    /// use fixed::types::extra::U0;
+    /// use kiddo::fixed::kdtree::KdTree;
+    ///
+    /// type FXD = FixedU16<U0>;
+    ///
+    /// let mut tree: KdTree<FXD, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
+    ///
+    /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
+    /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 101);
+    /// assert_eq!(tree.size(), 2);
+    ///
+    /// tree.remove(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
+    /// assert_eq!(tree.size(), 1);
+    ///
+    /// tree.remove(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 101);
+    /// assert_eq!(tree.size(), 0);
+    /// ```
     #[inline]
     pub fn remove(&mut self, query: &[A; K], item: T) -> usize {
         let mut stem_idx = self.root_index;
         let mut split_dim = 0;
         let mut removed: usize = 0;
 
-        while KdTree::<A, T, K, B, IDX>::is_stem_index(stem_idx) {
+        while is_stem_index(stem_idx) {
             let Some(stem_node) = self.stems.get_mut(stem_idx.az::<usize>()) else {
                 return removed;
             };
@@ -86,7 +130,7 @@ where
 
         let leaf_idx = stem_idx - IDX::leaf_offset();
 
-        if let Some(mut leaf_node) = self.leaves.get_mut(leaf_idx.az::<usize>()) {
+        if let Some(leaf_node) = self.leaves.get_mut(leaf_idx.az::<usize>()) {
             let mut p_index = 0;
             while p_index < leaf_node.size.az::<usize>() {
                 if &leaf_node.content_points[p_index] == query
@@ -117,9 +161,7 @@ where
         was_parents_left: bool,
     ) -> IDX {
         let orig = self.leaves.get_unchecked_mut(leaf_idx.az::<usize>());
-        let orig_min_bound = orig.min_bound;
-        let orig_max_bound = orig.max_bound;
-        let pivot_idx: IDX = B.div_floor(2).az::<IDX>();
+        let mut pivot_idx: IDX = (B / 2).az::<IDX>();
 
         mirror_select_nth_unstable_by(
             &mut orig.content_points,
@@ -132,111 +174,99 @@ where
             },
         );
 
-        let split_val = *orig
+        let mut split_val = *orig
             .content_points
             .get_unchecked(pivot_idx.az::<usize>())
             .get_unchecked(split_dim);
 
-        let mut left = LeafNode::new();
-        let mut right = LeafNode::new();
+        // if the chosen pivot point would result in some items whose position on the split
+        // dimension is the same as the split value being on the wrong side of the split:
+        if *orig
+            .content_points
+            .get_unchecked(pivot_idx.az::<usize>() - 1)
+            .get_unchecked(split_dim)
+            == split_val
+        {
+            let orig_pivot_idx = pivot_idx;
 
-        if B.rem(2) == 1 {
-            left.content_points
-                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
-                .copy_from_slice(
-                    orig.content_points
-                        .get_unchecked(..(pivot_idx.az::<usize>())),
-                );
-            left.content_items
-                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
-                .copy_from_slice(
-                    orig.content_items
-                        .get_unchecked(..(pivot_idx.az::<usize>())),
-                );
-            left.size = pivot_idx;
+            // Ensure that if pivot index would result in items that share the same co-ordinate
+            // on the splitting dimension would end up on different sides of the split, that we
+            // move the pivot to prevent this. We first try moving down, since that's the only
+            // part of the bucket that was sorted by mirror_select_nth_unstable_by
+            while pivot_idx > IDX::zero()
+                && *orig
+                    .content_points
+                    .get_unchecked(pivot_idx.az::<usize>() - 1)
+                    .get_unchecked(split_dim)
+                    == split_val
+            {
+                pivot_idx = pivot_idx - IDX::one();
+            }
 
-            right
+            // If the attempt to move the pivot point above would have resulted in the pivot
+            // point moving to the start of the bucket, search forwards from the original
+            // pivot point instead. We need to first ensure the upper half of the bucket
+            // is sorted
+            if pivot_idx == IDX::zero() {
+                mirror_select_nth_unstable_by(
+                    &mut orig.content_points,
+                    &mut orig.content_items,
+                    B - 1,
+                    |a, b| unsafe {
+                        a.get_unchecked(split_dim)
+                            .partial_cmp(b.get_unchecked(split_dim))
+                            .expect("Leaf node sort failed.")
+                    },
+                );
+
+                pivot_idx = orig_pivot_idx;
+                while *orig
+                    .content_points
+                    .get_unchecked(pivot_idx.az::<usize>())
+                    .get_unchecked(split_dim)
+                    == split_val
+                {
+                    pivot_idx = pivot_idx + IDX::one();
+
+                    if pivot_idx.az::<usize>() == B {
+                        panic!("Too many items with the same position on one axis. Bucket size must be increased to at least 1 more than the number of items with the same position on one axis.");
+                    }
+                }
+            }
+
+            split_val = *orig
                 .content_points
-                .get_unchecked_mut(..((pivot_idx + IDX::one()).az::<usize>()))
-                .copy_from_slice(
-                    orig.content_points
-                        .get_unchecked((pivot_idx.az::<usize>())..),
-                );
-            right
-                .content_items
-                .get_unchecked_mut(..((pivot_idx + IDX::one()).az::<usize>()))
-                .copy_from_slice(
-                    orig.content_items
-                        .get_unchecked((pivot_idx.az::<usize>())..),
-                );
-
-            right.size = (B.az::<IDX>()) - pivot_idx;
-        } else {
-            left.content_points
-                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
-                .copy_from_slice(
-                    orig.content_points
-                        .get_unchecked(..(pivot_idx.az::<usize>())),
-                );
-            left.content_items
-                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
-                .copy_from_slice(
-                    orig.content_items
-                        .get_unchecked(..(pivot_idx.az::<usize>())),
-                );
-            left.size = pivot_idx;
-
-            right
-                .content_points
-                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
-                .copy_from_slice(
-                    orig.content_points
-                        .get_unchecked((pivot_idx.az::<usize>())..),
-                );
-            right
-                .content_items
-                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
-                .copy_from_slice(
-                    orig.content_items
-                        .get_unchecked((pivot_idx.az::<usize>())..),
-                );
-
-            right.size = (B.az::<IDX>()) - pivot_idx;
+                .get_unchecked(pivot_idx.az::<usize>())
+                .get_unchecked(split_dim);
         }
 
-        left.min_bound = [A::MAX; K];
-        left.max_bound = [A::ZERO; K];
-        right.min_bound = [A::MAX; K];
-        right.max_bound = [A::ZERO; K];
-        left.content_points
-            .iter()
-            .take(left.size.az::<usize>())
-            .for_each(|a| {
-                a.iter().enumerate().for_each(|(idx, val)| {
-                    left.min_bound[idx] = left.min_bound[idx].min(*val);
-                    left.max_bound[idx] = left.max_bound[idx].max(*val);
-                })
-            });
+        let mut right = LeafNode::new();
+        orig.size = pivot_idx;
+        let dest_slice_end = B - pivot_idx.az::<usize>();
+
         right
             .content_points
-            .iter()
-            .take(right.size.az::<usize>())
-            .for_each(|a| {
-                a.iter().enumerate().for_each(|(idx, val)| {
-                    right.min_bound[idx] = right.min_bound[idx].min(*val);
-                    right.max_bound[idx] = right.max_bound[idx].max(*val);
-                })
-            });
+            .get_unchecked_mut(..dest_slice_end)
+            .copy_from_slice(
+                orig.content_points
+                    .get_unchecked((pivot_idx.az::<usize>())..),
+            );
+        right
+            .content_items
+            .get_unchecked_mut(..dest_slice_end)
+            .copy_from_slice(
+                orig.content_items
+                    .get_unchecked((pivot_idx.az::<usize>())..),
+            );
 
-        *orig = left;
+        right.size = (B.az::<IDX>()) - pivot_idx;
+
         self.leaves.push(right);
 
         self.stems.push(StemNode {
             left: leaf_idx + IDX::leaf_offset(),
             right: (self.leaves.len().az::<IDX>()) - IDX::one() + IDX::leaf_offset(),
             split_val,
-            min_bound: orig_min_bound,
-            max_bound: orig_max_bound,
         });
         let new_stem_index: IDX = (self.stems.len().az::<IDX>()) - IDX::one();
 
@@ -252,6 +282,66 @@ where
         }
 
         new_stem_index
+    }
+}
+
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    FromIterator<([A; K], T)> for KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    #[inline]
+    fn from_iter<I: IntoIterator<Item = ([A; K], T)>>(iter: I) -> Self {
+        let iter = iter.into_iter();
+        let mut tree = Self::with_capacity(iter.size_hint().0);
+        for (point, item) in iter {
+            tree.add(&point, item);
+        }
+        tree
+    }
+}
+
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>, const N: usize>
+    From<[([A; K], T); N]> for KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    #[inline]
+    fn from(value: [([A; K], T); N]) -> Self {
+        value.into_iter().collect()
+    }
+}
+
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> Extend<([A; K], T)>
+    for KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    #[inline]
+    fn extend<I: IntoIterator<Item = ([A; K], T)>>(&mut self, iter: I) {
+        for (point, item) in iter {
+            self.add(&point, item);
+        }
+    }
+}
+
+impl<
+        'a,
+        't,
+        A: Axis + Copy,
+        T: Content + Copy,
+        const K: usize,
+        const B: usize,
+        IDX: Index<T = IDX>,
+    > Extend<(&'a [A; K], &'t T)> for KdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    #[inline]
+    fn extend<I: IntoIterator<Item = (&'a [A; K], &'t T)>>(&mut self, iter: I) {
+        for (point, item) in iter.into_iter() {
+            self.add(point, *item);
+        }
     }
 }
 

@@ -1,5 +1,6 @@
-//! Definitions for some types that are common between the `fixed` and `float` modules
+//! Definitions for some types that are common between the [`fixed`](crate::fixed) and [`float`](crate::float) modules
 use az::Cast;
+use divrem::DivCeil;
 use num_traits::{One, PrimInt, Unsigned, Zero};
 use std::fmt::Debug;
 
@@ -63,7 +64,7 @@ impl Index for u32 {
         u32::ilog2(self)
     }
     fn div_ceil(self, b: u32) -> u32 {
-        u32::div_ceil(self, b)
+        DivCeil::div_ceil(self, b)
     }
     fn capacity_with_bucket_size(bucket_size: usize) -> usize {
         (u32::MAX - u32::MAX.overflowing_shr(1).0) as usize * bucket_size
@@ -85,8 +86,13 @@ impl Index for u16 {
         u16::ilog2(self) as u16
     }
     fn div_ceil(self, b: u16) -> u16 {
-        u16::div_ceil(self, b)
+        DivCeil::div_ceil(self, b)
     }
     fn capacity_with_bucket_size(bucket_size: usize) -> usize {
         (u16::MAX - u16::MAX.overflowing_shr(1).0) as usize * bucket_size
-    }}
+    }
+}
+
+pub(crate) fn is_stem_index<IDX: Index<T = IDX>>(x: IDX) -> bool {
+    x < <IDX as Index>::leaf_offset()
+}

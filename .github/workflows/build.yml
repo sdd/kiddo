@@ -11,7 +11,7 @@ jobs:
         rust:
           - nightly
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         name: Check out
       - uses: actions-rs/toolchain@v1
         name: Set up toolchain
@@ -34,4 +34,3 @@ jobs:
         with:
           command: build
           args: --all-features --release
-

@@ -1,132 +1,74 @@
 use crate::float::kdtree::{Axis, KdTree, LeafNode};
-use crate::types::{Content, Index};
+use crate::generate_nearest_one;
+use crate::types::{is_stem_index, Content, Index};
 use az::{Az, Cast};
 use std::ops::Rem;
+
+macro_rules! generate_float_nearest_one {
+    ($leafnode:ident, $doctest_build_tree:tt) => {
+        generate_nearest_one!(
+            $leafnode,
+            (
+                "Finds the nearest element to `query`, using the specified
+distance metric function.
+
+Faster than querying for nearest_n(point, 1, ...) due
+to not needing to allocate memory or maintain sorted results.
+
+# Examples
+
+```rust
+    use kiddo::float::kdtree::KdTree;
+    use kiddo::distance::squared_euclidean;
+
+    ",
+                $doctest_build_tree,
+                "
+
+    let nearest = tree.nearest_one(&[1.0, 2.0, 5.1], &squared_euclidean);
+
+    assert!((nearest.0 - 0.01f64).abs() < f64::EPSILON);
+    assert_eq!(nearest.1, 100);
+```"
+            )
+        );
+    };
+}
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {
-    /// Queries the tree to find the nearest element to `query`, using the specified
-    /// distance metric function.
-    ///
-    /// Faster than querying for nearest_n(point, 1, ...) due
-    /// to not needing to allocate memory or maintain sorted results.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use kiddo::KdTree;
-    /// use kiddo::distance::squared_euclidean;
-    ///
-    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
-    ///
-    /// tree.add(&[1.0, 2.0, 5.0], 100);
-    /// tree.add(&[2.0, 3.0, 6.0], 101);
-    ///
-    /// let nearest = tree.nearest_one(&[1.0, 2.0, 5.1], &squared_euclidean);
-    ///
-    /// assert!((nearest.0 - 0.01f64).abs() < f64::EPSILON);
-    /// assert_eq!(nearest.1, 100);
-    /// ```
-    #[inline]
-    pub fn nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> (A, T)
-    where
-        F: Fn(&[A; K], &[A; K]) -> A,
-    {
-        unsafe {
-            self.nearest_one_recurse(
-                query,
-                distance_fn,
-                self.root_index,
-                0,
-                T::zero(),
-                A::max_value(),
-            )
-        }
-    }
+    generate_float_nearest_one!(
+        LeafNode,
+        "let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+    tree.add(&[1.0, 2.0, 5.0], 100);
+    tree.add(&[2.0, 3.0, 6.0], 101);"
+    );
+}
 
-    #[inline]
-    unsafe fn nearest_one_recurse<F>(
-        &self,
-        query: &[A; K],
-        distance_fn: &F,
-        curr_node_idx: IDX,
-        split_dim: usize,
-        mut best_item: T,
-        mut best_dist: A,
-    ) -> (A, T)
-    where
-        F: Fn(&[A; K], &[A; K]) -> A,
-    {
-        if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
-            let node = &self.stems.get_unchecked(curr_node_idx.az::<usize>());
+#[cfg(feature = "rkyv")]
+use crate::float::kdtree::{ArchivedKdTree, ArchivedLeafNode};
+#[cfg(feature = "rkyv")]
+impl<
+        A: Axis + rkyv::Archive<Archived = A>,
+        T: Content + rkyv::Archive<Archived = T>,
+        const K: usize,
+        const B: usize,
+        IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>,
+    > ArchivedKdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    generate_float_nearest_one!(
+        ArchivedLeafNode,
+        "use std::fs::File;
+    use memmap::MmapOptions;
 
-            let child_node_indices = if *query.get_unchecked(split_dim) < node.split_val {
-                [node.left, node.right]
-            } else {
-                [node.right, node.left]
-            };
-            let next_split_dim = (split_dim + 1).rem(K);
-
-            for node_idx in child_node_indices {
-                let child_node_dist = self.child_dist_to_bounds(query, node_idx, distance_fn);
-                if child_node_dist <= best_dist {
-                    let (dist, item) = self.nearest_one_recurse(
-                        query,
-                        distance_fn,
-                        node_idx,
-                        next_split_dim,
-                        best_item,
-                        best_dist,
-                    );
-
-                    if dist < best_dist {
-                        best_dist = dist;
-                        best_item = item;
-                    }
-                }
-            }
-        } else {
-            let leaf_node = self
-                .leaves
-                .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
-
-            Self::search_content_for_best(
-                query,
-                distance_fn,
-                &mut best_item,
-                &mut best_dist,
-                leaf_node,
-            );
-        }
-
-        (best_dist, best_item)
-    }
-
-    fn search_content_for_best<F>(
-        query: &[A; K],
-        distance_fn: &F,
-        best_item: &mut T,
-        best_dist: &mut A,
-        leaf_node: &LeafNode<A, T, K, B, IDX>,
-    ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
-    {
-        leaf_node
-            .content_points
-            .iter()
-            .enumerate()
-            .take(leaf_node.size.az::<usize>())
-            .for_each(|(idx, entry)| {
-                let dist = distance_fn(query, entry);
-                if dist < *best_dist {
-                    *best_dist = dist;
-                    *best_item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
-                }
-            });
-    }
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/test-tree.rkyv\").unwrap()).unwrap() };
+    let tree = unsafe { rkyv::archived_root::<KdTree<f64, u32, 3, 32, u32>>(&mmap) };"
+    );
 }
 
 #[cfg(test)]
@@ -186,7 +128,35 @@ mod tests {
             let result = tree.nearest_one(&query_point, &manhattan);
 
             assert_eq!(result.0, expected.0);
-            //assert_eq!(result.1, expected.1);
+        }
+    }
+
+    #[test]
+    fn can_query_nearest_one_item_large_scale() {
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 100;
+
+        let content_to_add: Vec<([f32; 4], u32)> = (0..TREE_SIZE)
+            .map(|_| rand::random::<([f32; 4], u32)>())
+            .collect();
+
+        let mut tree: KdTree<AX, u32, 4, 32, u32> = KdTree::with_capacity(TREE_SIZE);
+        content_to_add
+            .iter()
+            .for_each(|(point, content)| tree.add(point, *content));
+        assert_eq!(tree.size(), TREE_SIZE as u32);
+
+        let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)
+            .map(|_| rand::random::<[f32; 4]>())
+            .collect();
+
+        for query_point in query_points {
+            let expected = linear_search(&content_to_add, &query_point);
+
+            let result = tree.nearest_one(&query_point, &manhattan);
+
+            assert_eq!(result.0, expected.0);
+            assert_eq!(result.1, expected.1);
         }
     }
 
