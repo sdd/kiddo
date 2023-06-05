@@ -16,7 +16,7 @@ where
         LeafNode,
         (r#"Queries the tree to find the best `n` elements within `dist` of `point`, using the specified
 distance metric function. Results are returned in arbitrary order. 'Best' is determined by
-performing a comparison of the elements using < (ie, std::ord::lt). Returns an iterator.
+performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt`]). Returns an iterator.
 
 # Examples
 

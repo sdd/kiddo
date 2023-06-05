@@ -1,6 +1,6 @@
 //! Fixed point k-d tree, for use when the co-ordinates of the points being stored in the tree
-//! are fixed point or integers. `u8`, `u16`, `u32`, and `u64` based fixed-point / integers are supported
-//! via the Fixed crate, eg `FixedU16<U14>` for a 16-bit fixed point number with 14 bits after the
+//! are fixed point or integers. [`u8`], [`u16`], [`u32`], and [`u64`] based fixed-point / integers are supported
+//! via the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate, eg [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html) for a 16-bit fixed point number with 14 bits after the
 //! decimal point.
 
 use az::{Az, Cast};
@@ -17,8 +17,8 @@ use serde::{Deserialize, Serialize};
 
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
-/// on `KdTree`. A type from the `Fixed` crate will implement
-/// all of the traits required by Axis. For example `FixedU16<U14>`.
+/// on [`FixedKdTree`](crate::FixedKdTree). A type from the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate will implement
+/// all of the traits required by Axis. For example [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html).
 pub trait Axis: Fixed + Default + Debug + Copy + Sync {
     /// Returns the maximum value that the type implementing this trait can have
     fn max_value() -> Self;
@@ -52,9 +52,9 @@ impl<T: num_traits::Zero + Default + Debug + rkyv::Archive> AxisRK for T {}
 /// Rkyv-serializable fixed point k-d tree
 ///
 /// This is only required when using Rkyv to serialize to / deserialize from
-/// a KdTree. The types in the `Fixed`  crate do not support `Rkyv` yet.
-/// As a workaround, we need to `std::mem::transmute` a `kiddo::fixed::kdtree::KdTree` into
-/// an equivalent `kiddo::fixed::kdtree::KdTreeRK` before serializing via Rkyv,
+/// a [`FixedKdTree`](crate::FixedKdTree). The types in the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed)  crate do not support [`Rkyv`](https://crates.io/crates/rkyv/0.7.39) yet.
+/// As a workaround, we need to [`std::mem::transmute`] a [`crate::FixedKdTree`] into
+/// an equivalent [`crate::fixed::kdtree::KdTreeRK`] before serializing via Rkyv,
 /// and vice-versa when deserializing.
 #[cfg_attr(
     feature = "serialize_rkyv",
@@ -77,8 +77,8 @@ pub struct KdTreeRK<
 /// Fixed point k-d tree
 ///
 /// For use when the co-ordinates of the points being stored in the tree
-/// are fixed point or integers. `u8`, `u16`, `u32`, and `u64` based fixed-point / integers are supported
-/// via the Fixed crate, eg `FixedU16<U14>` for a 16-bit fixed point number with 14 bits after the
+/// are fixed point or integers. [`u8`], [`u16`], [`u32`], and [`u64`] based fixed-point / integers are supported
+/// via the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate, eg [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html) for a 16-bit fixed point number with 14 bits after the
 /// decimal point.
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
