@@ -176,6 +176,18 @@ where
     }
 }
 
+impl<A, T, const K: usize, const B: usize, IDX> Default for KdTree<A, T, K, B, IDX>
+where
+    A: Axis,
+    T: Content,
+    IDX: Index<T = IDX>,
+    usize: Cast<IDX>,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<A, T, const K: usize, const B: usize, IDX> KdTree<A, T, K, B, IDX>
 where
     A: Axis,

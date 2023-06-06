@@ -26,6 +26,7 @@ macro_rules! generate_nearest_n {
         result.into_sorted_vec()
     }
 
+    #[allow(clippy::too_many_arguments)]
     unsafe fn nearest_n_recurse<F>(
         &self,
         query: &[A; K],
