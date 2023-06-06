@@ -108,3 +108,13 @@ required-features = ["serialize"]
 name = "rkyv"
 path = "examples/rkyv.rs"
 required-features = ["serialize_rkyv"]
+
+[[example]]
+name = "rkyv-large-serialize"
+path = "examples/rkyv-large-serialize.rs"
+required-features = ["serialize_rkyv"]
+
+[[example]]
+name = "rkyv-large-deserialize"
+path = "examples/rkyv-large-deserialize.rs"
+required-features = ["serialize_rkyv"]
