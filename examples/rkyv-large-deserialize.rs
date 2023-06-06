@@ -7,7 +7,6 @@
 ///
 /// Run the rkyv-large-serialize example before this to generate the
 /// tree of random data and serialize it to a file.
-
 use elapsed::ElapsedDuration;
 use memmap::MmapOptions;
 use std::error::Error;
@@ -19,7 +18,6 @@ use kiddo::{float::distance::squared_euclidean, float::kdtree::KdTree};
 type Tree = KdTree<f32, u64, 3, 32, u32>;
 
 fn main() -> Result<(), Box<dyn Error>> {
-
     let start = Instant::now();
 
     // memmap the file into a buffer
@@ -37,7 +35,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (_, nearest_idx) = tree.nearest_one(&query, &squared_euclidean);
 
     println!("Nearest item to query: {:?}", nearest_idx);
-    println!("total elapsed: {}\n\n", ElapsedDuration::new(start.elapsed()));
+    println!(
+        "total elapsed: {}\n\n",
+        ElapsedDuration::new(start.elapsed())
+    );
 
     Ok(())
 }

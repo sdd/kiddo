@@ -6,7 +6,6 @@
 /// Run the rkyv-large-deserialize example after this to see how
 /// quickly memmapped zero-copy deserialization can read in the tree
 /// from the file system and perform a query on it.
-
 use elapsed::ElapsedDuration;
 use std::error::Error;
 use std::fs::File;
@@ -15,10 +14,10 @@ use std::time::Instant;
 
 use kiddo::{float::distance::squared_euclidean, float::kdtree::KdTree};
 
+use kiddo::test_utils::build_populated_tree_float;
 use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
 use rkyv::ser::Serializer;
 use rkyv::{AlignedVec, Infallible};
-use kiddo::test_utils::build_populated_tree_float;
 
 const BUFFER_LEN: usize = 10_000_000_000;
 const SCRATCH_LEN: usize = 1_000_000_000;
@@ -31,14 +30,10 @@ type Tree = KdTree<f32, u64, 3, BUCKET_SIZE, u32>;
 fn main() -> Result<(), Box<dyn Error>> {
     // create a tree populated with random points
     let start = Instant::now();
-    let kdtree: Tree = build_populated_tree_float(
-        NUM_ITEMS, 0
-    );
+    let kdtree: Tree = build_populated_tree_float(NUM_ITEMS, 0);
     println!(
-        "Populated kd-tree with {} items. num stems = {}, num leaves = {}. Took {}",
+        "Populated kd-tree with {} items. Took {}",
         kdtree.size(),
-        kdtree.stems.len(),
-        kdtree.leaves.len(),
         ElapsedDuration::new(start.elapsed())
     );
 
@@ -58,7 +53,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         ElapsedDuration::new(start.elapsed())
     );
 
-    println!("total elapsed: {}\n\n", ElapsedDuration::new(start.elapsed()));
+    println!(
+        "total elapsed: {}\n\n",
+        ElapsedDuration::new(start.elapsed())
+    );
 
     Ok(())
 }
