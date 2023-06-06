@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity, clippy::unit_arg)]
 use az::Cast;
 use fixed::types::extra::Unsigned;
 use fixed::FixedU16;
@@ -128,7 +129,6 @@ where
     FixedU16<A>: AxisFixed,
 {
     (0..points_qty)
-        .into_iter()
         .map(|_| rand_data_fixed_u16_point::<A, K>())
         .collect()
 }
@@ -234,10 +234,7 @@ pub fn build_query_points_float<A: Axis, const K: usize>(points_qty: usize) -> V
 where
     Standard: Distribution<[A; K]>,
 {
-    (0..points_qty)
-        .into_iter()
-        .map(|_| rand::random::<[A; K]>())
-        .collect()
+    (0..points_qty).map(|_| rand::random::<[A; K]>()).collect()
 }
 
 pub fn build_populated_tree_and_query_points_float<

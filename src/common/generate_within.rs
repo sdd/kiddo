@@ -27,6 +27,7 @@ macro_rules! generate_within {
         matching_items.into_sorted_vec()
     }
 
+    #[allow(clippy::too_many_arguments)]
     unsafe fn within_recurse<F>(
         &self,
         query: &[A; K],

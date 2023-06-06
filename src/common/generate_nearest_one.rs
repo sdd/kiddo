@@ -24,7 +24,7 @@ macro_rules! generate_nearest_one {
                 }
             }
 
-            #[inline]
+            #[allow(clippy::too_many_arguments)]
             unsafe fn nearest_one_recurse<F>(
                 &self,
                 query: &[A; K],
