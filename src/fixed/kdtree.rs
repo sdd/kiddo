@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
-/// on [`FixedKdTree`](crate::FixedKdTree). A type from the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate will implement
+/// on [`FixedKdTree`](crate::fixed::kdtree::KdTree). A type from the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate will implement
 /// all of the traits required by Axis. For example [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html).
 pub trait Axis: Fixed + Default + Debug + Copy + Sync {
     /// Returns the maximum value that the type implementing this trait can have
@@ -53,7 +53,7 @@ impl<T: num_traits::Zero + Default + Debug + rkyv::Archive> AxisRK for T {}
 ///
 /// This is only required when using Rkyv to serialize to / deserialize from
 /// a [`FixedKdTree`](crate::FixedKdTree). The types in the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed)  crate do not support [`Rkyv`](https://crates.io/crates/rkyv/0.7.39) yet.
-/// As a workaround, we need to [`std::mem::transmute`] a [`crate::FixedKdTree`] into
+/// As a workaround, we need to [`std::mem::transmute`] a [`crate::fixed::kdtree::KdTree`] into
 /// an equivalent [`crate::fixed::kdtree::KdTreeRK`] before serializing via Rkyv,
 /// and vice-versa when deserializing.
 #[cfg_attr(
@@ -173,6 +173,18 @@ where
             content_items: [T::zero(); B],
             size: IDX::zero(),
         }
+    }
+}
+
+impl<A, T, const K: usize, const B: usize, IDX> Default for KdTree<A, T, K, B, IDX>
+where
+    A: Axis,
+    T: Content,
+    IDX: Index<T = IDX>,
+    usize: Cast<IDX>,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 

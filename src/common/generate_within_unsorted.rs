@@ -27,6 +27,7 @@ macro_rules! generate_within_unsorted {
         matching_items
     }
 
+    #[allow(clippy::too_many_arguments)]
     unsafe fn within_unsorted_recurse<F>(
         &self,
         query: &[A; K],

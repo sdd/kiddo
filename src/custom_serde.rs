@@ -40,11 +40,11 @@ pub(crate) mod array {
             //let mut data = Vec::with_capacity(N);
             let mut data = [T::default(); N];
 
-            for idx in 0..N {
+            for item in data.iter_mut().take(N) {
                 match (seq.next_element())? {
                     Some(val) => {
                         // data.push(val);
-                        data[idx] = val;
+                        *item = val;
                     }
                     None => return Err(serde::de::Error::invalid_length(N, &self)),
                 }
@@ -151,8 +151,8 @@ pub(crate) mod array_of_arrays {
     ) -> Result<S::Ok, S::Error> {
         let mut s = ser.serialize_tuple(N * K)?;
         for item in data {
-            for x in 0..K {
-                s.serialize_element(&item[x])?;
+            for elem in item.iter().take(K) {
+                s.serialize_element(elem)?;
             }
         }
         s.end()
@@ -179,11 +179,11 @@ pub(crate) mod array_of_arrays {
             // let mut data: Vec<(T, T)> = Vec::with_capacity(N);
             let mut data = [[T::default(); K]; N];
 
-            for idx in 0..N {
-                for x in 0..K {
+            for item in data.iter_mut().take(N) {
+                for elem in item.iter_mut().take(K) {
                     match (seq.next_element::<T>())? {
                         Some(val) => {
-                            data[idx][x] = val;
+                            *elem = val;
                         }
                         None => return Err(serde::de::Error::invalid_length(N, &self)),
                     }
