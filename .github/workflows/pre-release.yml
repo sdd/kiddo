@@ -63,10 +63,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Run bumper
         id: bumper
         uses: tomerfi/version-bumper-action@1.0.0
+
+      - name: Show new version
+        run: echo ${{ steps.bumper.outputs.new_version }}
 
       - name: Get latest stable Rust version
         run: |
