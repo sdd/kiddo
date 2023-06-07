@@ -1,19 +1,13 @@
-name: CI
+name: Pre-release
 
-on: [push]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  LATEST_STABLE_RUST_VERSION: "TBD"
+on:
+  push:
+    branches: [ master ]
 
 jobs:
-  format:
-    name: Formatting
+  check_master:
+    name: Check Master
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v3
 
@@ -37,60 +31,14 @@ jobs:
       - name: Rustfmt Check
         uses: actions-rust-lang/rustfmt@v1
 
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Get latest stable Rust version
-        run: |
-          echo "LATEST_STABLE_RUST_VERSION=$(gh api /repos/rust-lang/rust/releases --jq ".[0].tag_name")" >> "$GITHUB_ENV"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Cache Toolchain
-        uses: actions/cache@v3
-        with:
-          path: ~/.rustup
-          key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
-
-      - name: Install `stable` Toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          components: rustfmt,clippy
-
-      - uses: LoliGothick/clippy-check@master
+      - name: Clippy
+        uses: LoliGothick/clippy-check@master
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           options: --all-features --no-deps
 
       - name: Check Rustdoc Links
         run: RUSTDOCFLAGS="--deny broken_intra_doc_links" cargo doc --verbose --workspace --no-deps --document-private-items
-
-  check:
-    name: Cargo Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Get latest stable Rust version
-        run: |
-          echo "LATEST_STABLE_RUST_VERSION=$(gh api /repos/rust-lang/rust/releases --jq ".[0].tag_name")" >> "$GITHUB_ENV"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Cache Toolchain
-        uses: actions/cache@v3
-        with:
-          path: ~/.rustup
-          key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
-
-      - name: Install `stable` Toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          components: rustfmt,clippy
 
       - name: Install cargo-hack
         uses: baptiste0928/cargo-install@v2
@@ -101,11 +49,29 @@ jobs:
       - name: Cargo check all targets and features
         run: cargo hack check --workspace --each-feature --all-targets
 
-  test:
-    name: Run Tests
+      - name: Cargo Test
+        run: cargo test --workspace --all-features --lib --bins --tests --examples
+
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+
+  make-release-pr:
+    permissions:
+      id-token: write # Enable OIDC
+      pull-requests: write
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Run bumper
+        id: bumper
+        uses: tomerfi/version-bumper-action@1.0.0
+
+      - name: Show new version
+        run: echo ${{ steps.bumper.outputs.new_version }}
 
       - name: Get latest stable Rust version
         run: |
@@ -124,5 +90,18 @@ jobs:
         with:
           components: rustfmt,clippy
 
-      - name: Cargo test
-        run: cargo test --workspace --all-features --lib --bins --tests --examples
+      - uses: chainguard-dev/actions/setup-gitsign@main
+
+      - name: Install cargo-release
+        uses: baptiste0928/cargo-install@v2
+        with:
+          crate: cargo-release
+          version: "^0.24.10"
+
+      - name: Run release-plz
+        uses: MarcoIeni/release-plz-action@v0.5
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
