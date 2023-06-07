@@ -98,11 +98,10 @@ jobs:
           crate: cargo-release
           version: "^0.24.10"
 
-      - uses: cargo-bins/release-pr@v2
+      - name: Run release-plz
+        uses: MarcoIeni/release-plz-action@v0.5
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          version: ${{ steps.bumper.outputs.new_version }}
-          pr-draft: true
-          pr-merge-strategy: rebase
-          pr-release-notes: true
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
