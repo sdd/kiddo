@@ -95,7 +95,7 @@ jobs:
       - name: Install cargo-release
         uses: baptiste0928/cargo-install@v2
         with:
-          tool: cargo-release
+          crate: cargo-release
           version: "^0.24.10"
 
       - uses: cargo-bins/release-pr@v2
