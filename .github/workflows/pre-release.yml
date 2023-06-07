@@ -5,9 +5,13 @@ on:
     branches: [ master ]
 
 jobs:
-  check_master:
-    name: Check Master
+  pre-release:
+    name: Pre Release
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Enable OIDC
+      pull-requests: write
+      contents: write
     steps:
       - uses: actions/checkout@v3
 
@@ -51,52 +55,6 @@ jobs:
 
       - name: Cargo Test
         run: cargo test --workspace --all-features --lib --bins --tests --examples
-
-      - name: Check semver
-        uses: obi1kenobi/cargo-semver-checks-action@v2
-
-  make-release-pr:
-    permissions:
-      id-token: write # Enable OIDC
-      pull-requests: write
-      contents: write
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Run bumper
-        id: bumper
-        uses: tomerfi/version-bumper-action@1.0.0
-
-      - name: Show new version
-        run: echo ${{ steps.bumper.outputs.new_version }}
-
-      - name: Get latest stable Rust version
-        run: |
-          echo "LATEST_STABLE_RUST_VERSION=$(gh api /repos/rust-lang/rust/releases --jq ".[0].tag_name")" >> "$GITHUB_ENV"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Cache Toolchain
-        uses: actions/cache@v3
-        with:
-          path: ~/.rustup
-          key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
-
-      - name: Install `stable` Toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          components: rustfmt,clippy
-
-      - uses: chainguard-dev/actions/setup-gitsign@main
-
-      - name: Install cargo-release
-        uses: baptiste0928/cargo-install@v2
-        with:
-          crate: cargo-release
-          version: "^0.24.10"
 
       - name: Run release-plz
         uses: MarcoIeni/release-plz-action@v0.5
