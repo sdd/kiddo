@@ -1,4 +1,4 @@
-# Kiddo Changelog
+Kiddo Changelog# 
 
 ## 2.1.0
 * feat: implement the main query methods plus `size` on `kiddo::float::kdtree::ArchivedKdTree` and improve the rkyv example.
