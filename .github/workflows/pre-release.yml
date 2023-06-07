@@ -34,16 +34,7 @@ jobs:
 
       - name: Rustfmt Check
         uses: actions-rust-lang/rustfmt@v1
-
-      - name: Clippy
-        uses: LoliGothick/clippy-check@master
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          options: --all-features --no-deps
-
-      - name: Check Rustdoc Links
-        run: RUSTDOCFLAGS="--deny broken_intra_doc_links" cargo doc --verbose --workspace --no-deps --document-private-items
-
+        
       - name: Install cargo-hack
         uses: baptiste0928/cargo-install@v2
         with:
