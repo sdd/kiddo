@@ -1,5 +1,31 @@
 [changelog]
-header = "Kiddo Changelog"
+header = """
+# Kiddo Changelog\n
+"""
+
+body = """
+{% if version %}\
+    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+    ## [unreleased]
+{% endif %}\
+{% if previous %}\
+    {% if previous.commit_id %}
+        [{{ previous.commit_id | truncate(length=7, end="") }}]({{ previous.commit_id }})...\
+            [{{ commit_id | truncate(length=7, end="") }}]({{ commit_id }})
+    {% endif %}\
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | upper_first }}
+    {% for commit in commits %}
+        - {{ commit.message | upper_first }} ([{{ commit.id | truncate(length=7, end="") }}]({{ commit.id }}))\
+          {% for footer in commit.footers -%}
+            , {{ footer.token }}{{ footer.separator }}{{ footer.value }}\
+          {% endfor %}\
+    {% endfor %}
+{% endfor %}\n
+"""
+
 trim = true
 
 [git]
@@ -16,5 +42,6 @@ commit_parsers = [
     { message = "^test", group = "Testing"},
 ]
 protect_breaking_commits = true
+tag_pattern = "v[0-9]\\.[0-9]\\.[0-9]"
 filter_commits = false
-limit_commits = 42
+sort_commits = "oldest"
