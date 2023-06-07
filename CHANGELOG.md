@@ -1,5 +1,51 @@
 # Kiddo Changelog
 
+## [2.1.1] - 2023-06-07
+
+### Bug Fixes
+
+- Update rust crate serde_with to v3
+
+### Documentation
+
+- Update rkyv-large example
+- Minor documentation enhancements
+- Fix serde example
+
+### Refactor
+
+- Float and fixed both use a common macro for best_n_within
+- Float and fixed both use a common macro for within_unsorted
+- Float and fixed both use a common macro for within
+- Float and fixed both use a common macro for nearest_n
+- Update `Axis` trait to include some methods so that the
+
+### Testing
+
+- Fix nearest_n bench code
+
+### Chore
+
+- Fix clippy lints
+- Update rust crate criterion to 0.5
+- Add some missing docs and hide some private internals
+
+### Ci
+
+- Update git-cliff.toml
+- Update git-cliff.toml
+- Update git-cliff config path in release-plz.toml
+- Add release-plz.toml and git-cliff.toml
+- Fix pre-release
+- Fix pre-release.yml
+- Fix pre-release
+- Fix pre-release
+- Fix pre-release.yml
+- Fix pre-release
+- Add pre-release
+- Add coverage checking
+- Update CI workflow
+
 ## 2.1.0
 * feat: implement the main query methods plus `size` on `kiddo::float::kdtree::ArchivedKdTree` and improve the rkyv example.
 
