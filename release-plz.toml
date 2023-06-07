@@ -1,0 +1,10 @@
+[workspace]
+allow_dirty = false
+changelog_config = "config/git-cliff.toml" # use a custom git-cliff configuration
+changelog_update = true # disable changelog updates
+dependencies_update = true # update dependencies with `cargo update`
+git_release_enable = true # disable GitHub/Gitea releases
+pr_labels = ["release"] # add the `release` label to the release Pull Request
+publish = true
+publish_allow_dirty = false
+semver_check = true # disable API breaking changes checks

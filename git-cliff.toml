@@ -1,0 +1,20 @@
+[changelog]
+header = "Kiddo Changelog"
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+commit_parsers = [
+    { message = "^feat", group = "Features"},
+    { message = "^fix", group = "Bug Fixes"},
+    { message = "^doc", group = "Documentation"},
+    { message = "^perf", group = "Performance"},
+    { message = "^refactor", group = "Refactor"},
+    { message = "^style", group = "Styling"},
+    { message = "^test", group = "Testing"},
+]
+protect_breaking_commits = true
+filter_commits = false
+limit_commits = 42
