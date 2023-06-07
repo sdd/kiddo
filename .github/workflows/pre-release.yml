@@ -66,7 +66,7 @@ jobs:
 
       - name: Run bumper
         id: bumper
-        uses: tomerfi/version-bumper-action@1.2
+        uses: tomerfi/version-bumper-action@1
 
       - name: Get latest stable Rust version
         run: |
