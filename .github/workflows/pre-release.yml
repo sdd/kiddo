@@ -68,7 +68,7 @@ jobs:
 
       - name: Run bumper
         id: bumper
-        uses: tomerfi/version-bumper-action@1.0.0
+        uses: tomerfi/version-bumper-action@1.2.2
 
       - name: Show new version
         run: echo ${{ steps.bumper.outputs.new_version }}
