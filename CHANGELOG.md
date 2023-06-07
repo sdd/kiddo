@@ -1,5 +1,50 @@
 # Kiddo Changelog
 
+## [2.1.1] - 2023-06-07
+
+### Bug Fixes
+
+- Update rust crate serde_with to v3 ([id](id))
+
+### Documentation
+
+- Update rkyv-large example ([id](id))
+- Minor documentation enhancements ([id](id))
+- Fix serde example ([id](id))
+
+### Refactor
+
+- Float and fixed both use a common macro for best_n_within ([id](id))
+- Float and fixed both use a common macro for within_unsorted ([id](id))
+- Float and fixed both use a common macro for within ([id](id))
+- Float and fixed both use a common macro for nearest_n ([id](id))
+- Update `Axis` trait to include some methods so that the ([id](id))
+
+### Testing
+
+- Fix nearest_n bench code ([id](id))
+
+### Chore
+
+- Fix clippy lints ([id](id))
+- Update rust crate criterion to 0.5 ([id](id))
+- Add some missing docs and hide some private internals ([id](id))
+
+### Ci
+
+- Update git-cliff.toml ([id](id))
+- Update git-cliff config path in release-plz.toml ([id](id))
+- Add release-plz.toml and git-cliff.toml ([id](id))
+- Fix pre-release ([id](id))
+- Fix pre-release.yml ([id](id))
+- Fix pre-release ([id](id))
+- Fix pre-release ([id](id))
+- Fix pre-release.yml ([id](id))
+- Fix pre-release ([id](id))
+- Add pre-release ([id](id))
+- Add coverage checking ([id](id))
+- Update CI workflow ([id](id))
+
 ## 2.1.0
 * feat: implement the main query methods plus `size` on `kiddo::float::kdtree::ArchivedKdTree` and improve the rkyv example.
 
