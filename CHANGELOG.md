@@ -1,3 +1,39 @@
+# Changelog
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [2.1.1](https://github.com/sdd/kiddo/compare/v2.1.0...v2.1.1) - 2023-06-07
+
+### Fixed
+- *(deps)* update rust crate serde_with to v3
+
+### Other
+- fix pre-release
+- fix pre-release.yml
+- fix pre-release
+- fix pre-release
+- fix pre-release.yml
+- fix pre-release
+- add pre-release
+- add coverage checking
+- fix clippy lints
+- update CI workflow
+- update rkyv-large example
+- minor documentation enhancements
+- fix serde example
+- *(deps)* update rust crate criterion to 0.5
+- Add `FromIterator` and `Extend` impls
+- add some missing docs and hide some private internals
+- fix nearest_n bench code
+- float and fixed both use a common macro for best_n_within
+- float and fixed both use a common macro for within_unsorted
+- float and fixed both use a common macro for within
+- float and fixed both use a common macro for nearest_n
+- update `Axis` trait to include some methods so that the
 # Kiddo Changelog
 
 ## 2.1.0
