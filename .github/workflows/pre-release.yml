@@ -34,7 +34,7 @@ jobs:
 
       - name: Rustfmt Check
         uses: actions-rust-lang/rustfmt@v1
-        
+
       - name: Install cargo-hack
         uses: baptiste0928/cargo-install@v2
         with:
