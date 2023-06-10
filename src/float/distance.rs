@@ -14,7 +14,8 @@ use crate::float::kdtree::Axis;
 /// # Examples
 ///
 /// ```rust
-/// use kiddo::float::distance::{DistanceMetric, Manhattan};
+/// use kiddo::distance_metric::DistanceMetric;
+/// use kiddo::float::distance::Manhattan;
 ///
 /// assert_eq!(0f32, Manhattan::dist(&[0f32, 0f32], &[0f32, 0f32]));
 /// assert_eq!(1f32, Manhattan::dist(&[0f32, 0f32], &[1f32, 0f32]));
@@ -45,7 +46,8 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
 /// # Examples
 ///
 /// ```rust
-/// use kiddo::float::distance::{DistanceMetric, SquaredEuclidean};
+/// use kiddo::distance_metric::DistanceMetric;
+/// use kiddo::float::distance::SquaredEuclidean;
 ///
 /// assert_eq!(0f32, SquaredEuclidean::dist(&[0f32, 0f32], &[0f32, 0f32]));
 /// assert_eq!(1f32, SquaredEuclidean::dist(&[0f32, 0f32], &[1f32, 0f32]));
