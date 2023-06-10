@@ -289,39 +289,167 @@ mod tests {
         assert_eq!(tree.size(), 0);
     }
 
-    // #[cfg(feature = "serialize")]
-    // #[test]
-    // fn can_serde() {
-    //     let mut tree: KdTree<u16, u32, 4, 32, u32> = KdTree::new();
-    //
-    //     let content_to_add: [(PT, T); 16] = [
-    //         ([9f32, 0f32, 9f32, 0f32], 9),
-    //         ([4f32, 500f32, 4f32, 500f32], 4),
-    //         ([12f32, -300f32, 12f32, -300f32], 12),
-    //         ([7f32, 200f32, 7f32, 200f32], 7),
-    //         ([13f32, -400f32, 13f32, -400f32], 13),
-    //         ([6f32, 300f32, 6f32, 300f32], 6),
-    //         ([2f32, 700f32, 2f32, 700f32], 2),
-    //         ([14f32, -500f32, 14f32, -500f32], 14),
-    //         ([3f32, 600f32, 3f32, 600f32], 3),
-    //         ([10f32, -100f32, 10f32, -100f32], 10),
-    //         ([16f32, -700f32, 16f32, -700f32], 16),
-    //         ([1f32, 800f32, 1f32, 800f32], 1),
-    //         ([15f32, -600f32, 15f32, -600f32], 15),
-    //         ([5f32, 400f32, 5f32, 400f32], 5),
-    //         ([8f32, 100f32, 8f32, 100f32], 8),
-    //         ([11f32, -200f32, 11f32, -200f32], 11),
-    //     ];
-    //
-    //     for (point, item) in content_to_add {
-    //         tree.add(&point, item);
-    //     }
-    //     assert_eq!(tree.size(), 16);
-    //
-    //     let serialized = serde_json::to_string(&tree).unwrap();
-    //     println!("JSON: {:?}", &serialized);
-    //
-    //     let deserialized: KdTree = serde_json::from_str(&serialized).unwrap();
-    //     assert_eq!(tree, deserialized);
-    // }
+    #[cfg(feature = "serialize")]
+    #[test]
+    fn can_serde() {
+        let mut tree: KdTree<FXD, u32, 4, 32, u32> = KdTree::new();
+
+        let content_to_add: [([FXD; 4], u32); 16] = [
+            (
+                [
+                    FXD::from_num(0.9),
+                    FXD::from_num(0),
+                    FXD::from_num(0.9),
+                    FXD::from_num(0),
+                ],
+                9,
+            ),
+            (
+                [
+                    FXD::from_num(0.4),
+                    FXD::from_num(0.5),
+                    FXD::from_num(0.4),
+                    FXD::from_num(0.50),
+                ],
+                4,
+            ),
+            (
+                [
+                    FXD::from_num(0.12),
+                    FXD::from_num(0.3),
+                    FXD::from_num(0.12),
+                    FXD::from_num(0.3),
+                ],
+                12,
+            ),
+            (
+                [
+                    FXD::from_num(0.7),
+                    FXD::from_num(0.2),
+                    FXD::from_num(0.7),
+                    FXD::from_num(0.2),
+                ],
+                7,
+            ),
+            (
+                [
+                    FXD::from_num(0.13),
+                    FXD::from_num(0.4),
+                    FXD::from_num(0.13),
+                    FXD::from_num(0.4),
+                ],
+                13,
+            ),
+            (
+                [
+                    FXD::from_num(0.6),
+                    FXD::from_num(0.3),
+                    FXD::from_num(0.6),
+                    FXD::from_num(0.3),
+                ],
+                6,
+            ),
+            (
+                [
+                    FXD::from_num(0.2),
+                    FXD::from_num(0.7),
+                    FXD::from_num(0.2),
+                    FXD::from_num(0.7),
+                ],
+                2,
+            ),
+            (
+                [
+                    FXD::from_num(0.14),
+                    FXD::from_num(0.5),
+                    FXD::from_num(0.14),
+                    FXD::from_num(0.5),
+                ],
+                14,
+            ),
+            (
+                [
+                    FXD::from_num(0.3),
+                    FXD::from_num(0.6),
+                    FXD::from_num(0.3),
+                    FXD::from_num(0.6),
+                ],
+                3,
+            ),
+            (
+                [
+                    FXD::from_num(0.1),
+                    FXD::from_num(0.1),
+                    FXD::from_num(0.10),
+                    FXD::from_num(0.1),
+                ],
+                10,
+            ),
+            (
+                [
+                    FXD::from_num(0.16),
+                    FXD::from_num(0.7),
+                    FXD::from_num(0.16),
+                    FXD::from_num(0.7),
+                ],
+                16,
+            ),
+            (
+                [
+                    FXD::from_num(0.1),
+                    FXD::from_num(0.8),
+                    FXD::from_num(0.1),
+                    FXD::from_num(0.8),
+                ],
+                1,
+            ),
+            (
+                [
+                    FXD::from_num(0.15),
+                    FXD::from_num(0.6),
+                    FXD::from_num(0.15),
+                    FXD::from_num(0.6),
+                ],
+                15,
+            ),
+            (
+                [
+                    FXD::from_num(0.5),
+                    FXD::from_num(0.4),
+                    FXD::from_num(0.5),
+                    FXD::from_num(0.4),
+                ],
+                5,
+            ),
+            (
+                [
+                    FXD::from_num(0.8),
+                    FXD::from_num(0.1),
+                    FXD::from_num(0.8),
+                    FXD::from_num(0.1),
+                ],
+                8,
+            ),
+            (
+                [
+                    FXD::from_num(0.11),
+                    FXD::from_num(0.2),
+                    FXD::from_num(0.11),
+                    FXD::from_num(0.2),
+                ],
+                11,
+            ),
+        ];
+
+        for (point, item) in content_to_add {
+            tree.add(&point, item);
+        }
+        assert_eq!(tree.size(), 16);
+
+        let serialized = serde_json::to_string(&tree).unwrap();
+        println!("JSON: {:?}", &serialized);
+
+        let deserialized: KdTree<FXD, u32, 4, 32, u32> = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(tree, deserialized);
+    }
 }
