@@ -22,8 +22,12 @@ use serde::{Deserialize, Serialize};
 pub trait Axis: Fixed + Default + Debug + Copy + Sync + Send {
     /// Returns the maximum value that the type implementing this trait can have
     fn max_value() -> Self;
+
     /// returns the zero value for this type
     fn zero() -> Self;
+
+    /// used in query methods to update the rd value. Basically a saturating add for Fixed and an add for Float
+    fn rd_update(rd: Self, delta: Self) -> Self;
 }
 impl<T: Fixed + Default + Debug + Copy + Sync + Send> Axis for T {
     fn max_value() -> Self {
@@ -32,6 +36,11 @@ impl<T: Fixed + Default + Debug + Copy + Sync + Send> Axis for T {
 
     fn zero() -> Self {
         Self::ZERO
+    }
+
+    #[inline]
+    fn rd_update(rd: Self, delta: Self) -> Self {
+        rd.saturating_add(delta)
     }
 }
 
