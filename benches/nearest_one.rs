@@ -7,9 +7,9 @@ use criterion::{
 use fixed::types::extra::{Unsigned, U16};
 use fixed::FixedU16;
 use kiddo::batch_benches;
-use kiddo::distance::squared_euclidean;
-use kiddo::fixed::distance::squared_euclidean as squared_euclidean_fixedpoint;
+use kiddo::fixed::distance::SquaredEuclidean as SquaredEuclideanFixed;
 use kiddo::fixed::kdtree::{Axis as AxisFixed, KdTree as KdTreeFixed};
+use kiddo::float::distance::SquaredEuclidean;
 use kiddo::float::kdtree::{Axis, KdTree};
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_fixed, build_populated_tree_and_query_points_float,
@@ -93,7 +93,7 @@ fn perform_query_float<
 ) where
     usize: Cast<IDX>,
 {
-    kdtree.nearest_one(&point, &squared_euclidean);
+    kdtree.nearest_one::<SquaredEuclidean>(&point);
 }
 
 fn perform_query_fixed<
@@ -109,7 +109,7 @@ fn perform_query_fixed<
     usize: Cast<IDX>,
     FixedU16<A>: AxisFixed,
 {
-    kdtree.nearest_one(&point, &squared_euclidean_fixedpoint);
+    kdtree.nearest_one::<SquaredEuclideanFixed>(&point);
 }
 
 fn bench_query_nearest_one_float<

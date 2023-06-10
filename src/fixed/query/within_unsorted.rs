@@ -1,6 +1,7 @@
 use az::{Az, Cast};
 use std::ops::Rem;
 
+use crate::distance_metric::DistanceMetric;
 use crate::fixed::kdtree::{Axis, KdTree};
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::{is_stem_index, Content, Index};
@@ -24,7 +25,7 @@ Results are returned in arbitrary order. Faster than `within`.
     use fixed::FixedU16;
     use fixed::types::extra::U0;
     use kiddo::fixed::kdtree::KdTree;
-    use kiddo::fixed::distance::squared_euclidean;
+    use kiddo::fixed::distance::SquaredEuclidean;
 
     type FXD = FixedU16<U0>;
 
@@ -35,7 +36,7 @@ Results are returned in arbitrary order. Faster than `within`.
     tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
     tree.add(&[FXD::from_num(20), FXD::from_num(30), FXD::from_num(60)], 102);
 
-    let within = tree.within(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], FXD::from_num(10), &squared_euclidean);
+    let within = tree.within::<SquaredEuclidean>(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], FXD::from_num(10));
 
     assert_eq!(within.len(), 2);
 ```"#)
@@ -44,7 +45,8 @@ Results are returned in arbitrary order. Faster than `within`.
 
 #[cfg(test)]
 mod tests {
-    use crate::fixed::distance::manhattan;
+    use crate::distance_metric::DistanceMetric;
+    use crate::fixed::distance::Manhattan;
     use crate::fixed::kdtree::{Axis, KdTree};
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
     use fixed::types::extra::U14;
@@ -93,7 +95,7 @@ mod tests {
         let expected = linear_search(&content_to_add, &query_point, radius);
 
         let result: Vec<_> = tree
-            .within_unsorted(&query_point, radius, &manhattan)
+            .within_unsorted::<Manhattan>(&query_point, radius)
             .into_iter()
             .map(|n| (n.distance, n.item))
             .collect();
@@ -111,7 +113,7 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, radius);
 
             let mut result: Vec<_> = tree
-                .within_unsorted(&query_point, radius, &manhattan)
+                .within_unsorted::<Manhattan>(&query_point, radius)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -145,7 +147,7 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, radius);
 
             let mut result: Vec<_> = tree
-                .within_unsorted(&query_point, radius, &manhattan)
+                .within_unsorted::<Manhattan>(&query_point, radius)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -163,7 +165,7 @@ mod tests {
         let mut matching_items = vec![];
 
         for &(p, item) in content {
-            let dist = manhattan(query_point, &p);
+            let dist = Manhattan::dist(query_point, &p);
             if dist < radius {
                 matching_items.push((dist, item));
             }
