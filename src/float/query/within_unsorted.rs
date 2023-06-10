@@ -1,8 +1,8 @@
-use crate::float::neighbour::Neighbour;
 use az::{Az, Cast};
 use std::ops::Rem;
 
 use crate::float::kdtree::{Axis, KdTree};
+use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::{is_stem_index, Content, Index};
 
 use crate::generate_within_unsorted;

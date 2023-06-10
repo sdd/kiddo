@@ -1,5 +1,6 @@
 use crate::float::kdtree::{Axis, KdTree, LeafNode};
 
+use crate::best_neighbour::BestNeighbour;
 use crate::types::{is_stem_index, Content, Index};
 use az::{Az, Cast};
 use std::collections::BinaryHeap;
@@ -22,6 +23,7 @@ Returns an iterator.
 
 ```rust
     use kiddo::float::kdtree::KdTree;
+    use kiddo::best_neighbour::BestNeighbour;
     use kiddo::distance::squared_euclidean;
 
     ",
@@ -31,7 +33,7 @@ Returns an iterator.
     let mut best_n_within = tree.best_n_within(&[1.0, 2.0, 5.0], 10f64, 1, &squared_euclidean);
     let first = best_n_within.next().unwrap();
 
-    assert_eq!(first, 100);
+    assert_eq!(first, BestNeighbour { distance: 0.0, item: 100 });
 ```"
             )
         );
@@ -76,6 +78,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::best_neighbour::BestNeighbour;
     use crate::float::distance::squared_euclidean;
     use crate::float::kdtree::KdTree;
     use rand::Rng;
@@ -113,7 +116,20 @@ mod tests {
         let query = [9f64, 0f64];
         let radius = 20000f64;
         let max_qty = 3;
-        let expected = vec![10, 9, 8];
+        let expected = vec![
+            BestNeighbour {
+                distance: 10001.0,
+                item: 10,
+            },
+            BestNeighbour {
+                distance: 0.0,
+                item: 9,
+            },
+            BestNeighbour {
+                distance: 10001.0,
+                item: 8,
+            },
+        ];
 
         let result: Vec<_> = tree
             .best_n_within(&query, radius, max_qty, &squared_euclidean)
@@ -130,7 +146,6 @@ mod tests {
             ];
             let radius = 100000f64;
             let expected = linear_search(&content_to_add, &query, radius, max_qty);
-            println!("{}, {}", query[0].to_string(), query[1].to_string());
 
             let result: Vec<_> = tree
                 .best_n_within(&query, radius, max_qty, &squared_euclidean)
@@ -175,18 +190,18 @@ mod tests {
         query: &[f64; 2],
         radius: f64,
         max_qty: usize,
-    ) -> Vec<i32> {
+    ) -> Vec<BestNeighbour<f64, i32>> {
         let mut best_items = Vec::with_capacity(max_qty);
 
         for &(p, item) in content {
-            let dist = squared_euclidean(query, &p);
-            if dist <= radius {
+            let distance = squared_euclidean(query, &p);
+            if distance <= radius {
                 if best_items.len() < max_qty {
-                    best_items.push(item);
+                    best_items.push(BestNeighbour { distance, item });
                 } else {
-                    if item < *best_items.last().unwrap() {
+                    if item < (*best_items.last().unwrap()).item {
                         best_items.pop().unwrap();
-                        best_items.push(item);
+                        best_items.push(BestNeighbour { distance, item });
                     }
                 }
             }

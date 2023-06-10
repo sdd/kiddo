@@ -75,9 +75,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Test query on the newly created tree
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let (_, nearest_idx) = kdtree.nearest_one(&query, &squared_euclidean);
-    let nearest = &cities[nearest_idx as usize];
-    println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest);
+    let nearest_neighbour = kdtree.nearest_one(&query, &squared_euclidean);
+    let nearest_city = &cities[nearest_neighbour.item as usize];
+    println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest_city);
 
     let start = Instant::now();
     let mut file: File = File::create("./examples/geonames-tree.rkyv")?;
@@ -97,9 +97,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let (_, nearest_idx) = mm_zc_deserialized_tree.nearest_one(&query, &squared_euclidean);
-    let nearest = &cities[nearest_idx as usize];
-    println!("Nearest city to 52.5N, 1.9W: {:?}", nearest);
+    let nearest_neighbour = mm_zc_deserialized_tree.nearest_one(&query, &squared_euclidean);
+    let nearest_city = &cities[nearest_neighbour.item as usize];
+    println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest_city);
     println!(
         "total elapsed: {}\n\n",
         ElapsedDuration::new(start.elapsed())
@@ -116,9 +116,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let (_, nearest_idx) = zc_deserialized_tree.nearest_one(&query, &squared_euclidean);
-    let nearest = &cities[nearest_idx as usize];
-    println!("Nearest city to 52.5N, 1.9W: {:?}", nearest);
+    let nearest_neighbour = zc_deserialized_tree.nearest_one(&query, &squared_euclidean);
+    let nearest_city = &cities[nearest_neighbour.item as usize];
+    println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest_city);
     println!(
         "total elapsed: {}\n\n",
         ElapsedDuration::new(start.elapsed())
@@ -135,9 +135,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let (_, nearest_idx) = mm_deserialized_tree.nearest_one(&query, &squared_euclidean);
-    let nearest = &cities[nearest_idx as usize];
-    println!("Nearest city to 52.5N, 1.9W: {:?}", nearest);
+    let nearest_neighbour = mm_deserialized_tree.nearest_one(&query, &squared_euclidean);
+    let nearest_city = &cities[nearest_neighbour.item as usize];
+    println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest_city);
     println!(
         "total elapsed: {}\n\n",
         ElapsedDuration::new(start.elapsed())
@@ -156,9 +156,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let (_, nearest_idx) = deserialized_tree.nearest_one(&query, &squared_euclidean);
-    let nearest = &cities[nearest_idx as usize];
-    println!("Nearest city to 52.5N, 1.9W: {:?}", nearest);
+    let nearest_neighbour = deserialized_tree.nearest_one(&query, &squared_euclidean);
+    let nearest_city = &cities[nearest_neighbour.item as usize];
+    println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest_city);
     println!(
         "total elapsed: {}\n\n",
         ElapsedDuration::new(start.elapsed())

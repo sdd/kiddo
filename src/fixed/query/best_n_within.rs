@@ -2,6 +2,7 @@ use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
+use crate::best_neighbour::BestNeighbour;
 use crate::fixed::kdtree::{Axis, KdTree, LeafNode};
 use crate::types::{is_stem_index, Content, Index};
 
@@ -15,14 +16,18 @@ where
     generate_best_n_within!(
         LeafNode,
         (r#"Queries the tree to find the best `n` elements within `dist` of `point`, using the specified
-distance metric function. Results are returned in arbitrary order. 'Best' is determined by
-performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt`]). Returns an iterator.
+distance metric function.
+
+Returns an iterator.
+Results are returned in arbitrary order. 'Best' is determined by
+performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt`]).
 
 # Examples
 
 ```rust
     use fixed::FixedU16;
     use fixed::types::extra::U0;
+    use kiddo::best_neighbour::BestNeighbour;
     use kiddo::fixed::kdtree::KdTree;
     use kiddo::fixed::distance::squared_euclidean;
 
@@ -37,13 +42,14 @@ performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt
     let mut best_n_within_iter = tree.best_n_within(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], FXD::from_num(10), 1, &squared_euclidean);
     let first = best_n_within_iter.next().unwrap();
 
-    assert_eq!(first, 1);
+    assert_eq!(first, BestNeighbour { distance: FXD::from_num(3), item: 1 });
 ```"#)
     );
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::best_neighbour::BestNeighbour;
     use crate::fixed::distance::manhattan;
     use crate::fixed::kdtree::{Axis, KdTree};
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
@@ -89,7 +95,28 @@ mod tests {
 
         let query = [n(0.9f32), n(0.7f32)];
         let radius = n(0.8f32);
-        let expected = vec![6, 5, 3, 2, 4];
+        let expected = vec![
+            BestNeighbour {
+                distance: n(0.7001f32),
+                item: 6,
+            },
+            BestNeighbour {
+                distance: n(0.7f32),
+                item: 5,
+            },
+            BestNeighbour {
+                distance: n(0.7001f32),
+                item: 3,
+            },
+            BestNeighbour {
+                distance: n(0.7f32),
+                item: 2,
+            },
+            BestNeighbour {
+                distance: n(0.7f32),
+                item: 4,
+            },
+        ];
 
         let result: Vec<_> = tree
             .best_n_within(&query, radius, max_qty, &manhattan)
@@ -102,7 +129,6 @@ mod tests {
                 n(rng.gen_range(0.0f32..0.9f32)),
                 n(rng.gen_range(0.0f32..0.9f32)),
             ];
-            println!("{}: {}, {}", _i, query[0].to_string(), query[1].to_string());
             let radius = n(0.1f32);
             let expected = linear_search(&content_to_add, &query, radius, max_qty);
 
@@ -150,21 +176,21 @@ mod tests {
 
     fn linear_search<A: Axis, const K: usize>(
         content: &[([A; K], u32)],
-        query_point: &[A; K],
+        query: &[A; K],
         radius: A,
         max_qty: usize,
-    ) -> Vec<u32> {
+    ) -> Vec<BestNeighbour<A, u32>> {
         let mut best_items = Vec::with_capacity(max_qty);
 
         for &(p, item) in content {
-            let dist = manhattan(query_point, &p);
-            if dist <= radius {
+            let distance = manhattan(query, &p);
+            if distance <= radius {
                 if best_items.len() < max_qty {
-                    best_items.push(item);
+                    best_items.push(BestNeighbour { distance, item });
                 } else {
-                    if item < *best_items.last().unwrap() {
+                    if item < (*best_items.last().unwrap()).item {
                         best_items.pop().unwrap();
-                        best_items.push(item);
+                        best_items.push(BestNeighbour { distance, item });
                     }
                 }
             }
