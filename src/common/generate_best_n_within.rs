@@ -72,7 +72,7 @@ macro_rules! generate_best_n_within {
                 rd,
             );
 
-            rd += D::dist1(new_off, old_off);
+            rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
 
             if rd <= radius {
                 off[split_dim] = new_off;
