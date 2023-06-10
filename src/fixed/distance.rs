@@ -18,7 +18,8 @@ use crate::fixed::kdtree::Axis;
 /// ```rust
 /// use fixed::types::extra::U0;
 /// use fixed::FixedU16;
-/// use kiddo::fixed::distance::{DistanceMetric, Manhattan};
+/// use kiddo::distance_metric::DistanceMetric;
+/// use kiddo::fixed::distance::Manhattan;
 /// type FXD = FixedU16<U0>;
 ///
 /// let ZERO = FXD::from_num(0);
@@ -66,7 +67,7 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
 /// ```rust
 /// use fixed::types::extra::U0;
 /// use fixed::FixedU16;
-/// use kiddo::fixed::distance::DistanceMetric;
+/// use kiddo::distance_metric::DistanceMetric;
 /// use kiddo::fixed::distance::SquaredEuclidean;
 /// type FXD = FixedU16<U0>;
 ///

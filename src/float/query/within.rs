@@ -1,11 +1,9 @@
-use az::{Az, Cast};
-use std::collections::BinaryHeap;
-use std::ops::Rem;
+use az::Cast;
 
 use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::{Axis, KdTree};
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::types::{is_stem_index, Content, Index};
+use crate::types::{Content, Index};
 
 use crate::generate_within;
 
@@ -21,7 +19,7 @@ Results are returned sorted nearest-first
 
 ```rust
     use kiddo::float::kdtree::KdTree;
-    use kiddo::distance::SquaredEuclidean;
+    use kiddo::float::distance::SquaredEuclidean;
     ",
             $doctest_build_tree,
             "

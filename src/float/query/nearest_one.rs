@@ -22,7 +22,7 @@ to not needing to allocate memory or maintain sorted results.
 
 ```rust
     use kiddo::float::kdtree::KdTree;
-    use kiddo::distance::SquaredEuclidean;
+    use kiddo::float::distance::SquaredEuclidean;
 
     ",
                 $doctest_build_tree,
