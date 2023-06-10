@@ -20,7 +20,7 @@ Results are returned in arbitrary order. Faster than `within`.
 
 ```rust
 use kiddo::float::kdtree::KdTree;
-use kiddo::distance::SquaredEuclidean;
+use kiddo::float::distance::SquaredEuclidean;
 ",
             $doctest_build_tree,
             "

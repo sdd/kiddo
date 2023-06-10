@@ -38,7 +38,7 @@ Returns an Iterator. Results are returned in arbitrary order. Faster than `withi
     tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
     tree.add(&[FXD::from_num(20), FXD::from_num(30), FXD::from_num(60)], 102);
 
-    let within = tree.within_unsorted_iter::<SquaredEuclidean>(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], FXD::from_num(10)).collect::<Vec>();
+    let within = tree.within_unsorted_iter::<SquaredEuclidean>(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], FXD::from_num(10)).collect::<Vec<_>>();
 
     assert_eq!(within.len(), 2);
 ```"#)
