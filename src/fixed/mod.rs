@@ -7,6 +7,5 @@
 pub mod construction;
 pub mod distance;
 pub mod kdtree;
-pub mod neighbour;
 #[doc(hidden)]
 pub mod query;
