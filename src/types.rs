@@ -14,11 +14,21 @@ use std::fmt::Debug;
 /// a Vec, and try switching tqo a smaller type and benchmarking to see if you get better
 /// performance.
 pub trait Content:
-    Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync
+    Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync + Send
 {
 }
 impl<
-        T: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync,
+        T: Zero
+            + One
+            + PartialEq
+            + Default
+            + Clone
+            + Copy
+            + Ord
+            + Debug
+            + std::ops::SubAssign
+            + Sync
+            + Send,
     > Content for T
 {
 }
