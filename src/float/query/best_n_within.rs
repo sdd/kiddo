@@ -1,10 +1,11 @@
-use crate::float::kdtree::{Axis, KdTree, LeafNode};
-
-use crate::best_neighbour::BestNeighbour;
-use crate::types::{is_stem_index, Content, Index};
 use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
+
+use crate::best_neighbour::BestNeighbour;
+use crate::distance_metric::DistanceMetric;
+use crate::float::kdtree::{Axis, KdTree, LeafNode};
+use crate::types::{is_stem_index, Content, Index};
 
 use crate::generate_best_n_within;
 
@@ -24,13 +25,13 @@ Returns an iterator.
 ```rust
     use kiddo::float::kdtree::KdTree;
     use kiddo::best_neighbour::BestNeighbour;
-    use kiddo::distance::squared_euclidean;
+    use kiddo::distance::SquaredEuclidean;
 
     ",
                 $doctest_build_tree,
                 "
 
-    let mut best_n_within = tree.best_n_within(&[1.0, 2.0, 5.0], 10f64, 1, &squared_euclidean);
+    let mut best_n_within = tree.best_n_within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64, 1);
     let first = best_n_within.next().unwrap();
 
     assert_eq!(first, BestNeighbour { distance: 0.0, item: 100 });
@@ -79,7 +80,8 @@ where
 #[cfg(test)]
 mod tests {
     use crate::best_neighbour::BestNeighbour;
-    use crate::float::distance::squared_euclidean;
+    use crate::distance_metric::DistanceMetric;
+    use crate::float::distance::SquaredEuclidean;
     use crate::float::kdtree::KdTree;
     use rand::Rng;
 
@@ -132,7 +134,7 @@ mod tests {
         ];
 
         let result: Vec<_> = tree
-            .best_n_within(&query, radius, max_qty, &squared_euclidean)
+            .best_n_within::<SquaredEuclidean>(&query, radius, max_qty)
             .collect();
         assert_eq!(result, expected);
 
@@ -148,7 +150,7 @@ mod tests {
             let expected = linear_search(&content_to_add, &query, radius, max_qty);
 
             let result: Vec<_> = tree
-                .best_n_within(&query, radius, max_qty, &squared_euclidean)
+                .best_n_within::<SquaredEuclidean>(&query, radius, max_qty)
                 .collect();
             assert_eq!(result, expected);
         }
@@ -179,7 +181,7 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, radius, max_qty);
 
             let result: Vec<_> = tree
-                .best_n_within(&query_point, radius, max_qty, &squared_euclidean)
+                .best_n_within::<SquaredEuclidean>(&query_point, radius, max_qty)
                 .collect();
             assert_eq!(result, expected);
         }
@@ -194,7 +196,7 @@ mod tests {
         let mut best_items = Vec::with_capacity(max_qty);
 
         for &(p, item) in content {
-            let distance = squared_euclidean(query, &p);
+            let distance = SquaredEuclidean::dist(query, &p);
             if distance <= radius {
                 if best_items.len() < max_qty {
                     best_items.push(BestNeighbour { distance, item });

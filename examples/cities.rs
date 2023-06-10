@@ -8,7 +8,7 @@ use std::fmt::Formatter;
 use std::fs::File;
 
 use csv::Reader;
-use kiddo::float::{distance::squared_euclidean, kdtree::KdTree};
+use kiddo::float::{distance::SquaredEuclidean, kdtree::KdTree};
 use serde::Deserialize;
 
 #[allow(dead_code)]
@@ -128,7 +128,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // now we perform the actual nearest neighbour query. We need to specify a
     // distance metric: we use `squared_euclidean` in this case, which is a good
     // default. See the `distance` module docs for a discussion o distance metrics.
-    let nearest_neighbour = kdtree.nearest_one(&query, &squared_euclidean);
+    let nearest_neighbour = kdtree.nearest_one::<SquaredEuclidean>(&query);
 
     // since the result of the query is an index, we need to use this index
     // on the `cities` `Vec` in order to retrieve the original record.
@@ -143,7 +143,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // This allows us to find, for example, the five nearest cities to a specified
     // point, sorted in order of distance.
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let nearest_5_idx = kdtree.nearest_n(&query, 5, &squared_euclidean);
+    let nearest_5_idx = kdtree.nearest_n::<SquaredEuclidean>(&query, 5);
 
     // `kdtree::nearest_n` returns an `Iterator`, rather than a `Vec`. This
     // gives callers the flexibility of deciding how to process and store the
@@ -171,7 +171,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let query = degrees_lat_lng_to_unit_sphere(0f32, 0f32);
     let dist = kilometres_to_unit_sphere_squared_euclidean(1000.0);
     let all_within = kdtree
-        .within(&query, dist, &squared_euclidean)
+        .within::<SquaredEuclidean>(&query, dist)
         .iter()
         .map(|neighbour| &cities[neighbour.item as usize].name)
         .collect::<Vec<_>>();
@@ -189,7 +189,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // first three, which is significantly slower.
     let query = degrees_lat_lng_to_unit_sphere(0f32, 0f32);
     let dist = kilometres_to_unit_sphere_squared_euclidean(1000.0);
-    let best_3_iter = kdtree.best_n_within(&query, dist, 3, &squared_euclidean);
+    let best_3_iter = kdtree.best_n_within::<SquaredEuclidean>(&query, dist, 3);
     let best_3 = best_3_iter
         .map(|neighbour| (&cities[neighbour.item as usize].name))
         .collect::<Vec<_>>();

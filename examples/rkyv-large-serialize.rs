@@ -12,7 +12,7 @@ use std::fs::File;
 use std::io::Write;
 use std::time::Instant;
 
-use kiddo::{float::distance::squared_euclidean, float::kdtree::KdTree};
+use kiddo::{float::distance::SquaredEuclidean, float::kdtree::KdTree};
 
 use kiddo::test_utils::build_populated_tree_float;
 use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Test query on the newly created tree
     let query = [0.123f32, 0.456f32, 0.789f32];
-    let nearest_neighbour = kdtree.nearest_one(&query, &squared_euclidean);
+    let nearest_neighbour = kdtree.nearest_one::<SquaredEuclidean>(&query);
     println!("Nearest item to query: {:?}", nearest_neighbour.item);
 
     let start = Instant::now();
