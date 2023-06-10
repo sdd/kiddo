@@ -83,6 +83,7 @@ pub mod nearest_neighbour;
 #[doc(hidden)]
 pub mod test_utils;
 pub mod types;
+pub mod within_unsorted_iter;
 
 /// A floating-point k-d tree with default parameters.
 ///
