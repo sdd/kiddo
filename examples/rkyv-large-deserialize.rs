@@ -13,7 +13,7 @@ use std::error::Error;
 use std::fs::File;
 use std::time::Instant;
 
-use kiddo::{float::distance::squared_euclidean, float::kdtree::KdTree};
+use kiddo::{float::distance::SquaredEuclidean, float::kdtree::KdTree};
 
 type Tree = KdTree<f32, u64, 3, 32, u32>;
 
@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // perform a query
     let query = [0.123f32, 0.456f32, 0.789f32];
-    let nearest_neighbour = tree.nearest_one(&query, &squared_euclidean);
+    let nearest_neighbour = tree.nearest_one::<SquaredEuclidean>(&query);
 
     println!("Nearest item to query: {:?}", nearest_neighbour.item);
     println!(

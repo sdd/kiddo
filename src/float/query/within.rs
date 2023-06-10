@@ -2,6 +2,7 @@ use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
+use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::{Axis, KdTree};
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::{is_stem_index, Content, Index};
@@ -20,12 +21,12 @@ Results are returned sorted nearest-first
 
 ```rust
     use kiddo::float::kdtree::KdTree;
-    use kiddo::distance::squared_euclidean;
+    use kiddo::distance::SquaredEuclidean;
     ",
             $doctest_build_tree,
             "
 
-    let within = tree.within(&[1.0, 2.0, 5.0], 10f64, &squared_euclidean);
+    let within = tree.within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64);
 
     assert_eq!(within.len(), 2);
 ```"
@@ -70,7 +71,8 @@ let tree = unsafe { rkyv::archived_root::<KdTree<f64, u32, 3, 32, u32>>(&mmap) }
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::manhattan;
+    use crate::distance_metric::DistanceMetric;
+    use crate::float::distance::Manhattan;
     use crate::float::kdtree::{Axis, KdTree};
     use crate::nearest_neighbour::NearestNeighbour;
     use rand::Rng;
@@ -112,7 +114,7 @@ mod tests {
         let radius = 0.2;
         let expected = linear_search(&content_to_add, &query_point, radius);
 
-        let mut result: Vec<_> = tree.within(&query_point, radius, &manhattan);
+        let mut result: Vec<_> = tree.within::<Manhattan>(&query_point, radius);
         stabilize_sort(&mut result);
         assert_eq!(result, expected);
 
@@ -127,7 +129,7 @@ mod tests {
             let radius: f32 = 2.0;
             let expected = linear_search(&content_to_add, &query_point, radius);
 
-            let mut result: Vec<_> = tree.within(&query_point, radius, &manhattan);
+            let mut result: Vec<_> = tree.within::<Manhattan>(&query_point, radius);
             stabilize_sort(&mut result);
 
             assert_eq!(result, expected);
@@ -157,7 +159,7 @@ mod tests {
         for query_point in query_points {
             let expected = linear_search(&content_to_add, &query_point, RADIUS);
 
-            let mut result: Vec<_> = tree.within(&query_point, RADIUS, &manhattan);
+            let mut result: Vec<_> = tree.within::<Manhattan>(&query_point, RADIUS);
 
             // TODO: ensure that adjacent results with the same dist are sorted in order of item val
             //       to prevent occasional test failures due to the linear search returning items
@@ -184,7 +186,7 @@ mod tests {
         let mut matching_items = vec![];
 
         for &(p, item) in content {
-            let distance = manhattan(query_point, &p);
+            let distance = Manhattan::dist(query_point, &p);
             if distance < radius {
                 matching_items.push(NearestNeighbour { distance, item });
             }

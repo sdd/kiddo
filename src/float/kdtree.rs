@@ -16,20 +16,13 @@ use serde::{Deserialize, Serialize};
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
 /// on the float [`KdTree`]. This will be [`f64`] or [`f32`].
-pub trait Axis: Float + Default + Debug + Copy + Sync {
+pub trait Axis: Float + Default + Debug + Copy + Sync + std::ops::AddAssign {
     /// returns absolute diff between two values of a type implementing this trait
     fn saturating_dist(self, other: Self) -> Self;
-
-    /// used within query functions to update rd from old and new off
-    fn rd_update(self, old_off: Self, new_off: Self) -> Self;
 }
-impl<T: Float + Default + Debug + Copy + Sync> Axis for T {
+impl<T: Float + Default + Debug + Copy + Sync + std::ops::AddAssign> Axis for T {
     fn saturating_dist(self, other: Self) -> Self {
         (self - other).abs()
-    }
-
-    fn rd_update(self, old_off: Self, new_off: Self) -> Self {
-        self + new_off * new_off - old_off * old_off
     }
 }
 
