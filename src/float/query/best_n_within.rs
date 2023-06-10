@@ -25,7 +25,7 @@ Returns an iterator.
 ```rust
     use kiddo::float::kdtree::KdTree;
     use kiddo::best_neighbour::BestNeighbour;
-    use kiddo::distance::SquaredEuclidean;
+    use kiddo::float::distance::SquaredEuclidean;
 
     ",
                 $doctest_build_tree,
