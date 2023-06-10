@@ -19,13 +19,13 @@ use serde::{Deserialize, Serialize};
 /// by the type that is used as the first generic parameter, `A`,
 /// on [`FixedKdTree`](crate::fixed::kdtree::KdTree). A type from the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate will implement
 /// all of the traits required by Axis. For example [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html).
-pub trait Axis: Fixed + Default + Debug + Copy + Sync {
+pub trait Axis: Fixed + Default + Debug + Copy + Sync + Send {
     /// Returns the maximum value that the type implementing this trait can have
     fn max_value() -> Self;
     /// returns the zero value for this type
     fn zero() -> Self;
 }
-impl<T: Fixed + Default + Debug + Copy + Sync> Axis for T {
+impl<T: Fixed + Default + Debug + Copy + Sync + Send> Axis for T {
     fn max_value() -> Self {
         Self::MAX
     }
