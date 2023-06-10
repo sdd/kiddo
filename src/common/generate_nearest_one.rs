@@ -63,7 +63,7 @@ macro_rules! generate_nearest_one {
                         nearest = nearest_neighbour;
                     }
 
-                    rd += D::dist1(new_off, old_off);
+                    rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
 
                     if rd <= nearest.distance {
                         off[split_dim] = new_off;

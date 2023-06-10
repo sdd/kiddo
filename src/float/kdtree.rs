@@ -19,10 +19,18 @@ use serde::{Deserialize, Serialize};
 pub trait Axis: Float + Default + Debug + Copy + Sync + Send + std::ops::AddAssign {
     /// returns absolute diff between two values of a type implementing this trait
     fn saturating_dist(self, other: Self) -> Self;
+
+    /// used in query methods to update the rd value. Basically a saturating add for Fixed and an add for Float
+    fn rd_update(rd: Self, delta: Self) -> Self;
 }
 impl<T: Float + Default + Debug + Copy + Sync + Send + std::ops::AddAssign> Axis for T {
     fn saturating_dist(self, other: Self) -> Self {
         (self - other).abs()
+    }
+
+    #[inline]
+    fn rd_update(rd: Self, delta: Self) -> Self {
+        rd + delta
     }
 }
 
