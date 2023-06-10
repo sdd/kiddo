@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [3.0.0] - 2023-06-10
+
+### 🧪 Testing
+
+- Re-enable serde test
+
 ## [2.1.1] - 2023-06-07
 
 ### Refactor
