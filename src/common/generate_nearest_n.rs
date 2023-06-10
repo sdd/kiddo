@@ -61,7 +61,7 @@ macro_rules! generate_nearest_n {
                 rd,
             );
 
-            rd += D::dist1(new_off, old_off);
+            rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
 
             if Self::dist_belongs_in_heap(rd, results) {
                 off[split_dim] = new_off;
