@@ -7,9 +7,9 @@ use criterion::{
 use fixed::types::extra::{LeEqU16, Unsigned, U16};
 use fixed::FixedU16;
 use kiddo::batch_benches_parameterized;
-use kiddo::distance::squared_euclidean;
-use kiddo::fixed::distance::squared_euclidean as squared_euclidean_fixedpoint;
+use kiddo::fixed::distance::SquaredEuclidean as SquaredEuclideanFixed;
 use kiddo::fixed::kdtree::{Axis as AxisFixed, KdTree as KdTreeFixed};
+use kiddo::float::distance::SquaredEuclidean;
 use kiddo::float::kdtree::{Axis, KdTree};
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_fixed, build_populated_tree_and_query_points_float,
@@ -102,7 +102,7 @@ fn perform_query_float<
     usize: Cast<IDX>,
     f64: Cast<A>,
 {
-    let _res = kdtree.within(&point, radius.az::<A>(), &squared_euclidean);
+    let _res = kdtree.within::<SquaredEuclidean>(&point, radius.az::<A>());
 }
 
 fn perform_query_fixed<
@@ -120,11 +120,7 @@ fn perform_query_fixed<
     FixedU16<A>: AxisFixed,
     A: LeEqU16,
 {
-    let _res = kdtree.within(
-        &point,
-        FixedU16::<A>::from_num(radius),
-        &squared_euclidean_fixedpoint,
-    );
+    let _res = kdtree.within::<SquaredEuclideanFixed>(&point, FixedU16::<A>::from_num(radius));
 }
 
 fn bench_query_float<

@@ -1,9 +1,11 @@
-use crate::float::kdtree::{Axis, KdTree};
-use crate::nearest_neighbour::NearestNeighbour;
-use crate::types::{is_stem_index, Content, Index};
 use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
+
+use crate::distance_metric::DistanceMetric;
+use crate::float::kdtree::{Axis, KdTree};
+use crate::nearest_neighbour::NearestNeighbour;
+use crate::types::{is_stem_index, Content, Index};
 
 use crate::generate_nearest_n;
 
@@ -16,13 +18,13 @@ distance metric function.
 
 ```rust
     use kiddo::float::kdtree::KdTree;
-    use kiddo::distance::squared_euclidean;
+    use kiddo::distance::SquaredEuclidean;
 
     ",
             $doctest_build_tree,
             "
 
-    let nearest: Vec<_> = tree.nearest_n(&[1.0, 2.0, 5.1], 1, &squared_euclidean);
+    let nearest: Vec<_> = tree.nearest_n::<SquaredEuclidean>(&[1.0, 2.0, 5.1], 1);
 
     assert_eq!(nearest.len(), 1);
     assert!((nearest[0].distance - 0.01f64).abs() < f64::EPSILON);
@@ -68,7 +70,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::squared_euclidean;
+    use crate::distance_metric::DistanceMetric;
+    use crate::float::distance::SquaredEuclidean;
     use crate::float::kdtree::{Axis, KdTree};
     use rand::Rng;
 
@@ -108,7 +111,7 @@ mod tests {
         let expected = vec![(0.17569996, 6), (0.19139998, 5), (0.24420004, 7)];
 
         let result: Vec<_> = tree
-            .nearest_n(&query_point, 3, &squared_euclidean)
+            .nearest_n::<SquaredEuclidean>(&query_point, 3)
             .into_iter()
             .map(|n| (n.distance, n.item))
             .collect();
@@ -126,7 +129,7 @@ mod tests {
             let expected = linear_search(&content_to_add, qty, &query_point);
 
             let result: Vec<_> = tree
-                .nearest_n(&query_point, qty, &squared_euclidean)
+                .nearest_n::<SquaredEuclidean>(&query_point, qty)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -162,7 +165,7 @@ mod tests {
             let expected = linear_search(&content_to_add, N, &query_point);
 
             let result: Vec<_> = tree
-                .nearest_n(&query_point, N, &squared_euclidean)
+                .nearest_n::<SquaredEuclidean>(&query_point, N)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -182,7 +185,7 @@ mod tests {
         let mut results = vec![];
 
         for &(p, item) in content {
-            let dist = squared_euclidean(query_point, &p);
+            let dist = SquaredEuclidean::dist(query_point, &p);
             if results.len() < qty {
                 results.push((dist, item));
                 results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(&b_dist).unwrap());

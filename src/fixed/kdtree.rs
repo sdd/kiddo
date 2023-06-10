@@ -24,8 +24,6 @@ pub trait Axis: Fixed + Default + Debug + Copy + Sync {
     fn max_value() -> Self;
     /// returns the zero value for this type
     fn zero() -> Self;
-    /// used within query functions to update rd from old and new off
-    fn rd_update(self, old_off: Self, new_off: Self) -> Self;
 }
 impl<T: Fixed + Default + Debug + Copy + Sync> Axis for T {
     fn max_value() -> Self {
@@ -34,12 +32,6 @@ impl<T: Fixed + Default + Debug + Copy + Sync> Axis for T {
 
     fn zero() -> Self {
         Self::ZERO
-    }
-
-    fn rd_update(self, old_off: Self, new_off: Self) -> Self {
-        self.saturating_add(
-            (new_off.saturating_mul(new_off)).saturating_sub(old_off.saturating_mul(old_off)),
-        )
     }
 }
 

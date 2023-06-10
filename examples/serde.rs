@@ -18,7 +18,7 @@ use kiddo::float::kdtree::KdTree;
 use serde::Deserialize;
 
 use cities::{degrees_lat_lng_to_unit_sphere, parse_csv_file};
-use kiddo::float::distance::squared_euclidean;
+use kiddo::float::distance::SquaredEuclidean;
 
 /// Each `CityCsvRecord` corresponds to 1 row in our city source data CSV.
 ///
@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Test query on the newly created tree
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let nearest_neighbour = kdtree.nearest_one(&query, &squared_euclidean);
+    let nearest_neighbour = kdtree.nearest_one::<SquaredEuclidean>(&query);
     let nearest_city = &cities[nearest_neighbour.item as usize];
     println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest_city);
 
@@ -96,7 +96,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Test that the deserialization worked
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let nearest_neighbour = deserialized_tree.nearest_one(&query, &squared_euclidean);
+    let nearest_neighbour = deserialized_tree.nearest_one::<SquaredEuclidean>(&query);
     let nearest_city = &cities[nearest_neighbour.item as usize];
     println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest_city);
 

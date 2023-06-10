@@ -4,25 +4,23 @@ macro_rules! generate_best_n_within {
     doc_comment! {
     concat!$comments,
     #[inline]
-    pub fn best_n_within<F>(
+    pub fn best_n_within<D>(
         &self,
         query: &[A; K],
         dist: A,
         max_qty: usize,
-        distance_fn: &F,
     ) -> impl Iterator<Item = BestNeighbour<A, T>>
     where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>,
     {
         let mut off = [A::zero(); K];
         let mut best_items: BinaryHeap<BestNeighbour<A, T>> = BinaryHeap::new();
 
         unsafe {
-            self.best_n_within_recurse(
+            self.best_n_within_recurse::<D>(
                 query,
                 dist,
                 max_qty,
-                distance_fn,
                 self.root_index,
                 0,
                 &mut best_items,
@@ -35,19 +33,18 @@ macro_rules! generate_best_n_within {
     }
 
     #[allow(clippy::too_many_arguments)]
-    unsafe fn best_n_within_recurse<F>(
+    unsafe fn best_n_within_recurse<D>(
         &self,
         query: &[A; K],
         radius: A,
         max_qty: usize,
-        distance_fn: &F,
         curr_node_idx: IDX,
         split_dim: usize,
         best_items: &mut BinaryHeap<BestNeighbour<A, T>>,
         off: &mut [A; K],
         rd: A,
     ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>,
     {
         if is_stem_index(curr_node_idx) {
             let node = self.stems.get_unchecked(curr_node_idx.az::<usize>());
@@ -64,11 +61,10 @@ macro_rules! generate_best_n_within {
                 };
             let next_split_dim = (split_dim + 1).rem(K);
 
-            self.best_n_within_recurse(
+            self.best_n_within_recurse::<D>(
                 query,
                 radius,
                 max_qty,
-                distance_fn,
                 closer_node_idx,
                 next_split_dim,
                 best_items,
@@ -76,17 +72,14 @@ macro_rules! generate_best_n_within {
                 rd,
             );
 
-            // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-            //       so that updating rd is not hardcoded to sq euclidean
-            rd = rd.rd_update(old_off, new_off);
+            rd += D::dist1(new_off, old_off);
 
             if rd <= radius {
                 off[split_dim] = new_off;
-                self.best_n_within_recurse(
+                self.best_n_within_recurse::<D>(
                     query,
                     radius,
                     max_qty,
-                    distance_fn,
                     further_node_idx,
                     next_split_dim,
                     best_items,
@@ -100,25 +93,25 @@ macro_rules! generate_best_n_within {
                 .leaves
                 .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
 
-            Self::process_leaf_node(query, radius, max_qty, distance_fn, best_items, leaf_node);
+            Self::process_leaf_node::<D>(query, radius, max_qty, best_items, leaf_node);
         }
     }
 
-    unsafe fn process_leaf_node<F>(
+    #[inline]
+    unsafe fn process_leaf_node<D>(
         query: &[A; K],
         radius: A,
         max_qty: usize,
-        distance_fn: &F,
         best_items: &mut BinaryHeap<BestNeighbour<A, T>>,
         leaf_node: &$leafnode<A, T, K, B, IDX>,
     ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>,
     {
         leaf_node
             .content_points
             .iter()
             .take(leaf_node.size.az::<usize>())
-            .map(|entry| distance_fn(query, entry))
+            .map(|entry| D::dist(query, entry))
             .enumerate()
             .filter(|(_, distance)| *distance <= radius)
             .for_each(|(idx, distance)| {
@@ -126,6 +119,7 @@ macro_rules! generate_best_n_within {
             });
     }
 
+    #[inline]
     unsafe fn get_item_and_add_if_good(
         max_qty: usize,
         best_items: &mut BinaryHeap<BestNeighbour<A, T>>,
