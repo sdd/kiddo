@@ -4,16 +4,15 @@ macro_rules! generate_nearest_one {
         doc_comment! {
             concat!$comments,
             #[inline]
-            pub fn nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> NearestNeighbour<A, T>
+            pub fn nearest_one<D>(&self, query: &[A; K]) -> NearestNeighbour<A, T>
                 where
-                    F: Fn(&[A; K], &[A; K]) -> A,
+                    D: DistanceMetric<A, K>,
             {
                 let mut off = [A::zero(); K];
 
                 unsafe {
-                    self.nearest_one_recurse(
+                    self.nearest_one_recurse::<D>(
                         query,
-                        distance_fn,
                         self.root_index,
                         0,
                         NearestNeighbour { distance: A::max_value(), item: T::zero() },
@@ -24,10 +23,9 @@ macro_rules! generate_nearest_one {
             }
 
             #[allow(clippy::too_many_arguments)]
-            unsafe fn nearest_one_recurse<F>(
+            unsafe fn nearest_one_recurse<D>(
                 &self,
                 query: &[A; K],
-                distance_fn: &F,
                 curr_node_idx: IDX,
                 split_dim: usize,
                 mut nearest: NearestNeighbour<A, T>,
@@ -35,7 +33,7 @@ macro_rules! generate_nearest_one {
                 rd: A,
             ) -> NearestNeighbour<A, T>
                 where
-                    F: Fn(&[A; K], &[A; K]) -> A,
+                    D: DistanceMetric<A, K>,
             {
                 if is_stem_index(curr_node_idx) {
                     let node = &self.stems.get_unchecked(curr_node_idx.az::<usize>());
@@ -52,9 +50,8 @@ macro_rules! generate_nearest_one {
                         };
                     let next_split_dim = (split_dim + 1).rem(K);
 
-                    let nearest_neighbour = self.nearest_one_recurse(
+                    let nearest_neighbour = self.nearest_one_recurse::<D>(
                         query,
-                        distance_fn,
                         closer_node_idx,
                         next_split_dim,
                         nearest,
@@ -66,14 +63,12 @@ macro_rules! generate_nearest_one {
                         nearest = nearest_neighbour;
                     }
 
-                    // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-                    //       so that updating rd is not hardcoded to sq euclidean
-                    rd = rd.rd_update(old_off, new_off);
+                    rd += D::dist1(new_off, old_off);
+
                     if rd <= nearest.distance {
                         off[split_dim] = new_off;
-                        let result = self.nearest_one_recurse(
+                        let result = self.nearest_one_recurse::<D>(
                             query,
-                            distance_fn,
                             further_node_idx,
                             next_split_dim,
                             nearest,
@@ -91,9 +86,8 @@ macro_rules! generate_nearest_one {
                         .leaves
                         .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
 
-                    Self::search_content_for_nearest(
+                    Self::search_content_for_nearest::<D>(
                         query,
-                        distance_fn,
                         &mut nearest,
                         leaf_node,
                     );
@@ -103,13 +97,12 @@ macro_rules! generate_nearest_one {
             }
 
             #[inline]
-            fn search_content_for_nearest<F>(
+            fn search_content_for_nearest<D>(
                 query: &[A; K],
-                distance_fn: &F,
                 nearest: &mut NearestNeighbour<A, T>,
                 leaf_node: &$leafnode<A, T, K, B, IDX>,
             ) where
-                F: Fn(&[A; K], &[A; K]) -> A,
+                D: DistanceMetric<A, K>,
             {
                 leaf_node
                     .content_points
@@ -117,7 +110,7 @@ macro_rules! generate_nearest_one {
                     .enumerate()
                     .take(leaf_node.size.az::<usize>())
                     .for_each(|(idx, entry)| {
-                        let dist = distance_fn(query, entry);
+                        let dist = D::dist(query, entry);
                         if dist < nearest.distance {
                             nearest.distance = dist;
                             nearest.item = unsafe { *leaf_node.content_items.get_unchecked(idx) };

@@ -11,7 +11,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::time::Instant;
 
-use kiddo::{float::distance::squared_euclidean, float::kdtree::KdTree};
+use kiddo::{float::distance::SquaredEuclidean, float::kdtree::KdTree};
 
 use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
 use rkyv::ser::Serializer;
@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Test query on the newly created tree
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let nearest_neighbour = kdtree.nearest_one(&query, &squared_euclidean);
+    let nearest_neighbour = kdtree.nearest_one::<SquaredEuclidean>(&query);
     let nearest_city = &cities[nearest_neighbour.item as usize];
     println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest_city);
 
@@ -97,7 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let nearest_neighbour = mm_zc_deserialized_tree.nearest_one(&query, &squared_euclidean);
+    let nearest_neighbour = mm_zc_deserialized_tree.nearest_one::<SquaredEuclidean>(&query);
     let nearest_city = &cities[nearest_neighbour.item as usize];
     println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest_city);
     println!(
@@ -116,7 +116,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let nearest_neighbour = zc_deserialized_tree.nearest_one(&query, &squared_euclidean);
+    let nearest_neighbour = zc_deserialized_tree.nearest_one::<SquaredEuclidean>(&query);
     let nearest_city = &cities[nearest_neighbour.item as usize];
     println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest_city);
     println!(
@@ -135,7 +135,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let nearest_neighbour = mm_deserialized_tree.nearest_one(&query, &squared_euclidean);
+    let nearest_neighbour = mm_deserialized_tree.nearest_one::<SquaredEuclidean>(&query);
     let nearest_city = &cities[nearest_neighbour.item as usize];
     println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest_city);
     println!(
@@ -156,7 +156,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let nearest_neighbour = deserialized_tree.nearest_one(&query, &squared_euclidean);
+    let nearest_neighbour = deserialized_tree.nearest_one::<SquaredEuclidean>(&query);
     let nearest_city = &cities[nearest_neighbour.item as usize];
     println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest_city);
     println!(
