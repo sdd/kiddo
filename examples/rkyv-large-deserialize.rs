@@ -32,9 +32,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // perform a query
     let query = [0.123f32, 0.456f32, 0.789f32];
-    let (_, nearest_idx) = tree.nearest_one(&query, &squared_euclidean);
+    let nearest_neighbour = tree.nearest_one(&query, &squared_euclidean);
 
-    println!("Nearest item to query: {:?}", nearest_idx);
+    println!("Nearest item to query: {:?}", nearest_neighbour.item);
     println!(
         "total elapsed: {}\n\n",
         ElapsedDuration::new(start.elapsed())
