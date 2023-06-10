@@ -1,6 +1,7 @@
 use az::{Az, Cast};
 use std::ops::Rem;
 
+use crate::distance_metric::DistanceMetric;
 use crate::fixed::kdtree::{Axis, KdTree, LeafNode};
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::{is_stem_index, Content, Index};
@@ -26,7 +27,7 @@ to not needing to allocate memory or maintain sorted results.
     use fixed::FixedU16;
     use fixed::types::extra::U0;
     use kiddo::fixed::kdtree::KdTree;
-    use kiddo::fixed::distance::squared_euclidean;
+    use kiddo::fixed::distance::SquaredEuclidean;
 
     type FXD = FixedU16<U0>;
 
@@ -35,7 +36,7 @@ to not needing to allocate memory or maintain sorted results.
     tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
     tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
 
-    let nearest = tree.nearest_one(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], &squared_euclidean);
+    let nearest = tree.nearest_one::<SquaredEuclidean>(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)]);
 
     assert_eq!(nearest.distance, FXD::from_num(0));
     assert_eq!(nearest.item, 100);
@@ -45,7 +46,8 @@ to not needing to allocate memory or maintain sorted results.
 
 #[cfg(test)]
 mod tests {
-    use crate::fixed::distance::manhattan;
+    use crate::distance_metric::DistanceMetric;
+    use crate::fixed::distance::Manhattan;
     use crate::fixed::kdtree::{Axis, KdTree};
     use crate::nearest_neighbour::NearestNeighbour;
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
@@ -94,7 +96,7 @@ mod tests {
             item: 7,
         };
 
-        let result = tree.nearest_one(&query_point, &manhattan);
+        let result = tree.nearest_one::<Manhattan>(&query_point);
         assert_eq!(result, expected);
 
         let mut rng = rand::thread_rng();
@@ -107,7 +109,7 @@ mod tests {
             ];
             let expected = linear_search(&content_to_add, &query_point);
 
-            let result = tree.nearest_one(&query_point, &manhattan);
+            let result = tree.nearest_one::<Manhattan>(&query_point);
 
             assert_eq!(result.distance, expected.distance);
         }
@@ -135,7 +137,7 @@ mod tests {
         for query_point in query_points {
             let expected = linear_search(&content_to_add, &query_point);
 
-            let result = tree.nearest_one(&query_point, &manhattan);
+            let result = tree.nearest_one::<Manhattan>(&query_point);
 
             assert_eq!(result.distance, expected.distance);
         }
@@ -149,7 +151,7 @@ mod tests {
         let mut best_item: u32 = u32::MAX;
 
         for &(p, item) in content {
-            let dist = manhattan(query_point, &p);
+            let dist = Manhattan::dist(query_point, &p);
             if dist < best_dist {
                 best_item = item;
                 best_dist = dist;

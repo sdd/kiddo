@@ -2,6 +2,7 @@ use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
+use crate::distance_metric::DistanceMetric;
 use crate::fixed::kdtree::{Axis, KdTree};
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::{is_stem_index, Content, Index};
@@ -23,7 +24,7 @@ distance metric function.
     use fixed::FixedU16;
     use fixed::types::extra::U0;
     use kiddo::fixed::kdtree::KdTree;
-    use kiddo::fixed::distance::squared_euclidean;
+    use kiddo::fixed::distance::SquaredEuclidean;
 
     type FXD = FixedU16<U0>;
 
@@ -32,7 +33,7 @@ distance metric function.
     tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
     tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
 
-    let nearest: Vec<_> = tree.nearest_n(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 1, &squared_euclidean);
+    let nearest: Vec<_> = tree.nearest_n::<SquaredEuclidean>(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 1);
 
     assert_eq!(nearest.len(), 1);
     assert_eq!(nearest[0].distance, FXD::from_num(0));
@@ -43,7 +44,8 @@ distance metric function.
 
 #[cfg(test)]
 mod tests {
-    use crate::fixed::distance::manhattan;
+    use crate::distance_metric::DistanceMetric;
+    use crate::fixed::distance::Manhattan;
     use crate::fixed::kdtree::{Axis, KdTree};
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
     use fixed::types::extra::U14;
@@ -90,7 +92,7 @@ mod tests {
         let expected = vec![(n(0.86), 7), (n(0.86), 4), (n(0.86), 5)];
 
         let result: Vec<_> = tree
-            .nearest_n(&query_point, 3, &manhattan)
+            .nearest_n::<Manhattan>(&query_point, 3)
             .into_iter()
             .map(|n| (n.distance, n.item))
             .collect();
@@ -108,7 +110,7 @@ mod tests {
             let expected = linear_search(&content_to_add, qty, &query_point);
 
             let result: Vec<_> = tree
-                .nearest_n(&query_point, qty, &manhattan)
+                .nearest_n::<Manhattan>(&query_point, qty)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -144,7 +146,7 @@ mod tests {
             let expected = linear_search(&content_to_add, N, &query_point);
 
             let result: Vec<_> = tree
-                .nearest_n(&query_point, N, &manhattan)
+                .nearest_n::<Manhattan>(&query_point, N)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -164,7 +166,7 @@ mod tests {
         let mut results = vec![];
 
         for &(p, item) in content {
-            let dist = manhattan(query_point, &p);
+            let dist = Manhattan::dist(query_point, &p);
             if results.len() < qty {
                 results.push((dist, item));
                 results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(b_dist).unwrap());

@@ -4,17 +4,16 @@ macro_rules! generate_nearest_n {
     doc_comment! {
     concat!$comments,
     #[inline]
-    pub fn nearest_n<F>(&self, query: &[A; K], qty: usize, distance_fn: &F) -> Vec<NearestNeighbour<A, T>>
+    pub fn nearest_n<D>(&self, query: &[A; K], qty: usize) -> Vec<NearestNeighbour<A, T>>
     where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>,
     {
         let mut off = [A::zero(); K];
         let mut result: BinaryHeap<NearestNeighbour<A, T>> = BinaryHeap::with_capacity(qty);
 
         unsafe {
-            self.nearest_n_recurse(
+            self.nearest_n_recurse::<D>(
                 query,
-                distance_fn,
                 self.root_index,
                 0,
                 &mut result,
@@ -27,17 +26,16 @@ macro_rules! generate_nearest_n {
     }
 
     #[allow(clippy::too_many_arguments)]
-    unsafe fn nearest_n_recurse<F>(
+    unsafe fn nearest_n_recurse<D>(
         &self,
         query: &[A; K],
-        distance_fn: &F,
         curr_node_idx: IDX,
         split_dim: usize,
         results: &mut BinaryHeap<NearestNeighbour<A, T>>,
         off: &mut [A; K],
         rd: A,
     ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>,
     {
         if is_stem_index(curr_node_idx) {
             let node = &self.stems.get_unchecked(curr_node_idx.az::<usize>());
@@ -54,9 +52,8 @@ macro_rules! generate_nearest_n {
                 };
             let next_split_dim = (split_dim + 1).rem(K);
 
-            self.nearest_n_recurse(
+            self.nearest_n_recurse::<D>(
                 query,
-                distance_fn,
                 closer_node_idx,
                 next_split_dim,
                 results,
@@ -64,14 +61,12 @@ macro_rules! generate_nearest_n {
                 rd,
             );
 
-            // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-            //       so that updating rd is not hardcoded to sq euclidean
-            rd = rd.rd_update(old_off, new_off);
+            rd += D::dist1(new_off, old_off);
+
             if Self::dist_belongs_in_heap(rd, results) {
                 off[split_dim] = new_off;
-                self.nearest_n_recurse(
+                self.nearest_n_recurse::<D>(
                     query,
-                    distance_fn,
                     further_node_idx,
                     next_split_dim,
                     results,
@@ -91,7 +86,7 @@ macro_rules! generate_nearest_n {
                 .take(leaf_node.size.az::<usize>())
                 .enumerate()
                 .for_each(|(idx, entry)| {
-                    let distance: A = distance_fn(query, entry);
+                    let distance: A = D::dist(query, entry);
                     if Self::dist_belongs_in_heap(distance, results) {
                         let item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
                         let element = NearestNeighbour { distance, item };
@@ -108,6 +103,7 @@ macro_rules! generate_nearest_n {
         }
     }
 
+    #[inline]
     fn dist_belongs_in_heap(dist: A, heap: &BinaryHeap<NearestNeighbour<A, T>>) -> bool {
         heap.is_empty() || dist < heap.peek().unwrap().distance || heap.len() < heap.capacity()
     }
