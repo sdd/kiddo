@@ -4,12 +4,12 @@ macro_rules! generate_nearest_n {
     doc_comment! {
     concat!$comments,
     #[inline]
-    pub fn nearest_n<F>(&self, query: &[A; K], qty: usize, distance_fn: &F) -> Vec<Neighbour<A, T>>
+    pub fn nearest_n<F>(&self, query: &[A; K], qty: usize, distance_fn: &F) -> Vec<NearestNeighbour<A, T>>
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
         let mut off = [A::zero(); K];
-        let mut result: BinaryHeap<Neighbour<A, T>> = BinaryHeap::with_capacity(qty);
+        let mut result: BinaryHeap<NearestNeighbour<A, T>> = BinaryHeap::with_capacity(qty);
 
         unsafe {
             self.nearest_n_recurse(
@@ -33,7 +33,7 @@ macro_rules! generate_nearest_n {
         distance_fn: &F,
         curr_node_idx: IDX,
         split_dim: usize,
-        results: &mut BinaryHeap<Neighbour<A, T>>,
+        results: &mut BinaryHeap<NearestNeighbour<A, T>>,
         off: &mut [A; K],
         rd: A,
     ) where
@@ -94,7 +94,7 @@ macro_rules! generate_nearest_n {
                     let distance: A = distance_fn(query, entry);
                     if Self::dist_belongs_in_heap(distance, results) {
                         let item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
-                        let element = Neighbour { distance, item };
+                        let element = NearestNeighbour { distance, item };
                         if results.len() < results.capacity() {
                             results.push(element)
                         } else {
@@ -108,7 +108,7 @@ macro_rules! generate_nearest_n {
         }
     }
 
-    fn dist_belongs_in_heap(dist: A, heap: &BinaryHeap<Neighbour<A, T>>) -> bool {
+    fn dist_belongs_in_heap(dist: A, heap: &BinaryHeap<NearestNeighbour<A, T>>) -> bool {
         heap.is_empty() || dist < heap.peek().unwrap().distance || heap.len() < heap.capacity()
     }
 }}}

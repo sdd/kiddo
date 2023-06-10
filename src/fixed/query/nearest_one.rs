@@ -2,6 +2,7 @@ use az::{Az, Cast};
 use std::ops::Rem;
 
 use crate::fixed::kdtree::{Axis, KdTree, LeafNode};
+use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::{is_stem_index, Content, Index};
 
 use crate::generate_nearest_one;
@@ -36,8 +37,8 @@ to not needing to allocate memory or maintain sorted results.
 
     let nearest = tree.nearest_one(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], &squared_euclidean);
 
-    assert_eq!(nearest.0, FXD::from_num(0));
-    assert_eq!(nearest.1, 100);
+    assert_eq!(nearest.distance, FXD::from_num(0));
+    assert_eq!(nearest.item, 100);
 ```"#)
     );
 }
@@ -46,6 +47,7 @@ to not needing to allocate memory or maintain sorted results.
 mod tests {
     use crate::fixed::distance::manhattan;
     use crate::fixed::kdtree::{Axis, KdTree};
+    use crate::nearest_neighbour::NearestNeighbour;
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
     use fixed::types::extra::U14;
     use fixed::FixedU16;
@@ -87,7 +89,10 @@ mod tests {
         assert_eq!(tree.size(), 16);
 
         let query_point = [n(0.78f32), n(0.55f32), n(0.78f32), n(0.55f32)];
-        let expected = (n(0.86), 7);
+        let expected = NearestNeighbour {
+            distance: n(0.86),
+            item: 7,
+        };
 
         let result = tree.nearest_one(&query_point, &manhattan);
         assert_eq!(result, expected);
@@ -104,7 +109,7 @@ mod tests {
 
             let result = tree.nearest_one(&query_point, &manhattan);
 
-            assert_eq!(result.0, expected.0);
+            assert_eq!(result.distance, expected.distance);
         }
     }
 
@@ -132,14 +137,14 @@ mod tests {
 
             let result = tree.nearest_one(&query_point, &manhattan);
 
-            assert_eq!(result.0, expected.0);
+            assert_eq!(result.distance, expected.distance);
         }
     }
 
     fn linear_search<A: Axis, const K: usize>(
         content: &[([A; K], u32)],
         query_point: &[A; K],
-    ) -> (A, u32) {
+    ) -> NearestNeighbour<A, u32> {
         let mut best_dist: A = A::max_value();
         let mut best_item: u32 = u32::MAX;
 
@@ -151,6 +156,9 @@ mod tests {
             }
         }
 
-        (best_dist, best_item)
+        NearestNeighbour {
+            distance: best_dist,
+            item: best_item,
+        }
     }
 }

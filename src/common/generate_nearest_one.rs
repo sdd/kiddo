@@ -4,7 +4,7 @@ macro_rules! generate_nearest_one {
         doc_comment! {
             concat!$comments,
             #[inline]
-            pub fn nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> (A, T)
+            pub fn nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> NearestNeighbour<A, T>
                 where
                     F: Fn(&[A; K], &[A; K]) -> A,
             {
@@ -16,8 +16,7 @@ macro_rules! generate_nearest_one {
                         distance_fn,
                         self.root_index,
                         0,
-                        T::zero(),
-                        A::max_value(),
+                        NearestNeighbour { distance: A::max_value(), item: T::zero() },
                         &mut off,
                         A::zero(),
                     )
@@ -31,11 +30,10 @@ macro_rules! generate_nearest_one {
                 distance_fn: &F,
                 curr_node_idx: IDX,
                 split_dim: usize,
-                mut best_item: T,
-                mut best_dist: A,
+                mut nearest: NearestNeighbour<A, T>,
                 off: &mut [A; K],
                 rd: A,
-            ) -> (A, T)
+            ) -> NearestNeighbour<A, T>
                 where
                     F: Fn(&[A; K], &[A; K]) -> A,
             {
@@ -54,42 +52,38 @@ macro_rules! generate_nearest_one {
                         };
                     let next_split_dim = (split_dim + 1).rem(K);
 
-                    let (dist, item) = self.nearest_one_recurse(
+                    let nearest_neighbour = self.nearest_one_recurse(
                         query,
                         distance_fn,
                         closer_node_idx,
                         next_split_dim,
-                        best_item,
-                        best_dist,
+                        nearest,
                         off,
                         rd,
                     );
 
-                    if dist < best_dist {
-                        best_dist = dist;
-                        best_item = item;
+                    if nearest_neighbour < nearest {
+                        nearest = nearest_neighbour;
                     }
 
                     // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
                     //       so that updating rd is not hardcoded to sq euclidean
                     rd = rd.rd_update(old_off, new_off);
-                    if rd <= best_dist {
+                    if rd <= nearest.distance {
                         off[split_dim] = new_off;
-                        let (dist, item) = self.nearest_one_recurse(
+                        let result = self.nearest_one_recurse(
                             query,
                             distance_fn,
                             further_node_idx,
                             next_split_dim,
-                            best_item,
-                            best_dist,
+                            nearest,
                             off,
                             rd,
                         );
                         off[split_dim] = old_off;
 
-                        if dist < best_dist {
-                            best_dist = dist;
-                            best_item = item;
+                        if result < nearest {
+                            nearest = result;
                         }
                     }
                 } else {
@@ -97,24 +91,22 @@ macro_rules! generate_nearest_one {
                         .leaves
                         .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
 
-                    Self::search_content_for_best(
+                    Self::search_content_for_nearest(
                         query,
                         distance_fn,
-                        &mut best_item,
-                        &mut best_dist,
+                        &mut nearest,
                         leaf_node,
                     );
                 }
 
-                (best_dist, best_item)
+                nearest
             }
 
             #[inline]
-            fn search_content_for_best<F>(
+            fn search_content_for_nearest<F>(
                 query: &[A; K],
                 distance_fn: &F,
-                best_item: &mut T,
-                best_dist: &mut A,
+                nearest: &mut NearestNeighbour<A, T>,
                 leaf_node: &$leafnode<A, T, K, B, IDX>,
             ) where
                 F: Fn(&[A; K], &[A; K]) -> A,
@@ -126,9 +118,9 @@ macro_rules! generate_nearest_one {
                     .take(leaf_node.size.az::<usize>())
                     .for_each(|(idx, entry)| {
                         let dist = distance_fn(query, entry);
-                        if dist < *best_dist {
-                            *best_dist = dist;
-                            *best_item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
+                        if dist < nearest.distance {
+                            nearest.distance = dist;
+                            nearest.item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
                         }
                     });
             }

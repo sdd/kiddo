@@ -3,7 +3,7 @@ use std::collections::BinaryHeap;
 use std::ops::Rem;
 
 use crate::fixed::kdtree::{Axis, KdTree};
-use crate::fixed::neighbour::Neighbour;
+use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::{is_stem_index, Content, Index};
 
 use crate::generate_within;

@@ -2,10 +2,8 @@ use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
-use crate::float::{
-    kdtree::{Axis, KdTree},
-    neighbour::Neighbour,
-};
+use crate::float::kdtree::{Axis, KdTree};
+use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::{is_stem_index, Content, Index};
 
 use crate::generate_within;
@@ -74,6 +72,7 @@ let tree = unsafe { rkyv::archived_root::<KdTree<f64, u32, 3, 32, u32>>(&mmap) }
 mod tests {
     use crate::float::distance::manhattan;
     use crate::float::kdtree::{Axis, KdTree};
+    use crate::nearest_neighbour::NearestNeighbour;
     use rand::Rng;
     use std::cmp::Ordering;
 
@@ -113,11 +112,7 @@ mod tests {
         let radius = 0.2;
         let expected = linear_search(&content_to_add, &query_point, radius);
 
-        let mut result: Vec<_> = tree
-            .within(&query_point, radius, &manhattan)
-            .into_iter()
-            .map(|n| (n.distance, n.item))
-            .collect();
+        let mut result: Vec<_> = tree.within(&query_point, radius, &manhattan);
         stabilize_sort(&mut result);
         assert_eq!(result, expected);
 
@@ -132,11 +127,7 @@ mod tests {
             let radius: f32 = 2.0;
             let expected = linear_search(&content_to_add, &query_point, radius);
 
-            let mut result: Vec<_> = tree
-                .within(&query_point, radius, &manhattan)
-                .into_iter()
-                .map(|n| (n.distance, n.item))
-                .collect();
+            let mut result: Vec<_> = tree.within(&query_point, radius, &manhattan);
             stabilize_sort(&mut result);
 
             assert_eq!(result, expected);
@@ -166,15 +157,21 @@ mod tests {
         for query_point in query_points {
             let expected = linear_search(&content_to_add, &query_point, RADIUS);
 
-            let result: Vec<_> = tree
-                .within(&query_point, RADIUS, &manhattan)
-                .into_iter()
-                .map(|n| (n.distance, n.item))
-                .collect();
+            let mut result: Vec<_> = tree.within(&query_point, RADIUS, &manhattan);
 
             // TODO: ensure that adjacent results with the same dist are sorted in order of item val
             //       to prevent occasional test failures due to the linear search returning items
             //       with the same dist in a different order to the query
+            stabilize_sort(&mut result);
+
+            // let slice = &mut result[..];
+            // let slice_of_cells: &[Cell<NearestNeighbour<f32, u32>>] = Cell::from_mut(slice).as_slice_of_cells();
+            // for w in slice_of_cells.windows(2) {
+            //     if w[0].get().distance == w[1].get().distance && w[0].get().item > w[1].get().item {
+            //         Cell::swap(&w[0], &w[1]);
+            //     }
+            //
+            // }
             assert_eq!(result, expected);
         }
     }
@@ -183,26 +180,35 @@ mod tests {
         content: &[([A; K], u32)],
         query_point: &[A; K],
         radius: A,
-    ) -> Vec<(A, u32)> {
+    ) -> Vec<NearestNeighbour<A, u32>> {
         let mut matching_items = vec![];
 
         for &(p, item) in content {
-            let dist = manhattan(query_point, &p);
-            if dist < radius {
-                matching_items.push((dist, item));
+            let distance = manhattan(query_point, &p);
+            if distance < radius {
+                matching_items.push(NearestNeighbour { distance, item });
             }
         }
 
         stabilize_sort(&mut matching_items);
 
+        // let slice = &mut matching_items[..];
+        // let slice_of_cells: &[Cell<NearestNeighbour<A, u32>>] = Cell::from_mut(slice).as_slice_of_cells();
+        //
+        // for w in slice_of_cells.windows(2) {
+        //     if w[0].get().distance == w[1].get().distance && w[0].get().item > w[1].get().item {
+        //         Cell::swap(&w[0], &w[1]);
+        //     }
+        // }
+
         matching_items
     }
 
-    fn stabilize_sort<A: Axis>(matching_items: &mut Vec<(A, u32)>) {
+    fn stabilize_sort<A: Axis>(matching_items: &mut Vec<NearestNeighbour<A, u32>>) {
         matching_items.sort_unstable_by(|a, b| {
-            let dist_cmp = a.0.partial_cmp(&b.0).unwrap();
+            let dist_cmp = a.distance.partial_cmp(&b.distance).unwrap();
             if dist_cmp == Ordering::Equal {
-                a.1.cmp(&b.1)
+                a.item.cmp(&b.item)
             } else {
                 dist_cmp
             }

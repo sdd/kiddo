@@ -10,12 +10,12 @@ macro_rules! generate_best_n_within {
         dist: A,
         max_qty: usize,
         distance_fn: &F,
-    ) -> impl Iterator<Item = T>
+    ) -> impl Iterator<Item = BestNeighbour<A, T>>
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
         let mut off = [A::zero(); K];
-        let mut best_items: BinaryHeap<T> = BinaryHeap::new();
+        let mut best_items: BinaryHeap<BestNeighbour<A, T>> = BinaryHeap::new();
 
         unsafe {
             self.best_n_within_recurse(
@@ -43,7 +43,7 @@ macro_rules! generate_best_n_within {
         distance_fn: &F,
         curr_node_idx: IDX,
         split_dim: usize,
-        best_items: &mut BinaryHeap<T>,
+        best_items: &mut BinaryHeap<BestNeighbour<A, T>>,
         off: &mut [A; K],
         rd: A,
     ) where
@@ -109,7 +109,7 @@ macro_rules! generate_best_n_within {
         radius: A,
         max_qty: usize,
         distance_fn: &F,
-        best_items: &mut BinaryHeap<T>,
+        best_items: &mut BinaryHeap<BestNeighbour<A, T>>,
         leaf_node: &$leafnode<A, T, K, B, IDX>,
     ) where
         F: Fn(&[A; K], &[A; K]) -> A,
@@ -121,24 +121,26 @@ macro_rules! generate_best_n_within {
             .map(|entry| distance_fn(query, entry))
             .enumerate()
             .filter(|(_, distance)| *distance <= radius)
-            .for_each(|(idx, _)| {
-                Self::get_item_and_add_if_good(max_qty, best_items, leaf_node, idx)
+            .for_each(|(idx, distance)| {
+                Self::get_item_and_add_if_good(max_qty, best_items, leaf_node, idx, distance)
             });
     }
 
     unsafe fn get_item_and_add_if_good(
         max_qty: usize,
-        best_items: &mut BinaryHeap<T>,
+        best_items: &mut BinaryHeap<BestNeighbour<A, T>>,
         leaf_node: &$leafnode<A, T, K, B, IDX>,
         idx: usize,
+        distance: A,
     ) {
         let item = *leaf_node.content_items.get_unchecked(idx.az::<usize>());
         if best_items.len() < max_qty {
-            best_items.push(item);
+            best_items.push(BestNeighbour{ distance, item });
         } else {
             let mut top = best_items.peek_mut().unwrap();
-            if item < *top {
-                *top = item;
+            if item < top.item {
+                top.item = item;
+                top.distance = distance;
             }
         }
     }
