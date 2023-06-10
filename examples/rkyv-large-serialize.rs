@@ -39,8 +39,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Test query on the newly created tree
     let query = [0.123f32, 0.456f32, 0.789f32];
-    let (_, nearest_idx) = kdtree.nearest_one(&query, &squared_euclidean);
-    println!("\nNearest item: {:?}", nearest_idx);
+    let nearest_neighbour = kdtree.nearest_one(&query, &squared_euclidean);
+    println!("Nearest item to query: {:?}", nearest_neighbour.item);
 
     let start = Instant::now();
 

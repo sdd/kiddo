@@ -128,12 +128,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     // now we perform the actual nearest neighbour query. We need to specify a
     // distance metric: we use `squared_euclidean` in this case, which is a good
     // default. See the `distance` module docs for a discussion o distance metrics.
-    let (_, nearest_idx) = kdtree.nearest_one(&query, &squared_euclidean);
+    let nearest_neighbour = kdtree.nearest_one(&query, &squared_euclidean);
 
     // since the result of the query is an index, we need to use this index
     // on the `cities` `Vec` in order to retrieve the original record.
-    let nearest = &cities[nearest_idx as usize];
-    println!("\nNearest city to 52.5N, 1.9W: {}", nearest);
+    let nearest = &cities[nearest_neighbour.item as usize];
+    println!(
+        "\nNearest city to 52.5N, 1.9W: {} ({:.1})km",
+        nearest, nearest_neighbour.distance
+    );
 
     // ### Find the nearest five cities to 52.5N, 1.9W
     // Let's try something similar, but a K-nearest-neighbour (KNN) query instead.
@@ -188,7 +191,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let dist = kilometres_to_unit_sphere_squared_euclidean(1000.0);
     let best_3_iter = kdtree.best_n_within(&query, dist, 3, &squared_euclidean);
     let best_3 = best_3_iter
-        .map(|idx| (&cities[idx as usize].name))
+        .map(|neighbour| (&cities[neighbour.item as usize].name))
         .collect::<Vec<_>>();
     println!(
         "\nMost populous 3 cities within 1000km of 0N, 0W: {:?}",

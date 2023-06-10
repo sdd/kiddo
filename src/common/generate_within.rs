@@ -4,12 +4,12 @@ macro_rules! generate_within {
     doc_comment! {
     concat!$comments,
     #[inline]
-    pub fn within<F>(&self, query: &[A; K], dist: A, distance_fn: &F) -> Vec<Neighbour<A, T>>
+    pub fn within<F>(&self, query: &[A; K], dist: A, distance_fn: &F) -> Vec<NearestNeighbour<A, T>>
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
         let mut off = [A::zero(); K];
-        let mut matching_items: BinaryHeap<Neighbour<A, T>> = BinaryHeap::new();
+        let mut matching_items: BinaryHeap<NearestNeighbour<A, T>> = BinaryHeap::new();
 
         unsafe {
             self.within_recurse(
@@ -35,7 +35,7 @@ macro_rules! generate_within {
         distance_fn: &F,
         curr_node_idx: IDX,
         split_dim: usize,
-        matching_items: &mut BinaryHeap<Neighbour<A, T>>,
+        matching_items: &mut BinaryHeap<NearestNeighbour<A, T>>,
         off: &mut [A; K],
         rd: A,
     ) where
@@ -99,7 +99,7 @@ macro_rules! generate_within {
                     let distance = distance_fn(query, entry);
 
                     if distance < radius {
-                        matching_items.push(Neighbour {
+                        matching_items.push(NearestNeighbour {
                             distance,
                             item: *leaf_node.content_items.get_unchecked(idx.az::<usize>()),
                         })
