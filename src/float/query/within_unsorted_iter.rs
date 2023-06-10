@@ -22,12 +22,12 @@ Returns an `Iterator`. Results are returned in arbitrary order.
 
 ```rust
 use kiddo::float::kdtree::KdTree;
-use kiddo::distance::SquaredEuclidean;
+use kiddo::float::distance::SquaredEuclidean;
 ",
             $doctest_build_tree,
             "
 
-let within = tree.within_unsorted_iter::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64).collect::<Vec>();
+let within = tree.within_unsorted_iter::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64).collect::<Vec<_>>();
 
 assert_eq!(within.len(), 2);
 ```"
