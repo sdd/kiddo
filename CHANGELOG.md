@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [2.1.2] - 2023-06-10
+
+### Ci
+
+- Add job to update version strings in docs on pre-release PR branch
+
 ## [2.1.1] - 2023-06-07
 
 ### Refactor
