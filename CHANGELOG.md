@@ -1,5 +1,27 @@
 # Kiddo Changelog
 
+## [3.0.0-beta.1] - 2023-06-18
+
+### Breaking Changes
+
+* feat!: queries return structs instead of tuples. Query methods have been updated so that they all return
+  either a `NearestNeighbour`, `Vec<NearestNeighbour>`,
+  or `Vec<BestNeighbour>`, for consistency.
+* feat!: use a trait instead of a function pointer for distance metrics (See [SquaredEuclidean](https://docs.rs/kiddo/3.0.0-beta.1/kiddo/float/distance/struct.SquaredEuclidean.html) and [Manhattan](https://docs.rs/kiddo/3.0.0-beta.1/kiddo/float/distance/struct.Manhattan.html))
+* feat: add [within_unsorted_iter](https://docs.rs/kiddo/3.0.0-beta.1/kiddo/float/kdtree/struct.KdTree.html#method.within_unsorted_iter) query
+
+### Performance
+
+* perf: refactor [within](https://docs.rs/kiddo/3.0.0-beta.1/kiddo/float/kdtree/struct.KdTree.html#method.within) to simply sort the result of [within_unsorted](https://docs.rs/kiddo/3.0.0-beta.1/kiddo/float/kdtree/struct.KdTree.html#method.within_unsorted).
+  Previously, `within` was keeping its results in a `BinaryHeap` and calling
+  its `into_sorted_vec` method to, well, return a sorted `Vec`.
+  Whilst a `BinaryHeap` is great if you are frequently adding and removing
+  items, if your use case is to gradually add all your items, and then sort
+  them all at once, its quicker to just put things in a `Vec` and then
+  sort the `Vec` at the end.
+  Benchmarking shows that this change improves performance by anything from
+  5 to 60% in practice.
+
 ## [2.1.1] - 2023-06-07
 
 ### Refactor
