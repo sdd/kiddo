@@ -3,7 +3,7 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::broken_intra_doc_links)]
 #![warn(rustdoc::private_intra_doc_links)]
-#![doc(html_root_url = "https://docs.rs/kiddo/2.1.1")]
+#![doc(html_root_url = "https://docs.rs/kiddo/3.0.0-beta.1")]
 #![doc(issue_tracker_base_url = "https://github.com/sdd/kiddo/issues/")]
 
 //! # Kiddo
@@ -12,7 +12,7 @@
 //!
 //! Possibly the fastest k-d tree library in the world? [See for yourself](https://sdd.github.io/kd-tree-comparison-webapp/).
 //!
-//! Version 2.x is a complete rewrite, providing:
+//! Version 2 and onwards is a complete rewrite over the previous v0.6.x codebase, providing:
 //! - a new internal architecture for **much-improved performance**;
 //! - Added **integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) library;
 //! - **instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
@@ -29,7 +29,7 @@
 //! Add `kiddo` to `Cargo.toml`
 //! ```toml
 //! [dependencies]
-//! kiddo = "2.1.1"
+//! kiddo = "3.0.0-beta.1"
 //! ```
 //!
 //! ## Usage
