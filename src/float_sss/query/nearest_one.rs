@@ -1,7 +1,13 @@
-use crate::float_sss::kdtree::{Axis, KdTree, LeafNode};
+use crate::float_sss::kdtree::{Axis, KdTree};
 use crate::types::{Content, Index};
 use az::{Az, Cast};
 use std::ops::Rem;
+
+enum StemIdx<IDX> {
+    Stem(IDX),
+    DStem(IDX),
+    Leaf(IDX),
+}
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
@@ -40,7 +46,7 @@ where
             self.nearest_one_recurse(
                 query,
                 distance_fn,
-                self.root_index,
+                StemIdx::Stem(IDX::one()),
                 0,
                 T::zero(),
                 A::max_value(),
@@ -55,7 +61,7 @@ where
         &self,
         query: &[A; K],
         distance_fn: &F,
-        curr_node_idx: IDX,
+        stem_idx: StemIdx<IDX>,
         split_dim: usize,
         mut best_item: T,
         mut best_dist: A,
@@ -65,85 +71,160 @@ where
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
-        if KdTree::<A, T, K, B, IDX>::is_stem_index(curr_node_idx) {
-            let node = &self.stems.get_unchecked(curr_node_idx.az::<usize>());
+        let mut rd = rd;
+        let old_off = off[split_dim];
+        let new_off: A;
 
-            let mut rd = rd;
-            let old_off = off[split_dim];
-            let new_off = query[split_dim] - node.split_val;
+        let [closer_node_idx, further_node_idx] = match stem_idx {
+            StemIdx::Stem(mut stem_idx) => {
+                let val = *unsafe { self.stems.get_unchecked(stem_idx.az::<usize>()) };
 
-            let [closer_node_idx, further_node_idx] =
-                if *query.get_unchecked(split_dim) < node.split_val {
-                    [node.left, node.right]
+                if val.is_nan() { // if bottom-level stem
+                    // corresponding leaf node will be leftmost child
+                    while stem_idx < self.stems.capacity().div_ceil(2).az::<IDX>() {
+                        stem_idx = stem_idx << 1;
+                    }
+
+                    let leaf_idx: IDX = stem_idx * 2.az::<IDX>() - self.stems.capacity().az::<IDX>();
+
+                    self.search_leaf_for_best(
+                        query,
+                        distance_fn,
+                        &mut best_item,
+                        &mut best_dist,
+                        leaf_idx,
+                    );
+
+                    return (best_dist, best_item);
+                }
+
+                new_off = query[split_dim] - val;
+
+                let left_child_idx = stem_idx << 1;
+                let right_child_idx = (stem_idx << 1) + IDX::one();
+
+                if right_child_idx < self.stems.capacity().az::<IDX>() {
+                    if *query.get_unchecked(split_dim) < val {
+                        [ StemIdx::Stem(left_child_idx), StemIdx::Stem(right_child_idx) ]
+                    } else {
+                        [ StemIdx::Stem(right_child_idx), StemIdx::Stem(left_child_idx) ]
+                    }
                 } else {
-                    [node.right, node.left]
-                };
-            let next_split_dim = (split_dim + 1).rem(K);
+                    let left_child = if val.is_lsb_set() {
+                        StemIdx::DStem(left_child_idx - self.stems.capacity().az::<IDX>())
+                    } else {
+                        StemIdx::Leaf(left_child_idx - self.stems.capacity().az::<IDX>())
+                    };
 
+                    let right_child = if val.is_2lsb_set() {
+                        StemIdx::DStem(right_child_idx - self.stems.capacity().az::<IDX>())
+                    } else {
+                        StemIdx::Leaf(right_child_idx - self.stems.capacity().az::<IDX>())
+                    };
+
+                    if *query.get_unchecked(split_dim) < val {
+                        [ left_child, right_child ]
+                    } else {
+                        [ right_child, left_child ]
+                    }
+                }
+            },
+
+            StemIdx::DStem(stem_idx) => {
+                let node = unsafe { self.dstems.get_unchecked(stem_idx.az::<usize>()) };
+
+                new_off = query[split_dim] - node.split_val;
+
+                let left_child = if KdTree::<A, T, K, B, IDX>::is_stem_index(node.children[0]) {
+                    StemIdx::DStem(node.children[0])
+                } else {
+                    StemIdx::Leaf(node.children[0] - IDX::leaf_offset())
+                };
+
+                let right_child = if KdTree::<A, T, K, B, IDX>::is_stem_index(node.children[1]) {
+                    StemIdx::DStem(node.children[1])
+                } else {
+                    StemIdx::Leaf(node.children[1] - IDX::leaf_offset())
+                };
+
+                if *unsafe { query.get_unchecked(split_dim) } < node.split_val {
+                    [ left_child, right_child ]
+                } else {
+                    [ right_child, left_child ]
+                }
+            },
+
+            StemIdx::Leaf(leaf_idx) => {
+                self.search_leaf_for_best(
+                    query,
+                    distance_fn,
+                    &mut best_item,
+                    &mut best_dist,
+                    leaf_idx,
+                );
+
+                return (best_dist, best_item);
+            }
+        };
+
+        let next_split_dim = (split_dim + 1).rem(K);
+
+        let (dist, item) = self.nearest_one_recurse(
+            query,
+            distance_fn,
+            closer_node_idx,
+            next_split_dim,
+            best_item,
+            best_dist,
+            off,
+            rd,
+        );
+
+        if dist < best_dist {
+            best_dist = dist;
+            best_item = item;
+        }
+
+        // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
+        //       so that updating rd is not hardcoded to sq euclidean
+        rd = rd + new_off * new_off - old_off * old_off;
+        // rd = rd.rd_update(old_off, new_off);
+
+        if rd <= best_dist {
+            off[split_dim] = new_off;
             let (dist, item) = self.nearest_one_recurse(
                 query,
                 distance_fn,
-                closer_node_idx,
+                further_node_idx,
                 next_split_dim,
                 best_item,
                 best_dist,
                 off,
                 rd,
             );
+            off[split_dim] = old_off;
 
             if dist < best_dist {
                 best_dist = dist;
                 best_item = item;
             }
-
-            // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-            //       so that updating rd is not hardcoded to sq euclidean
-            rd = rd + new_off * new_off - old_off * old_off;
-            if rd <= best_dist {
-                off[split_dim] = new_off;
-                let (dist, item) = self.nearest_one_recurse(
-                    query,
-                    distance_fn,
-                    further_node_idx,
-                    next_split_dim,
-                    best_item,
-                    best_dist,
-                    off,
-                    rd,
-                );
-                off[split_dim] = old_off;
-
-                if dist < best_dist {
-                    best_dist = dist;
-                    best_item = item;
-                }
-            }
-        } else {
-            let leaf_node = self
-                .leaves
-                .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
-
-            Self::search_content_for_best(
-                query,
-                distance_fn,
-                &mut best_item,
-                &mut best_dist,
-                leaf_node,
-            );
         }
 
         (best_dist, best_item)
     }
 
-    fn search_content_for_best<F>(
+    fn search_leaf_for_best<F>(
+        &self,
         query: &[A; K],
         distance_fn: &F,
         best_item: &mut T,
         best_dist: &mut A,
-        leaf_node: &LeafNode<A, T, K, B, IDX>,
+        leaf_idx: IDX,
     ) where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
+        let leaf_node = unsafe { self.leaves.get_unchecked(leaf_idx.az::<usize>()) };
+
         leaf_node
             .content_points
             .iter()
@@ -161,8 +242,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::manhattan;
-    use crate::float::kdtree::{Axis, KdTree};
+    use crate::float_sss::distance::manhattan;
+    use crate::float_sss::kdtree::{Axis, KdTree};
     use rand::Rng;
 
     type AX = f32;
@@ -215,6 +296,7 @@ mod tests {
 
             let result = tree.nearest_one(&query_point, &manhattan);
 
+            // println!("#{}: {} == {}", _i, result.0, expected.0);
             assert_eq!(result.0, expected.0);
         }
     }
@@ -232,17 +314,18 @@ mod tests {
         content_to_add
             .iter()
             .for_each(|(point, content)| tree.add(point, *content));
-        assert_eq!(tree.size(), TREE_SIZE as u32);
+        assert_eq!(tree.size(), TREE_SIZE);
 
         let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)
             .map(|_| rand::random::<[f32; 4]>())
             .collect();
 
-        for query_point in query_points {
+        for (_i, query_point) in query_points.iter().enumerate() {
             let expected = linear_search(&content_to_add, &query_point);
 
             let result = tree.nearest_one(&query_point, &manhattan);
 
+            // println!("#{}: {} == {}", _i, result.0, expected.0);
             assert_eq!(result.0, expected.0);
             assert_eq!(result.1, expected.1);
         }
