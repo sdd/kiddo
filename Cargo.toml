@@ -16,6 +16,12 @@ debug = true
 lto = true
 codegen-units = 1
 
+[profile.bench]
+debug = true
+lto = true
+codegen-units = 1
+opt-level = 3
+
 [dependencies]
 log = "0.4"
 num-traits = "0.2"
@@ -76,6 +82,10 @@ harness = false
 
 [[bench]]
 name = "nearest_one"
+harness = false
+
+[[bench]]
+name = "nearest_one_sss"
 harness = false
 
 [[bench]]

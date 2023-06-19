@@ -7,6 +7,7 @@ use std::hint::black_box;
 
 use crate::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
 use crate::float::kdtree::{Axis, KdTree};
+use crate::float_sss::kdtree::{Axis as AxisSSS, KdTree as KdTreeSSS};
 use crate::types::{Content, Index};
 
 // use rand_distr::UnitSphere as SPHERE;
@@ -112,6 +113,32 @@ where
     Standard: Distribution<[A; K]>,
 {
     let mut kdtree = KdTree::<A, T, K, B, IDX>::with_capacity(size + spare_capacity);
+
+    for _ in 0..size {
+        let entry = rand::random::<([A; K], T)>();
+        kdtree.add(&entry.0, entry.1);
+    }
+
+    kdtree
+}
+
+pub fn build_populated_tree_float_sss<
+    A: AxisSSS,
+    T: Content,
+    const K: usize,
+    const B: usize,
+    IDX: Index<T = IDX>,
+>(
+    size: usize,
+    spare_capacity: usize,
+) -> KdTreeSSS<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+    Standard: Distribution<T>,
+    Standard: Distribution<([A; K], T)>,
+    Standard: Distribution<[A; K]>,
+{
+    let mut kdtree = KdTreeSSS::<A, T, K, B, IDX>::with_capacity(size + spare_capacity);
 
     for _ in 0..size {
         let entry = rand::random::<([A; K], T)>();
@@ -261,6 +288,27 @@ where
     )
 }
 
+pub fn build_populated_tree_and_query_points_float_sss<
+    A: AxisSSS,
+    T: Content,
+    const K: usize,
+    const B: usize,
+    IDX: Index<T = IDX>,
+>(
+    size: usize,
+    query_point_qty: usize,
+) -> (KdTreeSSS<A, T, K, B, IDX>, Vec<[A; K]>)
+where
+    usize: Cast<IDX>,
+    Standard: Distribution<T>,
+    Standard: Distribution<[A; K]>,
+{
+    (
+        build_populated_tree_float_sss(size, 0),
+        build_query_points_float(query_point_qty),
+    )
+}
+
 #[inline]
 pub fn process_queries_float<
     A: Axis + 'static,
@@ -280,6 +328,34 @@ where
 {
     Box::new(
         move |(kdtree, points_to_query): (KdTree<A, T, K, B, IDX>, Vec<[A; K]>)| {
+            black_box(
+                points_to_query
+                    .iter()
+                    .for_each(|point| black_box(query(&kdtree, point))),
+            )
+        },
+    )
+}
+
+#[inline]
+pub fn process_queries_float_sss<
+    A: AxisSSS + 'static,
+    T: Content,
+    const K: usize,
+    const B: usize,
+    IDX: Index<T = IDX>,
+    F,
+>(
+    query: F,
+) -> Box<dyn Fn((KdTreeSSS<A, T, K, B, IDX>, Vec<[A; K]>))>
+where
+    usize: Cast<IDX>,
+    Standard: Distribution<T>,
+    Standard: Distribution<[A; K]>,
+    F: Fn(&KdTreeSSS<A, T, K, B, IDX>, &[A; K]) + 'static,
+{
+    Box::new(
+        move |(kdtree, points_to_query): (KdTreeSSS<A, T, K, B, IDX>, Vec<[A; K]>)| {
             black_box(
                 points_to_query
                     .iter()
