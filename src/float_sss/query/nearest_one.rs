@@ -85,6 +85,7 @@ where
             (further_node_type, further_node_idx)
         ] = match idx_type {
             IdxType::Stem => {
+                self.prefetch_stems(idx << 1);
                 let val = *unsafe { self.stems.get_unchecked(idx) };
 
                 if val.is_nan() { // if bottom-level stem
@@ -306,6 +307,28 @@ where
                     *best_item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
                 }
             });
+    }
+
+    #[inline]
+    fn prefetch_stems(&self, idx: usize) {
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            let prefetch = self.stems.as_ptr().wrapping_offset(2 * idx as isize);
+            std::arch::x86_64::_mm_prefetch::<{ core::arch::x86_64::_MM_HINT_T0 }>(ptr::addr_of!(
+                prefetch
+            )
+                as *const i8);
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        unsafe {
+            let prefetch = self.stems.as_ptr().wrapping_offset(2 * idx as isize);
+            core::arch::aarch64::_prefetch(
+                ptr::addr_of!(prefetch) as *const i8,
+                core::arch::aarch64::_PREFETCH_READ,
+                core::arch::aarch64::_PREFETCH_LOCALITY3,
+            );
+        }
     }
 }
 
