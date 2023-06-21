@@ -34,6 +34,7 @@ az = "1.2"
 min-max-heap = "1.3"
 elapsed = "0.1.2"
 divrem = "1.0.0"
+num-derive = "0.3.3"
 
 [dev-dependencies]
 aligned = "0.4"
