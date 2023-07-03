@@ -2,6 +2,7 @@ use crate::float_sss::kdtree::{Axis, KdTree};
 use crate::types::{Content, Index};
 use az::{Az, Cast};
 use std::ops::Rem;
+use std::ptr;
 
 enum StemIdx<IDX> {
     Stem(IDX),
@@ -79,13 +80,15 @@ where
             StemIdx::Stem(mut stem_idx) => {
                 let val = *unsafe { self.stems.get_unchecked(stem_idx.az::<usize>()) };
 
-                if val.is_nan() { // if bottom-level stem
+                if val.is_nan() {
+                    // if bottom-level stem
                     // corresponding leaf node will be leftmost child
                     while stem_idx < self.stems.capacity().div_ceil(2).az::<IDX>() {
                         stem_idx = stem_idx << 1;
                     }
 
-                    let leaf_idx: IDX = stem_idx * 2.az::<IDX>() - self.stems.capacity().az::<IDX>();
+                    let leaf_idx: IDX =
+                        stem_idx * 2.az::<IDX>() - self.stems.capacity().az::<IDX>();
 
                     self.search_leaf_for_best(
                         query,
@@ -102,13 +105,20 @@ where
 
                 let left_child_idx = stem_idx << 1;
                 let right_child_idx = (stem_idx << 1) + IDX::one();
+                self.prefetch_stems(left_child_idx.az::<usize>());
+                let is_left_child =
+                    usize::from(*unsafe { query.get_unchecked(split_dim) } < val).az::<IDX>();
 
                 if right_child_idx < self.stems.capacity().az::<IDX>() {
-                    if *query.get_unchecked(split_dim) < val {
-                        [ StemIdx::Stem(left_child_idx), StemIdx::Stem(right_child_idx) ]
-                    } else {
-                        [ StemIdx::Stem(right_child_idx), StemIdx::Stem(left_child_idx) ]
-                    }
+                    [
+                        StemIdx::Stem(left_child_idx + (IDX::one() - is_left_child)),
+                        StemIdx::Stem(left_child_idx + is_left_child),
+                    ]
+                    // if *query.get_unchecked(split_dim) < val {
+                    //     [ StemIdx::Stem(left_child_idx), StemIdx::Stem(right_child_idx) ]
+                    // } else {
+                    //     [ StemIdx::Stem(right_child_idx), StemIdx::Stem(left_child_idx) ]
+                    // }
                 } else {
                     let left_child = if val.is_lsb_set() {
                         StemIdx::DStem(left_child_idx - self.stems.capacity().az::<IDX>())
@@ -123,12 +133,12 @@ where
                     };
 
                     if *query.get_unchecked(split_dim) < val {
-                        [ left_child, right_child ]
+                        [left_child, right_child]
                     } else {
-                        [ right_child, left_child ]
+                        [right_child, left_child]
                     }
                 }
-            },
+            }
 
             StemIdx::DStem(stem_idx) => {
                 let node = unsafe { self.dstems.get_unchecked(stem_idx.az::<usize>()) };
@@ -148,11 +158,11 @@ where
                 };
 
                 if *unsafe { query.get_unchecked(split_dim) } < node.split_val {
-                    [ left_child, right_child ]
+                    [left_child, right_child]
                 } else {
-                    [ right_child, left_child ]
+                    [right_child, left_child]
                 }
-            },
+            }
 
             StemIdx::Leaf(leaf_idx) => {
                 self.search_leaf_for_best(
@@ -211,6 +221,28 @@ where
         }
 
         (best_dist, best_item)
+    }
+
+    #[inline]
+    fn prefetch_stems(&self, idx: usize) {
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            let prefetch = self.stems.as_ptr().wrapping_offset(2 * idx as isize);
+            std::arch::x86_64::_mm_prefetch::<{ core::arch::x86_64::_MM_HINT_T0 }>(ptr::addr_of!(
+                prefetch
+            )
+                as *const i8);
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        unsafe {
+            let prefetch = self.stems.as_ptr().wrapping_offset(2 * idx as isize);
+            core::arch::aarch64::_prefetch(
+                ptr::addr_of!(prefetch) as *const i8,
+                core::arch::aarch64::_PREFETCH_READ,
+                core::arch::aarch64::_PREFETCH_LOCALITY3,
+            );
+        }
     }
 
     fn search_leaf_for_best<F>(
