@@ -17,7 +17,7 @@
 * if a leaf fills and needs splitting, and its parent is a main stem, set the LSB of the main stem's split plane, to indicate that the children will be dynamic stem nodes.
 * when dynamic stem nodes are first required, allocate a Vec<> of size 16 in the case above. static stem child indices are assumed to be (2N - 16) and (2N - 15).
 * the dynamic stem nodes can be assumed to use the MSB to indicate whether their child is a leaf node or another dynamic node. a SET MSB indicates a leaf node child, of index n-MSB, as per kiddo v2.
-* when a teop-level dstem is required, two must be created
+* when a top-level dstem is required, two must be created
 * leaf nodes are initially a vec with capacity of log2(cap).
 * use maybeuninit and Vec::from_raw_parts when creating the leaf vec
 
@@ -54,4 +54,6 @@ if leaf 0 now splits again:
     dynamic stem nodes: None
     leaf nodes: [0-15 exist but only 0, 1, 2, 4, and 8 initialized]
 
-When creating the initial vec of uninitialized
+
+
+

@@ -4,11 +4,10 @@ use crate::types::{Content, Index};
 use az::{Az, Cast};
 use std::ops::Rem;
 
-
 #[derive(Clone)]
 enum LeafParent<T> {
     Stem(usize, bool),
-    DStem(T, bool)
+    DStem(T, bool),
 }
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
@@ -43,14 +42,21 @@ where
         while stem_idx < self.stems.capacity() {
             val = *unsafe { self.stems.get_unchecked(stem_idx) };
 
-            if val.is_nan() { // if bottom-level stem
+            if val.is_nan() {
+                // if bottom-level stem
                 // corresponding leaf node will be leftmost child
                 while stem_idx < self.stems.capacity().div_ceil(2) {
                     stem_idx = stem_idx << 1;
                 }
 
                 let leaf_idx: IDX = (stem_idx * 2 - self.stems.capacity()).az::<IDX>();
-                return self.add_to_leaf(query, item, split_dim, leaf_idx, LeafParent::Stem(parent_idx, is_right_child));
+                return self.add_to_leaf(
+                    query,
+                    item,
+                    split_dim,
+                    leaf_idx,
+                    LeafParent::Stem(parent_idx, is_right_child),
+                );
             }
 
             parent_idx = stem_idx;
@@ -70,26 +76,86 @@ where
                 parent_idx = stem_idx;
                 is_right_child = *unsafe { query.get_unchecked(split_dim) } > val;
 
-                stem_idx = (* unsafe {node.children.get_unchecked(usize::from(is_right_child))}).az::<usize>();
+                stem_idx = (*unsafe { node.children.get_unchecked(usize::from(is_right_child)) })
+                    .az::<usize>();
                 split_dim = (split_dim + 1).rem(K);
             }
             let leaf_idx: IDX = stem_idx.az::<IDX>() - IDX::leaf_offset();
-            return self.add_to_leaf(query, item, split_dim, leaf_idx, LeafParent::DStem(parent_idx.az::<IDX>(), is_right_child));
-
+            return self.add_to_leaf(
+                query,
+                item,
+                split_dim,
+                leaf_idx,
+                LeafParent::DStem(parent_idx.az::<IDX>(), is_right_child),
+            );
         } else {
             let leaf_idx: IDX = (stem_idx - self.stems.capacity()).az::<IDX>();
-            return self.add_to_leaf(query, item, split_dim, leaf_idx, LeafParent::Stem(parent_idx, is_right_child));
+            return self.add_to_leaf(
+                query,
+                item,
+                split_dim,
+                leaf_idx,
+                LeafParent::Stem(parent_idx, is_right_child),
+            );
         }
     }
 
-    fn add_to_leaf(&mut self, query: &[A; K], item: T, split_dim: usize, leaf_idx: IDX, parent: LeafParent<IDX>) {
-        let mut node: &mut super::kdtree::LeafNode<A, T, K, B, IDX>;
+    #[inline]
+    pub(crate) fn add_to_optimized(&mut self, query: &[A; K], item: T) {
+        assert!(self.optimized_read_only);
+
+        let mut dim = 0;
+        let mut idx: usize = 1;
+        let mut val: A;
+
+        while idx < self.stems.capacity() {
+            val = *unsafe { self.stems.get_unchecked(idx) };
+
+            let is_right_child = *unsafe { query.get_unchecked(dim) } >= val;
+            idx = (idx << 1) + usize::from(is_right_child);
+            dim = (dim + 1).rem(K);
+        }
+        idx -= self.stems.len();
+
+        let node_size = (unsafe { self.leaves.get_unchecked_mut(idx) })
+            .size
+            .az::<usize>();
+
+        if node_size == B {
+            println!("Tree Stats: {:?}", self.generate_stats())
+        }
+
+        let node = unsafe { self.leaves.get_unchecked_mut(idx) };
+        debug_assert!(node.size.az::<usize>() < B);
+
+        *unsafe {
+            node.content_points
+                .get_unchecked_mut(node.size.az::<usize>())
+        } = *query;
+        *unsafe {
+            node.content_items
+                .get_unchecked_mut(node.size.az::<usize>())
+        } = item;
+
+        node.size = node.size + IDX::one();
+        self.size += 1;
+    }
+
+    fn add_to_leaf(
+        &mut self,
+        query: &[A; K],
+        item: T,
+        split_dim: usize,
+        leaf_idx: IDX,
+        parent: LeafParent<IDX>,
+    ) {
+        let node: &mut super::kdtree::LeafNode<A, T, K, B, IDX>;
 
         let node_size = unsafe { self.leaves.get_unchecked_mut(leaf_idx.az::<usize>()) }.size;
 
         if node_size == B.az::<IDX>() {
             let (right_leaf_idx, split_val) = self.split(leaf_idx, split_dim, parent);
-            if query[split_dim] > split_val  {
+            if query[split_dim] > split_val {
                 node = unsafe { self.leaves.get_unchecked_mut(right_leaf_idx.az::<usize>()) };
             } else {
                 node = unsafe { self.leaves.get_unchecked_mut(leaf_idx.az::<usize>()) };
@@ -98,8 +164,14 @@ where
             node = unsafe { self.leaves.get_unchecked_mut(leaf_idx.az::<usize>()) };
         }
 
-        *unsafe { node.content_points.get_unchecked_mut(node.size.az::<usize>()) } = *query;
-        *unsafe { node.content_items.get_unchecked_mut(node.size.az::<usize>()) } = item;
+        *unsafe {
+            node.content_points
+                .get_unchecked_mut(node.size.az::<usize>())
+        } = *query;
+        *unsafe {
+            node.content_items
+                .get_unchecked_mut(node.size.az::<usize>())
+        } = item;
 
         node.size = node.size + IDX::one();
         self.size += 1;
@@ -127,7 +199,7 @@ where
     /// tree.remove(&[1.0, 2.0, 5.0], 200);
     /// assert_eq!(tree.size(), 0);
     /// ```
-/*     #[inline]
+    /*     #[inline]
     pub fn remove(&mut self, query: &[A; K], item: T) -> usize {
         let mut stem_idx = self.root_index;
         let mut split_dim = 0;
@@ -172,19 +244,11 @@ where
         removed
     } */
 
-    fn split(
-        &mut self,
-        leaf_idx: IDX,
-        split_dim: usize,
-        parent: LeafParent<IDX>,
-    ) -> (IDX, A) {
-
+    fn split(&mut self, leaf_idx: IDX, split_dim: usize, parent: LeafParent<IDX>) -> (IDX, A) {
         let mut split_val: A;
         let pivot_idx: IDX;
         {
-            let orig = unsafe {
-                self.leaves.get_unchecked_mut(leaf_idx.az::<usize>())
-            };
+            let orig = unsafe { self.leaves.get_unchecked_mut(leaf_idx.az::<usize>()) };
             pivot_idx = (B / 2).az::<IDX>();
 
             // partially sort original leaf so that first half of content
@@ -195,22 +259,24 @@ where
                 pivot_idx.az::<usize>(),
                 |a, b| unsafe {
                     a.get_unchecked(split_dim)
-                    .partial_cmp(b.get_unchecked(split_dim))
-                    .expect("Leaf node sort failed.")
+                        .partial_cmp(b.get_unchecked(split_dim))
+                        .expect("Leaf node sort failed.")
                 },
             );
 
-            split_val = unsafe { *orig
-                .content_points
-                .get_unchecked(pivot_idx.az::<usize>())
-                .get_unchecked(split_dim) };
+            split_val = unsafe {
+                *orig
+                    .content_points
+                    .get_unchecked(pivot_idx.az::<usize>())
+                    .get_unchecked(split_dim)
+            };
         }
 
         // determine where to copy the upper half of points to
         let mut right_idx;
 
         match parent {
-            LeafParent::Stem(parent_idx , _) if parent_idx == 1 && self.stems[1].is_nan() => {
+            LeafParent::Stem(parent_idx, _) if parent_idx == 1 && self.stems[1].is_nan() => {
                 // parent is a static stem, root level, first split:
 
                 // 1) update stems to use the root static stem
@@ -228,8 +294,10 @@ where
                     right_idx = right_idx * 2.az::<IDX>();
                 }
                 right_idx = right_idx - self.stems.capacity().az::<IDX>();
-            },
-            LeafParent::Stem(parent_idx, is_right_child ) if parent_idx < self.stems.capacity().div_ceil(2) => {
+            }
+            LeafParent::Stem(parent_idx, is_right_child)
+                if parent_idx < self.stems.capacity().div_ceil(2) =>
+            {
                 // parent is a static stem, not first split, not bottom layer:
 
                 // 1) if the new stem is at base level, adjust the split
@@ -254,7 +322,7 @@ where
                     right_idx = right_idx * 2.az::<IDX>();
                 }
                 right_idx = right_idx - (self.stems.capacity()).az::<IDX>();
-            },
+            }
             LeafParent::Stem(parent_idx, is_right_child) => {
                 // parent is a static stem, bottom level:
 
@@ -271,7 +339,6 @@ where
                     right_idx = (parent_idx * 2 + 1).az::<IDX>();
                     right_idx = right_idx - (self.stems.capacity() + 1).az::<IDX>();
                 } else {
-
                     // 1) allocate space for twice as many dstem nodes
                     //    as there are bottom-level stem values
                     if self.dstems.capacity() == 0 {
@@ -292,7 +359,8 @@ where
                     //    that we came from. It's left child should be
                     //    the leaf index & MSB, and the right child should
                     //    be the index of a new leaf node & MSB.
-                    let new_dstem = unsafe { self.dstems.get_unchecked_mut(leaf_idx.az::<usize>()) };
+                    let new_dstem =
+                        unsafe { self.dstems.get_unchecked_mut(leaf_idx.az::<usize>()) };
                     new_dstem.split_val = split_val;
                     new_dstem.children[0] = leaf_idx + IDX::leaf_offset();
 
@@ -304,7 +372,7 @@ where
 
                     new_dstem.children[1] = right_idx + IDX::leaf_offset();
                 }
-            },
+            }
             LeafParent::DStem(parent_idx, is_right_child) => {
                 // parent is a dynamic stem:
 
@@ -315,13 +383,14 @@ where
                 self.dstems.push(StemNode {
                     children: [
                         leaf_idx + IDX::leaf_offset(),
-                        (leaf_len.az::<IDX>()) /*- IDX::one()*/ + IDX::leaf_offset()
+                        (leaf_len.az::<IDX>()) /*- IDX::one()*/ + IDX::leaf_offset(),
                     ],
                     split_val,
                 });
                 let new_stem_index: IDX = (self.dstems.len() - 1).az::<IDX>();
 
-                let parent_node = unsafe { self.dstems.get_unchecked_mut(parent_idx.az::<usize>()) };
+                let parent_node =
+                    unsafe { self.dstems.get_unchecked_mut(parent_idx.az::<usize>()) };
                 if is_right_child {
                     parent_node.children[1] = new_stem_index;
                 } else {
@@ -337,23 +406,26 @@ where
             }
         }
 
-        let [mut right, mut orig] =  unsafe { self.leaves.get_many_unchecked_mut([right_idx.az::<usize>(), leaf_idx.az::<usize>()]) };
+        let [right, orig] = unsafe {
+            self.leaves
+                .get_many_unchecked_mut([right_idx.az::<usize>(), leaf_idx.az::<usize>()])
+        };
 
         unsafe {
             right
-            .content_points
-            .get_unchecked_mut(..(pivot_idx.az::<usize>()))
-            .copy_from_slice(
-                orig.content_points
-                .get_unchecked((pivot_idx.az::<usize>())..),
-            );
+                .content_points
+                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
+                .copy_from_slice(
+                    orig.content_points
+                        .get_unchecked((pivot_idx.az::<usize>())..),
+                );
             right
-            .content_items
-            .get_unchecked_mut(..(pivot_idx.az::<usize>()))
-            .copy_from_slice(
-                orig.content_items
-                .get_unchecked((pivot_idx.az::<usize>())..),
-            );
+                .content_items
+                .get_unchecked_mut(..(pivot_idx.az::<usize>()))
+                .copy_from_slice(
+                    orig.content_items
+                        .get_unchecked((pivot_idx.az::<usize>())..),
+                );
         }
 
         right.size = (B.az::<IDX>()) - pivot_idx;
@@ -365,7 +437,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{float_sss::kdtree::{KdTree, FloatLSB}, types::Index};
+    use crate::{
+        float_sss::kdtree::{FloatLSB, KdTree},
+        types::Index,
+    };
     use rand::Rng;
 
     type FLT = f32;
@@ -395,9 +470,9 @@ mod tests {
     fn can_add_items_root_stem_specified() {
         let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
 
-       //      01      Stems
-       //   02    03   Stems
-       //  0  1  2  3  Leaves
+        //      01      Stems
+        //   02    03   Stems
+        //  0  1  2  3  Leaves
 
         let point_1: [FLT; 4] = [n(0.1f32), n(0.6f32), n(0.6f32), n(0.6f32)];
         let item_1 = 123;
@@ -518,19 +593,16 @@ mod tests {
         tree.dstems[0].split_val = 0.5f32;
         tree.dstems[0].children = [
             0 + <u32 as Index>::leaf_offset(),
-            5 + <u32 as Index>::leaf_offset()
+            5 + <u32 as Index>::leaf_offset(),
         ];
 
         tree.dstems[3].split_val = 0.5f32;
-        tree.dstems[3].children = [
-            2 + <u32 as Index>::leaf_offset(),
-            2
-        ];
+        tree.dstems[3].children = [2 + <u32 as Index>::leaf_offset(), 2];
 
         tree.dstems[2].split_val = 0.5f32;
         tree.dstems[2].children = [
             6 + <u32 as Index>::leaf_offset(),
-            7 + <u32 as Index>::leaf_offset()
+            7 + <u32 as Index>::leaf_offset(),
         ];
 
         tree.add(&point_1, item_1);
@@ -545,8 +617,14 @@ mod tests {
         tree.add(&point_2, item_2);
         assert_eq!(tree.size(), 2);
 
-        assert_eq!(unsafe { tree.leaves.get_unchecked(5) }.content_items[0], 222);
-        assert_eq!(&unsafe { tree.leaves.get_unchecked(5) }.content_points[0], &point_2);
+        assert_eq!(
+            unsafe { tree.leaves.get_unchecked(5) }.content_items[0],
+            222
+        );
+        assert_eq!(
+            &unsafe { tree.leaves.get_unchecked(5) }.content_points[0],
+            &point_2
+        );
 
         tree.add(&point_3, item_3);
         assert_eq!(tree.size(), 3);
@@ -566,8 +644,14 @@ mod tests {
         tree.leaves.reserve(1);
         tree.unreserved_leaf_idx += 1;
 
-        assert_eq!(unsafe { tree.leaves.get_unchecked(6) }.content_items[0], 555);
-        assert_eq!(&unsafe { tree.leaves.get_unchecked(6) }.content_points[0], &point_5);
+        assert_eq!(
+            unsafe { tree.leaves.get_unchecked(6) }.content_items[0],
+            555
+        );
+        assert_eq!(
+            &unsafe { tree.leaves.get_unchecked(6) }.content_points[0],
+            &point_5
+        );
     }
 
     #[test]
@@ -796,7 +880,13 @@ mod tests {
         assert!(tree.stems[3].is_nan());
 
         assert_eq!(tree.dstems[0].split_val, 0.3f32);
-        assert_eq!(tree.dstems[0].children, [0 + <u32 as Index>::leaf_offset(), 4 + <u32 as Index>::leaf_offset()]);
+        assert_eq!(
+            tree.dstems[0].children,
+            [
+                0 + <u32 as Index>::leaf_offset(),
+                4 + <u32 as Index>::leaf_offset()
+            ]
+        );
 
         assert_eq!(tree.leaves[0].content_items[0], item_1);
         assert_eq!(tree.leaves[0].content_items[1], item_2);
@@ -804,12 +894,30 @@ mod tests {
         assert_eq!(&tree.leaves[0].content_points[1], &point_2);
         assert_eq!(tree.leaves[0].size, 2);
 
-        assert_eq!(unsafe { tree.leaves.get_unchecked(4) }.content_items[0], item_4);
-        assert_eq!(unsafe { tree.leaves.get_unchecked(4) }.content_items[1], item_3);
-        assert_eq!(unsafe { tree.leaves.get_unchecked(4) }.content_items[2], item_5);
-        assert_eq!(&unsafe { tree.leaves.get_unchecked(4) }.content_points[0], &point_4);
-        assert_eq!(&unsafe { tree.leaves.get_unchecked(4) }.content_points[1], &point_3);
-        assert_eq!(&unsafe { tree.leaves.get_unchecked(4) }.content_points[2], &point_5);
+        assert_eq!(
+            unsafe { tree.leaves.get_unchecked(4) }.content_items[0],
+            item_4
+        );
+        assert_eq!(
+            unsafe { tree.leaves.get_unchecked(4) }.content_items[1],
+            item_3
+        );
+        assert_eq!(
+            unsafe { tree.leaves.get_unchecked(4) }.content_items[2],
+            item_5
+        );
+        assert_eq!(
+            &unsafe { tree.leaves.get_unchecked(4) }.content_points[0],
+            &point_4
+        );
+        assert_eq!(
+            &unsafe { tree.leaves.get_unchecked(4) }.content_points[1],
+            &point_3
+        );
+        assert_eq!(
+            &unsafe { tree.leaves.get_unchecked(4) }.content_points[2],
+            &point_5
+        );
         assert_eq!(unsafe { tree.leaves.get_unchecked(4) }.size, 3);
     }
 
@@ -828,7 +936,6 @@ mod tests {
         //    D0    1   2  3  Dstems / Leaves
         //  D4   4            DStems / Leaves (D1-D3 reserved)
         // 0  5               Leaves
-
 
         let point_1: [FLT; 4] = [n(0.12f32), n(0.2f32), n(0.2f32), n(0.102f32)];
         let item_1 = 111;
@@ -852,7 +959,10 @@ mod tests {
 
         tree.initialise_dstems();
         tree.dstems[0].split_val = 0.3f32;
-        tree.dstems[0].children = [0 + <u32 as Index>::leaf_offset(), 4 + <u32 as Index>::leaf_offset()];
+        tree.dstems[0].children = [
+            0 + <u32 as Index>::leaf_offset(),
+            4 + <u32 as Index>::leaf_offset(),
+        ];
 
         tree.leaves.reserve(1);
         tree.unreserved_leaf_idx += 1;
@@ -877,10 +987,19 @@ mod tests {
         assert!(tree.stems[3].is_nan());
 
         assert_eq!(tree.dstems[0].split_val, 0.3f32);
-        assert_eq!(tree.dstems[0].children, [4, 4 + <u32 as Index>::leaf_offset()]);
+        assert_eq!(
+            tree.dstems[0].children,
+            [4, 4 + <u32 as Index>::leaf_offset()]
+        );
 
         assert_eq!(tree.dstems[4].split_val, 0.106f32);
-        assert_eq!(tree.dstems[4].children, [0 + <u32 as Index>::leaf_offset(), 5 + <u32 as Index>::leaf_offset()]);
+        assert_eq!(
+            tree.dstems[4].children,
+            [
+                0 + <u32 as Index>::leaf_offset(),
+                5 + <u32 as Index>::leaf_offset()
+            ]
+        );
 
         assert_eq!(tree.leaves[0].content_items[0], item_1);
         assert_eq!(tree.leaves[0].content_items[1], item_2);
@@ -888,12 +1007,30 @@ mod tests {
         assert_eq!(&tree.leaves[0].content_points[1], &point_2);
         assert_eq!(tree.leaves[0].size, 2);
 
-        assert_eq!(unsafe { tree.leaves.get_unchecked(5) }.content_items[0], item_3);
-        assert_eq!(unsafe { tree.leaves.get_unchecked(5) }.content_items[1], item_4);
-        assert_eq!(unsafe { tree.leaves.get_unchecked(5) }.content_items[2], item_5);
-        assert_eq!(&unsafe { tree.leaves.get_unchecked(5) }.content_points[0], &point_3);
-        assert_eq!(&unsafe { tree.leaves.get_unchecked(5) }.content_points[1], &point_4);
-        assert_eq!(&unsafe { tree.leaves.get_unchecked(5) }.content_points[2], &point_5);
+        assert_eq!(
+            unsafe { tree.leaves.get_unchecked(5) }.content_items[0],
+            item_3
+        );
+        assert_eq!(
+            unsafe { tree.leaves.get_unchecked(5) }.content_items[1],
+            item_4
+        );
+        assert_eq!(
+            unsafe { tree.leaves.get_unchecked(5) }.content_items[2],
+            item_5
+        );
+        assert_eq!(
+            &unsafe { tree.leaves.get_unchecked(5) }.content_points[0],
+            &point_3
+        );
+        assert_eq!(
+            &unsafe { tree.leaves.get_unchecked(5) }.content_points[1],
+            &point_4
+        );
+        assert_eq!(
+            &unsafe { tree.leaves.get_unchecked(5) }.content_points[2],
+            &point_5
+        );
         assert_eq!(unsafe { tree.leaves.get_unchecked(5) }.size, 3);
     }
 
@@ -1070,7 +1207,7 @@ mod tests {
             .iter()
             .for_each(|point| kdtree.add(&point.0, point.1));
 
-            assert_eq!(kdtree.size(), 200_000);
+        assert_eq!(kdtree.size(), 200_000);
     }
 
     /* #[test]

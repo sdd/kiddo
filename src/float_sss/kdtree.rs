@@ -2,11 +2,13 @@
 //! are floats. f64 or f32 are supported currently.
 
 use az::{Az, Cast};
-use num_traits::Float;
-use std::alloc::{Layout, Global, Allocator, AllocError};
-use std::{cmp::PartialEq};
-use std::fmt::Debug;
 use divrem::DivCeil;
+use num_traits::Float;
+use ordered_float::OrderedFloat;
+use std::alloc::{AllocError, Allocator, Global, Layout};
+use std::cmp::PartialEq;
+use std::fmt::Debug;
+use std::ops::Rem;
 
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;
@@ -98,8 +100,8 @@ pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B:
     pub(crate) size: usize,
 
     pub(crate) unreserved_leaf_idx: usize,
+    pub(crate) optimized_read_only: bool,
 }
-
 
 #[doc(hidden)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
@@ -159,6 +161,15 @@ where
         }
     }
 } */
+
+#[derive(Debug)]
+pub struct TreeStats {
+    dstem_node_count: usize,
+    leaf_fill_counts: Vec<usize>,
+    leaf_fill_ratio: f32,
+    stem_fill_ratio: f32,
+    unused_stem_count: usize,
+}
 
 impl<A, T, const K: usize, const B: usize, IDX> KdTree<A, T, K, B, IDX>
 where
@@ -232,7 +243,8 @@ where
             stems,
             dstems: Vec::with_capacity(0),
             leaves,
-            unreserved_leaf_idx: leaf_capacity
+            unreserved_leaf_idx: leaf_capacity,
+            optimized_read_only: false,
         };
 
         tree.leaves[0].size = IDX::zero();
@@ -244,6 +256,137 @@ where
         tree.stems[1] = A::nan();
 
         tree
+    }
+
+    /// Creates a new float KdTree, balanced and optimized.
+    ///
+    /// Trees constructed using this method will not be modifiable
+    /// after construction, ant will be optimally balanced and tuned.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use kiddo::float::kdtree::KdTree;
+    ///
+    /// let points: Vec<[f64; 3]> = vec!();
+    /// let tree: KdTree<f64, u32, 3, 32, u32> = KdTree::optimize_from(points);
+    ///
+    /// assert_eq!(tree.size(), 1);
+    /// ```
+    #[inline]
+    pub fn optimize_from(source: &[[A; K]]) -> Self
+    where
+        usize: Cast<T>,
+    {
+        let item_count = source.len();
+        let leaf_node_count = item_count.div_ceil(B);
+        let stem_node_count = leaf_node_count.next_power_of_two();
+
+        let layout = Layout::array::<LeafNode<A, T, K, B, IDX>>(leaf_node_count).unwrap();
+        let mut leaves = unsafe {
+            let mem = match Global.allocate(layout) {
+                Ok(mem) => mem.cast::<LeafNode<A, T, K, B, IDX>>().as_ptr(),
+                Err(AllocError) => panic!(),
+            };
+
+            Vec::from_raw_parts_in(mem, leaf_node_count, leaf_node_count, Global)
+        };
+        for mut leaf in &mut leaves {
+            leaf.size = IDX::zero();
+        }
+
+        let mut stems = vec![A::infinity(); stem_node_count];
+        let mut sort_index = Vec::from_iter(0..item_count);
+        stems[0] = A::infinity();
+
+        Self::optimize_stems(&mut stems, source, &mut sort_index, 1, 0);
+
+        let mut tree = Self {
+            size: 0,
+            stems,
+            dstems: Vec::with_capacity(0),
+            leaves,
+            unreserved_leaf_idx: leaf_node_count,
+            optimized_read_only: true,
+        };
+
+        for (idx, point) in source.iter().enumerate() {
+            tree.add_to_optimized(point, idx.az::<T>());
+        }
+
+        tree
+    }
+
+    /// the value returned is zero if balancing was successful. If however a child splitpoint has
+    /// landed in between two (or more) items with the same value, the value returned is a hint to
+    /// the caller of how many items overflowed out of the second bucket due to the optimization
+    /// attempt overflowing after the pivot was moved.
+    fn optimize_stems(
+        stems: &mut Vec<A>,
+        source: &[[A; K]],
+        sort_index: &mut [usize],
+        stem_index: usize,
+        dim: usize,
+    ) -> usize {
+        let next_dim = (dim + 1).rem(K);
+
+        // If there are few enough items that we could fit all of them in the left subtree,
+        // leave the current stem val as +inf to push everything down into the left and
+        // recurse down without splitting
+        let levels_below = stems.len().ilog2() - stem_index.ilog2();
+        let items_below = 2usize.pow(levels_below) * B;
+        if sort_index.len() <= items_below / 2 {
+            Self::optimize_stems(stems, source, sort_index, stem_index << 1, next_dim);
+            return 0;
+        }
+
+        let mut pivot = ((sort_index.len() >> 1) - (B / 2)).next_power_of_two();
+        let orig_pivot = pivot;
+
+        sort_index.select_nth_unstable_by_key(pivot + 1, |&i| OrderedFloat(source[i][dim]));
+
+        //debug_assert!(source[sort_index[mid]][dim] != source[sort_index[mid + 1]][dim]);
+
+        while (source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim]
+            || source[sort_index[pivot]][dim] == source[sort_index[pivot + 1]][dim])
+            && pivot > 1
+        {
+            pivot -= 1;
+        }
+        if pivot == 1 {
+            pivot = orig_pivot;
+            sort_index.select_nth_unstable_by_key(sort_index.len() - 1, |&i| {
+                OrderedFloat(source[i][dim])
+            });
+            while (source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim]
+                || source[sort_index[pivot]][dim] == source[sort_index[pivot + 1]][dim])
+                && pivot < sort_index.len() - 2
+            {
+                pivot += 1;
+            }
+        }
+        if pivot == sort_index.len() - 2 {
+            let vals_for_dim: Vec<_> = sort_index.iter().map(|x| source[*x][dim]).collect();
+            println!("Can't split!");
+            println!("Data along dim: {:?}", vals_for_dim);
+            println!("orig pivot: {:?}", orig_pivot);
+            println!("orig pivot val: {:?}", source[sort_index[orig_pivot]][dim])
+        }
+        debug_assert!(pivot != sort_index.len() - 2);
+
+        stems[stem_index] = source[sort_index[pivot]][dim];
+
+        if pivot <= B {
+            return;
+        }
+
+        let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
+
+        let next_stem_index = stem_index << 1;
+        Self::optimize_stems(stems, source, lower_sort_index, next_stem_index, next_dim);
+
+        let next_stem_index = next_stem_index + 1;
+        Self::optimize_stems(stems, source, upper_sort_index, next_stem_index, next_dim);
     }
 
     /// Returns the current number of elements stored in the tree
@@ -266,6 +409,11 @@ where
     }
 
     #[inline]
+    pub fn capacity(&self) -> usize {
+        self.leaves.len() * B
+    }
+
+    #[inline]
     pub(crate) fn is_stem_index(x: IDX) -> bool {
         x < <IDX as Index>::leaf_offset()
     }
@@ -282,6 +430,29 @@ where
 
             Vec::from_raw_parts_in(mem, leaf_capacity, leaf_capacity, Global)
         };
+    }
+
+    pub fn generate_stats(&self) -> TreeStats {
+        let mut leaf_fill_counts = vec![0usize; B + 1];
+        for leaf in &self.leaves {
+            leaf_fill_counts[leaf.size.az::<usize>()] += 1;
+        }
+
+        let leaf_fill_ratio = (self.size as f32) / (self.capacity() as f32);
+
+        let unused_stem_count = self.stems.iter().filter(|x| x.is_infinite()).count() - 1;
+
+        let stem_fill_ratio = 1.0 - (unused_stem_count as f32 / ((self.stems.len() - 1) as f32));
+
+        let dstem_node_count = self.dstems.len();
+
+        TreeStats {
+            dstem_node_count,
+            leaf_fill_counts,
+            leaf_fill_ratio,
+            stem_fill_ratio,
+            unused_stem_count,
+        }
     }
 }
 
@@ -304,7 +475,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::kdtree::KdTree;
+    use crate::float_sss::kdtree::KdTree;
+    use ordered_float::OrderedFloat;
+    use rand::{Rng, SeedableRng};
     type AX = f64;
 
     #[test]
@@ -362,4 +535,28 @@ mod tests {
     //     let deserialized: KdTree = serde_json::from_str(&serialized).unwrap();
     //     assert_eq!(tree, deserialized);
     // }
+
+    #[test]
+    fn can_construct_optimized_tree() {
+        use itertools::Itertools;
+
+        const TREE_SIZE: usize = 8_388_608; // 2^23
+                                            // const TREE_SIZE: usize = 1000;
+
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(493);
+        // let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(1);
+        let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE).map(|_| rng.gen::<[f32; 4]>()).collect();
+
+        // let num_uniq = content_to_add
+        //     .iter()
+        //     .flatten()
+        //     .map(|&x| OrderedFloat(x))
+        //     .unique()
+        //     .count();
+
+        let tree: KdTree<f32, usize, 4, 32, u32> = KdTree::optimize_from(&content_to_add);
+        // let tree: KdTree<f32, usize, 4, 32, u32> = KdTree::from(&content_to_add);
+
+        println!("Tree Stats: {:?}", tree.generate_stats())
+    }
 }

@@ -36,6 +36,9 @@ elapsed = "0.1.2"
 divrem = "1.0.0"
 doc-comment = "0.3.3"
 generator = "0.7.4"
+ordered-float = "3.7.0"
+rand_chacha = "0.3.1"
+itertools = "0.10.5"
 
 [dev-dependencies]
 aligned = "0.4"
