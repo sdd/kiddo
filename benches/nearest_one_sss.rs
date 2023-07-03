@@ -8,8 +8,7 @@ use kiddo::batch_benches;
 use kiddo::distance::squared_euclidean;
 use kiddo::float_sss::kdtree::{Axis, KdTree};
 use kiddo::test_utils::{
-    build_populated_tree_and_query_points_float_sss,
-    process_queries_float_sss,
+    build_populated_tree_and_query_points_float_sss, process_queries_float_sss,
 };
 use kiddo::types::{Content, Index};
 use rand::distributions::Standard;
@@ -17,7 +16,6 @@ use rand_distr::Distribution;
 
 const BUCKET_SIZE: usize = 32;
 const QUERY_POINTS_PER_LOOP: usize = 1000;
-
 
 macro_rules! bench_float {
     ($group:ident, $a:ty, $t:ty, $k:tt, $idx: ty, $size:tt, $subtype: expr) => {
@@ -29,7 +27,6 @@ macro_rules! bench_float {
         );
     };
 }
-
 
 pub fn nearest_one_sss(c: &mut Criterion) {
     let mut group = c.benchmark_group("Query Nearest 1");

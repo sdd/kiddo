@@ -1,6 +1,7 @@
 #![feature(get_many_mut)]
 #![feature(allocator_api)]
 #![feature(int_roundings)]
+#![feature(generic_const_exprs)]
 #![warn(rustdoc::missing_crate_level_docs)]
 #![deny(rustdoc::invalid_codeblock_attributes)]
 #![warn(missing_docs)]
