@@ -364,14 +364,21 @@ where
         let levels_below = stems.len().ilog2() - stem_index.ilog2();
         let items_below = 2usize.pow(levels_below) * B;
         if sort_index.len() <= items_below / 2 {
-            Self::optimize_stems(stems, source, sort_index, stem_index << 1, next_dim, shifted);
+            Self::optimize_stems(
+                stems,
+                source,
+                sort_index,
+                stem_index << 1,
+                next_dim,
+                shifted,
+            );
             return 0;
         }
 
         let mut pivot = sort_index.len() >> 1;
         if stem_index == 1 {
             // top level. special shift to ensure the left subtree is the full one.
-            pivot = (pivot  - (B / 2) + 1).next_power_of_two();
+            pivot = (pivot - (B / 2) + 1).next_power_of_two();
         }
         //pivot = pivot - shifted;
         // let mut pivot = ((sort_index.len() >> 1) - 1).next_power_of_two();
@@ -403,7 +410,6 @@ where
 
         // are we on the bottom row?
         if levels_below == 0 {
-
             // if the right bucket will overflow, return the overflow amount
             if (source.len() - pivot) > B {
                 return (source.len() - pivot) - B;
@@ -421,7 +427,14 @@ where
         loop {
             (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
 
-            requested_shift_amount = Self::optimize_stems(stems, source, lower_sort_index, next_stem_index, next_dim, shift);
+            requested_shift_amount = Self::optimize_stems(
+                stems,
+                source,
+                lower_sort_index,
+                next_stem_index,
+                next_dim,
+                shift,
+            );
 
             if requested_shift_amount == 0 {
                 break;
@@ -443,7 +456,14 @@ where
         // TODO: if we get here ahd have shifted, upper_sort_index
         // now contains too many items.
         let next_stem_index = next_stem_index + 1;
-        Self::optimize_stems(stems, source, upper_sort_index, next_stem_index, next_dim, 0)
+        Self::optimize_stems(
+            stems,
+            source,
+            upper_sort_index,
+            next_stem_index,
+            next_dim,
+            0,
+        )
     }
 
     /// Returns the current number of elements stored in the tree
@@ -595,7 +615,6 @@ mod tests {
 
     #[test]
     fn can_construct_optimized_tree_with_straddled_split() {
-
         let content_to_add = vec![
             [1.0, 101.0],
             [2.0, 102.0],
