@@ -4,10 +4,10 @@
 //! decimal point.
 
 use az::{Az, Cast};
+use divrem::DivCeil;
 use fixed::traits::Fixed;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
-use divrem::DivCeil;
 
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;

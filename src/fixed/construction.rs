@@ -130,7 +130,7 @@ where
 
         let leaf_idx = stem_idx - IDX::leaf_offset();
 
-        if let Some(mut leaf_node) = self.leaves.get_mut(leaf_idx.az::<usize>()) {
+        if let Some(leaf_node) = self.leaves.get_mut(leaf_idx.az::<usize>()) {
             let mut p_index = 0;
             while p_index < leaf_node.size.az::<usize>() {
                 if &leaf_node.content_points[p_index] == query

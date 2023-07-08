@@ -2,10 +2,10 @@
 //! are floats. f64 or f32 are supported currently.
 
 use az::{Az, Cast};
+use divrem::DivCeil;
 use num_traits::Float;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
-use divrem::DivCeil;
 
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;
