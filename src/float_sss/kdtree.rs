@@ -279,27 +279,40 @@ where
         usize: Cast<T>,
     {
         let item_count = source.len();
-        let leaf_node_count = item_count.div_ceil(B);
-        let stem_node_count = leaf_node_count.next_power_of_two();
+        let mut leaf_node_count = item_count.div_ceil(B);
+        let mut stem_node_count = leaf_node_count.next_power_of_two();
 
-        let layout = Layout::array::<LeafNode<A, T, K, B, IDX>>(leaf_node_count).unwrap();
-        let mut leaves = unsafe {
-            let mem = match Global.allocate(layout) {
-                Ok(mem) => mem.cast::<LeafNode<A, T, K, B, IDX>>().as_ptr(),
-                Err(AllocError) => panic!(),
+        let mut stems;
+        let mut leaves;
+
+        let mut requested_shift = 0;
+        loop {
+            let layout = Layout::array::<LeafNode<A, T, K, B, IDX>>(leaf_node_count).unwrap();
+            leaves = unsafe {
+                let mem = match Global.allocate(layout) {
+                    Ok(mem) => mem.cast::<LeafNode<A, T, K, B, IDX>>().as_ptr(),
+                    Err(AllocError) => panic!(),
+                };
+
+                Vec::from_raw_parts_in(mem, leaf_node_count, leaf_node_count, Global)
             };
+            for mut leaf in &mut leaves {
+                leaf.size = IDX::zero();
+            }
 
-            Vec::from_raw_parts_in(mem, leaf_node_count, leaf_node_count, Global)
-        };
-        for mut leaf in &mut leaves {
-            leaf.size = IDX::zero();
+            stems = vec![A::infinity(); stem_node_count];
+            let mut sort_index = Vec::from_iter(0..item_count);
+            stems[0] = A::infinity();
+
+            requested_shift = Self::optimize_stems(&mut stems, source, &mut sort_index, 1, 0, 0);
+
+            if requested_shift == 0 {
+                break;
+            }
+
+            stem_node_count = stem_node_count.next_power_of_two();
+            leaf_node_count += 1;
         }
-
-        let mut stems = vec![A::infinity(); stem_node_count];
-        let mut sort_index = Vec::from_iter(0..item_count);
-        stems[0] = A::infinity();
-
-        Self::optimize_stems(&mut stems, source, &mut sort_index, 1, 0);
 
         let mut tree = Self {
             size: 0,
@@ -317,6 +330,20 @@ where
         tree
     }
 
+    /**
+     *  1234456789ABCDEF: Initial alloc
+     *
+     *  12344567 89ABCDEF: First split
+     *
+     *  1234 4567        : Second split
+     *
+     *  123 44567        :  Second split adjust: overflow
+     *
+     *  1234456 789ABCDE F : desired readjustment
+     *
+     *  123 4456           : Revised second split
+     */
+
     /// the value returned is zero if balancing was successful. If however a child splitpoint has
     /// landed in between two (or more) items with the same value, the value returned is a hint to
     /// the caller of how many items overflowed out of the second bucket due to the optimization
@@ -327,6 +354,7 @@ where
         sort_index: &mut [usize],
         stem_index: usize,
         dim: usize,
+        shifted: usize,
     ) -> usize {
         let next_dim = (dim + 1).rem(K);
 
@@ -336,57 +364,86 @@ where
         let levels_below = stems.len().ilog2() - stem_index.ilog2();
         let items_below = 2usize.pow(levels_below) * B;
         if sort_index.len() <= items_below / 2 {
-            Self::optimize_stems(stems, source, sort_index, stem_index << 1, next_dim);
+            Self::optimize_stems(stems, source, sort_index, stem_index << 1, next_dim, shifted);
             return 0;
         }
 
-        let mut pivot = ((sort_index.len() >> 1) - (B / 2)).next_power_of_two();
+        let mut pivot = sort_index.len() >> 1;
+        if stem_index == 1 {
+            // top level. special shift to ensure the left subtree is the full one.
+            pivot = (pivot  - (B / 2) + 1).next_power_of_two();
+        }
+        //pivot = pivot - shifted;
+        // let mut pivot = ((sort_index.len() >> 1) - 1).next_power_of_two();
         let orig_pivot = pivot;
 
         sort_index.select_nth_unstable_by_key(pivot + 1, |&i| OrderedFloat(source[i][dim]));
 
         //debug_assert!(source[sort_index[mid]][dim] != source[sort_index[mid + 1]][dim]);
 
-        while (source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim]
-            || source[sort_index[pivot]][dim] == source[sort_index[pivot + 1]][dim])
-            && pivot > 1
-        {
+        // if the pivot straddles teo values that are the same, keep nudging it left until
+        // it doesn't
+        while source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim] && pivot > 0 {
             pivot -= 1;
         }
-        if pivot == 1 {
-            pivot = orig_pivot;
-            sort_index.select_nth_unstable_by_key(sort_index.len() - 1, |&i| {
-                OrderedFloat(source[i][dim])
-            });
-            while (source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim]
-                || source[sort_index[pivot]][dim] == source[sort_index[pivot + 1]][dim])
-                && pivot < sort_index.len() - 2
-            {
-                pivot += 1;
-            }
+        debug_assert!(pivot > 0); // if we end up with a pivot of 0, something has gone wrong!
+
+        // if we have had to nudge left, abort early with non-zero to instruct parent to rebalance
+        if pivot < orig_pivot {
+            return orig_pivot - pivot;
         }
-        if pivot == sort_index.len() - 2 {
-            let vals_for_dim: Vec<_> = sort_index.iter().map(|x| source[*x][dim]).collect();
-            println!("Can't split!");
-            println!("Data along dim: {:?}", vals_for_dim);
-            println!("orig pivot: {:?}", orig_pivot);
-            println!("orig pivot val: {:?}", source[sort_index[orig_pivot]][dim])
+
+        // if the total number of items that we have to the left of the pivot can fit
+        // in a single bucket, we're done
+        if pivot <= B {
+            return 0;
         }
-        debug_assert!(pivot != sort_index.len() - 2);
 
         stems[stem_index] = source[sort_index[pivot]][dim];
 
-        if pivot <= B {
-            return;
+        // are we on the bottom row?
+        if levels_below == 0 {
+
+            // if the right bucket will overflow, return the overflow amount
+            if (source.len() - pivot) > B {
+                return (source.len() - pivot) - B;
+            }
+
+            // if the right bucket won't overflow, we're good.
+            return 0;
         }
 
-        let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
-
         let next_stem_index = stem_index << 1;
-        Self::optimize_stems(stems, source, lower_sort_index, next_stem_index, next_dim);
+        let mut requested_shift_amount = 0;
+        let mut shift = 0;
+        let mut lower_sort_index;
+        let mut upper_sort_index;
+        loop {
+            (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
 
+            requested_shift_amount = Self::optimize_stems(stems, source, lower_sort_index, next_stem_index, next_dim, shift);
+
+            if requested_shift_amount == 0 {
+                break;
+            } else {
+                pivot -= requested_shift_amount;
+                shift += requested_shift_amount;
+
+                // TODO: test for RHS now having more items than can fit
+                // in the buckets present in its subtree. If it does,
+                // return with a value so that the parent reduces our
+                // total allocation
+                let new_upper_size = sort_index.len() - pivot;
+                if new_upper_size > items_below >> 1 {
+                    return new_upper_size - (items_below >> 1);
+                }
+            }
+        }
+
+        // TODO: if we get here ahd have shifted, upper_sort_index
+        // now contains too many items.
         let next_stem_index = next_stem_index + 1;
-        Self::optimize_stems(stems, source, upper_sort_index, next_stem_index, next_dim);
+        Self::optimize_stems(stems, source, upper_sort_index, next_stem_index, next_dim, 0)
     }
 
     /// Returns the current number of elements stored in the tree
@@ -537,7 +594,34 @@ mod tests {
     // }
 
     #[test]
-    fn can_construct_optimized_tree() {
+    fn can_construct_optimized_tree_with_straddled_split() {
+
+        let content_to_add = vec![
+            [1.0, 101.0],
+            [2.0, 102.0],
+            [3.0, 103.0],
+            [4.0, 104.0],
+            [4.0, 104.0],
+            [5.0, 105.0],
+            [6.0, 106.0],
+            [7.0, 107.0],
+            [8.0, 108.0],
+            [9.0, 109.0],
+            [10.0, 110.0],
+            [11.0, 111.0],
+            [12.0, 112.0],
+            [13.0, 113.0],
+            [14.0, 114.0],
+            [15.0, 115.0],
+        ];
+
+        let tree: KdTree<f32, usize, 2, 4, u32> = KdTree::optimize_from(&content_to_add);
+
+        println!("Tree Stats: {:?}", tree.generate_stats())
+    }
+
+    #[test]
+    fn can_construct_optimized_tree_large_rand() {
         use itertools::Itertools;
 
         const TREE_SIZE: usize = 8_388_608; // 2^23
