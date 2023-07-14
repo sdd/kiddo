@@ -1,5 +1,4 @@
 #![feature(allocator_api)]
-#![feature(generic_const_exprs)]
 #![feature(get_many_mut)]
 #![feature(int_roundings)]
 #![feature(stdsimd)]
