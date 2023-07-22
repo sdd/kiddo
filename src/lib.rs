@@ -82,7 +82,8 @@ pub mod distance;
 
 pub mod fixed;
 pub mod float;
-pub mod float_sss;
+//pub mod float_sss;
+pub mod immutable_float;
 mod mirror_select_nth_unstable_by;
 #[doc(hidden)]
 pub mod test_utils;

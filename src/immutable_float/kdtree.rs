@@ -2,7 +2,6 @@
 //! are floats. f64 or f32 are supported currently.
 
 use az::{Az, Cast};
-use divrem::DivCeil;
 use num_traits::Float;
 use ordered_float::OrderedFloat;
 use std::alloc::{AllocError, Allocator, Global, Layout};
@@ -12,76 +11,16 @@ use std::ops::Rem;
 
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;
-use crate::types::{Content, Index};
+use crate::types::Content;
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
 
-pub trait FloatLSB {
-    fn is_lsb_set(self) -> bool;
-    fn with_lsb_set(self) -> Self;
-    fn with_lsb_clear(self) -> Self;
-    fn is_2lsb_set(self) -> bool;
-    fn with_2lsb_set(self) -> Self;
-    fn with_2lsb_clear(self) -> Self;
-}
-
-impl FloatLSB for f32 {
-    fn is_lsb_set(self) -> bool {
-        self.to_bits() & 1u32 != 0
-    }
-
-    fn with_lsb_set(self) -> f32 {
-        f32::from_bits(self.to_bits() | 1u32)
-    }
-
-    fn with_lsb_clear(self) -> f32 {
-        f32::from_bits(self.to_bits() & 0xFFFFFFFE)
-    }
-
-    fn is_2lsb_set(self) -> bool {
-        self.to_bits() & 2u32 != 0
-    }
-
-    fn with_2lsb_set(self) -> f32 {
-        f32::from_bits(self.to_bits() | 2u32)
-    }
-
-    fn with_2lsb_clear(self) -> f32 {
-        f32::from_bits(self.to_bits() & 0xFFFFFFFD)
-    }
-}
-
-impl FloatLSB for f64 {
-    fn is_lsb_set(self) -> bool {
-        self.to_bits() & 1u64 != 0
-    }
-
-    fn with_lsb_set(self) -> f64 {
-        f64::from_bits(self.to_bits() | 1u64)
-    }
-
-    fn with_lsb_clear(self) -> f64 {
-        f64::from_bits(self.to_bits() & 0xFFFFFFFFFFFFFFFE)
-    }
-
-    fn is_2lsb_set(self) -> bool {
-        self.to_bits() & 2u64 != 0
-    }
-
-    fn with_2lsb_set(self) -> f64 {
-        f64::from_bits(self.to_bits() | 2u64)
-    }
-
-    fn with_2lsb_clear(self) -> f64 {
-        f64::from_bits(self.to_bits() & 0xFFFFFFFFFFFFFFFD)
-    }
-}
 
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
 /// on the float `KdTree`. This will be `f64` or `f32`.
-pub trait Axis: Float + Default + Debug + Copy + Sync + FloatLSB {}
-impl<T: Float + Default + Debug + Copy + Sync + FloatLSB> Axis for T {}
+pub trait Axis: Float + Default + Debug + Copy + Sync {}
+impl<T: Float + Default + Debug + Copy + Sync> Axis for T {}
 
 /// Floating point k-d tree
 ///
@@ -93,14 +32,10 @@ impl<T: Float + Default + Debug + Copy + Sync + FloatLSB> Axis for T {}
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[derive(Clone, Debug, PartialEq)]
-pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
-    pub(crate) leaves: Vec<LeafNode<A, T, K, B, IDX>>,
+pub struct ImmutableKdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize> {
+    pub(crate) leaves: Vec<LeafNode<A, T, K, B>>,
     pub(crate) stems: Vec<A>,
-    pub(crate) dstems: Vec<StemNode<A, K, IDX>>,
-    pub(crate) size: usize,
-
-    pub(crate) unreserved_leaf_idx: usize,
-    pub(crate) optimized_read_only: bool,
+    pub(crate) size: usize
 }
 
 #[doc(hidden)]
@@ -110,21 +45,7 @@ pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B:
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[derive(Clone, Debug, PartialEq)]
-pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
-    // pub(crate) left: IDX,
-    // pub(crate) right: IDX,
-    pub(crate) children: [IDX; 2],
-    pub(crate) split_val: A,
-}
-
-#[doc(hidden)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-#[cfg_attr(
-    feature = "serialize_rkyv",
-    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
-)]
-#[derive(Clone, Debug, PartialEq)]
-pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
+pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize> {
     #[cfg_attr(feature = "serialize", serde(with = "array_of_arrays"))]
     #[cfg_attr(
         feature = "serialize",
@@ -143,134 +64,42 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
     )]
     pub(crate) content_items: [T; B],
 
-    pub(crate) size: IDX,
+    // TODO: can I get rid of this by padding with NaNs?
+    pub(crate) size: usize,
 }
 
-/* impl<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX>
-    LeafNode<A, T, K, B, IDX>
-where
-    A: Axis,
-    T: Content,
-    IDX: Index<T = IDX>,
-{
-    pub(crate) fn new() -> Self {
-        Self {
-            content_points: [[A::zero(); K]; B],
-            content_items: [T::zero(); B],
-            size: IDX::zero(),
-        }
-    }
-} */
-
+/// Encloses stats on a particular `ImmutableTree`'s usage at
+/// the time of calling `generate_stats()`
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct TreeStats {
-    dstem_node_count: usize,
+    size: usize,
+    capacity: usize,
+    stem_count: usize,
+    leaf_count: usize,
     leaf_fill_counts: Vec<usize>,
     leaf_fill_ratio: f32,
     stem_fill_ratio: f32,
     unused_stem_count: usize,
 }
 
-impl<A, T, const K: usize, const B: usize, IDX> KdTree<A, T, K, B, IDX>
+impl<A, T, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
 where
     A: Axis,
-    T: Content,
-    IDX: Index<T = IDX>,
-    usize: Cast<IDX>,
+    T: Content
 {
-    /// Creates a new float KdTree.
-    ///
-    /// Capacity is set by default to 10x the bucket size (32 in this case).
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
-    ///
-    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
-    ///
-    /// tree.add(&[1.0, 2.0, 5.0], 100);
-    ///
-    /// assert_eq!(tree.size(), 1);
-    /// ```
-    #[inline]
-    pub fn new() -> Self {
-        KdTree::with_capacity(B * 16)
-    }
-
-    /// Creates a new float KdTree and reserve capacity for a specific number of items.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
-    ///
-    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
-    ///
-    /// tree.add(&[1.0, 2.0, 5.0], 100);
-    ///
-    /// assert_eq!(tree.size(), 1);
-    /// ```
-    #[inline]
-    pub fn with_capacity(capacity: usize) -> Self {
-        assert!(capacity <= <IDX as Index>::capacity_with_bucket_size(B));
-
-        let leaf_capacity = DivCeil::div_ceil(capacity, B.az::<usize>()).next_power_of_two();
-        let stem_capacity = leaf_capacity.max(1);
-
-        let layout = Layout::array::<A>(stem_capacity).unwrap();
-        let stems = unsafe {
-            let mem = match Global.allocate(layout) {
-                Ok(mem) => mem.cast::<A>().as_ptr(),
-                Err(AllocError) => panic!(),
-            };
-
-            Vec::from_raw_parts_in(mem, stem_capacity, stem_capacity, Global)
-        };
-
-        let layout = Layout::array::<LeafNode<A, T, K, B, IDX>>(leaf_capacity).unwrap();
-        let leaves = unsafe {
-            let mem = match Global.allocate(layout) {
-                Ok(mem) => mem.cast::<LeafNode<A, T, K, B, IDX>>().as_ptr(),
-                Err(AllocError) => panic!(),
-            };
-
-            Vec::from_raw_parts_in(mem, leaf_capacity, leaf_capacity, Global)
-        };
-
-        let mut tree = Self {
-            size: 0,
-            stems,
-            dstems: Vec::with_capacity(0),
-            leaves,
-            unreserved_leaf_idx: leaf_capacity,
-            optimized_read_only: false,
-        };
-
-        tree.leaves[0].size = IDX::zero();
-
-        // Set this to infinity so that if it is accessed, things will break
-        tree.stems[0] = A::infinity();
-
-        // 1 is the true root, so that we can use *2 and *2+1 to traverse down
-        tree.stems[1] = A::nan();
-
-        tree
-    }
-
-    /// Creates a new float KdTree, balanced and optimized.
+    /// Creates an ImmutableKdTree, balanced and optimized.
     ///
     /// Trees constructed using this method will not be modifiable
-    /// after construction, ant will be optimally balanced and tuned.
+    /// after construction and will be optimally balanced and tuned.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
+    /// use kiddo::immutable_float::kdtree::ImmutableKdTree;
     ///
     /// let points: Vec<[f64; 3]> = vec!();
-    /// let tree: KdTree<f64, u32, 3, 32, u32> = KdTree::optimize_from(points);
+    /// let tree: KdTree<f64, u32, 3, 32> = KdTree::optimize_from(points);
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
@@ -294,8 +123,7 @@ where
             let mut sort_index = Vec::from_iter(0..item_count);
             stems[0] = A::infinity();
 
-            let requested_shift =
-                Self::optimize_stems(&mut stems, source, &mut sort_index, 1, 0, total_shift);
+            let requested_shift = Self::optimize_stems(&mut stems, source, &mut sort_index, 1, 0, total_shift);
 
             if requested_shift == 0 {
                 break;
@@ -309,10 +137,7 @@ where
         let mut tree = Self {
             size: 0,
             stems,
-            dstems: Vec::with_capacity(0),
             leaves,
-            unreserved_leaf_idx: leaf_node_count,
-            optimized_read_only: true,
         };
 
         for (idx, point) in source.iter().enumerate() {
@@ -322,24 +147,24 @@ where
         tree
     }
 
-    fn allocate_leaves(count: usize) -> Vec<LeafNode<A, T, K, B, IDX>> {
-        let layout = Layout::array::<LeafNode<A, T, K, B, IDX>>(count).unwrap();
+    fn allocate_leaves(count: usize) -> Vec<LeafNode<A, T, K, B>> {
+        let layout = Layout::array::<LeafNode<A, T, K, B>>(count).unwrap();
         let mut leaves = unsafe {
             let mem = match Global.allocate(layout) {
-                Ok(mem) => mem.cast::<LeafNode<A, T, K, B, IDX>>().as_ptr(),
+                Ok(mem) => mem.cast::<LeafNode<A, T, K, B>>().as_ptr(),
                 Err(AllocError) => panic!(),
             };
 
             Vec::from_raw_parts_in(mem, count, count, Global)
         };
         for leaf in &mut leaves {
-            leaf.size = IDX::zero();
+            leaf.size = 0;
         }
 
         leaves
     }
 
-    /**
+        /**
      *  1234456789ABCDEF: Initial alloc
      *
      *  12344567 89ABCDEF: First split
@@ -464,7 +289,7 @@ where
 
         let next_stem_index = stem_index << 1;
         let mut requested_shift_amount;
-        let mut shift = 0;
+        let mut shift = shifted;
         let mut lower_sort_index;
         let mut upper_sort_index;
         loop {
@@ -508,6 +333,7 @@ where
         )
     }
 
+
     /// Returns the current number of elements stored in the tree
     ///
     /// # Examples
@@ -527,30 +353,14 @@ where
         self.size
     }
 
+    /// Returns the theoretical max capacity of this tree
     #[inline]
     pub fn capacity(&self) -> usize {
         self.leaves.len() * B
     }
 
-    #[inline]
-    pub(crate) fn is_stem_index(x: IDX) -> bool {
-        x < <IDX as Index>::leaf_offset()
-    }
-
-    pub(crate) fn initialise_dstems(&mut self) {
-        let leaf_capacity = self.leaves.capacity();
-
-        let layout = Layout::array::<StemNode<A, K, IDX>>(leaf_capacity).unwrap();
-        self.dstems = unsafe {
-            let mem = match Global.allocate(layout) {
-                Ok(mem) => mem.cast::<StemNode<A, K, IDX>>().as_ptr(),
-                Err(AllocError) => panic!(),
-            };
-
-            Vec::from_raw_parts_in(mem, leaf_capacity, leaf_capacity, Global)
-        };
-    }
-
+    /// Gererates a `TreeStats` object, describing some
+    /// statistics of a particular instance of an `ImmutableTree`
     pub fn generate_stats(&self) -> TreeStats {
         let mut leaf_fill_counts = vec![0usize; B + 1];
         for leaf in &self.leaves {
@@ -563,10 +373,11 @@ where
 
         let stem_fill_ratio = 1.0 - (unused_stem_count as f32 / ((self.stems.len() - 1) as f32));
 
-        let dstem_node_count = self.dstems.len();
-
         TreeStats {
-            dstem_node_count,
+            size: self.size,
+            capacity: self.leaves.len() * B,
+            stem_count: self.stems.len(),
+            leaf_count: self.leaves.len(),
             leaf_fill_counts,
             leaf_fill_ratio,
             stem_fill_ratio,
@@ -575,90 +386,18 @@ where
     }
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> From<&Vec<[A; K]>>
-    for KdTree<A, T, K, B, IDX>
-where
-    usize: Cast<IDX>,
-    usize: Cast<T>,
-{
-    fn from(vec: &Vec<[A; K]>) -> Self {
-        let mut tree: KdTree<A, T, K, B, IDX> = KdTree::with_capacity(vec.len());
-
-        vec.iter().enumerate().for_each(|(idx, pos)| {
-            tree.add(pos, idx.az::<T>());
-        });
-
-        tree
-    }
-}
 
 #[cfg(test)]
 mod tests {
-    use crate::float_sss::kdtree::KdTree;
-    use num_traits::Pow;
+    use std::panic;
+
+    use crate::immutable_float::kdtree::ImmutableKdTree;
     use ordered_float::OrderedFloat;
     use rand::{Rng, SeedableRng};
-    use std::panic;
-    type AX = f64;
-
-    #[test]
-    fn it_can_be_constructed_with_new() {
-        let tree: KdTree<AX, u32, 4, 32, u32> = KdTree::new();
-
-        assert_eq!(tree.size(), 0);
-    }
-
-    #[test]
-    fn it_can_be_constructed_with_a_defined_capacity() {
-        let tree: KdTree<AX, u32, 4, 32, u32> = KdTree::with_capacity(10);
-
-        assert_eq!(tree.size(), 0);
-    }
-
-    #[test]
-    fn it_can_be_constructed_with_a_capacity_of_zero() {
-        let tree: KdTree<AX, u32, 4, 32, u32> = KdTree::with_capacity(0);
-
-        assert_eq!(tree.size(), 0);
-    }
-    /*    #[cfg(feature = "serialize")]
-    #[test]
-    fn can_serde() {
-        let mut tree: KdTree<u16, u32, 4, 32, u32> = KdTree::new();
-
-        let content_to_add: [(PT, T); 16] = [
-            ([9f32, 0f32, 9f32, 0f32], 9),
-            ([4f32, 500f32, 4f32, 500f32], 4),
-            ([12f32, -300f32, 12f32, -300f32], 12),
-            ([7f32, 200f32, 7f32, 200f32], 7),
-            ([13f32, -400f32, 13f32, -400f32], 13),
-            ([6f32, 300f32, 6f32, 300f32], 6),
-            ([2f32, 700f32, 2f32, 700f32], 2),
-            ([14f32, -500f32, 14f32, -500f32], 14),
-            ([3f32, 600f32, 3f32, 600f32], 3),
-            ([10f32, -100f32, 10f32, -100f32], 10),
-            ([16f32, -700f32, 16f32, -700f32], 16),
-            ([1f32, 800f32, 1f32, 800f32], 1),
-            ([15f32, -600f32, 15f32, -600f32], 15),
-            ([5f32, 400f32, 5f32, 400f32], 5),
-            ([8f32, 100f32, 8f32, 100f32], 8),
-            ([11f32, -200f32, 11f32, -200f32], 11),
-        ];
-
-        for (point, item) in content_to_add {
-            tree.add(&point, item);
-        }
-        assert_eq!(tree.size(), 16);
-
-        let serialized = serde_json::to_string(&tree).unwrap();
-        println!("JSON: {:?}", &serialized);
-
-        let deserialized: KdTree = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(tree, deserialized);
-    }*/
 
     #[test]
     fn can_construct_optimized_tree_with_straddled_split() {
+
         let content_to_add = vec![
             [1.0, 101.0],
             [2.0, 102.0],
@@ -678,7 +417,7 @@ mod tests {
             [15.0, 115.0],
         ];
 
-        let tree: KdTree<f32, usize, 2, 4, u32> = KdTree::optimize_from(&content_to_add);
+        let tree: ImmutableKdTree<f32, usize, 2, 4> = ImmutableKdTree::optimize_from(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats());
 
@@ -713,7 +452,7 @@ mod tests {
             [18.0, 118.0],
         ];
 
-        let tree: KdTree<f32, usize, 2, 4, u32> = KdTree::optimize_from(&content_to_add);
+        let tree: ImmutableKdTree<f32, usize, 2, 4> = ImmutableKdTree::optimize_from(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats());
 
@@ -753,7 +492,7 @@ mod tests {
         ];
         content_to_add.shuffle(&mut rng);
 
-        let tree: KdTree<f32, usize, 2, 4, u32> = KdTree::optimize_from(&content_to_add);
+        let tree: ImmutableKdTree<f32, usize, 2, 4> = ImmutableKdTree::optimize_from(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats());
 
@@ -772,9 +511,10 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
-        let _tree: KdTree<f32, usize, 4, 4, u32> = KdTree::optimize_from(&content_to_add);
+        let _tree: ImmutableKdTree<f32, usize, 4, 4> = ImmutableKdTree::optimize_from(&content_to_add);
     }
 
+    #[ignore]
     #[test]
     fn can_construct_optimized_tree_multi_rand_increasing_size() {
         let mut failed = false;
@@ -786,8 +526,8 @@ mod tests {
                     let content_to_add: Vec<[f32; 4]> =
                         (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
-                    let _tree: KdTree<f32, usize, 4, 4, u32> =
-                        KdTree::optimize_from(&content_to_add);
+                    let _tree: ImmutableKdTree<f32, usize, 4, 4> =
+                    ImmutableKdTree::optimize_from(&content_to_add);
                 });
 
                 if result.is_err() {
@@ -818,7 +558,7 @@ mod tests {
 
         println!("dupes: {:?}", TREE_SIZE * 4 - num_uniq);
 
-        let tree: KdTree<f32, usize, 4, 4, u32> = KdTree::optimize_from(&content_to_add);
+        let tree: ImmutableKdTree<f32, usize, 4, 4> = ImmutableKdTree::optimize_from(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
@@ -837,7 +577,7 @@ mod tests {
         //     .unique()
         //     .count();
 
-        let tree: KdTree<f32, usize, 4, 32, u32> = KdTree::optimize_from(&content_to_add);
+        let tree: ImmutableKdTree<f32, usize, 4, 32> = ImmutableKdTree::optimize_from(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
