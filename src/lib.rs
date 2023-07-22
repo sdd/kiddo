@@ -82,7 +82,8 @@ mod custom_serde;
 pub mod distance_metric;
 pub mod fixed;
 pub mod float;
-pub mod float_sss;
+//pub mod float_sss;
+pub mod immutable_float;
 mod mirror_select_nth_unstable_by;
 pub mod nearest_neighbour;
 #[doc(hidden)]
