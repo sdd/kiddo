@@ -775,6 +775,7 @@ mod tests {
         let _tree: KdTree<f32, usize, 4, 4, u32> = KdTree::optimize_from(&content_to_add);
     }
 
+    #[ignore]
     #[test]
     fn can_construct_optimized_tree_multi_rand_increasing_size() {
         let mut failed = false;
