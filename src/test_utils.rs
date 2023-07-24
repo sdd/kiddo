@@ -7,7 +7,7 @@ use std::hint::black_box;
 
 use crate::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
 use crate::float::kdtree::{Axis, KdTree};
-use crate::float_sss::kdtree::{Axis as AxisSSS, KdTree as KdTreeSSS};
+//use crate::float_sss::kdtree::{Axis as AxisSSS, KdTree as KdTreeSSS};
 use crate::types::{Content, Index};
 
 // use rand_distr::UnitSphere as SPHERE;
@@ -122,6 +122,7 @@ where
     kdtree
 }
 
+/*
 pub fn build_populated_tree_float_sss<
     A: AxisSSS,
     T: Content,
@@ -147,6 +148,7 @@ where
 
     kdtree
 }
+*/
 
 pub fn build_query_points_fixed<A: Unsigned, const K: usize>(
     points_qty: usize,
@@ -288,6 +290,7 @@ where
     )
 }
 
+/*
 pub fn build_populated_tree_and_query_points_float_sss<
     A: AxisSSS,
     T: Content,
@@ -308,6 +311,7 @@ where
         build_query_points_float(query_point_qty),
     )
 }
+*/
 
 #[inline]
 pub fn process_queries_float<
@@ -337,6 +341,7 @@ where
     )
 }
 
+/*
 #[inline]
 pub fn process_queries_float_sss<
     A: AxisSSS + 'static,
@@ -392,3 +397,4 @@ where
         },
     )
 }
+*/

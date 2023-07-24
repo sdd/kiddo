@@ -120,3 +120,7 @@ required-features = ["serialize"]
 name = "rkyv"
 path = "examples/rkyv.rs"
 required-features = ["serialize_rkyv"]
+
+[[example]]
+name = "immutable_large"
+path = "examples/immutable_large.rs"
