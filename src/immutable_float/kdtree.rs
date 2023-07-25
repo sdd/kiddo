@@ -278,7 +278,7 @@ where
 
         // if the total number of items that we have to the left of the pivot can fit
         // in a single bucket, we're done
-        if pivot <= B {
+        if pivot <= B && (chunk_length - pivot) <= B {
             return 0;
         }
 
