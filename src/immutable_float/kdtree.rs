@@ -15,7 +15,6 @@ use crate::types::Content;
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
 
-
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
 /// on the float `KdTree`. This will be `f64` or `f32`.
@@ -35,7 +34,7 @@ impl<T: Float + Default + Debug + Copy + Sync> Axis for T {}
 pub struct ImmutableKdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize> {
     pub(crate) leaves: Vec<LeafNode<A, T, K, B>>,
     pub(crate) stems: Vec<A>,
-    pub(crate) size: usize
+    pub(crate) size: usize,
 }
 
 #[doc(hidden)]
@@ -68,16 +67,16 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
     pub(crate) size: usize,
 }
 
-impl<A, T, const K: usize, const B: usize>  LeafNode<A, T, K, B>
+impl<A, T, const K: usize, const B: usize> LeafNode<A, T, K, B>
 where
     A: Axis,
-    T: Content
+    T: Content,
 {
     fn new() -> Self {
         LeafNode {
             content_items: [T::zero(); B],
             content_points: [[A::zero(); K]; B],
-            size: 0
+            size: 0,
         }
     }
 }
@@ -99,7 +98,7 @@ pub struct TreeStats {
 impl<A, T, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
 where
     A: Axis,
-    T: Content
+    T: Content,
 {
     /// Creates an ImmutableKdTree, balanced and optimized.
     ///
@@ -172,7 +171,7 @@ where
         let mut tree = Self {
             size: 0,
             stems,
-            leaves: Self::safe_allocate_leaves(leaf_node_count)
+            leaves: Self::safe_allocate_leaves(leaf_node_count),
         };
 
         for (idx, point) in source.iter().enumerate() {
@@ -320,6 +319,7 @@ where
         )
     }
 
+    #[allow(dead_code)]
     fn allocate_leaves(count: usize) -> Vec<LeafNode<A, T, K, B>> {
         let layout = Layout::array::<LeafNode<A, T, K, B>>(count).unwrap();
         let mut leaves = unsafe {
@@ -337,6 +337,7 @@ where
         leaves
     }
 
+    #[allow(dead_code)]
     fn safe_allocate_leaves(count: usize) -> Vec<LeafNode<A, T, K, B>> {
         vec![LeafNode::new(); count]
     }
@@ -410,7 +411,7 @@ fn calc_pivot(chunk_length: usize, shifted: usize, stem_index: usize) -> usize {
             }
         };
     } else if chunk_length & 0x01 == 1 && shifted == 0 {
-    //} else if chunk_length.count_ones() != 1 && shifted == 0 {
+        //} else if chunk_length.count_ones() != 1 && shifted == 0 {
         pivot = (pivot + 1).next_power_of_two()
     } else {
         pivot = pivot.next_power_of_two();
@@ -429,7 +430,6 @@ mod tests {
 
     #[test]
     fn can_construct_optimized_tree_with_straddled_split() {
-
         let content_to_add = vec![
             [1.0, 101.0],
             [2.0, 102.0],
@@ -449,7 +449,8 @@ mod tests {
             [15.0, 115.0],
         ];
 
-        let tree: ImmutableKdTree<f32, usize, 2, 4> = ImmutableKdTree::optimize_from(&content_to_add);
+        let tree: ImmutableKdTree<f32, usize, 2, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats());
 
@@ -484,7 +485,8 @@ mod tests {
             [18.0, 118.0],
         ];
 
-        let tree: ImmutableKdTree<f32, usize, 2, 4> = ImmutableKdTree::optimize_from(&content_to_add);
+        let tree: ImmutableKdTree<f32, usize, 2, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats());
 
@@ -524,7 +526,8 @@ mod tests {
         ];
         content_to_add.shuffle(&mut rng);
 
-        let tree: ImmutableKdTree<f32, usize, 2, 4> = ImmutableKdTree::optimize_from(&content_to_add);
+        let tree: ImmutableKdTree<f32, usize, 2, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats());
 
@@ -543,7 +546,8 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
-        let _tree: ImmutableKdTree<f32, usize, 4, 4> = ImmutableKdTree::optimize_from(&content_to_add);
+        let _tree: ImmutableKdTree<f32, usize, 4, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
     }
 
     #[test]
@@ -554,24 +558,38 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
-        let _tree: ImmutableKdTree<f32, usize, 4, 4> = ImmutableKdTree::optimize_from(&content_to_add);
+        let _tree: ImmutableKdTree<f32, usize, 4, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
     }
 
     #[test]
     fn can_construct_optimized_tree_bad_example_3() {
-        let tree_size = 32;
+        let tree_size = 26; // also 32
         let seed = 455191;
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
-        let _tree: ImmutableKdTree<f32, usize, 4, 4> = ImmutableKdTree::optimize_from(&content_to_add);
+        let _tree: ImmutableKdTree<f32, usize, 4, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
+    }
+
+    #[test]
+    fn can_construct_optimized_tree_bad_example_4() {
+        let tree_size = 21;
+        let seed = 131851;
+
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+        let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
+
+        let _tree: ImmutableKdTree<f32, usize, 4, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
     }
 
     #[ignore]
     #[test]
     fn can_construct_optimized_tree_multi_rand_increasing_size() {
-
+        #[allow(dead_code)]
         #[derive(Debug)]
         struct Failure {
             tree_size: i32,
@@ -588,7 +606,7 @@ mod tests {
                         (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
                     let _tree: ImmutableKdTree<f32, usize, 4, 4> =
-                    ImmutableKdTree::optimize_from(&content_to_add);
+                        ImmutableKdTree::optimize_from(&content_to_add);
                 });
 
                 if result.is_err() {
@@ -620,7 +638,8 @@ mod tests {
 
         println!("dupes: {:?}", TREE_SIZE * 4 - num_uniq);
 
-        let tree: ImmutableKdTree<f32, usize, 4, 4> = ImmutableKdTree::optimize_from(&content_to_add);
+        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
@@ -639,7 +658,8 @@ mod tests {
         //     .unique()
         //     .count();
 
-        let tree: ImmutableKdTree<f32, usize, 4, 32> = ImmutableKdTree::optimize_from(&content_to_add);
+        let tree: ImmutableKdTree<f32, usize, 4, 32> =
+            ImmutableKdTree::optimize_from(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
