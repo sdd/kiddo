@@ -1,14 +1,11 @@
 use crate::immutable_float::kdtree::{Axis, ImmutableKdTree};
 use crate::types::Content;
-use std::error::Error;
 use std::ops::Rem;
 
-impl<A: Axis, T: Content, const K: usize, const B: usize>
-ImmutableKdTree<A, T, K, B>
-{
+impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
+    #[allow(dead_code)]
     #[inline]
     pub(crate) fn add_to_optimized(&mut self, query: &[A; K], item: T) {
-
         let mut dim = 0;
         let mut idx: usize = 1;
         let mut val: A;
@@ -30,20 +27,16 @@ ImmutableKdTree<A, T, K, B>
         let node = unsafe { self.leaves.get_unchecked_mut(idx) };
         debug_assert!(node.size < B);
 
-        *unsafe {
-            node.content_points.get_unchecked_mut(node.size)
-        } = *query;
-        *unsafe {
-            node.content_items.get_unchecked_mut(node.size)
-        } = item;
+        *unsafe { node.content_points.get_unchecked_mut(node.size) } = *query;
+        *unsafe { node.content_items.get_unchecked_mut(node.size) } = item;
 
         node.size += 1;
         self.size += 1;
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub(crate) fn safe_add_to_optimized(&mut self, query: &[A; K], item: T) {
-
         let mut dim = 0;
         let mut idx: usize = 1;
         let mut val: A;
@@ -74,5 +67,4 @@ ImmutableKdTree<A, T, K, B>
 }
 
 #[cfg(test)]
-mod tests {
-}
+mod tests {}
