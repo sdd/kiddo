@@ -158,12 +158,21 @@ where
                 shifts = new_shifts;
             }
 
-            let requested_shift = Self::optimize_stems(&mut stems, &mut shifts, source, &mut sort_index, 1, 0);
+            let requested_shift = Self::optimize_stems(
+                &mut stems,
+                &mut shifts,
+                source,
+                &mut sort_index,
+                1,
+                0,
+                leaf_node_count,
+            );
 
             if requested_shift == 0 {
                 break;
             }
 
+            // TODO: a requested shift does not always require a new stem node?
             stem_node_count = (stem_node_count + 1).next_power_of_two();
             leaf_node_count += requested_shift.div_ceil(B);
         }
@@ -192,6 +201,7 @@ where
         sort_index: &mut [usize],
         stem_index: usize,
         dim: usize,
+        leaf_node_count: usize,
     ) -> usize {
         let next_dim = (dim + 1).rem(K);
         let chunk_length = sort_index.len();
@@ -201,20 +211,23 @@ where
         // TODO: this is wrong. It overestimates when being called for the upper half
         // when the source size is not a power of two.
         //let items_below = 2usize.pow(stem_levels_below + 1) * B;
-        let items_below = (2usize.pow(stem_levels_below + 1) * B).min(source.len()) - shifts[stem_index];
+        let items_below =
+            (2usize.pow(stem_levels_below + 1) * B).min(source.len()) + shifts[stem_index];
 
         // If there are few enough items that we could fit all of them in the left subtree,
         // leave the current stem val as +inf to push everything down into the left and
         // recurse down without splitting.
         if chunk_length + shifts[stem_index] <= items_below / 2 {
             if sort_index.len() > B {
-                /* return */ Self::optimize_stems(
+                /* return */
+                Self::optimize_stems(
                     stems,
                     shifts,
                     source,
                     sort_index,
                     stem_index << 1,
                     next_dim,
+                    leaf_node_count,
                 );
             }
             return 0;
@@ -286,6 +299,7 @@ where
                 lower_sort_index,
                 next_stem_index,
                 next_dim,
+                leaf_node_count,
             );
 
             if requested_shift_amount == 0 {
@@ -309,14 +323,17 @@ where
 
         // TODO: shift requests that bubble up from the right subtree
         // get ignored
-        Self::optimize_stems(
+        let right_subtree_requested_shift = Self::optimize_stems(
             stems,
             shifts,
             source,
             upper_sort_index,
             next_stem_index + 1,
             next_dim,
-        )
+            leaf_node_count,
+        );
+
+        return right_subtree_requested_shift;
     }
 
     #[allow(dead_code)]
