@@ -1,10 +1,9 @@
 use std::error::Error;
 
 use kiddo::immutable_float::kdtree::ImmutableKdTree;
-use rand::{SeedableRng, Rng};
+use rand::{Rng, SeedableRng};
 
 const TREE_SIZE: usize = 2usize.pow(23); // ~8M
-
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(493);
