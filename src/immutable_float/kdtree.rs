@@ -623,8 +623,8 @@ mod tests {
 
         let mut failures: Vec<Failure> = Vec::new();
 
-        for tree_size in 16..=40 {
-            for seed in 0..500000 {
+        for tree_size in 16..=32 {
+            for seed in 0..1000000 {
                 let result = panic::catch_unwind(|| {
                     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
                     let content_to_add: Vec<[f32; 4]> =
