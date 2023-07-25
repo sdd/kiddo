@@ -263,7 +263,15 @@ where
         // if we have had to nudge left, abort early with non-zero to instruct parent to rebalance
         if pivot < orig_pivot {
             shifts[stem_index] += 1;
-            return orig_pivot - pivot;
+
+            if stem_index == 1 {
+                // TODO: only need to return requesting a shift
+                //       if moving the pivot would cause the right subtree to overflow.
+                if source.len() + (orig_pivot - pivot) > leaf_node_count * B {
+                    return orig_pivot - pivot;
+                }
+                //return 0;
+            }
         }
 
         stems[stem_index] = source[sort_index[pivot]][dim];
