@@ -165,7 +165,7 @@ where
                 &mut sort_index,
                 1,
                 0,
-                leaf_node_count,
+                leaf_node_count * B,
             );
 
             if requested_shift == 0 {
@@ -201,25 +201,20 @@ where
         sort_index: &mut [usize],
         stem_index: usize,
         dim: usize,
-        leaf_node_count: usize,
+        capacity: usize,
     ) -> usize {
         let next_dim = (dim + 1).rem(K);
         let chunk_length = sort_index.len();
 
         let stem_levels_below = stems.len().ilog2() - stem_index.ilog2() - 1;
-
-        // TODO: this is wrong. It overestimates when being called for the upper half
-        // when the source size is not a power of two.
-        //let items_below = 2usize.pow(stem_levels_below + 1) * B;
-        let items_below =
-            (2usize.pow(stem_levels_below + 1) * B).min(source.len()) + shifts[stem_index];
+        let left_capacity = 2usize.pow(stem_levels_below) * B;
+        let right_capacity = capacity.saturating_sub(left_capacity);
 
         // If there are few enough items that we could fit all of them in the left subtree,
         // leave the current stem val as +inf to push everything down into the left and
         // recurse down without splitting.
-        if chunk_length + shifts[stem_index] <= items_below / 2 {
+        if chunk_length + shifts[stem_index] <= left_capacity {
             if sort_index.len() > B {
-                /* return */
                 Self::optimize_stems(
                     stems,
                     shifts,
@@ -227,7 +222,7 @@ where
                     sort_index,
                     stem_index << 1,
                     next_dim,
-                    leaf_node_count,
+                    left_capacity,
                 );
             }
             return 0;
@@ -262,15 +257,14 @@ where
 
         // if we have had to nudge left, abort early with non-zero to instruct parent to rebalance
         if pivot < orig_pivot {
-            shifts[stem_index] += 1;
+            shifts[stem_index] += orig_pivot - pivot;
 
             if stem_index == 1 {
-                // TODO: only need to return requesting a shift
-                //       if moving the pivot would cause the right subtree to overflow.
-                if source.len() + (orig_pivot - pivot) > leaf_node_count * B {
+                // only need to return requesting a shift
+                //  if moving the pivot would cause the right subtree to overflow.
+                if source.len() + shifts[stem_index] > capacity {
                     return orig_pivot - pivot;
                 }
-                //return 0;
             }
         }
 
@@ -285,8 +279,8 @@ where
         // are we on the bottom row? Recursion termination case
         if stem_levels_below == 0 {
             // if the right bucket will overflow, return the overflow amount
-            if (chunk_length - pivot) > B {
-                return (chunk_length - pivot) - B;
+            if chunk_length - pivot > B {
+                return chunk_length - pivot - B;
             }
 
             // if the right bucket won't overflow, we're all good.
@@ -307,7 +301,7 @@ where
                 lower_sort_index,
                 next_stem_index,
                 next_dim,
-                leaf_node_count,
+                left_capacity,
             );
 
             if requested_shift_amount == 0 {
@@ -317,20 +311,18 @@ where
                 sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
                 stems[stem_index] = source[sort_index[pivot]][dim];
                 shifts[stem_index] += requested_shift_amount;
-
-                // Test for RHS now having more items than can fit
-                // in the buckets present in its subtree. If it does,
-                // return with a value so that the parent reduces our
-                // total allocation
-                let new_upper_size = chunk_length - pivot;
-                if new_upper_size > items_below >> 1 {
-                    return new_upper_size - (items_below >> 1);
-                }
             }
         }
 
-        // TODO: shift requests that bubble up from the right subtree
-        // get ignored
+        // Test for RHS now having more items than can fit
+        // in the buckets present in its subtree. If it does,
+        // return with a value so that the parent reduces our
+        // total allocation
+        let upper_size = chunk_length - pivot;
+        if upper_size > right_capacity {
+            return upper_size - right_capacity;
+        }
+
         let right_subtree_requested_shift = Self::optimize_stems(
             stems,
             shifts,
@@ -338,9 +330,10 @@ where
             upper_sort_index,
             next_stem_index + 1,
             next_dim,
-            leaf_node_count,
+            right_capacity,
         );
 
+        shifts[stem_index] += right_subtree_requested_shift;
         return right_subtree_requested_shift;
     }
 
@@ -564,7 +557,21 @@ mod tests {
     }
 
     #[test]
-    fn can_construct_optimized_tree_bad_example() {
+    fn can_construct_optimized_tree_bad_example_0() {
+        let tree_size = 18;
+        let seed = 894771;
+
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+        let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
+
+        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
+
+        println!("Tree Stats: {:?}", tree.generate_stats())
+    }
+
+    #[test]
+    fn can_construct_optimized_tree_bad_example_1() {
         let tree_size = 33;
         let seed = 100045;
 
@@ -609,6 +616,20 @@ mod tests {
 
         let _tree: ImmutableKdTree<f32, usize, 4, 4> =
             ImmutableKdTree::optimize_from(&content_to_add);
+    }
+
+    #[test]
+    fn can_construct_optimized_tree_bad_example_5() {
+        let tree_size = 32;
+        let seed = 455191;
+
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+        let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
+
+        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
+
+        println!("Tree Stats: {:?}", tree.generate_stats())
     }
 
     #[ignore]
