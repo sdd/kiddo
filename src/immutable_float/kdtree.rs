@@ -125,14 +125,14 @@ where
         let mut stem_node_count = leaf_node_count.next_power_of_two();
 
         let mut stems = vec![A::infinity(); stem_node_count];
-        let mut shifts = vec![0usize; stem_node_count];
+        let mut shifts = vec![0isize; stem_node_count];
         let mut sort_index = Vec::from_iter(0..item_count);
 
         loop {
             if stems.len() < stem_node_count {
                 stems = vec![A::infinity(); stem_node_count];
                 let root_shift = shifts[1];
-                let mut new_shifts = vec![0usize; stem_node_count];
+                let mut new_shifts = vec![0isize; stem_node_count];
 
                 // copy from old to new. Old forms the left subtree of new's root, eg:
                 //
@@ -174,7 +174,7 @@ where
 
             // TODO: a requested shift does not always require a new stem node?
             stem_node_count = (stem_node_count + 1).next_power_of_two();
-            leaf_node_count += requested_shift.div_ceil(B);
+            leaf_node_count += requested_shift.div_ceil(B as isize).max(0) as usize;
         }
 
         let mut tree = Self {
@@ -196,13 +196,13 @@ where
     /// attempt overflowing after the pivot was moved.
     fn optimize_stems(
         stems: &mut Vec<A>,
-        shifts: &mut Vec<usize>,
+        shifts: &mut Vec<isize>,
         source: &[[A; K]],
         sort_index: &mut [usize],
         stem_index: usize,
         dim: usize,
         capacity: usize,
-    ) -> usize {
+    ) -> isize {
         let next_dim = (dim + 1).rem(K);
         let chunk_length = sort_index.len();
 
@@ -213,7 +213,7 @@ where
         // If there are few enough items that we could fit all of them in the left subtree,
         // leave the current stem val as +inf to push everything down into the left and
         // recurse down without splitting.
-        if chunk_length + shifts[stem_index] <= left_capacity {
+        if chunk_length as isize + shifts[stem_index] <= left_capacity as isize {
             if sort_index.len() > B {
                 Self::optimize_stems(
                     stems,
@@ -257,13 +257,13 @@ where
 
         // if we have had to nudge left, abort early with non-zero to instruct parent to rebalance
         if pivot < orig_pivot {
-            shifts[stem_index] += orig_pivot - pivot;
+            shifts[stem_index] += (orig_pivot - pivot) as isize;
 
             if stem_index == 1 {
                 // only need to return requesting a shift
                 //  if moving the pivot would cause the right subtree to overflow.
-                if source.len() + shifts[stem_index] > capacity {
-                    return orig_pivot - pivot;
+                if source.len() as isize + shifts[stem_index] > capacity as isize {
+                    return (orig_pivot - pivot) as isize;
                 }
             }
         }
@@ -280,7 +280,7 @@ where
         if stem_levels_below == 0 {
             // if the right bucket will overflow, return the overflow amount
             if chunk_length - pivot > B {
-                return chunk_length - pivot - B;
+                return (chunk_length - pivot - B) as isize;
             }
 
             // if the right bucket won't overflow, we're all good.
@@ -307,7 +307,7 @@ where
             if requested_shift_amount == 0 {
                 break;
             } else {
-                pivot -= requested_shift_amount;
+                pivot = (pivot as isize - requested_shift_amount) as usize;
                 sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
                 stems[stem_index] = source[sort_index[pivot]][dim];
                 shifts[stem_index] += requested_shift_amount;
@@ -320,7 +320,7 @@ where
         // total allocation
         let upper_size = chunk_length - pivot;
         if upper_size > right_capacity {
-            return upper_size - right_capacity;
+            return (upper_size - right_capacity) as isize;
         }
 
         let right_subtree_requested_shift = Self::optimize_stems(
@@ -333,7 +333,7 @@ where
             right_capacity,
         );
 
-        shifts[stem_index] += right_subtree_requested_shift;
+        shifts[stem_index] -= right_subtree_requested_shift;
         return right_subtree_requested_shift;
     }
 
@@ -412,8 +412,8 @@ where
     }
 }
 
-fn calc_pivot(chunk_length: usize, shifted: usize, stem_index: usize) -> usize {
-    let mut pivot = (chunk_length + shifted) >> 1;
+fn calc_pivot(chunk_length: usize, shifted: isize, stem_index: usize) -> usize {
+    let mut pivot = ((chunk_length as isize + shifted) >> 1) as usize;
     if stem_index == 1 {
         // If at the top level, check if there's been a shift
         pivot = if shifted > 0 {
@@ -434,7 +434,7 @@ fn calc_pivot(chunk_length: usize, shifted: usize, stem_index: usize) -> usize {
     } else {
         pivot = pivot.next_power_of_two();
     }
-    pivot = pivot - shifted;
+    pivot = (pivot as isize - shifted) as usize;
     pivot
 }
 
