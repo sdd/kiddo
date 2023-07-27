@@ -128,6 +128,7 @@ where
         let mut shifts = vec![0isize; stem_node_count];
         let mut sort_index = Vec::from_iter(0..item_count);
 
+        let mut requested_shift = 0isize;
         loop {
             if stems.len() < stem_node_count {
                 stems = vec![A::infinity(); stem_node_count];
@@ -141,7 +142,7 @@ where
                 //       2   3   ->   2   3   0   0
                 //      4 5 6 7      4 5 6 7 0 0 0 0
 
-                new_shifts[1] = root_shift;
+                new_shifts[1] = requested_shift;
                 new_shifts[2] = root_shift;
                 let mut step = 1;
                 for i in 2..shifts.len() {
@@ -158,7 +159,7 @@ where
                 shifts = new_shifts;
             }
 
-            let requested_shift = Self::optimize_stems(
+            requested_shift = Self::optimize_stems(
                 &mut stems,
                 &mut shifts,
                 source,
@@ -333,7 +334,10 @@ where
             right_capacity,
         );
 
-        shifts[stem_index] -= right_subtree_requested_shift;
+        // If a right child requests a shift, don't shift yourself,
+        // but do pass that shift back up to your parent
+
+        // shifts[stem_index] -= right_subtree_requested_shift;
         return right_subtree_requested_shift;
     }
 
