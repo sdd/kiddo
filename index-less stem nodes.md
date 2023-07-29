@@ -5,14 +5,14 @@
   04   05     06   07               4    2N, 2N+1
 08 09 10 11 12 13 14 15             8
 
-
+    (0)
     01
  02    03
 0  1  2  3
 
 * this implies 16 - 31 are leaf nodes. If, however, a stem node split plane val is NaN, this implies that we should look at a leaf node instead.
-* The LSB of the final row of nodes could be used as a niche to indicate whether the children are dynamic stem nodes, or leaf nodes, obv at the loss of 1 bit of precision (which may not be noticable as the bucket likely covers more than one bit of dynamic range and will have the full position range).
-* when setting the split value of the last row of nodes, initally always choose a split value with the LSB clear. this indicates that the children
+* The LSB of the final row of nodes could be used as a niche to indicate whether the children are dynamic stem nodes, or leaf nodes, obv at the loss of 1 bit of precision (which may not be noticeable as the bucket likely covers more than one bit of dynamic range and will have the full position range).
+* when setting the split value of the last row of nodes, initially always choose a split value with the LSB clear. this indicates that the children
 * are actual leaves.
 * if a leaf fills and needs splitting, and its parent is a main stem, set the LSB of the main stem's split plane, to indicate that the children will be dynamic stem nodes.
 * when dynamic stem nodes are first required, allocate a Vec<> of size 16 in the case above. static stem child indices are assumed to be (2N - 16) and (2N - 15).

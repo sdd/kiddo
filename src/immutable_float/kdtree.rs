@@ -121,6 +121,12 @@ where
         usize: Cast<T>,
     {
         let item_count = source.len();
+
+        // TODO: is it possible to start with an excessive leaf count, but always ensure we are
+        //       packed to the left as we go? This could reduce the number of times that we need
+        //       to rebalance all the way to the outer loop, and any unused leaves could be
+        //       freed up afterwards?
+
         let mut leaf_node_count = item_count.div_ceil(B);
         let mut stem_node_count = leaf_node_count.next_power_of_two();
 
@@ -128,9 +134,31 @@ where
         let mut shifts = vec![0usize; stem_node_count];
         let mut sort_index = Vec::from_iter(0..item_count);
 
-        let mut requested_shift = 0;
         loop {
-            if stems.len() < stem_node_count {
+            let requested_shift = Self::optimize_stems(
+                &mut stems,
+                &mut shifts,
+                source,
+                &mut sort_index,
+                1,
+                0,
+                leaf_node_count * B,
+            );
+
+            if requested_shift == 0 {
+                break;
+            }
+
+            // if root has requested a shift, then there was not enough capacity in
+            // the tree to overflow into. Add just enough extra leaf nodes to accommodate
+            // the shift.
+            leaf_node_count += requested_shift.div_ceil(B);
+
+            // if the new leaf count can't be accommodated by the existing stem count,
+            // bump up the stem count to the next power of two.
+            if leaf_node_count > stem_node_count {
+                stem_node_count = (stem_node_count + 1).next_power_of_two();
+
                 stems = vec![A::infinity(); stem_node_count];
                 let root_shift = shifts[1];
                 let mut new_shifts = vec![0usize; stem_node_count];
@@ -158,24 +186,6 @@ where
 
                 shifts = new_shifts;
             }
-
-            requested_shift = Self::optimize_stems(
-                &mut stems,
-                &mut shifts,
-                source,
-                &mut sort_index,
-                1,
-                0,
-                leaf_node_count * B,
-            );
-
-            if requested_shift == 0 {
-                break;
-            }
-
-            // TODO: a requested shift does not always require a new stem node?
-            stem_node_count = (stem_node_count + 1).next_power_of_two();
-            leaf_node_count += requested_shift.div_ceil(B);
         }
 
         let mut tree = Self {
@@ -191,7 +201,7 @@ where
         tree
     }
 
-    /// the value returned is zero if balancing was successful. If however a child splitpoint has
+    /// Returns zero if balancing was successful. If a child splitpoint has
     /// landed in between two (or more) items with the same value, the value returned is a hint to
     /// the caller of how many items overflowed out of the second bucket due to the optimization
     /// attempt overflowing after the pivot was moved.
@@ -208,84 +218,49 @@ where
         let chunk_length = sort_index.len();
 
         let stem_levels_below = stems.len().ilog2() - stem_index.ilog2() - 1;
-        let left_capacity = 2usize.pow(stem_levels_below) * B;
+        let left_capacity = (2usize.pow(stem_levels_below) * B).min(capacity);
         let right_capacity = capacity.saturating_sub(left_capacity);
 
-        // If there are few enough items that we could fit all of them in the left subtree,
-        // leave the current stem val as +inf to push everything down into the left and
-        // recurse down without splitting.
-        if chunk_length + shifts[stem_index] <= left_capacity {
-            if sort_index.len() > B {
-                Self::optimize_stems(
-                    stems,
-                    shifts,
-                    source,
-                    sort_index,
-                    stem_index << 1,
-                    next_dim,
-                    left_capacity,
-                );
-            }
-            return 0;
-        }
+        let mut pivot = calc_pivot(chunk_length, shifts[stem_index], stem_index, right_capacity);
 
-        let mut pivot = calc_pivot(chunk_length, shifts[stem_index], stem_index);
-        let orig_pivot = pivot;
+        // only bother with this if we are putting at least one item in the right hand child
+        if pivot < chunk_length {
+            // ensure the slot at the pivot point has the correctly sorted item
+            sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
 
-        // ensure the slot at the pivot point has the correctly sorted item
-        sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
-
-        // ensure the slot to the left of the pivot has the correctly sorted item
-        (&mut sort_index[..pivot])
-            .select_nth_unstable_by_key(pivot - 1, |&i| OrderedFloat(source[i][dim]));
-
-        // if the pivot straddles two values that are equal,
-        // keep nudging it left until they aren't
-        while chunk_length > 1
-            && source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim]
-            && pivot > 0
-        {
-            pivot -= 1;
-
-            // ensure that the next slot to the left of our moving pivot has the correctly sorted item
+            // ensure the slot to the left of the pivot has the correctly sorted item
             (&mut sort_index[..pivot])
                 .select_nth_unstable_by_key(pivot - 1, |&i| OrderedFloat(source[i][dim]));
-        }
 
-        // if we end up with a pivot of 0, something has gone wrong,
-        // unless we only had a slice of len 1 anyway
-        debug_assert!(pivot > 0 || chunk_length == 1);
+            // if the pivot straddles two values that are equal,
+            // keep nudging it left until they aren't
+            while chunk_length > 1
+                && source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim]
+                && pivot > 0
+            {
+                pivot -= 1;
 
-        // if we have had to nudge left, abort early with non-zero to instruct parent to rebalance
-        if pivot < orig_pivot {
-            shifts[stem_index] += orig_pivot - pivot;
-
-            if stem_index == 1 {
-                // only need to return requesting a shift
-                //  if moving the pivot would cause the right subtree to overflow.
-                if source.len() + shifts[stem_index] > capacity {
-                    return orig_pivot - pivot;
-                }
+                // ensure that the next slot to the left of our moving pivot has the correctly sorted item
+                (&mut sort_index[..pivot])
+                    .select_nth_unstable_by_key(pivot - 1, |&i| OrderedFloat(source[i][dim]));
             }
-        }
 
-        stems[stem_index] = source[sort_index[pivot]][dim];
+            // if we end up with a pivot of 0, something has gone wrong,
+            // unless we only had a slice of len 1 anyway
+            debug_assert!(pivot > 0 || chunk_length == 1);
+
+            stems[stem_index] = source[sort_index[pivot]][dim];
+        }
 
         // if the total number of items that we have to the left of the pivot can fit
-        // in a single bucket, we're done
-        if pivot <= B && (chunk_length - pivot) <= B {
+        // in a single bucket, and the total amount to the right, we're done
+        if pivot <= B && (chunk_length < B || (chunk_length - pivot <= B)) {
             return 0;
         }
 
-        // are we on the bottom row? Recursion termination case
-        if stem_levels_below == 0 {
-            // if the right bucket will overflow, return the overflow amount
-            if chunk_length - pivot > B {
-                return chunk_length - pivot - B;
-            }
-
-            // if the right bucket won't overflow, we're all good.
-            return 0;
+        // if the right chunk is bigger than it's capacity, return the overflow amount
+        if chunk_length - pivot > right_capacity {
+            return chunk_length - pivot - right_capacity;
         }
 
         let next_stem_index = stem_index << 1;
@@ -307,24 +282,26 @@ where
 
             if requested_shift_amount == 0 {
                 break;
-            } else {
-                pivot -= requested_shift_amount;
-                sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
-                stems[stem_index] = source[sort_index[pivot]][dim];
-                shifts[stem_index] += requested_shift_amount;
             }
+
+            pivot -= requested_shift_amount;
+
+            // Test for RHS now having more items than can fit
+            // in the buckets present in its subtree. If it does,
+            // return with a value so that the parent reduces our
+            // total allocation
+            if chunk_length - pivot > right_capacity {
+                return chunk_length - pivot - right_capacity;
+            }
+
+            sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
+            stems[stem_index] = source[sort_index[pivot]][dim];
+            shifts[stem_index] += requested_shift_amount;
         }
 
-        // Test for RHS now having more items than can fit
-        // in the buckets present in its subtree. If it does,
-        // return with a value so that the parent reduces our
-        // total allocation
-        let upper_size = chunk_length - pivot;
-        if upper_size > right_capacity {
-            return upper_size - right_capacity;
-        }
-
-        let right_subtree_requested_shift = Self::optimize_stems(
+        // If a right child requests a shift, don't shift yourself,
+        // but do pass that shift back up to your parent
+        Self::optimize_stems(
             stems,
             shifts,
             source,
@@ -332,13 +309,7 @@ where
             next_stem_index + 1,
             next_dim,
             right_capacity,
-        );
-
-        // If a right child requests a shift, don't shift yourself,
-        // but do pass that shift back up to your parent
-
-        // shifts[stem_index] -= right_subtree_requested_shift;
-        return right_subtree_requested_shift;
+        )
     }
 
     #[allow(dead_code)]
@@ -416,7 +387,12 @@ where
     }
 }
 
-fn calc_pivot(chunk_length: usize, shifted: usize, stem_index: usize) -> usize {
+fn calc_pivot(
+    chunk_length: usize,
+    shifted: usize,
+    stem_index: usize,
+    right_capacity: usize,
+) -> usize {
     let mut pivot = (chunk_length + shifted) >> 1;
     if stem_index == 1 {
         // If at the top level, check if there's been a shift
@@ -425,7 +401,6 @@ fn calc_pivot(chunk_length: usize, shifted: usize, stem_index: usize) -> usize {
             chunk_length
         } else {
             // otherwise, do a special case pivot shift to ensure the left subtree is full.
-            //(pivot - (B / 2) + 1).next_power_of_two()
             if chunk_length & 1 == 1 {
                 (pivot + 1).next_power_of_two()
             } else {
@@ -433,13 +408,12 @@ fn calc_pivot(chunk_length: usize, shifted: usize, stem_index: usize) -> usize {
             }
         };
     } else if chunk_length & 0x01 == 1 && shifted == 0 {
-        //} else if chunk_length.count_ones() != 1 && shifted == 0 {
         pivot = (pivot + 1).next_power_of_two()
     } else {
         pivot = pivot.next_power_of_two();
     }
     pivot = pivot - shifted;
-    pivot
+    pivot.max(chunk_length.saturating_sub(right_capacity))
 }
 
 #[cfg(test)]
@@ -449,6 +423,7 @@ mod tests {
     use crate::immutable_float::kdtree::ImmutableKdTree;
     use ordered_float::OrderedFloat;
     use rand::{Rng, SeedableRng};
+    use rayon::prelude::IntoParallelRefIterator;
 
     #[test]
     fn can_construct_optimized_tree_with_straddled_split() {
@@ -636,9 +611,81 @@ mod tests {
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
 
+    #[test]
+    fn can_construct_optimized_tree_bad_example_6() {
+        let tree_size = 56;
+        let seed = 450533;
+
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+        let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
+
+        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
+
+        println!("Tree Stats: {:?}", tree.generate_stats())
+    }
+
+    #[test]
+    fn can_construct_optimized_tree_bad_example_7() {
+        let tree_size = 18;
+        let seed = 992063;
+
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+        let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
+
+        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
+
+        println!("Tree Stats: {:?}", tree.generate_stats())
+    }
+
+    #[test]
+    fn can_construct_optimized_tree_bad_example_8() {
+        let tree_size = 19;
+        let seed = 894771;
+
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+        let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
+
+        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
+
+        println!("Tree Stats: {:?}", tree.generate_stats())
+    }
+
+    #[test]
+    fn can_construct_optimized_tree_bad_example_9() {
+        let tree_size = 20;
+        let seed = 894771;
+
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+        let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
+
+        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
+
+        println!("Tree Stats: {:?}", tree.generate_stats())
+    }
+
+    #[test]
+    fn can_construct_optimized_tree_bad_example_10() {
+        let tree_size = 36;
+        let seed = 375096;
+
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+        let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
+
+        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
+
+        println!("Tree Stats: {:?}", tree.generate_stats())
+    }
+
     #[ignore]
     #[test]
     fn can_construct_optimized_tree_multi_rand_increasing_size() {
+        use rayon::iter::ParallelIterator;
+
         #[allow(dead_code)]
         #[derive(Debug)]
         struct Failure {
@@ -646,24 +693,27 @@ mod tests {
             seed: u64,
         }
 
-        let mut failures: Vec<Failure> = Vec::new();
+        let failures: Vec<Failure> = Vec::new();
 
-        for tree_size in 16..=32 {
-            for seed in 0..1000000 {
-                let result = panic::catch_unwind(|| {
-                    let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
-                    let content_to_add: Vec<[f32; 4]> =
-                        (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
+        for tree_size in 16..100 {
+            (0..1000000)
+                .collect::<Vec<_>>()
+                .par_iter()
+                .for_each(|&seed| {
+                    let result = panic::catch_unwind(|| {
+                        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+                        let content_to_add: Vec<[f32; 4]> =
+                            (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
-                    let _tree: ImmutableKdTree<f32, usize, 4, 4> =
-                        ImmutableKdTree::optimize_from(&content_to_add);
+                        let _tree: ImmutableKdTree<f32, usize, 4, 4> =
+                            ImmutableKdTree::optimize_from(&content_to_add);
+                    });
+
+                    if result.is_err() {
+                        //failures.push(Failure { tree_size, seed });
+                        println!("Failed on tree size {}, seed #{}", tree_size, seed);
+                    }
                 });
-
-                if result.is_err() {
-                    failures.push(Failure { tree_size, seed });
-                    println!("Failed on tree size {}, seed #{}", tree_size, seed);
-                }
-            }
         }
 
         println!("{:?}", &failures);
