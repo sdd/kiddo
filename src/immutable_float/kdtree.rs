@@ -198,7 +198,7 @@ where
         for i in 2..shifts.len() {
             // check to see if i is a power of 2
             if i.count_ones() == 1 {
-                step = step * 2;
+                step *= 2;
             }
 
             if shifts[i] > 0 {
@@ -241,7 +241,7 @@ where
             sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
 
             // ensure the slot to the left of the pivot has the correctly sorted item
-            (&mut sort_index[..pivot])
+            sort_index[..pivot]
                 .select_nth_unstable_by_key(pivot - 1, |&i| OrderedFloat(source[i][dim]));
 
             // if the pivot straddles two values that are equal,
@@ -253,7 +253,7 @@ where
                 pivot -= 1;
 
                 // ensure that the next slot to the left of our moving pivot has the correctly sorted item
-                (&mut sort_index[..pivot])
+                sort_index[..pivot]
                     .select_nth_unstable_by_key(pivot - 1, |&i| OrderedFloat(source[i][dim]));
             }
 
@@ -423,7 +423,7 @@ fn calc_pivot(
     } else {
         pivot = pivot.next_power_of_two();
     }
-    pivot = pivot - shifted;
+    pivot -= shifted;
     pivot.max(chunk_length.saturating_sub(right_capacity))
 }
 
