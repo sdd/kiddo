@@ -222,8 +222,12 @@ where
         dim: usize,
         capacity: usize,
     ) -> usize {
-        let next_dim = (dim + 1).rem(K);
         let chunk_length = sort_index.len();
+        if chunk_length <= B {
+            return 0;
+        }
+
+        let next_dim = (dim + 1).rem(K);
 
         let stem_levels_below = stems.len().ilog2() - stem_index.ilog2() - 1;
         let left_capacity = (2usize.pow(stem_levels_below) * B).min(capacity);
@@ -260,9 +264,8 @@ where
             stems[stem_index] = source[sort_index[pivot]][dim];
         }
 
-        // if the total number of items that we have to the left of the pivot can fit
-        // in a single bucket, and the total amount to the right, we're done
-        if pivot <= B && (chunk_length < B || (chunk_length - pivot <= B)) {
+        // if both subtrees can fit in a bucket, we're done
+        if pivot <= B && chunk_length - pivot <= B {
             return 0;
         }
 
