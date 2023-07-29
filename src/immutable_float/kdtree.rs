@@ -160,31 +160,7 @@ where
                 stem_node_count = (stem_node_count + 1).next_power_of_two();
 
                 stems = vec![A::infinity(); stem_node_count];
-                let root_shift = shifts[1];
-                let mut new_shifts = vec![0usize; stem_node_count];
-
-                // copy from old to new. Old forms the left subtree of new's root, eg:
-                //
-                //                          0
-                //         1            1       0
-                //       2   3   ->   2   3   0   0
-                //      4 5 6 7      4 5 6 7 0 0 0 0
-
-                new_shifts[1] = requested_shift;
-                new_shifts[2] = root_shift;
-                let mut step = 1;
-                for i in 2..shifts.len() {
-                    // check to see if i is a power of 2
-                    if i.count_ones() == 1 {
-                        step = step * 2;
-                    }
-
-                    if shifts[i] > 0 {
-                        new_shifts[i + step] = shifts[i];
-                    }
-                }
-
-                shifts = new_shifts;
+                shifts = Self::extend_shifts(stem_node_count, &shifts, requested_shift);
             }
         }
 
@@ -199,6 +175,38 @@ where
         }
 
         tree
+    }
+
+    fn extend_shifts(
+        stem_node_count: usize,
+        shifts: &Vec<usize>,
+        requested_shift: usize,
+    ) -> Vec<usize> {
+        let root_shift = shifts[1];
+        let mut new_shifts = vec![0usize; stem_node_count];
+
+        // copy from old to new. Old forms the left subtree of new's root, eg:
+        //
+        //                          0
+        //         1            1       0
+        //       2   3   ->   2   3   0   0
+        //      4 5 6 7      4 5 6 7 0 0 0 0
+
+        new_shifts[1] = requested_shift;
+        new_shifts[2] = root_shift;
+        let mut step = 1;
+        for i in 2..shifts.len() {
+            // check to see if i is a power of 2
+            if i.count_ones() == 1 {
+                step = step * 2;
+            }
+
+            if shifts[i] > 0 {
+                new_shifts[i + step] = shifts[i];
+            }
+        }
+
+        new_shifts
     }
 
     /// Returns zero if balancing was successful. If a child splitpoint has
