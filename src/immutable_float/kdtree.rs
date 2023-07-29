@@ -371,7 +371,7 @@ where
         self.leaves.len() * B
     }
 
-    /// Gererates a `TreeStats` object, describing some
+    /// Generates a `TreeStats` object, describing some
     /// statistics of a particular instance of an `ImmutableTree`
     pub fn generate_stats(&self) -> TreeStats {
         let mut leaf_fill_counts = vec![0usize; B + 1];
@@ -761,13 +761,6 @@ mod tests {
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(493);
         let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE).map(|_| rng.gen::<[f32; 4]>()).collect();
-
-        // let num_uniq = content_to_add
-        //     .iter()
-        //     .flatten()
-        //     .map(|&x| OrderedFloat(x))
-        //     .unique()
-        //     .count();
 
         let tree: ImmutableKdTree<f32, usize, 4, 32> =
             ImmutableKdTree::optimize_from(&content_to_add);
