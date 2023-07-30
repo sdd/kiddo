@@ -1,5 +1,41 @@
 # Kiddo Changelog
 
+## 2.1.1
+
+### Refactor
+
+- update Axis trait to include some methods so that the `nearest_one` methods can be identical between `float` and `fixed`.
+- float and fixed both use a common macro for best_n_within
+- float and fixed both use a common macro for within_unsorted
+- float and fixed both use a common macro for within
+- float and fixed both use a common macro for nearest_n
+
+### CI
+
+- Update pre-release.yml to remove Clippy check
+- Add CI for format/clippy/test/coverage/release/publish
+
+## 2.1.0
+
+* feat: implement the main query methods plus `size` on `kiddo::float::kdtree::ArchivedKdTree` and improve the Rkyv example.
+
+The previous Rkyv example was not really using Rkyv in the most efficient way (Thanks to @cavemanloverboy for spotting my mistakes!). In order to properly use rkyv's zero-copy deserialization, you need to use `rkyv::archived_root` to transmute a buffer into an `ArchivedKdTree`. For `ArchivedKdTree` to be useful, it actually needs some methods though!
+
+v2.1.0 refactors the query code so that the method bodies of the queries are templated by macros, allowing them to be implemented on `KdTree` and `ArchivedKdTree` without completely duplicating the code.
+
+The updated Rkyv example shows the difference that zero-copy usage of Rkyv makes vs deserializing, as well as also showing the gains that can be made using mmap compared to standard file access. Combining both together results in absolutely mindblowing performance when measuring  time-from-binary-start-to-first-query-result.
+
+See for yourself by downloading the sample datasets mentioned in the examples readme and running:
+
+```sh
+cargo run --example rkyv --features=serialize_rkyv --release
+```
+
+On my machine, using the old technique of normal file access and deserialization into `KdTree`, the example code takes 348 milliseconds to load and query. The memmapped code that just transmutes to an `ArchivedKdTree` and then queries it takes 182 **micro** seconds(!) - an improvement by a factor of 1900x!!
+
+I'll follow up this release with equivalent methods for `Fixed`, and some more ergonomic methods for laoding and saving.
+
+
 ## 2.0.1
  * refactor: removed the requirement to use unstable features so that Kiddo should now work on Rust stable.
 
