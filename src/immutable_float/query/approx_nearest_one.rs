@@ -27,115 +27,53 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
     /// assert_eq!(nearest.1, 100);
     /// ```
     #[inline]
-    pub fn nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> (A, T)
+    pub fn approx_nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> (A, T)
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
-        let mut off = [A::zero(); K];
-        self.nearest_one_recurse(
-            query,
-            distance_fn,
-            1,
-            0,
-            T::zero(),
-            A::max_value(),
-            &mut off,
-            A::zero(),
-        )
-    }
+        let mut split_dim = 0;
+        let mut stem_idx = 1;
+        let mut best_item = T::zero();
+        let mut best_dist = A::max_value();
 
-    #[inline]
-    fn nearest_one_recurse<F>(
-        &self,
-        query: &[A; K],
-        distance_fn: &F,
-        stem_idx: usize,
-        split_dim: usize,
-        mut best_item: T,
-        mut best_dist: A,
-        off: &mut [A; K],
-        rd: A,
-    ) -> (A, T)
-    where
-        F: Fn(&[A; K], &[A; K]) -> A,
-    {
-        if stem_idx >= self.stems.len() {
-            self.search_leaf_for_best(
-                query,
-                distance_fn,
-                &mut best_item,
-                &mut best_dist,
-                stem_idx - self.stems.len(),
-            );
+        let stem_len = self.stems.len();
 
-            return (best_dist, best_item);
+        while stem_idx < stem_len {
+            let left_child_idx = stem_idx << 1;
+            self.approx_prefetch_stems(left_child_idx);
+
+            let val = *unsafe { self.stems.get_unchecked(stem_idx) };
+            let is_left_child = usize::from(*unsafe { query.get_unchecked(split_dim) } < val);
+
+            stem_idx = left_child_idx + (1 - is_left_child);
+
+            //split_dim = (split_dim + 1).rem(K);
+            split_dim += 1;
+            split_dim %= K;
         }
 
-        let left_child_idx = stem_idx << 1;
-        self.prefetch_stems(left_child_idx);
+        let leaf_node = unsafe { self.leaves.get_unchecked(stem_idx - stem_len) };
+        // let leaf_node = &self.leaves[leaf_idx];
 
-        let val = *unsafe { self.stems.get_unchecked(stem_idx) };
-        // let val = self.stems[stem_idx];
-
-        let mut rd = rd;
-        let old_off = off[split_dim];
-        // let new_off = (query[split_dim] * query[split_dim]) - (val * val);
-        let new_off = query[split_dim] - val;
-
-        let is_left_child = usize::from(*unsafe { query.get_unchecked(split_dim) } < val);
-        // let is_left_child = usize::from(query[split_dim] < val);
-
-        let closer_node_idx = left_child_idx + (1 - is_left_child);
-        let further_node_idx = left_child_idx + is_left_child;
-
-        let next_split_dim = (split_dim + 1).rem(K);
-
-        let (dist, item) = self.nearest_one_recurse(
-            query,
-            distance_fn,
-            closer_node_idx,
-            next_split_dim,
-            best_item,
-            best_dist,
-            off,
-            rd,
-        );
-
-        if dist < best_dist {
-            best_dist = dist;
-            best_item = item;
-        }
-
-        // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-        //       so that updating rd is not hardcoded to sq euclidean
-        rd = rd + new_off * new_off - old_off * old_off;
-        // rd = rd.rd_update(old_off, new_off);
-
-        if rd <= best_dist {
-            off[split_dim] = new_off;
-            let (dist, item) = self.nearest_one_recurse(
-                query,
-                distance_fn,
-                further_node_idx,
-                next_split_dim,
-                best_item,
-                best_dist,
-                off,
-                rd,
-            );
-            off[split_dim] = old_off;
-
-            if dist < best_dist {
-                best_dist = dist;
-                best_item = item;
-            }
-        }
+        leaf_node
+            .content_points
+            .iter()
+            .enumerate()
+            .take(leaf_node.size)
+            .for_each(|(idx, entry)| {
+                let dist = distance_fn(query, entry);
+                if dist < best_dist {
+                    best_dist = dist;
+                    best_item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
+                    // *best_item = leaf_node.content_items[idx]
+                }
+            });
 
         (best_dist, best_item)
     }
 
     #[inline]
-    fn prefetch_stems(&self, idx: usize) {
+    fn approx_prefetch_stems(&self, idx: usize) {
         #[cfg(target_arch = "x86_64")]
         unsafe {
             let prefetch = self.stems.as_ptr().wrapping_offset(2 * idx as isize);
@@ -154,34 +92,6 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
                 core::arch::aarch64::_PREFETCH_LOCALITY3,
             );
         }
-    }
-
-    fn search_leaf_for_best<F>(
-        &self,
-        query: &[A; K],
-        distance_fn: &F,
-        best_item: &mut T,
-        best_dist: &mut A,
-        leaf_idx: usize,
-    ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
-    {
-        let leaf_node = unsafe { self.leaves.get_unchecked(leaf_idx) };
-        // let leaf_node = &self.leaves[leaf_idx];
-
-        leaf_node
-            .content_points
-            .iter()
-            .enumerate()
-            .take(leaf_node.size)
-            .for_each(|(idx, entry)| {
-                let dist = distance_fn(query, entry);
-                if dist < *best_dist {
-                    *best_dist = dist;
-                    *best_item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
-                    // *best_item = leaf_node.content_items[idx]
-                }
-            });
     }
 }
 
