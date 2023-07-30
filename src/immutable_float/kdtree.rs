@@ -50,7 +50,7 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
         feature = "serialize",
         serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
     )]
-    // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
+    // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation?
     pub(crate) content_points: [[A; K]; B],
 
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
@@ -63,7 +63,6 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
     )]
     pub(crate) content_items: [T; B],
 
-    // TODO: can I get rid of this by padding with NaNs?
     pub(crate) size: usize,
 }
 
@@ -233,29 +232,12 @@ where
         let left_capacity = (2usize.pow(stem_levels_below) * B).min(capacity);
         let right_capacity = capacity.saturating_sub(left_capacity);
 
-        let mut pivot = calc_pivot(chunk_length, shifts[stem_index], stem_index, right_capacity);
+        let mut pivot =
+            Self::calc_pivot(chunk_length, shifts[stem_index], stem_index, right_capacity);
 
         // only bother with this if we are putting at least one item in the right hand child
         if pivot < chunk_length {
-            // ensure the slot at the pivot point has the correctly sorted item
-            sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
-
-            // ensure the slot to the left of the pivot has the correctly sorted item
-            sort_index[..pivot]
-                .select_nth_unstable_by_key(pivot - 1, |&i| OrderedFloat(source[i][dim]));
-
-            // if the pivot straddles two values that are equal,
-            // keep nudging it left until they aren't
-            while chunk_length > 1
-                && source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim]
-                && pivot > 0
-            {
-                pivot -= 1;
-
-                // ensure that the next slot to the left of our moving pivot has the correctly sorted item
-                sort_index[..pivot]
-                    .select_nth_unstable_by_key(pivot - 1, |&i| OrderedFloat(source[i][dim]));
-            }
+            pivot = Self::update_pivot(source, sort_index, dim, pivot);
 
             // if we end up with a pivot of 0, something has gone wrong,
             // unless we only had a slice of len 1 anyway
@@ -321,6 +303,61 @@ where
             next_dim,
             right_capacity,
         )
+    }
+
+    #[cfg(not(feature = "unreliable_select_nth_unstable"))]
+    #[inline]
+    fn update_pivot(
+        source: &[[A; K]],
+        sort_index: &mut [usize],
+        dim: usize,
+        mut pivot: usize,
+    ) -> usize {
+        // Using this version of update_pivot makes construction significantly faster (~13%)
+
+        // TODO: this block may be made faster by using a quickselect with a fat partition?
+        //       we could then run that quickselect and subtract (fat partition length - 1)
+        //       from the pivot, avoiding the need for the while loop.
+
+        // ensure the item whose index = pivot is in its correctly sorted position, and any
+        // items that are equal to it are adjacent, according to our assumptions about the
+        // behaviour of `select_nth_unstable_by` (See examples/check_select_nth_unstable.rs)
+        sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
+
+        // if the pivot straddles two values that are equal, keep nudging it left until they aren't
+        while source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim] && pivot > 0 {
+            pivot -= 1;
+        }
+
+        pivot
+    }
+
+    #[cfg(feature = "unreliable_select_nth_unstable")]
+    #[inline]
+    fn update_pivot(
+        source: &[[A; K]],
+        mut sort_index: &mut [usize],
+        dim: usize,
+        pivot: usize,
+    ) -> usize {
+        // ensure the item whose index = pivot is in its correctly sorted position
+        let (smaller, _, _) =
+            sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
+
+        // ensure the item whose index = (pivot - 1) is in its correctly sorted position
+        smaller.select_nth_unstable_by_key(pivot - 1, |&i| OrderedFloat(source[i][dim]));
+
+        // if the pivot straddles two values that are equal, keep nudging it left until they aren't
+        while source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim] && pivot > 0 {
+            pivot -= 1;
+
+            // ensure the item whose index = (pivot - 1) is in its correctly sorted position
+            // now that pivot has been decremented
+            sort_index[..pivot]
+                .select_nth_unstable_by_key(pivot - 1, |&i| OrderedFloat(source[i][dim]));
+        }
+
+        pivot
     }
 
     #[allow(dead_code)]
@@ -396,35 +433,35 @@ where
             unused_stem_count,
         }
     }
-}
 
-fn calc_pivot(
-    chunk_length: usize,
-    shifted: usize,
-    stem_index: usize,
-    right_capacity: usize,
-) -> usize {
-    let mut pivot = (chunk_length + shifted) >> 1;
-    if stem_index == 1 {
-        // If at the top level, check if there's been a shift
-        pivot = if shifted > 0 {
-            // if so,
-            chunk_length
-        } else {
-            // otherwise, do a special case pivot shift to ensure the left subtree is full.
-            if chunk_length & 1 == 1 {
-                (pivot + 1).next_power_of_two()
+    fn calc_pivot(
+        chunk_length: usize,
+        shifted: usize,
+        stem_index: usize,
+        right_capacity: usize,
+    ) -> usize {
+        let mut pivot = (chunk_length + shifted) >> 1;
+        if stem_index == 1 {
+            // If at the top level, check if there's been a shift
+            pivot = if shifted > 0 {
+                // if so,
+                chunk_length
             } else {
-                pivot.next_power_of_two()
-            }
-        };
-    } else if chunk_length & 0x01 == 1 && shifted == 0 {
-        pivot = (pivot + 1).next_power_of_two()
-    } else {
-        pivot = pivot.next_power_of_two();
+                // otherwise, do a special case pivot shift to ensure the left subtree is full.
+                if chunk_length & 1 == 1 {
+                    (pivot + 1).next_power_of_two()
+                } else {
+                    pivot.next_power_of_two()
+                }
+            };
+        } else if chunk_length & 0x01 == 1 && shifted == 0 {
+            pivot = (pivot + 1).next_power_of_two()
+        } else {
+            pivot = pivot.next_power_of_two();
+        }
+        pivot -= shifted;
+        pivot.max(chunk_length.saturating_sub(right_capacity))
     }
-    pivot -= shifted;
-    pivot.max(chunk_length.saturating_sub(right_capacity))
 }
 
 #[cfg(test)]
