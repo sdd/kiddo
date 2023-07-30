@@ -94,6 +94,10 @@ name = "nearest_one_sss"
 harness = false
 
 [[bench]]
+name = "nearest_one_immutable"
+harness = false
+
+[[bench]]
 name = "nearest_n"
 harness = false
 
@@ -136,3 +140,7 @@ required-features = ["serialize_rkyv"]
 [[example]]
 name = "immutable_large"
 path = "examples/immutable_large.rs"
+
+[[example]]
+name = "check_select_nth_unstable"
+path = "examples/check_select_nth_unstable.rs"
