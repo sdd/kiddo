@@ -54,7 +54,7 @@ cargo run --example rkyv --features=serialize_rkyv --release
 
 On my machine, using the old technique of normal file access and deserialization into `KdTree`, the example code takes 348 milliseconds to load and query. The memmapped code that just transmutes to an `ArchivedKdTree` and then queries it takes 182 **micro** seconds(!) - an improvement by a factor of 1900x!!
 
-I'll follow up this release with equivalent methods for `Fixed`, and some more ergonomic methods for laoding and saving.
+I'll follow up this release with equivalent methods for `Fixed`, and some more ergonomic methods for loading and saving.
 
 ## [2.0.2]
 * fix: properly split buckets.
