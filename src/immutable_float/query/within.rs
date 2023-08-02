@@ -1,11 +1,9 @@
-use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
-use crate::float_sss::{
-    kdtree::{Axis, KdTree},
-    neighbour::Neighbour,
-};
+use crate::float::kdtree::Axis;
+use crate::float::neighbour::Neighbour;
+use crate::immutable_float::kdtree::ImmutableKdTree;
 use crate::types::Content;
 
 impl<A: Axis, T: Content, const K: usize, const B: usize>
@@ -19,14 +17,16 @@ impl<A: Axis, T: Content, const K: usize, const B: usize>
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
+    /// use kiddo::immutable_float::kdtree::ImmutableKdTree;
     /// use kiddo::distance::squared_euclidean;
     ///
-    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+    /// let content: Vec<[f64; 3]> = vec!(
+    ///     [1.0, 2.0, 5.0],
+    ///     [2.0, 3.0, 6.0],
+    ///     [200.0, 300.0, 600.0],
+    /// );
     ///
-    /// tree.add(&[1.0, 2.0, 5.0], 100);
-    /// tree.add(&[2.0, 3.0, 6.0], 101);
-    /// tree.add(&[200.0, 300.0, 600.0], 102);
+    /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimized_from(&content);
     ///
     /// let within = tree.within(&[1.0, 2.0, 5.0], 10f64, &squared_euclidean);
     ///
@@ -40,28 +40,26 @@ impl<A: Axis, T: Content, const K: usize, const B: usize>
         let mut off = [A::zero(); K];
         let mut matching_items: BinaryHeap<Neighbour<A, T>> = BinaryHeap::new();
 
-        unsafe {
-            self.within_recurse(
-                query,
-                dist,
-                distance_fn,
-                self.root_index,
-                0,
-                &mut matching_items,
-                &mut off,
-                A::zero(),
-            );
-        }
+        self.within_recurse(
+            query,
+            dist,
+            distance_fn,
+            1,
+            0,
+            &mut matching_items,
+            &mut off,
+            A::zero(),
+        );
 
         matching_items.into_sorted_vec()
     }
 
-    unsafe fn within_recurse<F>(
+    fn within_recurse<F>(
         &self,
         query: &[A; K],
         radius: A,
         distance_fn: &F,
-        curr_node_idx: usize,
+        stem_idx: usize,
         split_dim: usize,
         matching_items: &mut BinaryHeap<Neighbour<A, T>>,
         off: &mut [A; K],
@@ -69,70 +67,74 @@ impl<A: Axis, T: Content, const K: usize, const B: usize>
     ) where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
-        if curr_node_idx < self.stems.len() {
-            let node = self.stems.get_unchecked(curr_node_idx);
+        if stem_idx >= self.stems.len() {
+            let leaf_node = &self.leaves[stem_idx - self.stems.len()];
 
-            let mut rd = rd;
-            let old_off = off[split_dim];
-            let new_off = query[split_dim] - node.split_val;
+            leaf_node
+            .content_points
+            .iter()
+            .enumerate()
+            .take(leaf_node.size)
+            .for_each(|(idx, entry)| {
+                let distance = distance_fn(query, entry);
 
-            let [closer_node_idx, further_node_idx] =
-                if *query.get_unchecked(split_dim) < node.split_val {
-                    [node.left, node.right]
-                } else {
-                    [node.right, node.left]
-                };
-            let next_split_dim = (split_dim + 1).rem(K);
+                if distance < radius {
+                    matching_items.push(Neighbour {
+                        distance,
+                        item: * unsafe { leaf_node.content_items.get_unchecked(idx) },
+                    })
+                }
+            });
 
+            return;
+        }
+
+        let left_child_idx = stem_idx << 1;
+        self.prefetch_stems(left_child_idx);
+
+        let val = *unsafe { self.stems.get_unchecked(stem_idx) };
+        // let val = self.stems[stem_idx];
+
+        let mut rd = rd;
+        let old_off = off[split_dim];
+        let new_off = query[split_dim] - val;
+
+        let is_left_child = usize::from(*unsafe { query.get_unchecked(split_dim) } < val);
+        // let is_left_child = usize::from(query[split_dim] < val);
+
+        let closer_node_idx = left_child_idx + (1 - is_left_child);
+        let further_node_idx = left_child_idx + is_left_child;
+
+        let next_split_dim = (split_dim + 1).rem(K);
+
+        self.within_recurse(
+            query,
+            radius,
+            distance_fn,
+            closer_node_idx,
+            next_split_dim,
+            matching_items,
+            off,
+            rd,
+        );
+
+        // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
+        //       so that updating rd is not hardcoded to sq euclidean
+        rd = rd + new_off * new_off - old_off * old_off;
+
+        if rd <= radius {
+            off[split_dim] = new_off;
             self.within_recurse(
                 query,
                 radius,
                 distance_fn,
-                closer_node_idx,
+                further_node_idx,
                 next_split_dim,
                 matching_items,
                 off,
                 rd,
             );
-
-            // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-            //       so that updating rd is not hardcoded to sq euclidean
-            rd = rd + new_off * new_off - old_off * old_off;
-
-            if rd <= radius {
-                off[split_dim] = new_off;
-                self.within_recurse(
-                    query,
-                    radius,
-                    distance_fn,
-                    further_node_idx,
-                    next_split_dim,
-                    matching_items,
-                    off,
-                    rd,
-                );
-                off[split_dim] = old_off;
-            }
-        } else {
-            let leaf_node = self
-                .leaves
-                .get_unchecked(curr_node_idx - self.stems.len());
-
-            leaf_node
-                .content_points
-                .iter()
-                .enumerate()
-                .take(leaf_node.size)
-                .for_each(|(idx, entry)| {
-                    let distance = distance_fn(query, entry);
-
-                    if distance < radius {
-                        matching_items.push(Neighbour {
-                            distance,
-                            item: *leaf_node.content_items.get_unchecked(idx),
-                        })
-                    }
-                });
+            off[split_dim] = old_off;
         }
     }
 }
@@ -140,7 +142,8 @@ impl<A: Axis, T: Content, const K: usize, const B: usize>
 #[cfg(test)]
 mod tests {
     use crate::float::distance::manhattan;
-    use crate::immutable_float::kdtree::{Axis, ImmutableKdTree};
+    use crate::float::kdtree::Axis;
+    use crate::immutable_float::kdtree::ImmutableKdTree;
     use rand::Rng;
     use std::cmp::Ordering;
 
@@ -148,30 +151,26 @@ mod tests {
 
     #[test]
     fn can_query_items_within_radius() {
-        let mut tree: ImmutableKdTree<AX, u32, 4, 5> = KdTree::new();
-
-        let content_to_add: [([AX; 4], u32); 16] = [
-            ([0.9f32, 0.0f32, 0.9f32, 0.0f32], 9),
-            ([0.4f32, 0.5f32, 0.4f32, 0.5f32], 4),
-            ([0.12f32, 0.3f32, 0.12f32, 0.3f32], 12),
-            ([0.7f32, 0.2f32, 0.7f32, 0.2f32], 7),
-            ([0.13f32, 0.4f32, 0.13f32, 0.4f32], 13),
-            ([0.6f32, 0.3f32, 0.6f32, 0.3f32], 6),
-            ([0.2f32, 0.7f32, 0.2f32, 0.7f32], 2),
-            ([0.14f32, 0.5f32, 0.14f32, 0.5f32], 14),
-            ([0.3f32, 0.6f32, 0.3f32, 0.6f32], 3),
-            ([0.10f32, 0.1f32, 0.10f32, 0.1f32], 10),
-            ([0.16f32, 0.7f32, 0.16f32, 0.7f32], 16),
-            ([0.1f32, 0.8f32, 0.1f32, 0.8f32], 1),
-            ([0.15f32, 0.6f32, 0.15f32, 0.6f32], 15),
-            ([0.5f32, 0.4f32, 0.5f32, 0.4f32], 5),
-            ([0.8f32, 0.1f32, 0.8f32, 0.1f32], 8),
-            ([0.11f32, 0.2f32, 0.11f32, 0.2f32], 11),
+        let content_to_add: [[AX; 4]; 16] = [
+            [0.9f32, 0.0f32, 0.9f32, 0.0f32],   // 1.34
+            [0.4f32, 0.5f32, 0.4f32, 0.51f32],  // 0.86
+            [0.12f32, 0.3f32, 0.12f32, 0.3f32], // 1.82
+            [0.7f32, 0.2f32, 0.7f32, 0.22f32],  // 0.86
+            [0.13f32, 0.4f32, 0.13f32, 0.4f32], // 1.56
+            [0.6f32, 0.3f32, 0.6f32, 0.33f32],  // 0.86
+            [0.2f32, 0.7f32, 0.2f32, 0.7f32],   // 1.46
+            [0.14f32, 0.5f32, 0.14f32, 0.5f32], // 1.38
+            [0.3f32, 0.6f32, 0.3f32, 0.6f32],   // 1.06
+            [0.10f32, 0.1f32, 0.10f32, 0.1f32], // 2.26
+            [0.16f32, 0.7f32, 0.16f32, 0.7f32], // 1.54
+            [0.1f32, 0.8f32, 0.1f32, 0.8f32],   // 1.86
+            [0.15f32, 0.6f32, 0.15f32, 0.6f32], // 1.36
+            [0.5f32, 0.4f32, 0.5f32, 0.44f32],  // 0.86
+            [0.8f32, 0.1f32, 0.8f32, 0.15f32],  // 0.86
+            [0.11f32, 0.2f32, 0.11f32, 0.2f32], // 2.04
         ];
 
-        for (point, item) in content_to_add {
-            tree.add(&point, item);
-        }
+        let tree: ImmutableKdTree<AX, u32, 4, 4> = ImmutableKdTree::optimize_from(&content_to_add);
 
         assert_eq!(tree.size(), 16);
 
@@ -216,15 +215,12 @@ mod tests {
         const NUM_QUERIES: usize = 100;
         const RADIUS: f32 = 0.2;
 
-        let content_to_add: Vec<([f32; 4], u32)> = (0..TREE_SIZE)
-            .map(|_| rand::random::<([f32; 4], u32)>())
+        let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE)
+            .map(|_| rand::random::<[f32; 4]>())
             .collect();
 
-        let mut tree: ImmutableKdTree<AX, u32, 4, 32> = KdTree::with_capacity(TREE_SIZE);
-        content_to_add
-            .iter()
-            .for_each(|(point, content)| tree.add(point, *content));
-        assert_eq!(tree.size(), TREE_SIZE as u32);
+        let tree: ImmutableKdTree<AX, u32, 4, 32> = ImmutableKdTree::optimize_from(&content_to_add);
+        assert_eq!(tree.size(), TREE_SIZE);
 
         let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)
             .map(|_| rand::random::<[f32; 4]>())
@@ -244,16 +240,16 @@ mod tests {
     }
 
     fn linear_search<A: Axis, const K: usize>(
-        content: &[([A; K], u32)],
+        content: &[[A; K]],
         query_point: &[A; K],
         radius: A,
     ) -> Vec<(A, u32)> {
         let mut matching_items = vec![];
 
-        for &(p, item) in content {
+        for (idx, p) in content.iter().enumerate() {
             let dist = manhattan(query_point, &p);
             if dist < radius {
-                matching_items.push((dist, item));
+                matching_items.push((dist, idx as u32));
             }
         }
 
