@@ -1,12 +1,12 @@
-use crate::immutable_float::kdtree::{Axis, KdTree};
-use crate::float_sss::neighbour::Neighbour;
-use crate::types::{Content};
-use az::{Az, Cast};
+use crate::float::kdtree::Axis;
+use crate::immutable_float::kdtree::ImmutableKdTree;
+use crate::float::neighbour::Neighbour;
+use crate::types::Content;
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
 impl<A: Axis, T: Content, const K: usize, const B: usize>
-    KdTree<A, T, K, B>
+ImmutableKdTree<A, T, K, B>
 {
     /// Finds the nearest `qty` elements to `query`, using the specified
     /// distance metric function.
@@ -14,13 +14,15 @@ impl<A: Axis, T: Content, const K: usize, const B: usize>
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
+    /// use kiddo::immutable_float::kdtree::ImmutableKdTree;
     /// use kiddo::distance::squared_euclidean;
     ///
-    /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = KdTree::new();
+    /// let content: Vec<[f64; 3]> = vec!(
+    ///     [1.0, 2.0, 5.0],
+    ///     [2.0, 3.0, 6.0]
+    /// );
     ///
-    /// tree.add(&[1.0, 2.0, 5.0], 100);
-    /// tree.add(&[2.0, 3.0, 6.0], 101);
+    /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimized_from(&content);
     ///
     /// let nearest: Vec<_> = tree.nearest_n(&[1.0, 2.0, 5.1], 1, &squared_euclidean);
     ///
@@ -36,26 +38,24 @@ impl<A: Axis, T: Content, const K: usize, const B: usize>
         let mut off = [A::zero(); K];
         let mut result: BinaryHeap<Neighbour<A, T>> = BinaryHeap::with_capacity(qty);
 
-        unsafe {
-            self.nearest_n_recurse(
-                query,
-                distance_fn,
-                self.root_index,
-                0,
-                &mut result,
-                &mut off,
-                A::zero(),
-            )
-        }
+        self.nearest_n_recurse(
+            query,
+            distance_fn,
+            1,
+            0,
+            &mut result,
+            &mut off,
+            A::zero(),
+        );
 
         result.into_sorted_vec()
     }
 
-    unsafe fn nearest_n_recurse<F>(
+    fn nearest_n_recurse<F>(
         &self,
         query: &[A; K],
         distance_fn: &F,
-        curr_node_idx: usize,
+        stem_idx: usize,
         split_dim: usize,
         results: &mut BinaryHeap<Neighbour<A, T>>,
         off: &mut [A; K],
@@ -63,51 +63,8 @@ impl<A: Axis, T: Content, const K: usize, const B: usize>
     ) where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
-        if curr_node_idx < self.stems.len() {
-            let node = &self.stems.get_unchecked(curr_node_idx);
-
-            let mut rd = rd;
-            let old_off = off[split_dim];
-            let new_off = query[split_dim] - node.split_val;
-
-            let [closer_node_idx, further_node_idx] =
-                if *query.get_unchecked(split_dim) < node.split_val {
-                    [node.left, node.right]
-                } else {
-                    [node.right, node.left]
-                };
-            let next_split_dim = (split_dim + 1).rem(K);
-
-            self.nearest_n_recurse(
-                query,
-                distance_fn,
-                closer_node_idx,
-                next_split_dim,
-                results,
-                off,
-                rd,
-            );
-
-            // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-            //       so that updating rd is not hardcoded to sq euclidean
-            rd = rd + new_off * new_off - old_off * old_off;
-            if Self::dist_belongs_in_heap(rd, results) {
-                off[split_dim] = new_off;
-                self.nearest_n_recurse(
-                    query,
-                    distance_fn,
-                    further_node_idx,
-                    next_split_dim,
-                    results,
-                    off,
-                    rd,
-                );
-                off[split_dim] = old_off;
-            }
-        } else {
-            let leaf_node = self
-                .leaves
-                .get_unchecked((curr_node_idx - self.stems.len()));
+        if stem_idx >= self.stems.len() {
+            let leaf_node = &self.leaves[stem_idx - self.stems.len()];
 
             leaf_node
                 .content_points
@@ -129,6 +86,53 @@ impl<A: Axis, T: Content, const K: usize, const B: usize>
                         }
                     }
                 });
+
+            return;
+        }
+
+        let left_child_idx = stem_idx << 1;
+        self.prefetch_stems(left_child_idx);
+
+        let val = *unsafe { self.stems.get_unchecked(stem_idx) };
+        // let val = self.stems[stem_idx];
+
+        let mut rd = rd;
+        let old_off = off[split_dim];
+        let new_off = query[split_dim] - val;
+
+        let is_left_child = usize::from(*unsafe { query.get_unchecked(split_dim) } < val);
+        // let is_left_child = usize::from(query[split_dim] < val);
+
+        let closer_node_idx = left_child_idx + (1 - is_left_child);
+        let further_node_idx = left_child_idx + is_left_child;
+
+        let next_split_dim = (split_dim + 1).rem(K);
+
+        self.nearest_n_recurse(
+            query,
+            distance_fn,
+            closer_node_idx,
+            next_split_dim,
+            results,
+            off,
+            rd,
+        );
+
+        // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
+        //       so that updating rd is not hardcoded to sq euclidean
+        rd = rd + new_off * new_off - old_off * old_off;
+        if Self::dist_belongs_in_heap(rd, results) {
+            off[split_dim] = new_off;
+            self.nearest_n_recurse(
+                query,
+                distance_fn,
+                further_node_idx,
+                next_split_dim,
+                results,
+                off,
+                rd,
+            );
+            off[split_dim] = old_off;
         }
     }
 
@@ -140,43 +144,40 @@ impl<A: Axis, T: Content, const K: usize, const B: usize>
 #[cfg(test)]
 mod tests {
     use crate::float::distance::squared_euclidean;
-    use crate::float::kdtree::{Axis, KdTree};
+    use crate::float::kdtree::Axis;
+    use crate::immutable_float::kdtree::ImmutableKdTree;
     use rand::Rng;
 
     type AX = f32;
 
     #[test]
     fn can_query_nearest_n_item() {
-        let mut tree: KdTree<AX, u32, 4, 8, u32> = KdTree::new();
-
-        let content_to_add: [([AX; 4], u32); 16] = [
-            ([0.9f32, 0.0f32, 0.9f32, 0.0f32], 9),    // 1.34
-            ([0.4f32, 0.5f32, 0.4f32, 0.51f32], 4),   // 0.86
-            ([0.12f32, 0.3f32, 0.12f32, 0.3f32], 12), // 1.82
-            ([0.7f32, 0.2f32, 0.7f32, 0.22f32], 7),   // 0.86
-            ([0.13f32, 0.4f32, 0.13f32, 0.4f32], 13), // 1.56
-            ([0.6f32, 0.3f32, 0.6f32, 0.33f32], 6),   // 0.86
-            ([0.2f32, 0.7f32, 0.2f32, 0.7f32], 2),    // 1.46
-            ([0.14f32, 0.5f32, 0.14f32, 0.5f32], 14), // 1.38
-            ([0.3f32, 0.6f32, 0.3f32, 0.6f32], 3),    // 1.06
-            ([0.10f32, 0.1f32, 0.10f32, 0.1f32], 10), // 2.26
-            ([0.16f32, 0.7f32, 0.16f32, 0.7f32], 16), // 1.54
-            ([0.1f32, 0.8f32, 0.1f32, 0.8f32], 1),    // 1.86
-            ([0.15f32, 0.6f32, 0.15f32, 0.6f32], 15), // 1.36
-            ([0.5f32, 0.4f32, 0.5f32, 0.44f32], 5),   // 0.86
-            ([0.8f32, 0.1f32, 0.8f32, 0.15f32], 8),   // 0.86
-            ([0.11f32, 0.2f32, 0.11f32, 0.2f32], 11), // 2.04
+        let content_to_add: [[AX; 4]; 16] = [
+            [0.9f32, 0.0f32, 0.9f32, 0.0f32],   // 1.34
+            [0.4f32, 0.5f32, 0.4f32, 0.51f32],  // 0.86
+            [0.12f32, 0.3f32, 0.12f32, 0.3f32], // 1.82
+            [0.7f32, 0.2f32, 0.7f32, 0.22f32],  // 0.86
+            [0.13f32, 0.4f32, 0.13f32, 0.4f32], // 1.56
+            [0.6f32, 0.3f32, 0.6f32, 0.33f32],  // 0.86
+            [0.2f32, 0.7f32, 0.2f32, 0.7f32],   // 1.46
+            [0.14f32, 0.5f32, 0.14f32, 0.5f32], // 1.38
+            [0.3f32, 0.6f32, 0.3f32, 0.6f32],   // 1.06
+            [0.10f32, 0.1f32, 0.10f32, 0.1f32], // 2.26
+            [0.16f32, 0.7f32, 0.16f32, 0.7f32], // 1.54
+            [0.1f32, 0.8f32, 0.1f32, 0.8f32],   // 1.86
+            [0.15f32, 0.6f32, 0.15f32, 0.6f32], // 1.36
+            [0.5f32, 0.4f32, 0.5f32, 0.44f32],  // 0.86
+            [0.8f32, 0.1f32, 0.8f32, 0.15f32],  // 0.86
+            [0.11f32, 0.2f32, 0.11f32, 0.2f32], // 2.04
         ];
 
-        for (point, item) in content_to_add {
-            tree.add(&point, item);
-        }
+        let tree: ImmutableKdTree<AX, u32, 4, 4> = ImmutableKdTree::optimize_from(&content_to_add);
 
         assert_eq!(tree.size(), 16);
 
         let query_point = [0.78f32, 0.55f32, 0.78f32, 0.55f32];
 
-        let expected = vec![(0.17569996, 6), (0.19139998, 5), (0.24420004, 7)];
+        let expected = vec![(0.17569996, 5), (0.19139998, 13), (0.24420004, 3)];
 
         let result: Vec<_> = tree
             .nearest_n(&query_point, 3, &squared_euclidean)
@@ -215,15 +216,13 @@ mod tests {
         const NUM_QUERIES: usize = 100;
         const N: usize = 10;
 
-        let content_to_add: Vec<([f32; 4], u32)> = (0..TREE_SIZE)
-            .map(|_| rand::random::<([f32; 4], u32)>())
+        let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE)
+            .map(|_| rand::random::<[f32; 4]>())
             .collect();
 
-        let mut tree: KdTree<AX, u32, 4, 32, u32> = KdTree::with_capacity(TREE_SIZE);
-        content_to_add
-            .iter()
-            .for_each(|(point, content)| tree.add(point, *content));
-        assert_eq!(tree.size(), TREE_SIZE as u32);
+        let tree: ImmutableKdTree<AX, u32, 4, 32> = ImmutableKdTree::optimize_from(&content_to_add);
+
+        assert_eq!(tree.size(), TREE_SIZE);
 
         let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)
             .map(|_| rand::random::<[f32; 4]>())
@@ -246,19 +245,19 @@ mod tests {
     }
 
     fn linear_search<A: Axis, const K: usize>(
-        content: &[([A; K], u32)],
+        content: &[[A; K]],
         qty: usize,
         query_point: &[A; K],
-    ) -> Vec<(A, u32)> {
+    ) -> Vec<(A, usize)> {
         let mut results = vec![];
 
-        for &(p, item) in content {
+        for (idx, p) in content.iter().enumerate() {
             let dist = squared_euclidean(query_point, &p);
             if results.len() < qty {
-                results.push((dist, item));
+                results.push((dist, idx));
                 results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(&b_dist).unwrap());
             } else if dist < results[qty - 1].0 {
-                results[qty - 1] = (dist, item);
+                results[qty - 1] = (dist, idx);
                 results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(&b_dist).unwrap());
             }
         }

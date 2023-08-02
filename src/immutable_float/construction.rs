@@ -1,4 +1,5 @@
-use crate::immutable_float::kdtree::{Axis, ImmutableKdTree};
+use crate::float::kdtree::Axis;
+use crate::immutable_float::kdtree::ImmutableKdTree;
 use crate::types::Content;
 use std::ops::Rem;
 
