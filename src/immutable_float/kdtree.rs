@@ -1,13 +1,19 @@
-//! Floating point k-d tree, for use when the co-ordinates of the points being stored in the tree
-//! are floats. f64 or f32 are supported currently.
+//! Immutable Floating point k-d tree. Offers less memory utilisation, smaller size
+//! when serialized, and faster more consistent query performace. This comes at the
+//! expense of not being able to modify the contents of the tree after its initial
+//! construction, and longer construction times - perhaps prohiitively so.
+//! As with the vanilla tree, `f64` or `f32` are supported currently for co-ordinate
+//! values.
 
 use az::{Az, Cast};
-use num_traits::Float;
 use ordered_float::OrderedFloat;
 use std::alloc::{AllocError, Allocator, Global, Layout};
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 use std::ops::Rem;
+use std::ptr;
+
+use crate::float::kdtree::Axis;
 
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;
@@ -15,16 +21,15 @@ use crate::types::Content;
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
 
-/// Axis trait represents the traits that must be implemented
-/// by the type that is used as the first generic parameter, `A`,
-/// on the float `KdTree`. This will be `f64` or `f32`.
-pub trait Axis: Float + Default + Debug + Copy + Sync {}
-impl<T: Float + Default + Debug + Copy + Sync> Axis for T {}
 
-/// Floating point k-d tree
+/// Immutable floating point k-d tree
 ///
-/// For use when the co-ordinates of the points being stored in the tree
-/// are floats. f64 or f32 are supported currently
+/// Offers less memory utilisation, smaller size
+/// when serialized, and faster more consistent query performace. This comes at the
+/// expense of not being able to modify the contents of the tree after its initial
+/// construction, and longer construction times - perhaps prohiitively so.
+/// As with the vanilla tree, `f64` or `f32` are supported currently for co-ordinate
+/// values.
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "serialize_rkyv",
@@ -79,8 +84,8 @@ where
         }
     }
 }
-/// Encloses stats on a particular `ImmutableTree`'s usage at
-/// the time of calling `generate_stats()`
+/// Encapsulates stats on a particular `ImmutableTree`'s contents and
+/// memory usage at the time of calling `generate_stats()`
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct TreeStats {
@@ -99,10 +104,13 @@ where
     A: Axis,
     T: Content,
 {
-    /// Creates an ImmutableKdTree, balanced and optimized.
+    /// Creates an ImmutableKdTree, balanced and optimized, populated
+    /// with items from `source`.
     ///
-    /// Trees constructed using this method will not be modifiable
-    /// after construction and will be optimally balanced and tuned.
+    /// Trees constructed using this method will be optimally
+    /// balanced and tuned, but will not be modifiable
+    /// after construction. This method may take a long time for
+    /// large numbers of points (>4 million)
     ///
     /// # Examples
     ///
@@ -208,10 +216,10 @@ where
         new_shifts
     }
 
-    /// Returns zero if balancing was successful. If a child splitpoint has
-    /// landed in between two (or more) items with the same value, the value returned is a hint to
-    /// the caller of how many items overflowed out of the second bucket due to the optimization
-    /// attempt overflowing after the pivot was moved.
+    /// Returns a value representing the number of items that would not fit (ie zero if balancing
+    /// was successful). If a child splitpoint has landed in between two (or more) items with
+    /// the same value on the split axis, the value returned is a hint to
+    /// the caller of how many items overflowed.
     fn optimize_stems(
         stems: &mut Vec<A>,
         shifts: &mut Vec<usize>,
@@ -315,7 +323,7 @@ where
     ) -> usize {
         // Using this version of update_pivot makes construction significantly faster (~13%)
 
-        // TODO: this block may be made faster by using a quickselect with a fat partition?
+        // TODO: this block might be faster by using a quickselect with a fat partition?
         //       we could then run that quickselect and subtract (fat partition length - 1)
         //       from the pivot, avoiding the need for the while loop.
 
@@ -461,6 +469,28 @@ where
         }
         pivot -= shifted;
         pivot.max(chunk_length.saturating_sub(right_capacity))
+    }
+
+    #[inline]
+    pub(crate) fn prefetch_stems(&self, idx: usize) {
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            let prefetch = self.stems.as_ptr().wrapping_offset(2 * idx as isize);
+            std::arch::x86_64::_mm_prefetch::<{ core::arch::x86_64::_MM_HINT_T0 }>(ptr::addr_of!(
+                prefetch
+            )
+                as *const i8);
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        unsafe {
+            let prefetch = self.stems.as_ptr().wrapping_offset(2 * idx as isize);
+            core::arch::aarch64::_prefetch(
+                ptr::addr_of!(prefetch) as *const i8,
+                core::arch::aarch64::_PREFETCH_READ,
+                core::arch::aarch64::_PREFETCH_LOCALITY3,
+            );
+        }
     }
 }
 

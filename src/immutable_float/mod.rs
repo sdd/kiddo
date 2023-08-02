@@ -5,13 +5,12 @@
 //! and items will not need to be added or removed from the
 //! tree once it has been constructed.
 //! These constraints permit improvements to be made in both
-//! space and time performance.
+//! space and query time performance, at the cost of construction
+//! time performance.
 
 #[doc(hidden)]
 pub mod construction;
-pub mod distance;
 pub mod kdtree;
-pub mod neighbour;
 
 #[doc(hidden)]
 pub mod query;

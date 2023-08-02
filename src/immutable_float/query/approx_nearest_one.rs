@@ -1,6 +1,6 @@
-use crate::immutable_float::kdtree::{Axis, ImmutableKdTree};
+use crate::float::kdtree::Axis;
+use crate::immutable_float::kdtree::ImmutableKdTree;
 use crate::types::Content;
-use std::ops::Rem;
 use std::ptr;
 
 impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
@@ -13,13 +13,15 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
+    /// use kiddo::immutable_float::kdtree::ImmutableKdTree;
     /// use kiddo::distance::squared_euclidean;
     ///
-    /// let mut tree: KdTree<f64, u32, 3, 32> = KdTree::new();
+    /// let content: Vec<[f64; 3]> = vec!(
+    ///     [1.0, 2.0, 5.0],
+    ///     [2.0, 3.0, 6.0]
+    /// );
     ///
-    /// tree.add(&[1.0, 2.0, 5.0], 100);
-    /// tree.add(&[2.0, 3.0, 6.0], 101);
+    /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimized_from(&content);
     ///
     /// let nearest = tree.nearest_one(&[1.0, 2.0, 5.1], &squared_euclidean);
     ///
@@ -97,8 +99,9 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
 
 #[cfg(test)]
 mod tests {
-    use crate::immutable_float::distance::manhattan;
-    use crate::immutable_float::kdtree::{Axis, ImmutableKdTree};
+    use crate::float::distance::manhattan;
+    use crate::float::kdtree::Axis;
+    use crate::immutable_float::kdtree::ImmutableKdTree;
     use rand::Rng;
 
     type AX = f32;
