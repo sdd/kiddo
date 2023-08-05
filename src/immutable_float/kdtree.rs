@@ -1,7 +1,7 @@
 //! Immutable Floating point k-d tree. Offers less memory utilisation, smaller size
 //! when serialized, and faster more consistent query performace. This comes at the
 //! expense of not being able to modify the contents of the tree after its initial
-//! construction, and longer construction times - perhaps prohiitively so.
+//! construction, and longer construction times - perhaps prohibitively so.
 //! As with the vanilla tree, `f64` or `f32` are supported currently for co-ordinate
 //! values.
 
@@ -13,14 +13,13 @@ use std::fmt::Debug;
 use std::ops::Rem;
 use std::ptr;
 
-use crate::float::kdtree::Axis;
+pub use crate::float::kdtree::Axis;
 
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;
 use crate::types::Content;
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
-
 
 /// Immutable floating point k-d tree
 ///
@@ -614,6 +613,40 @@ mod tests {
     }
 
     #[test]
+    fn can_construct_optimized_tree_with_multiple_dupes() {
+        use rand::seq::SliceRandom;
+
+        for seed in 0..1_000_000 {
+            let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+
+            let mut content_to_add = vec![
+                [4.0, 104.0],
+                [2.0, 102.0],
+                [3.0, 103.0],
+                [4.0, 104.0],
+                [4.0, 104.0],
+                [4.0, 104.0],
+                [4.0, 104.0],
+                [7.0, 107.0],
+                [8.0, 108.0],
+                [9.0, 109.0],
+                [10.0, 110.0],
+                [4.0, 104.0],
+                [12.0, 112.0],
+                [13.0, 113.0],
+                [4.0, 104.0],
+                [4.0, 104.0],
+                [17.0, 117.0],
+                [18.0, 118.0],
+            ];
+            content_to_add.shuffle(&mut rng);
+
+            let tree: ImmutableKdTree<f32, usize, 2, 8> =
+                ImmutableKdTree::optimize_from(&content_to_add);
+        }
+    }
+
+    #[test]
     fn can_construct_optimized_tree_bad_example_0() {
         let tree_size = 18;
         let seed = 894771;
@@ -759,7 +792,21 @@ mod tests {
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
 
-    #[ignore]
+    #[test]
+    fn can_construct_optimized_tree_bad_example_11() {
+        let tree_size = 10000;
+        let seed = 257281;
+
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+        let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
+
+        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+            ImmutableKdTree::optimize_from(&content_to_add);
+
+        println!("Tree Stats: {:?}", tree.generate_stats())
+    }
+
+    //#[ignore]
     #[test]
     fn can_construct_optimized_tree_multi_rand_increasing_size() {
         use rayon::iter::ParallelIterator;
