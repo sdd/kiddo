@@ -2,13 +2,13 @@ use std::error::Error;
 
 use criterion::black_box;
 use elapsed::ElapsedDuration;
-use kiddo::immutable_float::distance::squared_euclidean;
+use kiddo::float::distance::squared_euclidean;
 use rand::{Rng, SeedableRng};
-use rayon::iter::IntoParallelRefIterator;
-use rayon::iter::ParallelIterator;
+// use rayon::iter::IntoParallelRefIterator;
+// use rayon::iter::ParallelIterator;
 use std::time::Instant;
 
-use kiddo::float::kdtree::KdTree;
+// use kiddo::float::kdtree::KdTree;
 use kiddo::immutable_float::kdtree::ImmutableKdTree;
 use kiddo::test_utils::build_query_points_float;
 
