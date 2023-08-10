@@ -12,6 +12,7 @@ use std::cmp::PartialEq;
 use std::fmt::Debug;
 use std::ops::Rem;
 use std::ptr;
+use tracing::{event, span, Level};
 
 pub use crate::float::kdtree::Axis;
 
@@ -117,7 +118,7 @@ where
     /// use kiddo::immutable_float::kdtree::ImmutableKdTree;
     ///
     /// let points: Vec<[f64; 3]> = vec!();
-    /// let tree: KdTree<f64, u32, 3, 32> = KdTree::optimize_from(points);
+    /// let tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimize_from(&points);
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
@@ -140,6 +141,7 @@ where
         let mut shifts = vec![0usize; stem_node_count];
         let mut sort_index = Vec::from_iter(0..item_count);
 
+        let mut top_level_shift_change_count = 0;
         loop {
             let requested_shift = Self::optimize_stems(
                 &mut stems,
@@ -154,19 +156,44 @@ where
             if requested_shift == 0 {
                 break;
             }
+            top_level_shift_change_count += 1;
 
             // if root has requested a shift, then there was not enough capacity in
             // the tree to overflow into. Add just enough extra leaf nodes to accommodate
             // the shift.
             leaf_node_count += requested_shift.div_ceil(B);
+            event!(
+                Level::TRACE,
+                requested_shift,
+                leaf_node_count,
+                "top-level shift"
+            );
 
             // if the new leaf count can't be accommodated by the existing stem count,
             // bump up the stem count to the next power of two.
             if leaf_node_count > stem_node_count {
                 stem_node_count = (stem_node_count + 1).next_power_of_two();
+                event!(Level::TRACE, stem_node_count, "extending stems");
 
                 stems = vec![A::infinity(); stem_node_count];
                 shifts = Self::extend_shifts(stem_node_count, &shifts, requested_shift);
+            }
+        }
+
+        // generate construction stats
+        let max_shift = shifts.iter().max().unwrap();
+        let tot_shift: usize = shifts.iter().sum();
+
+        println!(
+            "top_level_shift_change_count: {:?}",
+            top_level_shift_change_count
+        );
+        println!("max_shift: {:?}", max_shift);
+        println!("tot_shift: {:?}", tot_shift);
+
+        for (idx, &shift) in shifts.iter().enumerate() {
+            if shift != 0 {
+                println!("Index {}: shift {}", &idx, shift);
             }
         }
 
@@ -228,10 +255,14 @@ where
         dim: usize,
         capacity: usize,
     ) -> usize {
+        let span = span!(Level::TRACE, "opt", idx = stem_index);
+        let _enter = span.enter();
         let chunk_length = sort_index.len();
         if chunk_length <= B {
             return 0;
         }
+
+        assert!(chunk_length <= capacity);
 
         let next_dim = (dim + 1).rem(K);
 
@@ -245,6 +276,9 @@ where
         // only bother with this if we are putting at least one item in the right hand child
         if pivot < chunk_length {
             pivot = Self::update_pivot(source, sort_index, dim, pivot);
+
+            // TODO: if pivot gets to 0, start again at orig pivot and try
+            //       nudging the other way.
 
             // if we end up with a pivot of 0, something has gone wrong,
             // unless we only had a slice of len 1 anyway
@@ -260,6 +294,11 @@ where
 
         // if the right chunk is bigger than it's capacity, return the overflow amount
         if chunk_length - pivot > right_capacity {
+            event!(
+                Level::TRACE,
+                val = chunk_length - pivot - right_capacity,
+                "RHS Overflow A"
+            );
             return chunk_length - pivot - right_capacity;
         }
 
@@ -283,6 +322,7 @@ where
             if requested_shift_amount == 0 {
                 break;
             }
+            event!(Level::TRACE, req = requested_shift_amount, "LHS shift");
 
             pivot -= requested_shift_amount;
 
@@ -291,17 +331,32 @@ where
             // return with a value so that the parent reduces our
             // total allocation
             if chunk_length - pivot > right_capacity {
+                event!(Level::TRACE, val = requested_shift_amount, "shift A");
+                shifts[stem_index] += requested_shift_amount;
+
+                event!(
+                    Level::TRACE,
+                    val = chunk_length - pivot - right_capacity,
+                    "RHS Overflow B"
+                );
                 return chunk_length - pivot - right_capacity;
             }
 
             sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
             stems[stem_index] = source[sort_index[pivot]][dim];
+
+            event!(
+                Level::TRACE,
+                idx = stem_index,
+                d = requested_shift_amount,
+                "shift B"
+            );
             shifts[stem_index] += requested_shift_amount;
         }
 
         // If a right child requests a shift, don't shift yourself,
         // but do pass that shift back up to your parent
-        Self::optimize_stems(
+        let res = Self::optimize_stems(
             stems,
             shifts,
             source,
@@ -309,7 +364,12 @@ where
             next_stem_index + 1,
             next_dim,
             right_capacity,
-        )
+        );
+        if res != 0 {
+            event!(Level::TRACE, val = res, "RHS shift");
+        }
+
+        res
     }
 
     #[cfg(not(feature = "unreliable_select_nth_unstable"))]
@@ -334,6 +394,12 @@ where
         // if the pivot straddles two values that are equal, keep nudging it left until they aren't
         while source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim] && pivot > 0 {
             pivot -= 1;
+            event!(
+                Level::TRACE,
+                pivot,
+                chunk_len = sort_index.len(),
+                "pivot shifted"
+            );
         }
 
         pivot
@@ -450,24 +516,24 @@ where
         let mut pivot = (chunk_length + shifted) >> 1;
         if stem_index == 1 {
             // If at the top level, check if there's been a shift
-            pivot = if shifted > 0 {
-                // if so,
-                chunk_length
+            pivot = if chunk_length & 1 == 1 {
+                event!(Level::DEBUG, "calc_pivot: unusual route");
+                (pivot + 1).next_power_of_two()
             } else {
-                // otherwise, do a special case pivot shift to ensure the left subtree is full.
-                if chunk_length & 1 == 1 {
-                    (pivot + 1).next_power_of_two()
-                } else {
-                    pivot.next_power_of_two()
-                }
+                //event!(Level::TRACE, "cp C");
+                pivot.next_power_of_two()
             };
         } else if chunk_length & 0x01 == 1 && shifted == 0 {
+            //event!(Level::TRACE, "cp D");
             pivot = (pivot + 1).next_power_of_two()
         } else {
             pivot = pivot.next_power_of_two();
         }
         pivot -= shifted;
-        pivot.max(chunk_length.saturating_sub(right_capacity))
+        pivot = pivot.max(chunk_length.saturating_sub(right_capacity));
+        //event!(Level::TRACE, pivot, "pivot");
+        pivot
+        // pivot - shifted
     }
 
     #[inline]
@@ -531,8 +597,8 @@ mod tests {
         assert_eq!(tree.leaves[0].size, 3);
         assert_eq!(tree.leaves[1].size, 4);
         assert_eq!(tree.leaves[2].size, 4);
-        assert_eq!(tree.leaves[3].size, 4);
-        assert_eq!(tree.leaves[4].size, 1);
+        assert_eq!(tree.leaves[3].size, 1);
+        assert_eq!(tree.leaves[4].size, 4);
     }
 
     #[test]
@@ -806,6 +872,26 @@ mod tests {
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
 
+    #[test]
+    fn can_construct_optimized_tree_many_dupes() {
+        let tree_size = 8;
+        let seed = 0;
+
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+        let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
+
+        let mut duped: Vec<[f32; 4]> = Vec::with_capacity(content_to_add.len() * 10);
+        for item in content_to_add {
+            for _ in 0..6 {
+                duped.push(item);
+            }
+        }
+
+        let tree: ImmutableKdTree<f32, usize, 4, 8> = ImmutableKdTree::optimize_from(&duped);
+
+        println!("Tree Stats: {:?}", tree.generate_stats());
+    }
+
     //#[ignore]
     #[test]
     fn can_construct_optimized_tree_multi_rand_increasing_size() {
@@ -821,7 +907,7 @@ mod tests {
         let failures: Vec<Failure> = Vec::new();
 
         for tree_size in 16..100 {
-            (0..1000000)
+            (0..1_000_000)
                 .collect::<Vec<_>>()
                 .par_iter()
                 .for_each(|&seed| {

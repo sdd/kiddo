@@ -2,6 +2,7 @@ use crate::float::kdtree::Axis;
 use crate::immutable_float::kdtree::ImmutableKdTree;
 use crate::types::Content;
 use std::ops::Rem;
+use tracing::{event, Level};
 
 impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
     #[allow(dead_code)]
@@ -53,7 +54,13 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
 
         let node_size = self.leaves[idx].size;
         if node_size == B {
-            println!("Tree Stats: {:?}", self.generate_stats())
+            event!(
+                Level::ERROR,
+                "Overflowing add to leaf #{}. item={:?}",
+                idx,
+                query
+            );
+            event!(Level::TRACE, "Tree Stats: {:?}", self.generate_stats())
         }
 
         let node = self.leaves.get_mut(idx).unwrap();
