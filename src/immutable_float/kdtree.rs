@@ -396,9 +396,12 @@ where
         while source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim] && pivot > 0 {
             pivot -= 1;
             event!(
-                Level::TRACE,
+                Level::INFO,
                 pivot,
                 chunk_len = sort_index.len(),
+                pivotN1_val = ?source[sort_index[pivot - 1]][dim],
+                pivot0_val = ?source[sort_index[pivot]][dim],
+                pivot1_val = ?source[sort_index[pivot + 1]][dim],
                 "pivot shifted"
             );
         }
