@@ -325,6 +325,7 @@ where
             event!(Level::TRACE, req = requested_shift_amount, "LHS shift");
 
             pivot -= requested_shift_amount;
+            pivot = Self::update_pivot(source, sort_index, dim, pivot);
 
             // Test for RHS now having more items than can fit
             // in the buckets present in its subtree. If it does,
