@@ -26,12 +26,12 @@ impl<A: Axis, T: Content, const K: usize, const B: usize>
     ///     [200.0, 300.0, 600.0],
     /// );
     ///
-    /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimized_from(&content);
+    /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimize_from(&content);
     ///
     /// let mut best_n_within = tree.best_n_within(&[1.0, 2.0, 5.0], 10f64, 1, &squared_euclidean);
     /// let first = best_n_within.next().unwrap();
     ///
-    /// assert_eq!(first, 1);
+    /// assert_eq!(first, 0);
     /// ```
     #[inline]
     pub fn best_n_within<F>(

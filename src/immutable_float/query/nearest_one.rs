@@ -21,12 +21,12 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
     ///     [2.0, 3.0, 6.0]
     /// );
     ///
-    /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimized_from(&content);
+    /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimize_from(&content);
     ///
     /// let nearest = tree.nearest_one(&[1.0, 2.0, 5.1], &squared_euclidean);
     ///
     /// assert!((nearest.0 - 0.01f64).abs() < f64::EPSILON);
-    /// assert_eq!(nearest.1, 100);
+    /// assert_eq!(nearest.1, 0);
     /// ```
     #[inline]
     pub fn nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> (A, T)
