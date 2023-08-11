@@ -26,7 +26,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize>
     ///     [200.0, 300.0, 600.0],
     /// );
     ///
-    /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimized_from(&content);
+    /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimize_from(&content);
     ///
     /// let within = tree.within(&[1.0, 2.0, 5.0], 10f64, &squared_euclidean);
     ///
