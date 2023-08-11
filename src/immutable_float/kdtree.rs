@@ -117,7 +117,7 @@ where
     /// ```rust
     /// use kiddo::immutable_float::kdtree::ImmutableKdTree;
     ///
-    /// let points: Vec<[f64; 3]> = vec!();
+    /// let points: Vec<[f64; 3]> = vec!([1.0f64, 2.0f64, 3.0f64]);
     /// let tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimize_from(&points);
     ///
     /// assert_eq!(tree.size(), 1);
@@ -707,7 +707,7 @@ mod tests {
             ];
             content_to_add.shuffle(&mut rng);
 
-            let tree: ImmutableKdTree<f32, usize, 2, 8> =
+            let _tree: ImmutableKdTree<f32, usize, 2, 8> =
                 ImmutableKdTree::optimize_from(&content_to_add);
         }
     }

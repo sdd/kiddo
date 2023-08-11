@@ -22,13 +22,13 @@ ImmutableKdTree<A, T, K, B>
     ///     [2.0, 3.0, 6.0]
     /// );
     ///
-    /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimized_from(&content);
+    /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimize_from(&content);
     ///
     /// let nearest: Vec<_> = tree.nearest_n(&[1.0, 2.0, 5.1], 1, &squared_euclidean);
     ///
     /// assert_eq!(nearest.len(), 1);
     /// assert!((nearest[0].distance - 0.01f64).abs() < f64::EPSILON);
-    /// assert_eq!(nearest[0].item, 100);
+    /// assert_eq!(nearest[0].item, 0);
     /// ```
     #[inline]
     pub fn nearest_n<F>(&self, query: &[A; K], qty: usize, distance_fn: &F) -> Vec<Neighbour<A, T>>
