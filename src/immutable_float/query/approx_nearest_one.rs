@@ -1,7 +1,6 @@
 use crate::float::kdtree::Axis;
 use crate::immutable_float::kdtree::ImmutableKdTree;
 use crate::types::Content;
-use std::ptr;
 
 impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
     /// Queries the tree to find the nearest element to `query`, using the specified
@@ -42,14 +41,13 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
 
         while stem_idx < stem_len {
             let left_child_idx = stem_idx << 1;
-            self.approx_prefetch_stems(left_child_idx);
+            self.prefetch_stems(left_child_idx);
 
             let val = *unsafe { self.stems.get_unchecked(stem_idx) };
-            let is_left_child = usize::from(*unsafe { query.get_unchecked(split_dim) } < val);
+            let is_right_child = usize::from(*unsafe { query.get_unchecked(split_dim) } >= val);
 
-            stem_idx = left_child_idx + (1 - is_left_child);
+            stem_idx = left_child_idx + is_right_child;
 
-            //split_dim = (split_dim + 1).rem(K);
             split_dim += 1;
             split_dim %= K;
         }
@@ -72,28 +70,6 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
             });
 
         (best_dist, best_item)
-    }
-
-    #[inline]
-    fn approx_prefetch_stems(&self, idx: usize) {
-        #[cfg(target_arch = "x86_64")]
-        unsafe {
-            let prefetch = self.stems.as_ptr().wrapping_offset(2 * idx as isize);
-            std::arch::x86_64::_mm_prefetch::<{ core::arch::x86_64::_MM_HINT_T0 }>(ptr::addr_of!(
-                prefetch
-            )
-                as *const i8);
-        }
-
-        #[cfg(target_arch = "aarch64")]
-        unsafe {
-            let prefetch = self.stems.as_ptr().wrapping_offset(2 * idx as isize);
-            core::arch::aarch64::_prefetch(
-                ptr::addr_of!(prefetch) as *const i8,
-                core::arch::aarch64::_PREFETCH_READ,
-                core::arch::aarch64::_PREFETCH_LOCALITY3,
-            );
-        }
     }
 }
 

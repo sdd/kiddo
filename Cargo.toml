@@ -138,3 +138,4 @@ path = "examples/check_select_nth_unstable.rs"
 [[example]]
 name = "broken"
 path = "examples/broken.rs"
+required-features = ["serialize_rkyv"]

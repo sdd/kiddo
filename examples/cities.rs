@@ -84,7 +84,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     //    cache. If you need more precision than 7 significant figures, Kiddo supports `f64`.
     //    If your data covers a narrow dynamic range (e.g. all of the values are within
     //    a few orders of magnitude of each other) and performance (or memory usage)
-    //    is a key concern, then youn may want to experiment with converting your
+    //    is a key concern, then you may want to experiment with converting your
     //    positions into 16-bit fixed point and using a kiddo::FixedKdTree.
     // 2) `T`: `u16` - this specifies the type of the indices that are stored in the tree.
     //    A `u16` will suffice for up to 2^16 (approx 65k) different items. A `u32` will allow you
