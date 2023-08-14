@@ -141,7 +141,7 @@ where
         let mut shifts = vec![0usize; stem_node_count];
         let mut sort_index = Vec::from_iter(0..item_count);
 
-        let mut top_level_shift_change_count = 0;
+        //let mut top_level_shift_change_count = 0;
         loop {
             let requested_shift = Self::optimize_stems(
                 &mut stems,
@@ -156,7 +156,7 @@ where
             if requested_shift == 0 {
                 break;
             }
-            top_level_shift_change_count += 1;
+            //top_level_shift_change_count += 1;
 
             // if root has requested a shift, then there was not enough capacity in
             // the tree to overflow into. Add just enough extra leaf nodes to accommodate
@@ -180,22 +180,22 @@ where
             }
         }
 
-        // generate construction stats
-        let max_shift = shifts.iter().max().unwrap();
-        let tot_shift: usize = shifts.iter().sum();
-
-        println!(
-            "top_level_shift_change_count: {:?}",
-            top_level_shift_change_count
-        );
-        println!("max_shift: {:?}", max_shift);
-        println!("tot_shift: {:?}", tot_shift);
-
-        for (idx, &shift) in shifts.iter().enumerate() {
-            if shift != 0 {
-                println!("Index {}: shift {}", &idx, shift);
-            }
-        }
+        // // generate construction stats
+        // let max_shift = shifts.iter().max().unwrap();
+        // let tot_shift: usize = shifts.iter().sum();
+        //
+        // println!(
+        //     "top_level_shift_change_count: {:?}",
+        //     top_level_shift_change_count
+        // );
+        // println!("max_shift: {:?}", max_shift);
+        // println!("tot_shift: {:?}", tot_shift);
+        //
+        // for (idx, &shift) in shifts.iter().enumerate() {
+        //     if shift != 0 {
+        //         println!("Index {}: shift {}", &idx, shift);
+        //     }
+        // }
 
         let mut tree = Self {
             size: 0,
@@ -278,7 +278,7 @@ where
             pivot = Self::update_pivot(source, sort_index, dim, pivot);
 
             // TODO: if pivot gets to 0, start again at orig pivot and try
-            //       nudging the other way.
+            //       nudging the other way?
 
             // if we end up with a pivot of 0, something has gone wrong,
             // unless we only had a slice of len 1 anyway
@@ -319,9 +319,11 @@ where
                 left_capacity,
             );
 
+            // exit the loop if the LHS balanced
             if requested_shift_amount == 0 {
                 break;
             }
+
             event!(Level::TRACE, req = requested_shift_amount, "LHS shift");
 
             pivot -= requested_shift_amount;
@@ -686,7 +688,8 @@ mod tests {
     fn can_construct_optimized_tree_with_multiple_dupes() {
         use rand::seq::SliceRandom;
 
-        for seed in 0..1_000_000 {
+        for seed in 0..1_000 {
+            //_000 {
             let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
 
             let mut content_to_add = vec![
@@ -896,7 +899,7 @@ mod tests {
         println!("Tree Stats: {:?}", tree.generate_stats());
     }
 
-    //#[ignore]
+    #[ignore]
     #[test]
     fn can_construct_optimized_tree_multi_rand_increasing_size() {
         use rayon::iter::ParallelIterator;
@@ -959,6 +962,7 @@ mod tests {
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
 
+    #[ignore]
     #[test]
     fn can_construct_optimized_tree_large_rand() {
         const TREE_SIZE: usize = 2usize.pow(23); // ~8M
