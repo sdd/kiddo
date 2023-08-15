@@ -5,9 +5,7 @@ use crate::types::Content;
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
-impl<A: Axis, T: Content, const K: usize, const B: usize>
-    ImmutableKdTree<A, T, K, B>
-{
+impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
     /// Finds the "best" `n` elements within `dist` of `query`.
     ///
     /// Results are returned in arbitrary order. 'Best' is determined by
@@ -59,7 +57,6 @@ impl<A: Axis, T: Content, const K: usize, const B: usize>
             A::zero(),
         );
 
-
         best_items.into_iter()
     }
 
@@ -89,7 +86,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize>
                 .enumerate()
                 .filter(|(_, distance)| *distance <= radius)
                 .for_each(|(idx, _)| {
-                    let item = * unsafe { leaf_node.content_items.get_unchecked(idx) };
+                    let item = *unsafe { leaf_node.content_items.get_unchecked(idx) };
                     if best_items.len() < max_qty {
                         best_items.push(item);
                     } else {
@@ -223,9 +220,8 @@ mod tests {
         const NUM_QUERIES: usize = 100;
         let max_qty = 2;
 
-        let content_to_add: Vec<[AX; 2]> = (0..TREE_SIZE)
-            .map(|_| rand::random::<[AX; 2]>())
-            .collect();
+        let content_to_add: Vec<[AX; 2]> =
+            (0..TREE_SIZE).map(|_| rand::random::<[AX; 2]>()).collect();
 
         let tree: ImmutableKdTree<AX, u32, 2, 32> = ImmutableKdTree::optimize_from(&content_to_add);
         assert_eq!(tree.size(), TREE_SIZE);
