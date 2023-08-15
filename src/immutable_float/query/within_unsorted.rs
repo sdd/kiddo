@@ -5,9 +5,7 @@ use crate::float::kdtree::Axis;
 use crate::immutable_float::kdtree::ImmutableKdTree;
 use crate::types::Content;
 
-impl<A: Axis, T: Content, const K: usize, const B: usize>
-    ImmutableKdTree<A, T, K, B>
-{
+impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
     /// Finds all elements within `dist` of `query`, using the specified
     /// distance metric function.
     ///
@@ -85,7 +83,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize>
                     if distance < radius {
                         matching_items.push(Neighbour {
                             distance,
-                            item: * unsafe { leaf_node.content_items.get_unchecked(idx) },
+                            item: *unsafe { leaf_node.content_items.get_unchecked(idx) },
                         });
                     }
                 });
@@ -219,9 +217,8 @@ mod tests {
         const NUM_QUERIES: usize = 100;
         const RADIUS: f32 = 0.2;
 
-        let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE)
-        .map(|_| rand::random::<[f32; 4]>())
-        .collect();
+        let content_to_add: Vec<[f32; 4]> =
+            (0..TREE_SIZE).map(|_| rand::random::<[f32; 4]>()).collect();
 
         let tree: ImmutableKdTree<AX, u32, 4, 32> = ImmutableKdTree::optimize_from(&content_to_add);
         assert_eq!(tree.size(), TREE_SIZE);
