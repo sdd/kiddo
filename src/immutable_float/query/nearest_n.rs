@@ -1,13 +1,11 @@
 use crate::float::kdtree::Axis;
-use crate::immutable_float::kdtree::ImmutableKdTree;
 use crate::float::neighbour::Neighbour;
+use crate::immutable_float::kdtree::ImmutableKdTree;
 use crate::types::Content;
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
-impl<A: Axis, T: Content, const K: usize, const B: usize>
-ImmutableKdTree<A, T, K, B>
-{
+impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
     /// Finds the nearest `qty` elements to `query`, using the specified
     /// distance metric function.
     ///
@@ -38,15 +36,7 @@ ImmutableKdTree<A, T, K, B>
         let mut off = [A::zero(); K];
         let mut result: BinaryHeap<Neighbour<A, T>> = BinaryHeap::with_capacity(qty);
 
-        self.nearest_n_recurse(
-            query,
-            distance_fn,
-            1,
-            0,
-            &mut result,
-            &mut off,
-            A::zero(),
-        );
+        self.nearest_n_recurse(query, distance_fn, 1, 0, &mut result, &mut off, A::zero());
 
         result.into_sorted_vec()
     }
@@ -216,9 +206,8 @@ mod tests {
         const NUM_QUERIES: usize = 100;
         const N: usize = 10;
 
-        let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE)
-            .map(|_| rand::random::<[f32; 4]>())
-            .collect();
+        let content_to_add: Vec<[f32; 4]> =
+            (0..TREE_SIZE).map(|_| rand::random::<[f32; 4]>()).collect();
 
         let tree: ImmutableKdTree<AX, u32, 4, 32> = ImmutableKdTree::optimize_from(&content_to_add);
 
