@@ -6,9 +6,7 @@ use crate::float::neighbour::Neighbour;
 use crate::immutable_float::kdtree::ImmutableKdTree;
 use crate::types::Content;
 
-impl<A: Axis, T: Content, const K: usize, const B: usize>
-    ImmutableKdTree<A, T, K, B>
-{
+impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
     /// Finds all elements within `dist` of `query`, using the specified
     /// distance metric function.
     ///
@@ -71,20 +69,20 @@ impl<A: Axis, T: Content, const K: usize, const B: usize>
             let leaf_node = &self.leaves[stem_idx - self.stems.len()];
 
             leaf_node
-            .content_points
-            .iter()
-            .enumerate()
-            .take(leaf_node.size)
-            .for_each(|(idx, entry)| {
-                let distance = distance_fn(query, entry);
+                .content_points
+                .iter()
+                .enumerate()
+                .take(leaf_node.size)
+                .for_each(|(idx, entry)| {
+                    let distance = distance_fn(query, entry);
 
-                if distance < radius {
-                    matching_items.push(Neighbour {
-                        distance,
-                        item: * unsafe { leaf_node.content_items.get_unchecked(idx) },
-                    })
-                }
-            });
+                    if distance < radius {
+                        matching_items.push(Neighbour {
+                            distance,
+                            item: *unsafe { leaf_node.content_items.get_unchecked(idx) },
+                        })
+                    }
+                });
 
             return;
         }
@@ -215,9 +213,8 @@ mod tests {
         const NUM_QUERIES: usize = 100;
         const RADIUS: f32 = 0.2;
 
-        let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE)
-            .map(|_| rand::random::<[f32; 4]>())
-            .collect();
+        let content_to_add: Vec<[f32; 4]> =
+            (0..TREE_SIZE).map(|_| rand::random::<[f32; 4]>()).collect();
 
         let tree: ImmutableKdTree<AX, u32, 4, 32> = ImmutableKdTree::optimize_from(&content_to_add);
         assert_eq!(tree.size(), TREE_SIZE);
