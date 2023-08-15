@@ -39,6 +39,7 @@ rand_chacha = "0.3"
 itertools = "0.11"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+bytesize = "1.2.0"
 
 [dev-dependencies]
 aligned = "0.4"
