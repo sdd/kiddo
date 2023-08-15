@@ -5,6 +5,7 @@
 // #[cfg(any(target_arch = "x86_64"))]
 // use std::arch::x86_64::*;
 
+use crate::distance_metric::DistanceMetric;
 use crate::fixed::kdtree::Axis;
 
 /// Returns the squared euclidean distance between two points. When you only
@@ -17,28 +18,43 @@ use crate::fixed::kdtree::Axis;
 /// ```rust
 /// use fixed::types::extra::U0;
 /// use fixed::FixedU16;
-/// use kiddo::fixed::distance::manhattan;
+/// use kiddo::distance_metric::DistanceMetric;
+/// use kiddo::fixed::distance::Manhattan;
 /// type FXD = FixedU16<U0>;
 ///
 /// let ZERO = FXD::from_num(0);
 /// let ONE = FXD::from_num(1);
 /// let TWO = FXD::from_num(2);
 ///
-/// assert!(ZERO == manhattan(&[ZERO, ZERO], &[ZERO, ZERO]));
-/// assert!(ONE == manhattan(&[ZERO, ZERO], &[ONE, ZERO]));
-/// assert!(TWO == manhattan(&[ZERO, ZERO], &[ONE, ONE]));
+/// assert_eq!(ZERO, Manhattan::dist(&[ZERO, ZERO], &[ZERO, ZERO]));
+/// assert_eq!(ONE, Manhattan::dist(&[ZERO, ZERO], &[ONE, ZERO]));
+/// assert_eq!(TWO, Manhattan::dist(&[ZERO, ZERO], &[ONE, ONE]));
 /// ```
-pub fn manhattan<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A {
-    a.iter()
-        .zip(b.iter())
-        .map(|(&a_val, &b_val)| {
-            if a_val > b_val {
-                a_val - b_val
-            } else {
-                b_val - a_val
-            }
-        })
-        .fold(A::ZERO, |a, b| a.saturating_add(b))
+pub struct Manhattan {}
+
+impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
+    #[inline]
+    fn dist(a: &[A; K], b: &[A; K]) -> A {
+        a.iter()
+            .zip(b.iter())
+            .map(|(&a_val, &b_val)| {
+                if a_val > b_val {
+                    a_val - b_val
+                } else {
+                    b_val - a_val
+                }
+            })
+            .fold(A::ZERO, |a, b| a.saturating_add(b))
+    }
+
+    #[inline]
+    fn dist1(a: A, b: A) -> A {
+        if a > b {
+            a - b
+        } else {
+            b - a
+        }
+    }
 }
 
 /// Returns the squared euclidean distance between two points.
@@ -51,7 +67,8 @@ pub fn manhattan<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A {
 /// ```rust
 /// use fixed::types::extra::U0;
 /// use fixed::FixedU16;
-/// use kiddo::fixed::distance::squared_euclidean;
+/// use kiddo::distance_metric::DistanceMetric;
+/// use kiddo::fixed::distance::SquaredEuclidean;
 /// type FXD = FixedU16<U0>;
 ///
 /// let ZERO = FXD::from_num(0);
@@ -59,40 +76,27 @@ pub fn manhattan<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A {
 /// let TWO = FXD::from_num(2);
 /// let EIGHT = FXD::from_num(8);
 ///
-/// assert_eq!(squared_euclidean(&[ZERO, ZERO], &[ZERO, ZERO]), ZERO);
-/// assert_eq!(squared_euclidean(&[ZERO, ZERO], &[ONE, ZERO]), ONE);
-/// assert_eq!(squared_euclidean(&[ZERO, ZERO], &[TWO, TWO]), EIGHT);
+/// assert_eq!(SquaredEuclidean::dist(&[ZERO, ZERO], &[ZERO, ZERO]), ZERO);
+/// assert_eq!(SquaredEuclidean::dist(&[ZERO, ZERO], &[ONE, ZERO]), ONE);
+/// assert_eq!(SquaredEuclidean::dist(&[ZERO, ZERO], &[TWO, TWO]), EIGHT);
 /// ```
-pub fn squared_euclidean<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A {
-    a.iter()
-        .zip(b.iter())
-        .map(|(&a_val, &b_val)| {
-            // let diff: A = if a_val > b_val {
-            //     a_val - b_val
-            // } else {
-            //     b_val - a_val
-            // };
-            let diff: A = a_val.dist(b_val);
-            //let diff = a_val - b_val;
-            //let diff = diff / A::from_num(4);
+pub struct SquaredEuclidean {}
 
-            //let res = diff.saturating_mul(diff);
-            diff * diff
+impl<A: Axis, const K: usize> DistanceMetric<A, K> for SquaredEuclidean {
+    #[inline]
+    fn dist(a: &[A; K], b: &[A; K]) -> A {
+        a.iter()
+            .zip(b.iter())
+            .map(|(&a_val, &b_val)| {
+                let diff: A = a_val.dist(b_val);
+                diff * diff
+            })
+            .fold(A::ZERO, |a, b| a.saturating_add(b))
+    }
 
-            // let res = (diff * A::from_num(0.5)).saturating_mul(diff); // / (A::from_num(K))
-            // if res == A::MAX {
-            //     println!("Dist saturated at mult (a={}, b={}, diff={})", &a_val, &b_val, &diff);
-            // }
-            //res
-        })
-        .fold(A::ZERO, |a, b| {
-            // let res = a.saturating_add(b);
-            a + b
-
-            // let res = a.saturating_add(b.shr(2) );
-            // if res == A::MAX {
-            //     println!("Dist saturated at add")
-            // }
-            //res
-        })
+    #[inline]
+    fn dist1(a: A, b: A) -> A {
+        let diff: A = a.dist(b);
+        diff * diff
+    }
 }

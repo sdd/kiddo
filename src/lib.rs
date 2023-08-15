@@ -7,7 +7,7 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::broken_intra_doc_links)]
 #![warn(rustdoc::private_intra_doc_links)]
-#![doc(html_root_url = "https://docs.rs/kiddo/2.0.1")]
+#![doc(html_root_url = "https://docs.rs/kiddo/3.0.0-beta.1")]
 #![doc(issue_tracker_base_url = "https://github.com/sdd/kiddo/issues/")]
 
 //! # Kiddo
@@ -16,7 +16,7 @@
 //!
 //! Possibly the fastest k-d tree library in the world? [See for yourself](https://sdd.github.io/kd-tree-comparison-webapp/).
 //!
-//! Version 2.x is a complete rewrite, providing:
+//! Version 2 and onwards is a complete rewrite over the previous v0.6.x codebase, providing:
 //! - a new internal architecture for **much-improved performance**;
 //! - Added **integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) library;
 //! - **instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
@@ -33,14 +33,14 @@
 //! Add `kiddo` to `Cargo.toml`
 //! ```toml
 //! [dependencies]
-//! kiddo = "2.0.1"
+//! kiddo = "3.0.0-beta.1"
 //! ```
 //!
 //! ## Usage
 //! ```rust
 //! use kiddo::KdTree;
-//! use kiddo::distance::squared_euclidean;
-//! use kiddo::float::neighbour::Neighbour;
+//! use kiddo::float::distance::SquaredEuclidean;
+//! use kiddo::nearest_neighbour::NearestNeighbour;
 //!
 //! let entries = vec![
 //!     [0f64, 0f64],
@@ -58,36 +58,38 @@
 //! // find the nearest item to [0f64, 0f64].
 //! // returns a tuple of (dist, index)
 //! assert_eq!(
-//!     kdtree.nearest_one(&[0f64, 0f64], &squared_euclidean),
-//!     (0f64, 0)
+//!     kdtree.nearest_one::<SquaredEuclidean>(&[0f64, 0f64]),
+//!     NearestNeighbour { distance: 0f64, item: 0 }
 //! );
 //!
 //! // find the nearest 3 items to [0f64, 0f64], and collect into a `Vec`
 //! assert_eq!(
-//!     kdtree.nearest_n(&[0f64, 0f64], 3, &squared_euclidean),
-//!     vec![Neighbour { distance: 0f64, item: 0 }, Neighbour { distance: 2f64, item: 1 }, Neighbour { distance: 8f64, item: 2 }]
+//!     kdtree.nearest_n::<SquaredEuclidean>(&[0f64, 0f64], 3),
+//!     vec![NearestNeighbour { distance: 0f64, item: 0 }, NearestNeighbour { distance: 2f64, item: 1 }, NearestNeighbour { distance: 8f64, item: 2 }]
 //! );
 //! ```
 //!
 //! See the [examples documentation](https://github.com/sdd/kiddo/tree/master/examples) for some more in-depth examples.
 
-#[cfg(feature = "serialize")]
-extern crate serde;
-#[cfg(feature = "serialize")]
-extern crate serde_derive;
+#[macro_use]
+extern crate doc_comment;
 
+pub mod best_neighbour;
+#[doc(hidden)]
+pub(crate) mod common;
 #[cfg(feature = "serialize")]
 mod custom_serde;
-pub mod distance;
-
+pub mod distance_metric;
 pub mod fixed;
 pub mod float;
 //pub mod float_sss;
 pub mod immutable_float;
 mod mirror_select_nth_unstable_by;
+pub mod nearest_neighbour;
 #[doc(hidden)]
 pub mod test_utils;
 pub mod types;
+pub mod within_unsorted_iter;
 
 /// A floating-point k-d tree with default parameters.
 ///

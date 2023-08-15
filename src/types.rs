@@ -14,11 +14,21 @@ use std::fmt::Debug;
 /// a Vec, and try switching tqo a smaller type and benchmarking to see if you get better
 /// performance.
 pub trait Content:
-    Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync
+    Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync + Send
 {
 }
 impl<
-        T: Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync,
+        T: Zero
+            + One
+            + PartialEq
+            + Default
+            + Clone
+            + Copy
+            + Ord
+            + Debug
+            + std::ops::SubAssign
+            + Sync
+            + Send,
     > Content for T
 {
 }
@@ -91,4 +101,8 @@ impl Index for u16 {
     fn capacity_with_bucket_size(bucket_size: usize) -> usize {
         (u16::MAX - u16::MAX.overflowing_shr(1).0) as usize * bucket_size
     }
+}
+
+pub(crate) fn is_stem_index<IDX: Index<T = IDX>>(x: IDX) -> bool {
+    x < <IDX as Index>::leaf_offset()
 }

@@ -1,43 +1,46 @@
-use az::Cast;
+use az::{Az, Cast};
+use generator::{done, Gn, Scope};
+use std::ops::Rem;
 
 use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::{Axis, KdTree};
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::types::{Content, Index};
+use crate::types::{is_stem_index, Content, Index};
+use crate::within_unsorted_iter::WithinUnsortedIter;
 
-use crate::generate_within;
+use crate::generate_within_unsorted_iter;
 
-macro_rules! generate_float_within {
+macro_rules! generate_float_within_unsorted_iter {
     ($doctest_build_tree:tt) => {
-        generate_within!((
+        generate_within_unsorted_iter!((
             "Finds all elements within `dist` of `query`, using the specified
 distance metric function.
 
-Results are returned sorted nearest-first
+Returns an `Iterator`. Results are returned in arbitrary order.
 
 # Examples
 
 ```rust
-    use kiddo::float::kdtree::KdTree;
-    use kiddo::float::distance::SquaredEuclidean;
-    ",
+use kiddo::float::kdtree::KdTree;
+use kiddo::float::distance::SquaredEuclidean;
+",
             $doctest_build_tree,
             "
 
-    let within = tree.within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64);
+let within = tree.within_unsorted_iter::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64).collect::<Vec<_>>();
 
-    assert_eq!(within.len(), 2);
+assert_eq!(within.len(), 2);
 ```"
         ));
     };
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+impl<'a, A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {
-    generate_float_within!(
+    generate_float_within_unsorted_iter!(
         "
 let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
 tree.add(&[1.0, 2.0, 5.0], 100);
@@ -49,6 +52,7 @@ tree.add(&[2.0, 3.0, 6.0], 101);"
 use crate::float::kdtree::ArchivedKdTree;
 #[cfg(feature = "rkyv")]
 impl<
+        'a,
         A: Axis + rkyv::Archive<Archived = A>,
         T: Content + rkyv::Archive<Archived = T>,
         const K: usize,
@@ -58,7 +62,7 @@ impl<
 where
     usize: Cast<IDX>,
 {
-    generate_float_within!(
+    generate_float_within_unsorted_iter!(
         "use std::fs::File;
 use memmap::MmapOptions;
 
@@ -80,7 +84,7 @@ mod tests {
 
     #[test]
     fn can_query_items_within_radius() {
-        let mut tree: KdTree<AX, u32, 4, 5, u32> = KdTree::new();
+        let mut tree: KdTree<AX, u32, 4, 4, u32> = KdTree::new();
 
         let content_to_add: [([AX; 4], u32); 16] = [
             ([0.9f32, 0.0f32, 0.9f32, 0.0f32], 9),
@@ -112,8 +116,9 @@ mod tests {
         let radius = 0.2;
         let expected = linear_search(&content_to_add, &query_point, radius);
 
-        let mut result: Vec<_> = tree.within::<Manhattan>(&query_point, radius);
-        stabilize_sort(&mut result);
+        let result: Vec<_> = tree
+            .within_unsorted_iter::<Manhattan>(&query_point, radius)
+            .collect();
         assert_eq!(result, expected);
 
         let mut rng = rand::thread_rng();
@@ -124,10 +129,12 @@ mod tests {
                 rng.gen_range(0f32..1f32),
                 rng.gen_range(0f32..1f32),
             ];
-            let radius: f32 = 2.0;
+            let radius = 0.2;
             let expected = linear_search(&content_to_add, &query_point, radius);
 
-            let mut result: Vec<_> = tree.within::<Manhattan>(&query_point, radius);
+            let mut result: Vec<_> = tree
+                .within_unsorted_iter::<Manhattan>(&query_point, radius)
+                .collect();
             stabilize_sort(&mut result);
 
             assert_eq!(result, expected);
@@ -135,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    fn can_query_items_within_radius_large_scale() {
+    fn can_query_items_unsorted_within_radius_large_scale() {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
         const RADIUS: f32 = 0.2;
@@ -157,21 +164,11 @@ mod tests {
         for query_point in query_points {
             let expected = linear_search(&content_to_add, &query_point, RADIUS);
 
-            let mut result: Vec<_> = tree.within::<Manhattan>(&query_point, RADIUS);
+            let mut result: Vec<_> = tree
+                .within_unsorted_iter::<Manhattan>(&query_point, RADIUS)
+                .collect();
 
-            // TODO: ensure that adjacent results with the same dist are sorted in order of item val
-            //       to prevent occasional test failures due to the linear search returning items
-            //       with the same dist in a different order to the query
             stabilize_sort(&mut result);
-
-            // let slice = &mut result[..];
-            // let slice_of_cells: &[Cell<NearestNeighbour<f32, u32>>] = Cell::from_mut(slice).as_slice_of_cells();
-            // for w in slice_of_cells.windows(2) {
-            //     if w[0].get().distance == w[1].get().distance && w[0].get().item > w[1].get().item {
-            //         Cell::swap(&w[0], &w[1]);
-            //     }
-            //
-            // }
             assert_eq!(result, expected);
         }
     }
@@ -191,16 +188,6 @@ mod tests {
         }
 
         stabilize_sort(&mut matching_items);
-
-        // let slice = &mut matching_items[..];
-        // let slice_of_cells: &[Cell<NearestNeighbour<A, u32>>] = Cell::from_mut(slice).as_slice_of_cells();
-        //
-        // for w in slice_of_cells.windows(2) {
-        //     if w[0].get().distance == w[1].get().distance && w[0].get().item > w[1].get().item {
-        //         Cell::swap(&w[0], &w[1]);
-        //     }
-        // }
-
         matching_items
     }
 

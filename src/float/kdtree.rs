@@ -15,14 +15,38 @@ use serde::{Deserialize, Serialize};
 
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
-/// on the float `KdTree`. This will be `f64` or `f32`.
-pub trait Axis: Float + Default + Debug + Copy + Sync {}
-impl<T: Float + Default + Debug + Copy + Sync> Axis for T {}
+/// on the float [`KdTree`]. This will be [`f64`] or [`f32`].
+pub trait Axis: Float + Default + Debug + Copy + Sync + Send + std::ops::AddAssign {
+    /// returns absolute diff between two values of a type implementing this trait
+    fn saturating_dist(self, other: Self) -> Self;
+
+    /// used in query methods to update the rd value. Basically a saturating add for Fixed and an add for Float
+    fn rd_update(rd: Self, delta: Self) -> Self;
+}
+impl<T: Float + Default + Debug + Copy + Sync + Send + std::ops::AddAssign> Axis for T {
+    fn saturating_dist(self, other: Self) -> Self {
+        (self - other).abs()
+    }
+
+    #[inline]
+    fn rd_update(rd: Self, delta: Self) -> Self {
+        rd + delta
+    }
+}
+
+// TODO: make LeafNode and StemNode `pub(crate)` so that they,
+//       and their Archived types, don't show up in docs.
+//       This is tricky due to encountering this problem:
+//       https://github.com/rkyv/rkyv/issues/275
+/* #[cfg_attr(
+    feature = "serialize_rkyv",
+    omit_bounds
+)] */
 
 /// Floating point k-d tree
 ///
 /// For use when the co-ordinates of the points being stored in the tree
-/// are floats. f64 or f32 are supported currently
+/// on the float [`KdTree`]. This will be [`f64`] or [`f32`].
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "serialize_rkyv",
@@ -94,6 +118,18 @@ where
     }
 }
 
+impl<A, T, const K: usize, const B: usize, IDX> Default for KdTree<A, T, K, B, IDX>
+where
+    A: Axis,
+    T: Content,
+    IDX: Index<T = IDX>,
+    usize: Cast<IDX>,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<A, T, const K: usize, const B: usize, IDX> KdTree<A, T, K, B, IDX>
 where
     A: Axis,
@@ -148,29 +184,6 @@ where
 
         tree
     }
-
-    /// Returns the current number of elements stored in the tree
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
-    ///
-    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
-    ///
-    /// tree.add(&[1.0, 2.0, 5.0], 100);
-    /// tree.add(&[1.1, 2.1, 5.1], 101);
-    ///
-    /// assert_eq!(tree.size(), 2);
-    /// ```
-    #[inline]
-    pub fn size(&self) -> T {
-        self.size
-    }
-
-    pub(crate) fn is_stem_index(x: IDX) -> bool {
-        x < <IDX as Index>::leaf_offset()
-    }
 }
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> From<&Vec<[A; K]>>
@@ -188,6 +201,53 @@ where
 
         tree
     }
+}
+
+macro_rules! generate_common_methods {
+    ($kdtree:ident) => {
+        /// Returns the current number of elements stored in the tree
+        ///
+        /// # Examples
+        ///
+        /// ```rust
+        /// use kiddo::float::kdtree::KdTree;
+        ///
+        /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+        ///
+        /// tree.add(&[1.0, 2.0, 5.0], 100);
+        /// tree.add(&[1.1, 2.1, 5.1], 101);
+        ///
+        /// assert_eq!(tree.size(), 2);
+        /// ```
+        #[inline]
+        pub fn size(&self) -> T {
+            self.size
+        }
+    };
+}
+
+impl<A, T, const K: usize, const B: usize, IDX> KdTree<A, T, K, B, IDX>
+where
+    A: Axis,
+    T: Content,
+    IDX: Index<T = IDX>,
+    usize: Cast<IDX>,
+{
+    generate_common_methods!(KdTree);
+}
+
+#[cfg(feature = "rkyv")]
+impl<
+        A: Axis + rkyv::Archive<Archived = A>,
+        T: Content + rkyv::Archive<Archived = T>,
+        const K: usize,
+        const B: usize,
+        IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>,
+    > ArchivedKdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    generate_common_methods!(ArchivedKdTree);
 }
 
 #[cfg(test)]
@@ -215,39 +275,40 @@ mod tests {
 
         assert_eq!(tree.size(), 0);
     }
-    // #[cfg(feature = "serialize")]
-    // #[test]
-    // fn can_serde() {
-    //     let mut tree: KdTree<u16, u32, 4, 32, u32> = KdTree::new();
-    //
-    //     let content_to_add: [(PT, T); 16] = [
-    //         ([9f32, 0f32, 9f32, 0f32], 9),
-    //         ([4f32, 500f32, 4f32, 500f32], 4),
-    //         ([12f32, -300f32, 12f32, -300f32], 12),
-    //         ([7f32, 200f32, 7f32, 200f32], 7),
-    //         ([13f32, -400f32, 13f32, -400f32], 13),
-    //         ([6f32, 300f32, 6f32, 300f32], 6),
-    //         ([2f32, 700f32, 2f32, 700f32], 2),
-    //         ([14f32, -500f32, 14f32, -500f32], 14),
-    //         ([3f32, 600f32, 3f32, 600f32], 3),
-    //         ([10f32, -100f32, 10f32, -100f32], 10),
-    //         ([16f32, -700f32, 16f32, -700f32], 16),
-    //         ([1f32, 800f32, 1f32, 800f32], 1),
-    //         ([15f32, -600f32, 15f32, -600f32], 15),
-    //         ([5f32, 400f32, 5f32, 400f32], 5),
-    //         ([8f32, 100f32, 8f32, 100f32], 8),
-    //         ([11f32, -200f32, 11f32, -200f32], 11),
-    //     ];
-    //
-    //     for (point, item) in content_to_add {
-    //         tree.add(&point, item);
-    //     }
-    //     assert_eq!(tree.size(), 16);
-    //
-    //     let serialized = serde_json::to_string(&tree).unwrap();
-    //     println!("JSON: {:?}", &serialized);
-    //
-    //     let deserialized: KdTree = serde_json::from_str(&serialized).unwrap();
-    //     assert_eq!(tree, deserialized);
-    // }
+
+    #[cfg(feature = "serialize")]
+    #[test]
+    fn can_serde() {
+        let mut tree: KdTree<f32, u32, 4, 32, u32> = KdTree::new();
+
+        let content_to_add: [([f32; 4], u32); 16] = [
+            ([9f32, 0f32, 9f32, 0f32], 9),
+            ([4f32, 500f32, 4f32, 500f32], 4),
+            ([12f32, -300f32, 12f32, -300f32], 12),
+            ([7f32, 200f32, 7f32, 200f32], 7),
+            ([13f32, -400f32, 13f32, -400f32], 13),
+            ([6f32, 300f32, 6f32, 300f32], 6),
+            ([2f32, 700f32, 2f32, 700f32], 2),
+            ([14f32, -500f32, 14f32, -500f32], 14),
+            ([3f32, 600f32, 3f32, 600f32], 3),
+            ([10f32, -100f32, 10f32, -100f32], 10),
+            ([16f32, -700f32, 16f32, -700f32], 16),
+            ([1f32, 800f32, 1f32, 800f32], 1),
+            ([15f32, -600f32, 15f32, -600f32], 15),
+            ([5f32, 400f32, 5f32, 400f32], 5),
+            ([8f32, 100f32, 8f32, 100f32], 8),
+            ([11f32, -200f32, 11f32, -200f32], 11),
+        ];
+
+        for (point, item) in content_to_add {
+            tree.add(&point, item);
+        }
+        assert_eq!(tree.size(), 16);
+
+        let serialized = serde_json::to_string(&tree).unwrap();
+        println!("JSON: {:?}", &serialized);
+
+        let deserialized: KdTree<f32, u32, 4, 32, u32> = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(tree, deserialized);
+    }
 }

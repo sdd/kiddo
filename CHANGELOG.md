@@ -1,6 +1,30 @@
 # Kiddo Changelog
 
-## 2.1.1
+
+## [3.0.0-beta.1] - 2023-06-18
+
+### Breaking Changes
+
+* feat!: queries return structs instead of tuples. Query methods have been updated so that they all return
+  either a `NearestNeighbour`, `Vec<NearestNeighbour>`,
+  or `Vec<BestNeighbour>`, for consistency.
+* feat!: use a trait instead of a function pointer for distance metrics (See [SquaredEuclidean](https://docs.rs/kiddo/3.0.0-beta.1/kiddo/float/distance/struct.SquaredEuclidean.html) and [Manhattan](https://docs.rs/kiddo/3.0.0-beta.1/kiddo/float/distance/struct.Manhattan.html))
+* feat: add [within_unsorted_iter](https://docs.rs/kiddo/3.0.0-beta.1/kiddo/float/kdtree/struct.KdTree.html#method.within_unsorted_iter) query
+
+### Performance
+
+* perf: refactor [within](https://docs.rs/kiddo/3.0.0-beta.1/kiddo/float/kdtree/struct.KdTree.html#method.within) to simply sort the result of [within_unsorted](https://docs.rs/kiddo/3.0.0-beta.1/kiddo/float/kdtree/struct.KdTree.html#method.within_unsorted).
+  Previously, `within` was keeping its results in a `BinaryHeap` and calling
+  its `into_sorted_vec` method to, well, return a sorted `Vec`.
+  Whilst a `BinaryHeap` is great if you are frequently adding and removing
+  items, if your use case is to gradually add all your items, and then sort
+  them all at once, its quicker to just put things in a `Vec` and then
+  sort the `Vec` at the end.
+  Benchmarking shows that this change improves performance by anything from
+  5 to 60% in practice.
+
+
+## [2.1.1] - 2023-06-07
 
 ### Refactor
 
@@ -15,15 +39,16 @@
 - Update pre-release.yml to remove Clippy check
 - Add CI for format/clippy/test/coverage/release/publish
 
-## 2.1.0
 
-* feat: implement the main query methods plus `size` on `kiddo::float::kdtree::ArchivedKdTree` and improve the Rkyv example.
+## [2.1.0]
 
-The previous Rkyv example was not really using Rkyv in the most efficient way (Thanks to @cavemanloverboy for spotting my mistakes!). In order to properly use rkyv's zero-copy deserialization, you need to use `rkyv::archived_root` to transmute a buffer into an `ArchivedKdTree`. For `ArchivedKdTree` to be useful, it actually needs some methods though!
+* feat: implement the main query methods plus `size` on `kiddo::float::kdtree::ArchivedKdTree` and improve the rkyv example.
+
+The previous Rkyv example was not really using Rkyv in the most efficient way (Thanks to @cavemanloverboy for spotting my mistakes!). In order to properly use rkyv'z zero-copy deserialization, you need to use `rkyv::archived_root` to transmute a buffer into an `ArchivedKdTree`. For `ArchivedKdTree` to be useful, it actually needs some methods though!
 
 v2.1.0 refactors the query code so that the method bodies of the queries are templated by macros, allowing them to be implemented on `KdTree` and `ArchivedKdTree` without completely duplicating the code.
 
-The updated Rkyv example shows the difference that zero-copy usage of Rkyv makes vs deserializing, as well as also showing the gains that can be made using mmap compared to standard file access. Combining both together results in absolutely mindblowing performance when measuring  time-from-binary-start-to-first-query-result.
+The updated rkyv example shows the difference that zero-copy usage of rkyv makes vs deserializing, as well as also showing the gains that can be made using mmap compared to standard file access. Combining both together results in absolutely mindblowing performance when measuring  time-from-binary-start-to-first-query-result.
 
 See for yourself by downloading the sample datasets mentioned in the examples readme and running:
 
@@ -33,13 +58,20 @@ cargo run --example rkyv --features=serialize_rkyv --release
 
 On my machine, using the old technique of normal file access and deserialization into `KdTree`, the example code takes 348 milliseconds to load and query. The memmapped code that just transmutes to an `ArchivedKdTree` and then queries it takes 182 **micro** seconds(!) - an improvement by a factor of 1900x!!
 
-I'll follow up this release with equivalent methods for `Fixed`, and some more ergonomic methods for laoding and saving.
+I'll follow up this release with equivalent methods for `Fixed`, and some more ergonomic methods for loading and saving.
 
 
-## 2.0.1
+## [2.0.2]
+* fix: properly split buckets.
+  Previously, when a bucket had multiple items with the same value in the splitting dimension as the split plane, and these values straddled the pivot point, some items could end up in the wrong bucket after the split.
+
+
+## [2.0.1]
+
  * refactor: removed the requirement to use unstable features so that Kiddo should now work on Rust stable.
 
-## 2.0.0
+
+## [2.0.0]
 
 Version 2 is a complete rewrite and rearchitecting of Kiddo. The same methods have been provided (except periodic boundary conditions, for now), but large performance improvements have been made across the board, and some improvements have been made to the ergonomics of the library also.
 Needless to say, this is a breaking change, but I hope you find the upgrade not too difficult as the improvements are significant.

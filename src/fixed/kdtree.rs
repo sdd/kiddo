@@ -1,6 +1,6 @@
 //! Fixed point k-d tree, for use when the co-ordinates of the points being stored in the tree
-//! are fixed point or integers. `u8`, `u16`, `u32`, and `u64` based fixed-point / integers are supported
-//! via the Fixed crate, eg `FixedU16<U14>` for a 16-bit fixed point number with 14 bits after the
+//! are fixed point or integers. [`u8`], [`u16`], [`u32`], and [`u64`] based fixed-point / integers are supported
+//! via the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate, eg [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html) for a 16-bit fixed point number with 14 bits after the
 //! decimal point.
 
 use az::{Az, Cast};
@@ -17,10 +17,32 @@ use serde::{Deserialize, Serialize};
 
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
-/// on `KdTree`. A type from the `Fixed` crate will implement
-/// all of the traits required by Axis. For example `FixedU16<U14>`.
-pub trait Axis: Fixed + Default + Debug + Copy + Sync {}
-impl<T: Fixed + Default + Debug + Copy + Sync> Axis for T {}
+/// on [`FixedKdTree`](crate::fixed::kdtree::KdTree). A type from the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate will implement
+/// all of the traits required by Axis. For example [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html).
+pub trait Axis: Fixed + Default + Debug + Copy + Sync + Send {
+    /// Returns the maximum value that the type implementing this trait can have
+    fn max_value() -> Self;
+
+    /// returns the zero value for this type
+    fn zero() -> Self;
+
+    /// used in query methods to update the rd value. Basically a saturating add for Fixed and an add for Float
+    fn rd_update(rd: Self, delta: Self) -> Self;
+}
+impl<T: Fixed + Default + Debug + Copy + Sync + Send> Axis for T {
+    fn max_value() -> Self {
+        Self::MAX
+    }
+
+    fn zero() -> Self {
+        Self::ZERO
+    }
+
+    #[inline]
+    fn rd_update(rd: Self, delta: Self) -> Self {
+        rd.saturating_add(delta)
+    }
+}
 
 /// Rkyv-serializable equivalent of `kiddo::fixed::kdtree::Axis`
 #[cfg(feature = "serialize_rkyv")]
@@ -31,9 +53,9 @@ impl<T: num_traits::Zero + Default + Debug + rkyv::Archive> AxisRK for T {}
 /// Rkyv-serializable fixed point k-d tree
 ///
 /// This is only required when using Rkyv to serialize to / deserialize from
-/// a KdTree. The types in the `Fixed`  crate do not support `Rkyv` yet.
-/// As a workaround, we need to `std::mem::transmute` a `kiddo::fixed::kdtree::KdTree` into
-/// an equivalent `kiddo::fixed::kdtree::KdTreeRK` before serializing via Rkyv,
+/// a [`FixedKdTree`](crate::fixed::kdtree::KdTree). The types in the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed)  crate do not support [`Rkyv`](https://crates.io/crates/rkyv/0.7.39) yet.
+/// As a workaround, we need to [`std::mem::transmute`] a [`crate::fixed::kdtree::KdTree`] into
+/// an equivalent [`crate::fixed::kdtree::KdTreeRK`] before serializing via Rkyv,
 /// and vice-versa when deserializing.
 #[cfg_attr(
     feature = "serialize_rkyv",
@@ -47,17 +69,17 @@ pub struct KdTreeRK<
     const B: usize,
     IDX: Index<T = IDX>,
 > {
-    leaves: Vec<LeafNodeRK<A, T, K, B, IDX>>,
-    stems: Vec<StemNodeRK<A, K, IDX>>,
+    pub(crate) leaves: Vec<LeafNodeRK<A, T, K, B, IDX>>,
+    pub(crate) stems: Vec<StemNodeRK<A, K, IDX>>,
     pub(crate) root_index: IDX,
-    size: T,
+    pub(crate) size: T,
 }
 
 /// Fixed point k-d tree
 ///
 /// For use when the co-ordinates of the points being stored in the tree
-/// are fixed point or integers. `u8`, `u16`, `u32`, and `u64` based fixed-point / integers are supported
-/// via the Fixed crate, eg `FixedU16<U14>` for a 16-bit fixed point number with 14 bits after the
+/// are fixed point or integers. [`u8`], [`u16`], [`u32`], and [`u64`] based fixed-point / integers are supported
+/// via the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate, eg [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html) for a 16-bit fixed point number with 14 bits after the
 /// decimal point.
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
@@ -155,6 +177,18 @@ where
     }
 }
 
+impl<A, T, const K: usize, const B: usize, IDX> Default for KdTree<A, T, K, B, IDX>
+where
+    A: Axis,
+    T: Content,
+    IDX: Index<T = IDX>,
+    usize: Cast<IDX>,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<A, T, const K: usize, const B: usize, IDX> KdTree<A, T, K, B, IDX>
 where
     A: Axis,
@@ -232,10 +266,6 @@ where
     pub fn size(&self) -> T {
         self.size
     }
-
-    pub(crate) fn is_stem_index(x: IDX) -> bool {
-        x < <IDX as Index>::leaf_offset()
-    }
 }
 
 #[cfg(test)]
@@ -268,39 +298,167 @@ mod tests {
         assert_eq!(tree.size(), 0);
     }
 
-    // #[cfg(feature = "serialize")]
-    // #[test]
-    // fn can_serde() {
-    //     let mut tree: KdTree<u16, u32, 4, 32, u32> = KdTree::new();
-    //
-    //     let content_to_add: [(PT, T); 16] = [
-    //         ([9f32, 0f32, 9f32, 0f32], 9),
-    //         ([4f32, 500f32, 4f32, 500f32], 4),
-    //         ([12f32, -300f32, 12f32, -300f32], 12),
-    //         ([7f32, 200f32, 7f32, 200f32], 7),
-    //         ([13f32, -400f32, 13f32, -400f32], 13),
-    //         ([6f32, 300f32, 6f32, 300f32], 6),
-    //         ([2f32, 700f32, 2f32, 700f32], 2),
-    //         ([14f32, -500f32, 14f32, -500f32], 14),
-    //         ([3f32, 600f32, 3f32, 600f32], 3),
-    //         ([10f32, -100f32, 10f32, -100f32], 10),
-    //         ([16f32, -700f32, 16f32, -700f32], 16),
-    //         ([1f32, 800f32, 1f32, 800f32], 1),
-    //         ([15f32, -600f32, 15f32, -600f32], 15),
-    //         ([5f32, 400f32, 5f32, 400f32], 5),
-    //         ([8f32, 100f32, 8f32, 100f32], 8),
-    //         ([11f32, -200f32, 11f32, -200f32], 11),
-    //     ];
-    //
-    //     for (point, item) in content_to_add {
-    //         tree.add(&point, item);
-    //     }
-    //     assert_eq!(tree.size(), 16);
-    //
-    //     let serialized = serde_json::to_string(&tree).unwrap();
-    //     println!("JSON: {:?}", &serialized);
-    //
-    //     let deserialized: KdTree = serde_json::from_str(&serialized).unwrap();
-    //     assert_eq!(tree, deserialized);
-    // }
+    #[cfg(feature = "serialize")]
+    #[test]
+    fn can_serde() {
+        let mut tree: KdTree<FXD, u32, 4, 32, u32> = KdTree::new();
+
+        let content_to_add: [([FXD; 4], u32); 16] = [
+            (
+                [
+                    FXD::from_num(0.9),
+                    FXD::from_num(0),
+                    FXD::from_num(0.9),
+                    FXD::from_num(0),
+                ],
+                9,
+            ),
+            (
+                [
+                    FXD::from_num(0.4),
+                    FXD::from_num(0.5),
+                    FXD::from_num(0.4),
+                    FXD::from_num(0.50),
+                ],
+                4,
+            ),
+            (
+                [
+                    FXD::from_num(0.12),
+                    FXD::from_num(0.3),
+                    FXD::from_num(0.12),
+                    FXD::from_num(0.3),
+                ],
+                12,
+            ),
+            (
+                [
+                    FXD::from_num(0.7),
+                    FXD::from_num(0.2),
+                    FXD::from_num(0.7),
+                    FXD::from_num(0.2),
+                ],
+                7,
+            ),
+            (
+                [
+                    FXD::from_num(0.13),
+                    FXD::from_num(0.4),
+                    FXD::from_num(0.13),
+                    FXD::from_num(0.4),
+                ],
+                13,
+            ),
+            (
+                [
+                    FXD::from_num(0.6),
+                    FXD::from_num(0.3),
+                    FXD::from_num(0.6),
+                    FXD::from_num(0.3),
+                ],
+                6,
+            ),
+            (
+                [
+                    FXD::from_num(0.2),
+                    FXD::from_num(0.7),
+                    FXD::from_num(0.2),
+                    FXD::from_num(0.7),
+                ],
+                2,
+            ),
+            (
+                [
+                    FXD::from_num(0.14),
+                    FXD::from_num(0.5),
+                    FXD::from_num(0.14),
+                    FXD::from_num(0.5),
+                ],
+                14,
+            ),
+            (
+                [
+                    FXD::from_num(0.3),
+                    FXD::from_num(0.6),
+                    FXD::from_num(0.3),
+                    FXD::from_num(0.6),
+                ],
+                3,
+            ),
+            (
+                [
+                    FXD::from_num(0.1),
+                    FXD::from_num(0.1),
+                    FXD::from_num(0.10),
+                    FXD::from_num(0.1),
+                ],
+                10,
+            ),
+            (
+                [
+                    FXD::from_num(0.16),
+                    FXD::from_num(0.7),
+                    FXD::from_num(0.16),
+                    FXD::from_num(0.7),
+                ],
+                16,
+            ),
+            (
+                [
+                    FXD::from_num(0.1),
+                    FXD::from_num(0.8),
+                    FXD::from_num(0.1),
+                    FXD::from_num(0.8),
+                ],
+                1,
+            ),
+            (
+                [
+                    FXD::from_num(0.15),
+                    FXD::from_num(0.6),
+                    FXD::from_num(0.15),
+                    FXD::from_num(0.6),
+                ],
+                15,
+            ),
+            (
+                [
+                    FXD::from_num(0.5),
+                    FXD::from_num(0.4),
+                    FXD::from_num(0.5),
+                    FXD::from_num(0.4),
+                ],
+                5,
+            ),
+            (
+                [
+                    FXD::from_num(0.8),
+                    FXD::from_num(0.1),
+                    FXD::from_num(0.8),
+                    FXD::from_num(0.1),
+                ],
+                8,
+            ),
+            (
+                [
+                    FXD::from_num(0.11),
+                    FXD::from_num(0.2),
+                    FXD::from_num(0.11),
+                    FXD::from_num(0.2),
+                ],
+                11,
+            ),
+        ];
+
+        for (point, item) in content_to_add {
+            tree.add(&point, item);
+        }
+        assert_eq!(tree.size(), 16);
+
+        let serialized = serde_json::to_string(&tree).unwrap();
+        println!("JSON: {:?}", &serialized);
+
+        let deserialized: KdTree<FXD, u32, 4, 32, u32> = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(tree, deserialized);
+    }
 }

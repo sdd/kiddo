@@ -1,0 +1,51 @@
+name: Pre-release String Updater
+
+on:
+  push:
+    branches: [ release-plz/* ]
+
+jobs:
+  pre-release-string-updater:
+    name: Pre Release String Updater
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Crate Version
+        id: crate-version
+        uses: colathro/crate-version@1.0.0
+        with:
+          file: "./Cargo.toml"
+
+      - name: Find and Replace 1/3
+        uses: jacobtomlinson/gha-find-replace@v3
+        with:
+          find: "^kiddo = \".*\"$"
+          include: "README.md"
+          replace: ${{ format('kiddo = "{0}"', steps.crate-version.outputs.version }}
+
+      - name: Find and Replace 2/3
+        uses: jacobtomlinson/gha-find-replace@v3
+        with:
+          find: "^//! kiddo = \".*\"$"
+          include: "src/lib.rs"
+          replace: ${{ format('kiddo = "{0}"', steps.crate-version.outputs.version }}
+
+      - name: Find and Replace 3/3
+        uses: jacobtomlinson/gha-find-replace@v3
+        with:
+          find: "\"https://docs.rs/kiddo/.*?\""
+          include: "src/lib.rs"
+          replace: ${{ format('"https://docs.rs/kiddo/{0}"', steps.crate-version.outputs.version }}
+
+      - name: Commit files
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git commit -a -m "chore: update version references"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@v0.6.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}

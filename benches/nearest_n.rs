@@ -7,9 +7,9 @@ use criterion::{
 use fixed::types::extra::{Unsigned, U16};
 use fixed::FixedU16;
 use kiddo::batch_benches;
-use kiddo::distance::squared_euclidean;
-use kiddo::fixed::distance::squared_euclidean as squared_euclidean_fixedpoint;
+use kiddo::fixed::distance::SquaredEuclidean as SquaredEuclideanFixed;
 use kiddo::fixed::kdtree::{Axis as AxisFixed, KdTree as KdTreeFixed};
+use kiddo::float::distance::SquaredEuclidean;
 use kiddo::float::kdtree::{Axis, KdTree};
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_fixed, build_populated_tree_and_query_points_float,
@@ -84,7 +84,8 @@ fn perform_query_float_10<
     usize: Cast<IDX>,
 {
     kdtree
-        .nearest_n(&point, 10, &squared_euclidean)
+        .nearest_n::<SquaredEuclidean>(&point, 10)
+        .into_iter()
         .for_each(|res_item| {
             black_box({
                 let _x = res_item;
@@ -106,7 +107,8 @@ fn perform_query_fixed_10<
     FixedU16<A>: AxisFixed,
 {
     kdtree
-        .nearest_n(&point, 10, &squared_euclidean_fixedpoint)
+        .nearest_n::<SquaredEuclideanFixed>(&point, 10)
+        .into_iter()
         .for_each(|res_item| {
             black_box({
                 let _x = res_item;
@@ -240,7 +242,8 @@ fn perform_query_float_100<
     usize: Cast<IDX>,
 {
     kdtree
-        .nearest_n(&point, 100, &squared_euclidean)
+        .nearest_n::<SquaredEuclidean>(&point, 100)
+        .into_iter()
         .for_each(|res_item| {
             black_box({
                 let _x = res_item;
@@ -262,7 +265,8 @@ fn perform_query_fixed_100<
     FixedU16<A>: AxisFixed,
 {
     kdtree
-        .nearest_n(&point, 100, &squared_euclidean_fixedpoint)
+        .nearest_n::<SquaredEuclideanFixed>(&point, 100)
+        .into_iter()
         .for_each(|res_item| {
             black_box({
                 let _x = res_item;
