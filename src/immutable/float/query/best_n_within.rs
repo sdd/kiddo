@@ -1,6 +1,7 @@
 use crate::float::kdtree::Axis;
-use crate::immutable_float::kdtree::ImmutableKdTree;
+use crate::immutable::float::kdtree::ImmutableKdTree;
 
+use crate::distance_metric::DistanceMetric;
 use crate::types::Content;
 use std::collections::BinaryHeap;
 use std::ops::Rem;
@@ -15,8 +16,8 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::immutable_float::kdtree::ImmutableKdTree;
-    /// use kiddo::distance::squared_euclidean;
+    /// use kiddo::immutable::float::kdtree::ImmutableKdTree;
+    /// use kiddo::float::distance::SquaredEuclidean;
     ///
     /// let content: Vec<[f64; 3]> = vec!(
     ///     [1.0, 2.0, 5.0],
@@ -26,30 +27,28 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
     ///
     /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimize_from(&content);
     ///
-    /// let mut best_n_within = tree.best_n_within(&[1.0, 2.0, 5.0], 10f64, 1, &squared_euclidean);
+    /// let mut best_n_within = tree.best_n_within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64, 1);
     /// let first = best_n_within.next().unwrap();
     ///
     /// assert_eq!(first, 0);
     /// ```
     #[inline]
-    pub fn best_n_within<F>(
+    pub fn best_n_within<D>(
         &self,
         query: &[A; K],
         dist: A,
         max_qty: usize,
-        distance_fn: &F,
     ) -> impl Iterator<Item = T>
     where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>,
     {
         let mut off = [A::zero(); K];
         let mut best_items: BinaryHeap<T> = BinaryHeap::new();
 
-        self.best_n_within_recurse(
+        self.best_n_within_recurse::<D>(
             query,
             dist,
             max_qty,
-            distance_fn,
             1,
             0,
             &mut best_items,
@@ -61,19 +60,18 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn best_n_within_recurse<F>(
+    fn best_n_within_recurse<D>(
         &self,
         query: &[A; K],
         radius: A,
         max_qty: usize,
-        distance_fn: &F,
         stem_idx: usize,
         split_dim: usize,
         best_items: &mut BinaryHeap<T>,
         off: &mut [A; K],
         rd: A,
     ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>,
     {
         if stem_idx >= self.stems.len() {
             let leaf_node = &self.leaves[stem_idx - self.stems.len()];
@@ -82,7 +80,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
                 .content_points
                 .iter()
                 .take(leaf_node.size)
-                .map(|entry| distance_fn(query, entry))
+                .map(|entry| D::dist(query, entry))
                 .enumerate()
                 .filter(|(_, distance)| *distance <= radius)
                 .for_each(|(idx, _)| {
@@ -118,11 +116,10 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
 
         let next_split_dim = (split_dim + 1).rem(K);
 
-        self.best_n_within_recurse(
+        self.best_n_within_recurse::<D>(
             query,
             radius,
             max_qty,
-            distance_fn,
             closer_node_idx,
             next_split_dim,
             best_items,
@@ -136,11 +133,10 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
 
         if rd <= radius {
             off[split_dim] = new_off;
-            self.best_n_within_recurse(
+            self.best_n_within_recurse::<D>(
                 query,
                 radius,
                 max_qty,
-                distance_fn,
                 further_node_idx,
                 next_split_dim,
                 best_items,
@@ -154,8 +150,9 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::squared_euclidean;
-    use crate::immutable_float::kdtree::ImmutableKdTree;
+    use crate::distance_metric::DistanceMetric;
+    use crate::float::distance::SquaredEuclidean;
+    use crate::immutable::float::kdtree::ImmutableKdTree;
     use rand::Rng;
 
     type AX = f64;
@@ -191,7 +188,7 @@ mod tests {
         let expected = vec![14, 0, 9];
 
         let result: Vec<_> = tree
-            .best_n_within(&query, radius, max_qty, &squared_euclidean)
+            .best_n_within::<SquaredEuclidean>(&query, radius, max_qty)
             .collect();
         assert_eq!(result, expected);
 
@@ -208,7 +205,7 @@ mod tests {
             println!("{}, {}", query[0].to_string(), query[1].to_string());
 
             let result: Vec<_> = tree
-                .best_n_within(&query, radius, max_qty, &squared_euclidean)
+                .best_n_within::<SquaredEuclidean>(&query, radius, max_qty)
                 .collect();
             assert_eq!(result, expected);
         }
@@ -235,7 +232,7 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, radius, max_qty);
 
             let result: Vec<_> = tree
-                .best_n_within(&query_point, radius, max_qty, &squared_euclidean)
+                .best_n_within::<SquaredEuclidean>(&query_point, radius, max_qty)
                 .collect();
             assert_eq!(result, expected);
         }
@@ -250,7 +247,7 @@ mod tests {
         let mut best_items = Vec::with_capacity(max_qty);
 
         for (idx, p) in content.iter().enumerate() {
-            let dist = squared_euclidean(query, &p);
+            let dist = SquaredEuclidean::dist(query, &p);
             if dist <= radius {
                 if best_items.len() < max_qty {
                     best_items.push(idx as u32);
