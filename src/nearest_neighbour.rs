@@ -19,6 +19,8 @@ impl<A: PartialOrd, T: Content> Ord for NearestNeighbour<A, T> {
     }
 }
 
+#[allow(unknown_lints)]
+#[allow(clippy::incorrect_partial_ord_impl_on_ord_type)]
 impl<A: PartialOrd, T: Content> PartialOrd for NearestNeighbour<A, T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.distance.partial_cmp(&other.distance)
@@ -36,5 +38,37 @@ impl<A: PartialEq, T: Content> PartialEq for NearestNeighbour<A, T> {
 impl<A, T: Content> From<NearestNeighbour<A, T>> for (A, T) {
     fn from(elem: NearestNeighbour<A, T>) -> Self {
         (elem.distance, elem.item)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::nearest_neighbour::NearestNeighbour;
+    use std::cmp::Ordering;
+
+    #[test]
+    fn test_from_tuple() {
+        let nn: (f32, usize) = NearestNeighbour::<f32, usize> {
+            distance: 1.0f32,
+            item: 1usize,
+        }
+        .into();
+
+        assert_eq!(nn.0, 1.0f32);
+        assert_eq!(nn.1, 1usize);
+    }
+
+    #[test]
+    fn test_partial_cmp() {
+        let a = NearestNeighbour {
+            distance: 1.0f32,
+            item: 10usize,
+        };
+        let b = NearestNeighbour {
+            distance: 2.0f32,
+            item: 5usize,
+        };
+
+        assert_eq!(a.partial_cmp(&b).unwrap(), Ordering::Less)
     }
 }

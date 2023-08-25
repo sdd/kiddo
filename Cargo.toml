@@ -80,6 +80,7 @@ features = ["alloc", "copy_unsafe", "size_64"]
 serialize = ["serde", "serde_derive", "serde_with", "fixed/serde"]
 serialize_rkyv = ["rkyv"]
 simd = []
+immutable = []
 
 [package.metadata.docs.rs]
 all-features = true
@@ -93,12 +94,9 @@ name = "nearest_one"
 harness = false
 
 [[bench]]
-name = "nearest_one_sss"
-harness = false
-
-[[bench]]
 name = "nearest_one_immutable"
 harness = false
+required-features = ["immutable"]
 
 [[bench]]
 name = "nearest_n"
@@ -143,12 +141,9 @@ required-features = ["serialize_rkyv"]
 [[example]]
 name = "immutable_large"
 path = "examples/immutable_large.rs"
+required-features = ["immutable"]
 
 [[example]]
 name = "check_select_nth_unstable"
 path = "examples/check_select_nth_unstable.rs"
 
-[[example]]
-name = "broken"
-path = "examples/broken.rs"
-required-features = ["serialize_rkyv"]
