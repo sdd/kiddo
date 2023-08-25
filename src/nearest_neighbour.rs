@@ -2,7 +2,7 @@
 use crate::types::Content;
 use std::cmp::Ordering;
 
-/// Represents an entry in the results of a nerest neighbour query, with `distance` being the distance of this
+/// Represents an entry in the results of a nearest neighbour query, with `distance` being the distance of this
 /// particular item from the query point, and `item` being the stored item index that was found
 /// as part of the query.
 #[derive(Debug, Copy, Clone)]

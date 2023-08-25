@@ -2,13 +2,13 @@ use std::error::Error;
 
 use criterion::black_box;
 use elapsed::ElapsedDuration;
-use kiddo::float::distance::squared_euclidean;
+use kiddo::float::distance::SquaredEuclidean;
 use rand::{Rng, SeedableRng};
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use std::time::Instant;
 
-use kiddo::immutable_float::kdtree::ImmutableKdTree;
+use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::test_utils::build_query_points_float;
 
 /*
@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     black_box({
         query_points.par_iter().for_each(|point| {
             black_box({
-                tree.nearest_one(point, &squared_euclidean);
+                tree.nearest_one::<SquaredEuclidean>(point);
             })
         });
     });
