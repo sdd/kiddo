@@ -1,9 +1,10 @@
+use crate::distance_metric::DistanceMetric;
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
 use crate::float::kdtree::Axis;
-use crate::float::neighbour::Neighbour;
-use crate::immutable_float::kdtree::ImmutableKdTree;
+use crate::immutable::float::kdtree::ImmutableKdTree;
+use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::Content;
 
 impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
@@ -15,8 +16,8 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::immutable_float::kdtree::ImmutableKdTree;
-    /// use kiddo::distance::squared_euclidean;
+    /// use kiddo::immutable::float::kdtree::ImmutableKdTree;
+    /// use kiddo::float::distance::SquaredEuclidean;
     ///
     /// let content: Vec<[f64; 3]> = vec!(
     ///     [1.0, 2.0, 5.0],
@@ -26,44 +27,35 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
     ///
     /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimize_from(&content);
     ///
-    /// let within = tree.within(&[1.0, 2.0, 5.0], 10f64, &squared_euclidean);
+    /// let within = tree.within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64);
     ///
     /// assert_eq!(within.len(), 2);
     /// ```
     #[inline]
-    pub fn within<F>(&self, query: &[A; K], dist: A, distance_fn: &F) -> Vec<Neighbour<A, T>>
+    pub fn within<D>(&self, query: &[A; K], dist: A) -> Vec<NearestNeighbour<A, T>>
     where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>,
     {
         let mut off = [A::zero(); K];
-        let mut matching_items: BinaryHeap<Neighbour<A, T>> = BinaryHeap::new();
+        let mut matching_items: BinaryHeap<NearestNeighbour<A, T>> = BinaryHeap::new();
 
-        self.within_recurse(
-            query,
-            dist,
-            distance_fn,
-            1,
-            0,
-            &mut matching_items,
-            &mut off,
-            A::zero(),
-        );
+        self.within_recurse::<D>(query, dist, 1, 0, &mut matching_items, &mut off, A::zero());
 
         matching_items.into_sorted_vec()
     }
 
-    fn within_recurse<F>(
+    #[allow(clippy::too_many_arguments)]
+    fn within_recurse<D>(
         &self,
         query: &[A; K],
         radius: A,
-        distance_fn: &F,
         stem_idx: usize,
         split_dim: usize,
-        matching_items: &mut BinaryHeap<Neighbour<A, T>>,
+        matching_items: &mut BinaryHeap<NearestNeighbour<A, T>>,
         off: &mut [A; K],
         rd: A,
     ) where
-        F: Fn(&[A; K], &[A; K]) -> A,
+        D: DistanceMetric<A, K>,
     {
         if stem_idx >= self.stems.len() {
             let leaf_node = &self.leaves[stem_idx - self.stems.len()];
@@ -74,10 +66,10 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
                 .enumerate()
                 .take(leaf_node.size)
                 .for_each(|(idx, entry)| {
-                    let distance = distance_fn(query, entry);
+                    let distance = D::dist(query, entry);
 
                     if distance < radius {
-                        matching_items.push(Neighbour {
+                        matching_items.push(NearestNeighbour {
                             distance,
                             item: *unsafe { leaf_node.content_items.get_unchecked(idx) },
                         })
@@ -105,10 +97,9 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
 
         let next_split_dim = (split_dim + 1).rem(K);
 
-        self.within_recurse(
+        self.within_recurse::<D>(
             query,
             radius,
-            distance_fn,
             closer_node_idx,
             next_split_dim,
             matching_items,
@@ -122,10 +113,9 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
 
         if rd <= radius {
             off[split_dim] = new_off;
-            self.within_recurse(
+            self.within_recurse::<D>(
                 query,
                 radius,
-                distance_fn,
                 further_node_idx,
                 next_split_dim,
                 matching_items,
@@ -139,9 +129,10 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::manhattan;
+    use crate::distance_metric::DistanceMetric;
+    use crate::float::distance::Manhattan;
     use crate::float::kdtree::Axis;
-    use crate::immutable_float::kdtree::ImmutableKdTree;
+    use crate::immutable::float::kdtree::ImmutableKdTree;
     use rand::Rng;
     use std::cmp::Ordering;
 
@@ -178,7 +169,7 @@ mod tests {
         let expected = linear_search(&content_to_add, &query_point, radius);
 
         let mut result: Vec<_> = tree
-            .within(&query_point, radius, &manhattan)
+            .within::<Manhattan>(&query_point, radius)
             .into_iter()
             .map(|n| (n.distance, n.item))
             .collect();
@@ -197,7 +188,7 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, radius);
 
             let mut result: Vec<_> = tree
-                .within(&query_point, radius, &manhattan)
+                .within::<Manhattan>(&query_point, radius)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -227,7 +218,7 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, RADIUS);
 
             let result: Vec<_> = tree
-                .within(&query_point, RADIUS, &manhattan)
+                .within::<Manhattan>(&query_point, RADIUS)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -244,7 +235,7 @@ mod tests {
         let mut matching_items = vec![];
 
         for (idx, p) in content.iter().enumerate() {
-            let dist = manhattan(query_point, &p);
+            let dist = Manhattan::dist(query_point, &p);
             if dist < radius {
                 matching_items.push((dist, idx as u32));
             }

@@ -115,7 +115,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::immutable_float::kdtree::ImmutableKdTree;
+    /// use kiddo::immutable::float::kdtree::ImmutableKdTree;
     ///
     /// let points: Vec<[f64; 3]> = vec!([1.0f64, 2.0f64, 3.0f64]);
     /// let tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimize_from(&points);
@@ -569,7 +569,7 @@ where
 mod tests {
     use std::panic;
 
-    use crate::immutable_float::kdtree::ImmutableKdTree;
+    use crate::immutable::float::kdtree::ImmutableKdTree;
     use ordered_float::OrderedFloat;
     use rand::{Rng, SeedableRng};
     use rayon::prelude::IntoParallelRefIterator;
