@@ -38,7 +38,7 @@ jobs:
         uses: actions-rust-lang/rustfmt@v1
 
   lint:
-    name: Lint
+    name: Lint (Stable)
     runs-on: ubuntu-latest
 
     steps:
@@ -64,13 +64,47 @@ jobs:
       - uses: LoliGothick/clippy-check@master
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          options: --features=serialize,serialize_rkyv --no-deps
+
+      - name: Check Rustdoc Links
+        run: RUSTDOCFLAGS="--deny broken_intra_doc_links" cargo doc --verbose --workspace --no-deps --document-private-items
+
+
+  lint-unstable:
+    name: Lint (Nightly)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Get date
+        run: |
+          echo "TODAY_DATE=$(date -Idate)" >> "$GITHUB_ENV"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Toolchain
+        uses: actions/cache@v3
+        with:
+          path: ~/.rustup
+          key: toolchain-x86-64-nightly-${{ env.TODAY_DATE }}
+
+      - name: Install `nightly` Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rustfmt,clippy
+
+      - uses: LoliGothick/clippy-check@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           options: --all-features --no-deps
 
       - name: Check Rustdoc Links
         run: RUSTDOCFLAGS="--deny broken_intra_doc_links" cargo doc --verbose --workspace --no-deps --document-private-items
 
   check:
-    name: Cargo Check
+    name: Cargo Check (Stable)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -99,10 +133,43 @@ jobs:
           version: "^0.5"
 
       - name: Cargo check all targets and features
+        run: cargo hack check --workspace --each-feature --all-targets --exclude-features immutable,simd
+
+  check-unstable:
+    name: Cargo Check (Nightly)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Get date
+        run: |
+          echo "TODAY_DATE=$(date -Idate)" >> "$GITHUB_ENV"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Toolchain
+        uses: actions/cache@v3
+        with:
+          path: ~/.rustup
+          key: toolchain-x86-64-nightly-${{ env.TODAY_DATE }}
+
+      - name: Install `nightly` Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rustfmt,clippy
+
+      - name: Install cargo-hack
+        uses: baptiste0928/cargo-install@v2
+        with:
+          crate: cargo-hack
+          version: "^0.5"
+
+      - name: Cargo check all targets and features
         run: cargo hack check --workspace --each-feature --all-targets
 
-  test:
-    name: Run Tests
+  test-basic:
+    name: Run Tests (Stable, no crate features enabled that require unstable Rust)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -122,6 +189,33 @@ jobs:
       - name: Install `stable` Toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
+          components: rustfmt,clippy
+
+      - name: Cargo test
+        run: cargo test --workspace --features=serialize,serialize_rkyv --lib --bins --tests --examples
+
+  test-all-features:
+    name: Run Tests (Nightly, all features enabled)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Get date
+        run: |
+          echo "TODAY_DATE=$(date -Idate)" >> "$GITHUB_ENV"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Toolchain
+        uses: actions/cache@v3
+        with:
+          path: ~/.rustup
+          key: toolchain-x86-64-nightly-${{ env.TODAY_DATE }}
+
+      - name: Install `nightly` Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
           components: rustfmt,clippy
 
       - name: Cargo test

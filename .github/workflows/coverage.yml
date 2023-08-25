@@ -12,9 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Get latest stable Rust version
+      - name: Get date
         run: |
-          echo "LATEST_STABLE_RUST_VERSION=$(gh api /repos/rust-lang/rust/releases --jq ".[0].tag_name")" >> "$GITHUB_ENV"
+          echo "TODAY_DATE=$(date -Idate)" >> "$GITHUB_ENV"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -22,11 +22,12 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.rustup
-          key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
+          key: toolchain-x86-64-nightly-${{ env.TODAY_DATE }}
 
-      - name: Install `stable` Toolchain
+      - name: Install `nightly` Toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
+          toolchain: nightly
           components: rustfmt,clippy,llvm-tools-preview
 
       - name: Install cargo-llvm-cov

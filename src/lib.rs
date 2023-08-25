@@ -1,7 +1,6 @@
-#![feature(allocator_api)]
-#![feature(get_many_mut)]
-#![feature(int_roundings)]
-#![feature(stdsimd)]
+//#![cfg_attr(feature = "simd", feature(stdsimd))]
+#![cfg_attr(feature = "immutable", feature(allocator_api))]
+#![cfg_attr(feature = "immutable", feature(int_roundings))]
 #![warn(rustdoc::missing_crate_level_docs)]
 #![deny(rustdoc::invalid_codeblock_attributes)]
 #![warn(missing_docs)]
@@ -82,6 +81,7 @@ mod custom_serde;
 pub mod distance_metric;
 pub mod fixed;
 pub mod float;
+#[cfg(feature = "immutable")]
 pub mod immutable;
 mod mirror_select_nth_unstable_by;
 pub mod nearest_neighbour;

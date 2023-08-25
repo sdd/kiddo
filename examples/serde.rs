@@ -14,6 +14,7 @@ use flate2::Compression;
 use std::time::Instant;
 
 use kiddo::float::kdtree::KdTree;
+#[cfg(feature = "immutable")]
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 
 use serde::Deserialize;
@@ -101,41 +102,42 @@ fn main() -> Result<(), Box<dyn Error>> {
     let nearest_city = &cities[nearest_neighbour.item as usize];
     println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest_city);
 
-    let city_points: Vec<_> = cities.iter().map(|city| city.as_xyz()).collect();
+    #[cfg(feature = "immutable")]
+    {
+        let city_points: Vec<_> = cities.iter().map(|city| city.as_xyz()).collect();
+        println!("Building an ImmutableKdTree...");
+        // Build an ImmutableKdTree
+        let start = Instant::now();
+        let kdtree: ImmutableKdTree<f32, u32, 3, 32> = ImmutableKdTree::optimize_from(&city_points);
+        println!(
+            "Built an ImmutableKdTree ({})",
+            ElapsedDuration::new(start.elapsed())
+        );
 
-    println!("Building an ImmutableKdTree...");
-    // Build an ImmutableKdTree
-    let start = Instant::now();
-    let kdtree: ImmutableKdTree<f32, u32, 3, 32> = ImmutableKdTree::optimize_from(&city_points);
-    println!(
-        "Built an ImmutableKdTree ({})",
-        ElapsedDuration::new(start.elapsed())
-    );
+        let start = Instant::now();
+        let file = File::create("./examples/geonames-immutable-tree.bincode.gz")?;
+        let encoder = GzEncoder::new(file, Compression::default());
+        bincode::serialize_into(encoder, &kdtree)?;
+        println!(
+            "Serialized kd-tree to gzipped bincode file ({})",
+            ElapsedDuration::new(start.elapsed())
+        );
 
-    let start = Instant::now();
-    let file = File::create("./examples/geonames-immutable-tree.bincode.gz")?;
-    let encoder = GzEncoder::new(file, Compression::default());
-    bincode::serialize_into(encoder, &kdtree)?;
-    println!(
-        "Serialized kd-tree to gzipped bincode file ({})",
-        ElapsedDuration::new(start.elapsed())
-    );
+        let start = Instant::now();
+        let file = File::open("./examples/geonames-immutable-tree.bincode.gz")?;
+        let decompressor = GzDecoder::new(file);
+        let deserialized_tree: ImmutableKdTree<f32, u32, 3, 32> =
+            bincode::deserialize_from(decompressor)?;
+        println!(
+            "Deserialized gzipped bincode file back into a kd-tree ({})",
+            ElapsedDuration::new(start.elapsed())
+        );
 
-    let start = Instant::now();
-    let file = File::open("./examples/geonames-immutable-tree.bincode.gz")?;
-    let decompressor = GzDecoder::new(file);
-    let deserialized_tree: ImmutableKdTree<f32, u32, 3, 32> =
-        bincode::deserialize_from(decompressor)?;
-    println!(
-        "Deserialized gzipped bincode file back into a kd-tree ({})",
-        ElapsedDuration::new(start.elapsed())
-    );
-
-    // Test that the deserialization worked
-    let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let (_, nearest_idx) = deserialized_tree.nearest_one::<SquaredEuclidean>(&query);
-    let nearest = &cities[nearest_idx as usize];
-    println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest);
-
+        // Test that the deserialization worked
+        let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
+        let (_, nearest_idx) = deserialized_tree.nearest_one::<SquaredEuclidean>(&query);
+        let nearest = &cities[nearest_idx as usize];
+        println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest);
+    }
     Ok(())
 }
