@@ -5,8 +5,8 @@ use criterion::{
     PlotConfiguration, Throughput,
 };
 use kiddo::batch_benches;
-use kiddo::distance::squared_euclidean;
-use kiddo::immutable_float::kdtree::{Axis, ImmutableKdTree};
+use kiddo::float::distance::SquaredEuclidean;
+use kiddo::immutable::float::kdtree::{Axis, ImmutableKdTree};
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_immutable_float, process_queries_immutable_float,
 };
@@ -54,7 +54,7 @@ fn perform_query_immutable_float<A: Axis, T: Content + 'static, const K: usize, 
     kdtree: &ImmutableKdTree<A, T, K, BUCKET_SIZE>,
     point: &[A; K],
 ) {
-    kdtree.nearest_one(&point, &squared_euclidean);
+    kdtree.nearest_one::<SquaredEuclidean>(&point);
 }
 
 fn bench_query_nearest_one_immutable_float<
