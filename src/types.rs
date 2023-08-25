@@ -106,3 +106,27 @@ impl Index for u16 {
 pub(crate) fn is_stem_index<IDX: Index<T = IDX>>(x: IDX) -> bool {
     x < <IDX as Index>::leaf_offset()
 }
+
+#[cfg(test)]
+mod tests {
+
+    use crate::types::Index;
+
+    #[test]
+    fn test_u16() {
+        assert_eq!(<u16 as Index>::max(), u16::MAX);
+        assert_eq!(<u16 as Index>::min(), 0u16);
+        assert_eq!(<u16 as Index>::leaf_offset(), 32_767u16);
+        assert_eq!(256u16.ilog2(), 8u32);
+        assert_eq!(u16::capacity_with_bucket_size(32), 1_048_576);
+    }
+
+    #[test]
+    fn test_u32() {
+        assert_eq!(<u32 as Index>::max(), u32::MAX);
+        assert_eq!(<u32 as Index>::min(), 0u32);
+        assert_eq!(<u32 as Index>::leaf_offset(), 2_147_483_647);
+        assert_eq!(256u32.ilog2(), 8u32);
+        assert_eq!(u32::capacity_with_bucket_size(32), 68_719_476_736);
+    }
+}

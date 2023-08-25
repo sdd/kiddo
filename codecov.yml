@@ -1,0 +1,10 @@
+ignore:
+  - "src/test_utils.rs"
+
+coverage:
+  range: "80...90"
+  status:
+    project:
+      default:
+        target: 85%
+        threshold: 1%
