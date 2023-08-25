@@ -10,8 +10,8 @@ use std::hint::black_box;
 
 use crate::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
 use crate::float::kdtree::{Axis, KdTree};
-//use crate::float_sss::kdtree::{Axis as AxisSSS, KdTree as KdTreeSSS};
-use crate::immutable_float::kdtree::ImmutableKdTree;
+//use crate::hybrid::kdtree::{Axis as AxisSSS, KdTree as KdTreeSSS};
+use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::types::{Content, Index};
 
 // use rand_distr::UnitSphere as SPHERE;
@@ -136,11 +136,9 @@ where
     Standard: Distribution<[A; K]>,
 {
     let mut points = vec![];
-    points.resize_with(size, || rand::random::<[A; K]>());
+    points.resize_with(size, rand::random::<[A; K]>);
 
-    let kdtree = ImmutableKdTree::<A, T, K, B>::optimize_from(&points);
-
-    kdtree
+    ImmutableKdTree::<A, T, K, B>::optimize_from(&points)
 }
 
 /*
