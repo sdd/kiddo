@@ -25,7 +25,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
     ///     [200.0, 300.0, 600.0],
     /// );
     ///
-    /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimize_from(&content);
+    /// let mut tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::new_from_slice(&content);
     ///
     /// let within = tree.within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64);
     ///
@@ -159,7 +159,7 @@ mod tests {
             [0.11f32, 0.2f32, 0.11f32, 0.2f32], // 2.04
         ];
 
-        let tree: ImmutableKdTree<AX, u32, 4, 4> = ImmutableKdTree::optimize_from(&content_to_add);
+        let tree: ImmutableKdTree<AX, u32, 4, 4> = ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), 16);
 
@@ -207,7 +207,8 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..TREE_SIZE).map(|_| rand::random::<[f32; 4]>()).collect();
 
-        let tree: ImmutableKdTree<AX, u32, 4, 32> = ImmutableKdTree::optimize_from(&content_to_add);
+        let tree: ImmutableKdTree<AX, u32, 4, 32> =
+            ImmutableKdTree::new_from_slice(&content_to_add);
         assert_eq!(tree.size(), TREE_SIZE);
 
         let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)

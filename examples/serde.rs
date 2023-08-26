@@ -108,7 +108,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Building an ImmutableKdTree...");
         // Build an ImmutableKdTree
         let start = Instant::now();
-        let kdtree: ImmutableKdTree<f32, u32, 3, 32> = ImmutableKdTree::optimize_from(&city_points);
+        let kdtree: ImmutableKdTree<f32, u32, 3, 32> =
+            ImmutableKdTree::new_from_slice(&city_points);
         println!(
             "Built an ImmutableKdTree ({})",
             ElapsedDuration::new(start.elapsed())

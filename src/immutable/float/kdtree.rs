@@ -99,18 +99,16 @@ pub struct TreeStats {
     unused_stem_count: usize,
 }
 
-impl<A, T, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
+impl<A: Axis, T: Content, const K: usize, const B: usize> From<&[[A; K]]>
+    for ImmutableKdTree<A, T, K, B>
 where
-    A: Axis,
-    T: Content,
+    usize: Cast<T>,
 {
-    /// Creates an ImmutableKdTree, balanced and optimized, populated
+    /// Creates an `ImmutableKdTree`, balanced and optimized, populated
     /// with items from `source`.
     ///
-    /// Trees constructed using this method will be optimally
-    /// balanced and tuned, but will not be modifiable
-    /// after construction. This method may take a long time for
-    /// large numbers of points (>4 million)
+    /// `ImmutableKdTree` instances are optimally
+    /// balanced and tuned, but are not modifiable after construction.
     ///
     /// # Examples
     ///
@@ -118,12 +116,38 @@ where
     /// use kiddo::immutable::float::kdtree::ImmutableKdTree;
     ///
     /// let points: Vec<[f64; 3]> = vec!([1.0f64, 2.0f64, 3.0f64]);
-    /// let tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::optimize_from(&points);
+    /// let tree: ImmutableKdTree<f64, u32, 3, 32> = (&*points).into();
+    ///
+    /// assert_eq!(tree.size(), 1);
+    /// ```
+    fn from(slice: &[[A; K]]) -> Self {
+        ImmutableKdTree::new_from_slice(slice)
+    }
+}
+
+impl<A, T, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
+where
+    A: Axis,
+    T: Content,
+{
+    /// Creates an `ImmutableKdTree`, balanced and optimized, populated
+    /// with items from `source`.
+    ///
+    /// `ImmutableKdTree` instances are optimally
+    /// balanced and tuned, but are not modifiable after construction.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use kiddo::immutable::float::kdtree::ImmutableKdTree;
+    ///
+    /// let points: Vec<[f64; 3]> = vec!([1.0f64, 2.0f64, 3.0f64]);
+    /// let tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::new_from_slice(&points);
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
     #[inline]
-    pub fn optimize_from(source: &[[A; K]]) -> Self
+    pub fn new_from_slice(source: &[[A; K]]) -> Self
     where
         usize: Cast<T>,
     {
@@ -596,7 +620,7 @@ mod tests {
         ];
 
         let tree: ImmutableKdTree<f32, usize, 2, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats());
 
@@ -632,7 +656,7 @@ mod tests {
         ];
 
         let tree: ImmutableKdTree<f32, usize, 2, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats());
 
@@ -673,7 +697,7 @@ mod tests {
         content_to_add.shuffle(&mut rng);
 
         let tree: ImmutableKdTree<f32, usize, 2, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats());
 
@@ -715,7 +739,7 @@ mod tests {
             content_to_add.shuffle(&mut rng);
 
             let _tree: ImmutableKdTree<f32, usize, 2, 8> =
-                ImmutableKdTree::optimize_from(&content_to_add);
+                ImmutableKdTree::new_from_slice(&content_to_add);
         }
     }
 
@@ -728,7 +752,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
         let tree: ImmutableKdTree<f32, usize, 4, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
@@ -742,7 +766,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
         let _tree: ImmutableKdTree<f32, usize, 4, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
     #[test]
@@ -754,7 +778,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
         let _tree: ImmutableKdTree<f32, usize, 4, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
     #[test]
@@ -766,7 +790,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
         let _tree: ImmutableKdTree<f32, usize, 4, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
     #[test]
@@ -778,7 +802,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
         let _tree: ImmutableKdTree<f32, usize, 4, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
     #[test]
@@ -790,7 +814,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
         let tree: ImmutableKdTree<f32, usize, 4, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
@@ -804,7 +828,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
         let tree: ImmutableKdTree<f32, usize, 4, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
@@ -818,7 +842,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
         let tree: ImmutableKdTree<f32, usize, 4, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
@@ -832,7 +856,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
         let tree: ImmutableKdTree<f32, usize, 4, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
@@ -846,7 +870,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
         let tree: ImmutableKdTree<f32, usize, 4, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
@@ -860,7 +884,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
         let tree: ImmutableKdTree<f32, usize, 4, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
@@ -874,7 +898,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
         let tree: ImmutableKdTree<f32, usize, 4, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
@@ -894,7 +918,7 @@ mod tests {
             }
         }
 
-        let tree: ImmutableKdTree<f32, usize, 4, 8> = ImmutableKdTree::optimize_from(&duped);
+        let tree: ImmutableKdTree<f32, usize, 4, 8> = ImmutableKdTree::new_from_slice(&duped);
 
         println!("Tree Stats: {:?}", tree.generate_stats());
     }
@@ -924,7 +948,7 @@ mod tests {
                             (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
                         let _tree: ImmutableKdTree<f32, usize, 4, 4> =
-                            ImmutableKdTree::optimize_from(&content_to_add);
+                            ImmutableKdTree::new_from_slice(&content_to_add);
                     });
 
                     if result.is_err() {
@@ -957,7 +981,7 @@ mod tests {
         println!("dupes: {:?}", TREE_SIZE * 4 - num_uniq);
 
         let tree: ImmutableKdTree<f32, usize, 4, 4> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
@@ -971,7 +995,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE).map(|_| rng.gen::<[f32; 4]>()).collect();
 
         let tree: ImmutableKdTree<f32, usize, 4, 32> =
-            ImmutableKdTree::optimize_from(&content_to_add);
+            ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
     }
