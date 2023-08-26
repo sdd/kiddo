@@ -139,7 +139,7 @@ where
     let mut points = vec![];
     points.resize_with(size, rand::random::<[A; K]>);
 
-    ImmutableKdTree::<A, T, K, B>::optimize_from(&points)
+    ImmutableKdTree::<A, T, K, B>::new_from_slice(&points)
 }
 
 /*
