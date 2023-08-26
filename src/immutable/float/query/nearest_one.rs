@@ -1,6 +1,7 @@
 use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
 use crate::immutable::float::kdtree::ImmutableKdTree;
+use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::Content;
 use std::ops::Rem;
 
@@ -25,16 +26,26 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
     ///
     /// let nearest = tree.nearest_one::<SquaredEuclidean>(&[1.0, 2.0, 5.1]);
     ///
-    /// assert!((nearest.0 - 0.01f64).abs() < f64::EPSILON);
-    /// assert_eq!(nearest.1, 0);
+    /// assert!((nearest.distance - 0.01f64).abs() < f64::EPSILON);
+    /// assert_eq!(nearest.item, 0);
     /// ```
     #[inline]
-    pub fn nearest_one<D>(&self, query: &[A; K]) -> (A, T)
+    pub fn nearest_one<D>(&self, query: &[A; K]) -> NearestNeighbour<A, T>
     where
         D: DistanceMetric<A, K>,
     {
         let mut off = [A::zero(); K];
-        self.nearest_one_recurse::<D>(query, 1, 0, T::zero(), A::max_value(), &mut off, A::zero())
+        self.nearest_one_recurse::<D>(
+            query,
+            1,
+            0,
+            NearestNeighbour {
+                distance: A::max_value(),
+                item: T::zero(),
+            },
+            &mut off,
+            A::zero(),
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -43,23 +54,17 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
         query: &[A; K],
         stem_idx: usize,
         split_dim: usize,
-        mut best_item: T,
-        mut best_dist: A,
+        mut nearest: NearestNeighbour<A, T>,
         off: &mut [A; K],
         rd: A,
-    ) -> (A, T)
+    ) -> NearestNeighbour<A, T>
     where
         D: DistanceMetric<A, K>,
     {
         if stem_idx >= self.stems.len() {
-            self.search_leaf_for_best::<D>(
-                query,
-                &mut best_item,
-                &mut best_dist,
-                stem_idx - self.stems.len(),
-            );
+            self.search_leaf_for_nearest::<D>(query, &mut nearest, stem_idx - self.stems.len());
 
-            return (best_dist, best_item);
+            return nearest;
         }
 
         let left_child_idx = stem_idx << 1;
@@ -71,7 +76,8 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
         let mut rd = rd;
         let old_off = off[split_dim];
         // let new_off = (query[split_dim] * query[split_dim]) - (val * val);
-        let new_off = query[split_dim] - val;
+        let new_off = query[split_dim].saturating_dist(val);
+        // let new_off = query[split_dim] - val;
 
         let is_left_child = usize::from(*unsafe { query.get_unchecked(split_dim) } < val);
         // let is_left_child = usize::from(query[split_dim] < val);
@@ -81,53 +87,39 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
 
         let next_split_dim = (split_dim + 1).rem(K);
 
-        let (dist, item) = self.nearest_one_recurse::<D>(
-            query,
-            closer_node_idx,
-            next_split_dim,
-            best_item,
-            best_dist,
-            off,
-            rd,
-        );
+        let nearest_neighbour =
+            self.nearest_one_recurse::<D>(query, closer_node_idx, next_split_dim, nearest, off, rd);
 
-        if dist < best_dist {
-            best_dist = dist;
-            best_item = item;
+        if nearest_neighbour < nearest {
+            nearest = nearest_neighbour;
         }
 
-        // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-        //       so that updating rd is not hardcoded to sq euclidean
-        rd = rd + new_off * new_off - old_off * old_off;
-        // rd = rd.rd_update(old_off, new_off);
+        rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
 
-        if rd <= best_dist {
+        if rd <= nearest.distance {
             off[split_dim] = new_off;
-            let (dist, item) = self.nearest_one_recurse::<D>(
+            let result = self.nearest_one_recurse::<D>(
                 query,
                 further_node_idx,
                 next_split_dim,
-                best_item,
-                best_dist,
+                nearest,
                 off,
                 rd,
             );
             off[split_dim] = old_off;
 
-            if dist < best_dist {
-                best_dist = dist;
-                best_item = item;
+            if result < nearest {
+                nearest = result;
             }
         }
 
-        (best_dist, best_item)
+        nearest
     }
 
-    fn search_leaf_for_best<D>(
+    fn search_leaf_for_nearest<D>(
         &self,
         query: &[A; K],
-        best_item: &mut T,
-        best_dist: &mut A,
+        nearest: &mut NearestNeighbour<A, T>,
         leaf_idx: usize,
     ) where
         D: DistanceMetric<A, K>,
@@ -142,10 +134,10 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
             .take(leaf_node.size)
             .for_each(|(idx, entry)| {
                 let dist = D::dist(query, entry);
-                if dist < *best_dist {
-                    *best_dist = dist;
-                    *best_item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
-                    // *best_item = leaf_node.content_items[idx]
+                if dist < nearest.distance {
+                    nearest.distance = dist;
+                    nearest.item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
+                    // nearest.item = leaf_node.content_items[idx]
                 }
             });
     }
@@ -157,6 +149,7 @@ mod tests {
     use crate::float::distance::Manhattan;
     use crate::float::kdtree::Axis;
     use crate::immutable::float::kdtree::ImmutableKdTree;
+    use crate::nearest_neighbour::NearestNeighbour;
     use rand::Rng;
 
     type AX = f32;
@@ -188,7 +181,10 @@ mod tests {
 
         let query_point = [0.78f32, 0.55f32, 0.78f32, 0.55f32];
 
-        let expected = (0.819999933, 13);
+        let expected = NearestNeighbour {
+            distance: 0.819999933,
+            item: 13,
+        };
 
         let result = tree.nearest_one::<Manhattan>(&query_point);
         assert_eq!(result, expected);
@@ -206,7 +202,7 @@ mod tests {
             let result = tree.nearest_one::<Manhattan>(&query_point);
 
             // println!("#{}: {} == {}", _i, result.0, expected.0);
-            assert_eq!(result.0, expected.0);
+            assert_eq!(result.distance, expected.distance);
         }
     }
 
@@ -233,15 +229,15 @@ mod tests {
             let result = tree.nearest_one::<Manhattan>(&query_point);
 
             // println!("#{}: {} == {}", _i, result.0, expected.0);
-            assert_eq!(result.0, expected.0);
-            assert_eq!(result.1 as usize, expected.1);
+            assert_eq!(result.distance, expected.distance);
+            assert_eq!(result.item as usize, expected.item);
         }
     }
 
     fn linear_search<A: Axis, const K: usize>(
         content: &[[A; K]],
         query_point: &[A; K],
-    ) -> (A, usize) {
+    ) -> NearestNeighbour<A, usize> {
         let mut best_dist: A = A::infinity();
         let mut best_item: usize = usize::MAX;
 
@@ -253,6 +249,9 @@ mod tests {
             }
         }
 
-        (best_dist, best_item)
+        NearestNeighbour {
+            distance: best_dist,
+            item: best_item,
+        }
     }
 }
