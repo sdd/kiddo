@@ -23,4 +23,6 @@
 //!
 //! As per the other Kiddo float-type trees, points being stored
 //! in the tree must be floats ([`f64`] or [`f32`] are supported currently).
+#[doc(hidden)]
+pub(crate) mod common;
 pub mod float;
