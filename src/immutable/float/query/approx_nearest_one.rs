@@ -1,5 +1,6 @@
 use crate::float::kdtree::Axis;
 use crate::immutable::float::kdtree::ImmutableKdTree;
+use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::Content;
 
 impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
@@ -24,11 +25,11 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
     ///
     /// let nearest = tree.nearest_one::<SquaredEuclidean>(&[1.0, 2.0, 5.1]);
     ///
-    /// assert!((nearest.0 - 0.01f64).abs() < f64::EPSILON);
-    /// assert_eq!(nearest.1, 0);
+    /// assert!((nearest.distance - 0.01f64).abs() < f64::EPSILON);
+    /// assert_eq!(nearest.item, 0);
     /// ```
     #[inline]
-    pub fn approx_nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> (A, T)
+    pub fn approx_nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> NearestNeighbour<A, T>
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
@@ -69,7 +70,10 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
                 }
             });
 
-        (best_dist, best_item)
+        NearestNeighbour {
+            distance: best_dist,
+            item: best_item,
+        }
     }
 }
 
@@ -79,6 +83,7 @@ mod tests {
     use crate::float::distance::Manhattan;
     use crate::float::kdtree::Axis;
     use crate::immutable::float::kdtree::ImmutableKdTree;
+    use crate::nearest_neighbour::NearestNeighbour;
     use rand::Rng;
 
     type AX = f32;
@@ -110,7 +115,10 @@ mod tests {
 
         let query_point = [0.78f32, 0.55f32, 0.78f32, 0.55f32];
 
-        let expected = (0.819999933, 13);
+        let expected = NearestNeighbour {
+            distance: 0.819999933,
+            item: 13,
+        };
 
         let result = tree.nearest_one::<Manhattan>(&query_point);
         assert_eq!(result, expected);
@@ -128,7 +136,7 @@ mod tests {
             let result = tree.nearest_one::<Manhattan>(&query_point);
 
             // println!("#{}: {} == {}", _i, result.0, expected.0);
-            assert_eq!(result.0, expected.0);
+            assert_eq!(result.distance, expected.distance);
         }
     }
 
@@ -155,15 +163,15 @@ mod tests {
             let result = tree.nearest_one::<Manhattan>(&query_point);
 
             // println!("#{}: {} == {}", _i, result.0, expected.0);
-            assert_eq!(result.0, expected.0);
-            assert_eq!(result.1 as usize, expected.1);
+            assert_eq!(result.distance, expected.distance);
+            assert_eq!(result.item as usize, expected.item);
         }
     }
 
     fn linear_search<A: Axis, const K: usize>(
         content: &[[A; K]],
         query_point: &[A; K],
-    ) -> (A, usize) {
+    ) -> NearestNeighbour<A, usize> {
         let mut best_dist: A = A::infinity();
         let mut best_item: usize = usize::MAX;
 
@@ -175,6 +183,9 @@ mod tests {
             }
         }
 
-        (best_dist, best_item)
+        NearestNeighbour {
+            distance: best_dist,
+            item: best_item,
+        }
     }
 }
