@@ -1,6 +1,7 @@
 use crate::float::kdtree::Axis;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 
+use crate::best_neighbour::BestNeighbour;
 use crate::distance_metric::DistanceMetric;
 use crate::types::Content;
 use std::collections::BinaryHeap;
@@ -30,7 +31,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
     /// let mut best_n_within = tree.best_n_within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64, 1);
     /// let first = best_n_within.next().unwrap();
     ///
-    /// assert_eq!(first, 0);
+    /// assert_eq!(first.item, 0);
     /// ```
     #[inline]
     pub fn best_n_within<D>(
@@ -38,12 +39,12 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
         query: &[A; K],
         dist: A,
         max_qty: usize,
-    ) -> impl Iterator<Item = T>
+    ) -> impl Iterator<Item = BestNeighbour<A, T>>
     where
         D: DistanceMetric<A, K>,
     {
         let mut off = [A::zero(); K];
-        let mut best_items: BinaryHeap<T> = BinaryHeap::new();
+        let mut best_items: BinaryHeap<BestNeighbour<A, T>> = BinaryHeap::new();
 
         self.best_n_within_recurse::<D>(
             query,
@@ -67,7 +68,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
         max_qty: usize,
         stem_idx: usize,
         split_dim: usize,
-        best_items: &mut BinaryHeap<T>,
+        best_items: &mut BinaryHeap<BestNeighbour<A, T>>,
         off: &mut [A; K],
         rd: A,
     ) where
@@ -83,14 +84,15 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
                 .map(|entry| D::dist(query, entry))
                 .enumerate()
                 .filter(|(_, distance)| *distance <= radius)
-                .for_each(|(idx, _)| {
+                .for_each(|(idx, distance)| {
                     let item = *unsafe { leaf_node.content_items.get_unchecked(idx) };
                     if best_items.len() < max_qty {
-                        best_items.push(item);
+                        best_items.push(BestNeighbour { distance, item });
                     } else {
                         let mut top = best_items.peek_mut().unwrap();
-                        if item < *top {
-                            *top = item;
+                        if item < top.item {
+                            top.item = item;
+                            top.distance = distance;
                         }
                     }
                 });
@@ -106,7 +108,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
 
         let mut rd = rd;
         let old_off = off[split_dim];
-        let new_off = query[split_dim] - val;
+        let new_off = query[split_dim].saturating_dist(val);
 
         let is_left_child = usize::from(*unsafe { query.get_unchecked(split_dim) } < val);
         // let is_left_child = usize::from(query[split_dim] < val);
@@ -127,9 +129,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
             rd,
         );
 
-        // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-        //       so that updating rd is not hardcoded to sq euclidean
-        rd = rd + new_off * new_off - old_off * old_off;
+        rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
 
         if rd <= radius {
             off[split_dim] = new_off;
@@ -150,6 +150,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
 
 #[cfg(test)]
 mod tests {
+    use crate::best_neighbour::BestNeighbour;
     use crate::distance_metric::DistanceMetric;
     use crate::float::distance::SquaredEuclidean;
     use crate::immutable::float::kdtree::ImmutableKdTree;
@@ -178,14 +179,27 @@ mod tests {
             [11f64, -200f64],
         ];
 
-        let tree: ImmutableKdTree<AX, u32, 2, 4> = ImmutableKdTree::new_from_slice(&content_to_add);
+        let tree: ImmutableKdTree<AX, i32, 2, 4> = ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), 16);
 
         let query = [9f64, 0f64];
         let radius = 20000f64;
         let max_qty = 3;
-        let expected = vec![14, 0, 9];
+        let expected = vec![
+            BestNeighbour {
+                distance: 10001.0,
+                item: 14,
+            },
+            BestNeighbour {
+                distance: 0.0,
+                item: 0,
+            },
+            BestNeighbour {
+                distance: 10001.0,
+                item: 9,
+            },
+        ];
 
         let result: Vec<_> = tree
             .best_n_within::<SquaredEuclidean>(&query, radius, max_qty)
@@ -202,7 +216,7 @@ mod tests {
             ];
             let radius = 100000f64;
             let expected = linear_search(&content_to_add, &query, radius, max_qty);
-            println!("{}, {}", query[0].to_string(), query[1].to_string());
+            //println!("{}, {}", query[0].to_string(), query[1].to_string());
 
             let result: Vec<_> = tree
                 .best_n_within::<SquaredEuclidean>(&query, radius, max_qty)
@@ -220,7 +234,7 @@ mod tests {
         let content_to_add: Vec<[AX; 2]> =
             (0..TREE_SIZE).map(|_| rand::random::<[AX; 2]>()).collect();
 
-        let tree: ImmutableKdTree<AX, u32, 2, 32> =
+        let tree: ImmutableKdTree<AX, i32, 2, 32> =
             ImmutableKdTree::new_from_slice(&content_to_add);
         assert_eq!(tree.size(), TREE_SIZE);
 
@@ -244,18 +258,24 @@ mod tests {
         query: &[f64; 2],
         radius: f64,
         max_qty: usize,
-    ) -> Vec<u32> {
+    ) -> Vec<BestNeighbour<f64, i32>> {
         let mut best_items = Vec::with_capacity(max_qty);
 
-        for (idx, p) in content.iter().enumerate() {
-            let dist = SquaredEuclidean::dist(query, &p);
-            if dist <= radius {
+        for (item, p) in content.iter().enumerate() {
+            let distance = SquaredEuclidean::dist(query, &p);
+            if distance <= radius {
                 if best_items.len() < max_qty {
-                    best_items.push(idx as u32);
+                    best_items.push(BestNeighbour {
+                        distance,
+                        item: item as i32,
+                    });
                 } else {
-                    if (idx as u32) < *best_items.last().unwrap() {
+                    if (item as i32) < (*best_items.last().unwrap()).item {
                         best_items.pop().unwrap();
-                        best_items.push(idx as u32);
+                        best_items.push(BestNeighbour {
+                            distance,
+                            item: item as i32,
+                        });
                     }
                 }
             }

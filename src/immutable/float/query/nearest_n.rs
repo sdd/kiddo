@@ -88,7 +88,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
 
         let mut rd = rd;
         let old_off = off[split_dim];
-        let new_off = query[split_dim] - val;
+        let new_off = query[split_dim].saturating_dist(val);
 
         let is_left_child = usize::from(*unsafe { query.get_unchecked(split_dim) } < val);
         // let is_left_child = usize::from(query[split_dim] < val);
@@ -100,9 +100,8 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
 
         self.nearest_n_recurse::<D>(query, closer_node_idx, next_split_dim, results, off, rd);
 
-        // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
-        //       so that updating rd is not hardcoded to sq euclidean
-        rd = rd + new_off * new_off - old_off * old_off;
+        rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
+
         if Self::dist_belongs_in_heap(rd, results) {
             off[split_dim] = new_off;
             self.nearest_n_recurse::<D>(query, further_node_idx, next_split_dim, results, off, rd);

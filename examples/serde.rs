@@ -136,8 +136,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         // Test that the deserialization worked
         let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-        let (_, nearest_idx) = deserialized_tree.nearest_one::<SquaredEuclidean>(&query);
-        let nearest = &cities[nearest_idx as usize];
+        let nearest_neighbour_result = deserialized_tree.nearest_one::<SquaredEuclidean>(&query);
+        let nearest = &cities[nearest_neighbour_result.item as usize];
         println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest);
     }
     Ok(())
