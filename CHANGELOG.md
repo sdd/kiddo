@@ -1,5 +1,10 @@
 # Kiddo Changelog
 
+## [3.0.0-beta.4] - 2023-08-28
+
+### Style / Tests
+* Increase reliability of `within()` test for `ImmutableKdTree`.
+* Remove some commented-out code and some useless comments in some tests
 
 ## [3.0.0-beta.3] - 2023-08-28
 
