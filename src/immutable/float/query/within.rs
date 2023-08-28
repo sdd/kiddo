@@ -152,11 +152,13 @@ mod tests {
         for query_point in query_points {
             let expected = linear_search(&content_to_add, &query_point, RADIUS);
 
-            let result: Vec<_> = tree
+            let mut result: Vec<_> = tree
                 .within::<Manhattan>(&query_point, RADIUS)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
+
+            stabilize_sort(&mut result);
 
             assert_eq!(result, expected);
         }
