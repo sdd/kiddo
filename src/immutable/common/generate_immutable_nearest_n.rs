@@ -18,7 +18,7 @@ macro_rules! generate_immutable_nearest_n {
             &mut result,
             &mut off,
             A::zero(),
-        )
+        );
 
         result.into_sorted_vec()
     }
@@ -41,7 +41,7 @@ macro_rules! generate_immutable_nearest_n {
             leaf_node
                 .content_points
                 .iter()
-                .take(leaf_node.size)
+                .take(leaf_node.size as usize)
                 .enumerate()
                 .for_each(|(idx, entry)| {
                     let distance: A = D::dist(query, entry);

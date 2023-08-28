@@ -11,17 +11,15 @@ macro_rules! generate_immutable_within_unsorted {
                 let mut off = [A::zero(); K];
                 let mut matching_items = Vec::new();
 
-                unsafe {
-                    self.within_unsorted_recurse::<D>(
-                        query,
-                        dist,
-                        1,
-                        0,
-                        &mut matching_items,
-                        &mut off,
-                        A::zero(),
-                    );
-                }
+                self.within_unsorted_recurse::<D>(
+                    query,
+                    dist,
+                    1,
+                    0,
+                    &mut matching_items,
+                    &mut off,
+                    A::zero(),
+                );
 
                 matching_items
             }
@@ -46,7 +44,7 @@ macro_rules! generate_immutable_within_unsorted {
                         .content_points
                         .iter()
                         .enumerate()
-                        .take(leaf_node.size)
+                        .take(leaf_node.size as usize)
                         .for_each(|(idx, entry)| {
                             let distance = D::dist(query, entry);
 

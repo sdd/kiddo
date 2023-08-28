@@ -145,6 +145,15 @@ path = "examples/immutable_large.rs"
 required-features = ["immutable"]
 
 [[example]]
+name = "immutable_rkyv"
+path = "examples/immutable_rkyv.rs"
+required-features = ["immutable", "serialize_rkyv"]
+
+[[example]]
 name = "check_select_nth_unstable"
 path = "examples/check_select_nth_unstable.rs"
 
+[[example]]
+name = "immutable-rkyv-serialize"
+path = "examples/immutable-rkyv-serialize.rs"
+required-features = ["immutable", "serialize_rkyv"]
