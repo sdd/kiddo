@@ -7,7 +7,70 @@ use crate::types::Content;
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
+use crate::generate_immutable_best_n_within;
+
+macro_rules! generate_immutable_float_best_n_within {
+    ($doctest_build_tree:tt) => {
+        generate_immutable_best_n_within!(
+            (
+                "Finds the \"best\" `n` elements within `dist` of `query`.
+
+Results are returned in arbitrary order. 'Best' is determined by
+performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt`]). Returns an iterator.
+Returns an iterator.
+
+# Examples
+
+```rust
+    use kiddo::immutable::float::kdtree::ImmutableKdTree;
+    use kiddo::best_neighbour::BestNeighbour;
+    use kiddo::float::distance::SquaredEuclidean;
+
+    ",
+                $doctest_build_tree,
+                "
+
+    let mut best_n_within = tree.best_n_within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64, 1);
+    let first = best_n_within.next().unwrap();
+
+    assert_eq!(first, BestNeighbour { distance: 0.0, item: 0 });
+```"
+            )
+        );
+    };
+}
+
 impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
+    generate_immutable_float_best_n_within!(
+        "let content: Vec<[f64; 3]> = vec!(
+            [1.0, 2.0, 5.0],
+            [2.0, 3.0, 6.0]
+        );
+
+        let tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::new_from_slice(&content);"
+    );
+}
+
+#[cfg(feature = "rkyv")]
+use crate::immutable::float::kdtree::ArchivedImmutableKdTree;
+#[cfg(feature = "rkyv")]
+impl<
+        A: Axis + rkyv::Archive<Archived = A>,
+        T: Content + rkyv::Archive<Archived = T>,
+        const K: usize,
+        const B: usize,
+    > ArchivedImmutableKdTree<A, T, K, B>
+{
+    generate_immutable_float_best_n_within!(
+        "use std::fs::File;
+    use memmap::MmapOptions;
+
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
+    let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, u32, 3, 32>>(&mmap) };"
+    );
+}
+
+/*impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
     /// Finds the "best" `n` elements within `dist` of `query`.
     ///
     /// Results are returned in arbitrary order. 'Best' is determined by
@@ -147,7 +210,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
         }
     }
 }
-
+*/
 #[cfg(test)]
 mod tests {
     use crate::best_neighbour::BestNeighbour;

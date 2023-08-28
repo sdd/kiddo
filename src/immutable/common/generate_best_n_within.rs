@@ -16,18 +16,16 @@ macro_rules! generate_immutable_best_n_within {
                 let mut off = [A::zero(); K];
                 let mut best_items: BinaryHeap<BestNeighbour<A, T>> = BinaryHeap::new();
 
-                unsafe {
-                    self.best_n_within_recurse::<D>(
-                        query,
-                        dist,
-                        max_qty,
-                        1,
-                        0,
-                        &mut best_items,
-                        &mut off,
-                        A::zero(),
-                    );
-                }
+                self.best_n_within_recurse::<D>(
+                    query,
+                    dist,
+                    max_qty,
+                    1,
+                    0,
+                    &mut best_items,
+                    &mut off,
+                    A::zero(),
+                );
 
                 best_items.into_iter()
             }
@@ -52,7 +50,7 @@ macro_rules! generate_immutable_best_n_within {
                     leaf_node
                         .content_points
                         .iter()
-                        .take(leaf_node.size)
+                        .take(leaf_node.size as usize)
                         .map(|entry| D::dist(query, entry))
                         .enumerate()
                         .filter(|(_, distance)| *distance <= radius)

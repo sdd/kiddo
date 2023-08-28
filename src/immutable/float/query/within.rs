@@ -1,13 +1,67 @@
 use crate::distance_metric::DistanceMetric;
-use std::collections::BinaryHeap;
-use std::ops::Rem;
-
 use crate::float::kdtree::Axis;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::Content;
 
+use crate::generate_immutable_within;
+
+macro_rules! generate_immutable_float_within {
+    ($doctest_build_tree:tt) => {
+        generate_immutable_within!((
+            "Finds all elements within `dist` of `query`, using the specified
+distance metric function.
+
+Results are returned sorted nearest-first
+
+# Examples
+
+```rust
+    use kiddo::immutable::float::kdtree::ImmutableKdTree;
+    use kiddo::float::distance::SquaredEuclidean;
+    ",
+            $doctest_build_tree,
+            "
+
+    let within = tree.within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64);
+
+    assert_eq!(within.len(), 2);
+```"
+        ));
+    };
+}
+
 impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
+    generate_immutable_float_within!(
+        "let content: Vec<[f64; 3]> = vec!(
+            [1.0, 2.0, 5.0],
+            [2.0, 3.0, 6.0]
+        );
+
+        let tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::new_from_slice(&content);"
+    );
+}
+
+#[cfg(feature = "rkyv")]
+use crate::immutable::float::kdtree::ArchivedImmutableKdTree;
+#[cfg(feature = "rkyv")]
+impl<
+        A: Axis + rkyv::Archive<Archived = A>,
+        T: Content + rkyv::Archive<Archived = T>,
+        const K: usize,
+        const B: usize,
+    > ArchivedImmutableKdTree<A, T, K, B>
+{
+    generate_immutable_float_within!(
+        "use std::fs::File;
+use memmap::MmapOptions;
+
+let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
+let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, u32, 3, 32>>(&mmap) };"
+    );
+}
+
+/*impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
     /// Finds all elements within `dist` of `query`, using the specified
     /// distance metric function.
     ///
@@ -123,7 +177,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
             off[split_dim] = old_off;
         }
     }
-}
+}*/
 
 #[cfg(test)]
 mod tests {
