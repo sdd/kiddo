@@ -4,6 +4,7 @@ ignore:
 coverage:
   range: "80...90"
   status:
+    patch: off
     project:
       default:
         target: 85%

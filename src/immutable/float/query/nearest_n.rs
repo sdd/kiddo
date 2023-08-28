@@ -6,7 +6,64 @@ use crate::types::Content;
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
+use crate::generate_immutable_nearest_n;
+
+macro_rules! generate_immutable_float_nearest_n {
+    ($doctest_build_tree:tt) => {
+        generate_immutable_nearest_n!((
+            "Finds the nearest `qty` elements to `query`, according the specified
+distance metric function.
+# Examples
+
+```rust
+    use kiddo::immutable::float::kdtree::ImmutableKdTree;
+    use kiddo::float::distance::SquaredEuclidean;
+
+    ",
+            $doctest_build_tree,
+            "
+
+    let nearest: Vec<_> = tree.nearest_n::<SquaredEuclidean>(&[1.0, 2.0, 5.1], 1);
+
+    assert_eq!(nearest.len(), 1);
+    assert!((nearest[0].distance - 0.01f64).abs() < f64::EPSILON);
+    assert_eq!(nearest[0].item, 0);
+```"
+        ));
+    };
+}
+
 impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
+    generate_immutable_float_nearest_n!(
+        "let content: Vec<[f64; 3]> = vec!(
+            [1.0, 2.0, 5.0],
+            [2.0, 3.0, 6.0]
+        );
+
+        let tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::new_from_slice(&content);"
+    );
+}
+
+#[cfg(feature = "rkyv")]
+use crate::immutable::float::kdtree::ArchivedImmutableKdTree;
+#[cfg(feature = "rkyv")]
+impl<
+        A: Axis + rkyv::Archive<Archived = A>,
+        T: Content + rkyv::Archive<Archived = T>,
+        const K: usize,
+        const B: usize,
+    > ArchivedImmutableKdTree<A, T, K, B>
+{
+    generate_immutable_float_nearest_n!(
+        "use std::fs::File;
+    use memmap::MmapOptions;
+
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
+    let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, u32, 3, 32>>(&mmap) };"
+    );
+}
+
+/*impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
     /// Finds the nearest `qty` elements to `query`, using the specified
     /// distance metric function.
     ///
@@ -112,7 +169,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
     fn dist_belongs_in_heap(dist: A, heap: &BinaryHeap<NearestNeighbour<A, T>>) -> bool {
         heap.is_empty() || dist < heap.peek().unwrap().distance || heap.len() < heap.capacity()
     }
-}
+}*/
 
 #[cfg(test)]
 mod tests {

@@ -23,10 +23,10 @@ macro_rules! generate_immutable_nearest_one {
             }
 
             #[allow(clippy::too_many_arguments)]
-            unsafe fn nearest_one_recurse<D>(
+            fn nearest_one_recurse<D>(
                 &self,
                 query: &[A; K],
-                curr_node_idx: usize,
+                stem_idx: usize,
                 split_dim: usize,
                 mut nearest: NearestNeighbour<A, T>,
                 off: &mut [A; K],
@@ -106,7 +106,7 @@ macro_rules! generate_immutable_nearest_one {
                     .content_points
                     .iter()
                     .enumerate()
-                    .take(leaf_node.size)
+                    .take(leaf_node.size as usize)
                     .for_each(|(idx, entry)| {
                         let dist = D::dist(query, entry);
                         if dist < nearest.distance {

@@ -589,6 +589,37 @@ where
     }
 }
 
+#[cfg(feature = "rkyv")]
+impl<
+        A: Axis + rkyv::Archive<Archived = A>,
+        T: Content + rkyv::Archive<Archived = T>,
+        const K: usize,
+        const B: usize,
+    > ArchivedImmutableKdTree<A, T, K, B>
+{
+    #[inline]
+    pub(crate) fn prefetch_stems(&self, idx: usize) {
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            let prefetch = self.stems.as_ptr().wrapping_offset(2 * idx as isize);
+            std::arch::x86_64::_mm_prefetch::<{ core::arch::x86_64::_MM_HINT_T0 }>(ptr::addr_of!(
+                prefetch
+            )
+                as *const i8);
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        unsafe {
+            let prefetch = self.stems.as_ptr().wrapping_offset(2 * idx as isize);
+            core::arch::aarch64::_prefetch(
+                ptr::addr_of!(prefetch) as *const i8,
+                core::arch::aarch64::_PREFETCH_READ,
+                core::arch::aarch64::_PREFETCH_LOCALITY3,
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::panic;
