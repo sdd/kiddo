@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+
+## [3.0.0-beta.3] - 2023-08-28
+
+### Features
+* Implement query methods on `ArchivedImmutableKdTree`, similarly to `ArchivedKdTree`
+
 ## [3.0.0-beta.2] - 2023-08-26
 
 Introducing the [ImmutableKdTree](https://docs.rs/kiddo/3.0.0-beta.2/kiddo/immutable/float/kdtree/struct.ImmutableKdTree.html) for floating point! :tada:
