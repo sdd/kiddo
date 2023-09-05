@@ -82,6 +82,7 @@ serialize = ["serde", "serde_derive", "serde_with", "fixed/serde"]
 serialize_rkyv = ["rkyv"]
 simd = []
 immutable = []
+default = ["simd", "immutable"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -157,3 +158,11 @@ path = "examples/check_select_nth_unstable.rs"
 name = "immutable-rkyv-serialize"
 path = "examples/immutable-rkyv-serialize.rs"
 required-features = ["immutable", "serialize_rkyv"]
+
+[[example]]
+name = "broken"
+path = "examples/broken.rs"
+
+[[example]]
+name = "simd_leaf"
+path = "examples/simd_leaf.rs"
