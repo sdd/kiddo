@@ -1,4 +1,6 @@
 //#![cfg_attr(feature = "simd", feature(stdsimd))]
+#![feature(stdsimd)]
+#![feature(slice_as_chunks)]
 #![cfg_attr(feature = "immutable", feature(allocator_api))]
 #![cfg_attr(feature = "immutable", feature(int_roundings))]
 #![warn(rustdoc::missing_crate_level_docs)]
@@ -89,6 +91,8 @@ pub mod nearest_neighbour;
 pub mod test_utils;
 pub mod types;
 pub mod within_unsorted_iter;
+
+pub mod float_leaf_simd;
 
 /// A floating-point k-d tree with default parameters.
 ///
