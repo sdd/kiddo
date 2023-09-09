@@ -1,3 +1,4 @@
+#[doc(hidden)]
 #[macro_export]
 macro_rules! generate_immutable_within_unsorted {
     ($comments:tt) => {

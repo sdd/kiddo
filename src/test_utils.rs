@@ -47,6 +47,7 @@ where
     (rand_data_fixed_u16_point::<A, K>(), rand::random())
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! size_t_idx {
     ( $group:ident; $callee:ident; $a:ty|$k:tt; [$(($size:tt,$t:ty,$idx:ty)),+] ) => {
@@ -54,6 +55,7 @@ macro_rules! size_t_idx {
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! batch_benches {
     ($group:ident, $callee:ident, [$(($a:ty, $k:tt)),+], $s_t_idx_list:tt ) => {
@@ -61,6 +63,7 @@ macro_rules! batch_benches {
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! size_t_idx_parameterized {
     ( $group:ident; $callee:ident; $param:tt;  $a:ty|$k:tt; [$(($size:tt,$t:ty,$idx:ty)),+] ) => {
@@ -68,6 +71,7 @@ macro_rules! size_t_idx_parameterized {
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! batch_benches_parameterized {
     ($group:ident, $callee:ident, $param:tt,  [$(($a:ty, $k:tt)),+], $s_t_idx_list:tt ) => {

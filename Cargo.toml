@@ -22,6 +22,12 @@ lto = true
 codegen-units = 1
 opt-level = 3
 
+[profile.test]
+debug = true
+lto = true
+codegen-units = 1
+opt-level = 3
+
 [dependencies]
 log = "0.4"
 num-traits = "0.2"
