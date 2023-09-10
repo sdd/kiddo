@@ -1,4 +1,4 @@
-use az::{Az, Cast};
+use az::Cast;
 
 use crate::{float::kdtree::Axis, types::Content};
 
@@ -10,7 +10,7 @@ pub(crate) fn get_best_from_dists_autovec<A: Axis, T: Content>(
 ) where
     usize: Cast<T>,
 {
-    // Autovectorizes with 256bit vectors on x86_64 where availble
+    // Autovectorizes with 256bit vectors on x86_64 where available
     // 341 loops (1 item per loop, unrolled x 3) of 4-8 instructions per item
     let (leaf_best_item, leaf_best_dist) = acc
         .iter()

@@ -6,6 +6,7 @@ use criterion::{
 };
 use kiddo::batch_benches;
 use kiddo::float::distance::SquaredEuclidean;
+use kiddo::float_leaf_simd::leaf_node::BestFromDists;
 use kiddo::immutable::float::kdtree::{Axis, ImmutableKdTree};
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_immutable_float, process_queries_immutable_float,
@@ -38,7 +39,7 @@ pub fn nearest_one_immutable_float(c: &mut Criterion) {
     batch_benches!(
         group,
         bench_float,
-        [(f64, 2), (f64, 3), (f64, 4), (f32, 3)],
+        [(f64, 2), (f64, 3), (f64, 4)],
         [
             (1_000, u16, usize),
             (10_000, u16, usize),
@@ -53,7 +54,10 @@ pub fn nearest_one_immutable_float(c: &mut Criterion) {
 fn perform_query_immutable_float<A: Axis, T: Content + 'static, const K: usize, const B: usize>(
     kdtree: &ImmutableKdTree<A, T, K, BUCKET_SIZE>,
     point: &[A; K],
-) {
+) where
+    A: BestFromDists<T, 32>,
+    usize: Cast<T>,
+{
     kdtree.nearest_one::<SquaredEuclidean>(&point);
 }
 
@@ -68,6 +72,7 @@ fn bench_query_nearest_one_immutable_float<
     query_point_qty: usize,
     subtype: &str,
 ) where
+    A: BestFromDists<T, 32>,
     usize: Cast<T>,
     Standard: Distribution<T>,
     Standard: Distribution<[A; K]>,

@@ -102,19 +102,31 @@ macro_rules! generate_immutable_nearest_one {
                 let leaf_node = unsafe { self.leaves.get_unchecked(leaf_idx) };
                 // let leaf_node = &self.leaves[leaf_idx];
 
-                leaf_node
-                    .content_points
-                    .iter()
-                    .enumerate()
-                    .take(leaf_node.size as usize)
-                    .for_each(|(idx, entry)| {
-                        let dist = D::dist(query, entry);
-                        if dist < nearest.distance {
-                            nearest.distance = dist;
-                            nearest.item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
-                            // nearest.item = leaf_node.content_items[idx]
-                        }
-                    });
+                let mut best_item = nearest.item;
+                let mut best_dist = nearest.distance;
+
+                leaf_node.nearest_one(
+                    query,
+                    &mut best_dist,
+                    &mut best_item
+                );
+
+                nearest.distance = best_dist;
+                nearest.item = best_item;
+
+                // leaf_node
+                //     .content_points
+                //     .iter()
+                //     .enumerate()
+                //     .take(leaf_node.size as usize)
+                //     .for_each(|(idx, entry)| {
+                //         let dist = D::dist(query, entry);
+                //         if dist < nearest.distance {
+                //             nearest.distance = dist;
+                //             nearest.item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
+                //             // nearest.item = leaf_node.content_items[idx]
+                //         }
+                //     });
             }
         }
     };
