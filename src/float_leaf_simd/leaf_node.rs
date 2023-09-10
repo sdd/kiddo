@@ -20,17 +20,19 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
     pub size: usize,
 }
 
-pub trait BestFromDists<A, T, const B: usize> {
-    fn get_best_from_dists(acc: [A; B], items: &[T; B], best_dist: &mut A, best_item: &mut T);
+pub trait BestFromDists<T, const B: usize> {
+    fn get_best_from_dists(acc: [Self; B], items: &[T; B], best_dist: &mut Self, best_item: &mut T)
+    where
+        Self: Sized;
 }
 
 impl<A, T, const K: usize, const B: usize> LeafNode<A, T, K, B>
 where
-    A: Axis + BestFromDists<A, T, B>,
+    A: Axis + BestFromDists<T, B>,
     T: Content,
     usize: Cast<T>,
 {
-    fn new() -> Self {
+    pub fn new() -> Self {
         LeafNode {
             content_items: [T::zero(); B],
             content_points: [[A::zero(); B]; K],
@@ -71,11 +73,12 @@ where
     }
 }
 
-impl<A: Axis, T: Content, const B: usize> BestFromDists<A, T, B> for f64
+impl<T: Content, const B: usize> BestFromDists<T, B> for f64
 where
+    T: Content,
     usize: Cast<T>,
 {
-    fn get_best_from_dists(acc: [A; B], items: &[T; B], best_dist: &mut A, best_item: &mut T) {
+    fn get_best_from_dists(acc: [f64; B], items: &[T; B], best_dist: &mut f64, best_item: &mut T) {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
             if is_x86_feature_detected!("avx512f") {
@@ -96,11 +99,12 @@ where
     }
 }
 
-impl<A: Axis, T: Content, const B: usize> BestFromDists<A, T, B> for f32
+impl<T: Content, const B: usize> BestFromDists<T, B> for f32
 where
+    T: Content,
     usize: Cast<T>,
 {
-    fn get_best_from_dists(acc: [A; B], items: &[T; B], best_dist: &mut A, best_item: &mut T) {
+    fn get_best_from_dists(acc: [f32; B], items: &[T; B], best_dist: &mut f32, best_item: &mut T) {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
             if is_x86_feature_detected!("avx512f") {

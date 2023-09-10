@@ -15,10 +15,11 @@ use std::ptr;
 use tracing::{event, span, Level};
 
 pub use crate::float::kdtree::Axis;
+use crate::float_leaf_simd::leaf_node::{BestFromDists, LeafNode};
+use crate::types::Content;
 
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;
-use crate::types::Content;
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
 
@@ -42,36 +43,36 @@ pub struct ImmutableKdTree<A: Copy + Default, T: Copy + Default, const K: usize,
     pub(crate) size: usize,
 }
 
-#[doc(hidden)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-#[cfg_attr(
-    feature = "serialize_rkyv",
-    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
-)]
-#[derive(Clone, Debug, PartialEq)]
-pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize> {
-    #[cfg_attr(feature = "serialize", serde(with = "array_of_arrays"))]
-    #[cfg_attr(
-        feature = "serialize",
-        serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
-    )]
-    // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation?
-    pub(crate) content_points: [[A; K]; B],
+// #[doc(hidden)]
+// #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+// #[cfg_attr(
+//     feature = "serialize_rkyv",
+//     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
+// )]
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize> {
+//     #[cfg_attr(feature = "serialize", serde(with = "array_of_arrays"))]
+//     #[cfg_attr(
+//         feature = "serialize",
+//         serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
+//     )]
+//     // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation?
+//     pub(crate) content_points: [[A; K]; B],
+//
+//     #[cfg_attr(feature = "serialize", serde(with = "array"))]
+//     #[cfg_attr(
+//         feature = "serialize",
+//         serde(bound(
+//             serialize = "A: Serialize, T: Serialize",
+//             deserialize = "A: Deserialize<'de>, T: Deserialize<'de> + Copy + Default"
+//         ))
+//     )]
+//     pub(crate) content_items: [T; B],
+//
+//     pub(crate) size: usize,
+// }
 
-    #[cfg_attr(feature = "serialize", serde(with = "array"))]
-    #[cfg_attr(
-        feature = "serialize",
-        serde(bound(
-            serialize = "A: Serialize, T: Serialize",
-            deserialize = "A: Deserialize<'de>, T: Deserialize<'de> + Copy + Default"
-        ))
-    )]
-    pub(crate) content_items: [T; B],
-
-    pub(crate) size: usize,
-}
-
-impl<A, T, const K: usize, const B: usize> LeafNode<A, T, K, B>
+/*impl<A, T, const K: usize, const B: usize> LeafNode<A, T, K, B>
 where
     A: Axis,
     T: Content,
@@ -79,11 +80,11 @@ where
     fn new() -> Self {
         LeafNode {
             content_items: [T::zero(); B],
-            content_points: [[A::zero(); K]; B],
+            content_points: [[A::zero(); B]; K],
             size: 0,
         }
     }
-}
+}*/
 /// Encapsulates stats on a particular `ImmutableTree`'s contents and
 /// memory usage at the time of calling `generate_stats()`
 #[allow(dead_code)]
@@ -102,6 +103,8 @@ pub struct TreeStats {
 impl<A: Axis, T: Content, const K: usize, const B: usize> From<&[[A; K]]>
     for ImmutableKdTree<A, T, K, B>
 where
+    A: Axis + BestFromDists<T, B>,
+    T: Content,
     usize: Cast<T>,
 {
     /// Creates an `ImmutableKdTree`, balanced and optimized, populated
@@ -127,8 +130,9 @@ where
 
 impl<A, T, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
 where
-    A: Axis,
+    A: Axis + BestFromDists<T, B>,
     T: Content,
+    usize: Cast<T>,
 {
     /// Creates an `ImmutableKdTree`, balanced and optimized, populated
     /// with items from `source`.

@@ -1,10 +1,17 @@
 use crate::float::kdtree::Axis;
+use crate::float_leaf_simd::leaf_node::BestFromDists;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::types::Content;
+use az::Cast;
 use std::ops::Rem;
 use tracing::{event, Level};
 
-impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
+impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
+where
+    A: Axis + BestFromDists<T, B>,
+    T: Content,
+    usize: Cast<T>,
+{
     #[allow(dead_code)]
     #[inline]
     pub(crate) fn add_to_optimized(&mut self, query: &[A; K], item: T) {
@@ -29,7 +36,11 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
         let node = unsafe { self.leaves.get_unchecked_mut(idx) };
         debug_assert!(node.size < B);
 
-        *unsafe { node.content_points.get_unchecked_mut(node.size) } = *query;
+        // *unsafe { node.content_points.get_unchecked_mut(node.size) } = *query;
+        for dim in 0..K {
+            *unsafe { node.content_points[dim].get_unchecked_mut(node.size) } = query[dim];
+        }
+
         *unsafe { node.content_items.get_unchecked_mut(node.size) } = item;
 
         node.size += 1;
@@ -66,7 +77,11 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
         let node = self.leaves.get_mut(idx).unwrap();
         debug_assert!(node.size < B);
 
-        *node.content_points.get_mut(node.size).unwrap() = *query;
+        // *node.content_points.get_mut(node.size).unwrap() = *query;
+        for dim in 0..K {
+            *node.content_points[dim].get_mut(node.size).unwrap() = query[dim];
+        }
+
         *node.content_items.get_mut(node.size).unwrap() = item;
 
         node.size += 1;

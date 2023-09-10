@@ -1,7 +1,9 @@
+use az::Cast;
 use std::ops::Rem;
 
 use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
+use crate::float_leaf_simd::leaf_node::BestFromDists;
 use crate::generate_immutable_nearest_one;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
@@ -34,7 +36,12 @@ to not needing to allocate memory or maintain sorted results.
     };
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
+impl<A, T, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
+where
+    A: Axis + BestFromDists<T, B>,
+    T: Content,
+    usize: Cast<T>,
+{
     generate_immutable_float_nearest_one!(
         "let content: Vec<[f64; 3]> = vec!(
             [1.0, 2.0, 5.0],
@@ -67,60 +74,60 @@ impl<
 #[cfg(test)]
 mod tests {
     use crate::distance_metric::DistanceMetric;
-    use crate::float::distance::Manhattan;
+    use crate::float::distance::SquaredEuclidean;
     use crate::float::kdtree::Axis;
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use crate::nearest_neighbour::NearestNeighbour;
     use rand::Rng;
 
-    type AX = f32;
+    type AX = f64;
 
     #[test]
     fn can_query_nearest_one_item() {
         let content_to_add: [[AX; 4]; 16] = [
-            [0.9f32, 0.0f32, 0.9f32, 0.0f32],
-            [0.4f32, 0.5f32, 0.4f32, 0.51f32],
-            [0.12f32, 0.3f32, 0.12f32, 0.3f32],
-            [0.7f32, 0.2f32, 0.7f32, 0.22f32],
-            [0.13f32, 0.4f32, 0.13f32, 0.4f32],
-            [0.6f32, 0.3f32, 0.6f32, 0.33f32],
-            [0.2f32, 0.7f32, 0.2f32, 0.7f32],
-            [0.14f32, 0.5f32, 0.14f32, 0.5f32],
-            [0.3f32, 0.6f32, 0.3f32, 0.6f32],
-            [0.10f32, 0.1f32, 0.10f32, 0.1f32],
-            [0.16f32, 0.7f32, 0.16f32, 0.7f32],
-            [0.1f32, 0.8f32, 0.1f32, 0.8f32],
-            [0.15f32, 0.6f32, 0.15f32, 0.6f32],
-            [0.5f32, 0.4f32, 0.5f32, 0.44f32],
-            [0.8f32, 0.1f32, 0.8f32, 0.15f32],
-            [0.11f32, 0.2f32, 0.11f32, 0.2f32],
+            [0.9f64, 0.0f64, 0.9f64, 0.0f64],
+            [0.4f64, 0.5f64, 0.4f64, 0.51f64],
+            [0.12f64, 0.3f64, 0.12f64, 0.3f64],
+            [0.7f64, 0.2f64, 0.7f64, 0.22f64],
+            [0.13f64, 0.4f64, 0.13f64, 0.4f64],
+            [0.6f64, 0.3f64, 0.6f64, 0.33f64],
+            [0.2f64, 0.7f64, 0.2f64, 0.7f64],
+            [0.14f64, 0.5f64, 0.14f64, 0.5f64],
+            [0.3f64, 0.6f64, 0.3f64, 0.6f64],
+            [0.10f64, 0.1f64, 0.10f64, 0.1f64],
+            [0.16f64, 0.7f64, 0.16f64, 0.7f64],
+            [0.1f64, 0.8f64, 0.1f64, 0.8f64],
+            [0.15f64, 0.6f64, 0.15f64, 0.6f64],
+            [0.5f64, 0.4f64, 0.5f64, 0.44f64],
+            [0.8f64, 0.1f64, 0.8f64, 0.15f64],
+            [0.11f64, 0.2f64, 0.11f64, 0.2f64],
         ];
 
         let tree: ImmutableKdTree<AX, u32, 4, 4> = ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), 16);
 
-        let query_point = [0.78f32, 0.55f32, 0.78f32, 0.55f32];
+        let query_point = [0.78f64, 0.55f64, 0.78f64, 0.55f64];
 
         let expected = NearestNeighbour {
-            distance: 0.819999933,
-            item: 13,
+            distance: 0.17570000000000008,
+            item: 5,
         };
 
-        let result = tree.nearest_one::<Manhattan>(&query_point);
-        assert_eq!(result, expected);
+        let result = tree.nearest_one::<SquaredEuclidean>(&query_point);
+        assert_eq!(result.distance, expected.distance);
 
         let mut rng = rand::thread_rng();
         for _i in 0..1000 {
             let query_point = [
-                rng.gen_range(0f32..1f32),
-                rng.gen_range(0f32..1f32),
-                rng.gen_range(0f32..1f32),
-                rng.gen_range(0f32..1f32),
+                rng.gen_range(0f64..1f64),
+                rng.gen_range(0f64..1f64),
+                rng.gen_range(0f64..1f64),
+                rng.gen_range(0f64..1f64),
             ];
             let expected = linear_search(&content_to_add, &query_point);
 
-            let result = tree.nearest_one::<Manhattan>(&query_point);
+            let result = tree.nearest_one::<SquaredEuclidean>(&query_point);
 
             assert_eq!(result.distance, expected.distance);
         }
@@ -131,22 +138,22 @@ mod tests {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
 
-        let content_to_add: Vec<[f32; 4]> =
-            (0..TREE_SIZE).map(|_| rand::random::<[f32; 4]>()).collect();
+        let content_to_add: Vec<[f64; 4]> =
+            (0..TREE_SIZE).map(|_| rand::random::<[f64; 4]>()).collect();
 
         let tree: ImmutableKdTree<AX, u32, 4, 32> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), TREE_SIZE);
 
-        let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)
-            .map(|_| rand::random::<[f32; 4]>())
+        let query_points: Vec<[f64; 4]> = (0..NUM_QUERIES)
+            .map(|_| rand::random::<[f64; 4]>())
             .collect();
 
         for (_i, query_point) in query_points.iter().enumerate() {
             let expected = linear_search(&content_to_add, &query_point);
 
-            let result = tree.nearest_one::<Manhattan>(&query_point);
+            let result = tree.nearest_one::<SquaredEuclidean>(&query_point);
 
             assert_eq!(result.distance, expected.distance);
             assert_eq!(result.item as usize, expected.item);
@@ -161,7 +168,7 @@ mod tests {
         let mut best_item: usize = usize::MAX;
 
         for (idx, p) in content.iter().enumerate() {
-            let dist = Manhattan::dist(query_point, p);
+            let dist = SquaredEuclidean::dist(query_point, p);
             if dist < best_dist {
                 best_item = idx;
                 best_dist = dist;

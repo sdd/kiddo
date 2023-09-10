@@ -1,9 +1,8 @@
 use std::error::Error;
 
-use kiddo::immutable::float::kdtree::{ImmutableKdTree};
 use kiddo::float_leaf_simd::leaf_node::LeafNode;
 
-use rand::{SeedableRng, Rng};
+use rand::{Rng, SeedableRng};
 use tracing_subscriber;
 
 const LEAF_COUNT: usize = 100;
@@ -12,7 +11,7 @@ const QUERY_COUNT: usize = 1_000;
 fn main() -> Result<(), Box<dyn Error>> {
     tracing_subscriber::fmt::init();
 
-    let seed: u64 = 1;//31851;
+    let seed: u64 = 1; //31851;
 
     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
 
@@ -22,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let simdleaf: LeafNode<f32, usize, 4, 32> = LeafNode {
             content_points: rng.gen::<[[f32; 32]; 4]>(),
             content_items: rng.gen::<[usize; 32]>(),
-            size: 32
+            size: 32,
         };
 
         leaves.push(simdleaf);
