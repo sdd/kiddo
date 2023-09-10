@@ -1,11 +1,15 @@
 use az::Az;
 use az::Cast;
 
-use super::fallback::get_best_from_dists_autovec;
+// #[cfg(target_feature = "avx2")]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use super::f64_avx2::get_best_from_dists_f64_avx2;
+
+#[cfg(target_feature = "avx512f")]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use super::f64_avx512::get_best_from_dists_f64_avx512;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use super::f64_avx512::get_best_from_dists_f64_avx;
+
+use super::fallback::get_best_from_dists_autovec;
 
 use crate::{float::kdtree::Axis, types::Content};
 
@@ -17,7 +21,7 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
 }
 
 pub trait BestFromDists<A, T, const B: usize> {
-    fn get_best_from_dists(acc: [A; B], best_dist: &mut A, best_item: &mut T);
+    fn get_best_from_dists(acc: [A; B], items: &[T; B], best_dist: &mut A, best_item: &mut T);
 }
 
 impl<A, T, const K: usize, const B: usize> LeafNode<A, T, K, B>
@@ -36,23 +40,29 @@ where
 
     #[inline(never)]
     pub fn nearest_one(self: &Self, query: &[A; K], best_dist: &mut A, best_item: &mut T) {
-
         // AVX512: 4 loops of 32 iterations, each 4x unrolled, 5 instructions per pre-unrolled iteration
         let mut acc = [A::zero(); B];
         (0..K).step_by(1).for_each(|dim| {
             let qd = [query[dim]; B];
 
             (0..B).step_by(1).for_each(|idx| {
-                acc[idx] = acc[idx] + (self.content_points[dim][idx] - qd[idx]) * (self.content_points[dim][idx] - qd[idx]);
+                acc[idx] = acc[idx]
+                    + (self.content_points[dim][idx] - qd[idx])
+                        * (self.content_points[dim][idx] - qd[idx]);
             });
         });
 
-        A::get_best_from_dists(acc, best_dist, best_item);
+        A::get_best_from_dists(acc, &self.content_items, best_dist, best_item);
 
-        let (leaf_best_dist, leaf_best_item) = acc.iter().enumerate()
-            .fold((*best_dist, usize::MAX), |(bd, bi), (i, &d)| {
-            (bd.min(d), bi * usize::from(bd >= d) + i * usize::from(bd < d))
-        });
+        let (leaf_best_dist, leaf_best_item) =
+            acc.iter()
+                .enumerate()
+                .fold((*best_dist, usize::MAX), |(bd, bi), (i, &d)| {
+                    (
+                        bd.min(d),
+                        bi * usize::from(bd >= d) + i * usize::from(bd < d),
+                    )
+                });
 
         if leaf_best_dist < *best_dist {
             *best_dist = leaf_best_dist;
@@ -62,17 +72,20 @@ where
 }
 
 impl<A: Axis, T: Content, const B: usize> BestFromDists<A, T, B> for f64
-    where usize: Cast<T>
+where
+    usize: Cast<T>,
 {
-    fn get_best_from_dists(acc: [A; B], best_dist: &mut A, best_item: &mut T) {
+    fn get_best_from_dists(acc: [A; B], items: &[T; B], best_dist: &mut A, best_item: &mut T) {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
-            if is_x86_feature_detected!("avx2") {
-                get_best_from_dists_f64_avx512(acc, best_dist, best_item)
-            } else if is_x86_feature_detected!("avx") {
-                get_best_from_dists_f64_avx(acc, best_dist, best_item)
+            if is_x86_feature_detected!("avx512f") {
+                #[cfg(target_feature = "avx512f")]
+                get_best_from_dists_f64_avx512(&acc, best_dist, best_item)
+            } else if is_x86_feature_detected!("avx2") {
+                // #[cfg(target_feature = "avx2")]
+                unsafe { get_best_from_dists_f64_avx2(&acc, items, best_dist, best_item) }
             } else {
-                get_best_from_dists_autovec(acc, best_dist, best_item)
+                get_best_from_dists_autovec(&acc, items, best_dist, best_item)
             }
         }
 
@@ -84,25 +97,26 @@ impl<A: Axis, T: Content, const B: usize> BestFromDists<A, T, B> for f64
 }
 
 impl<A: Axis, T: Content, const B: usize> BestFromDists<A, T, B> for f32
-where usize: Cast<T>
+where
+    usize: Cast<T>,
 {
-    fn get_best_from_dists(acc: [A; B], best_dist: &mut A, best_item: &mut T) {
+    fn get_best_from_dists(acc: [A; B], items: &[T; B], best_dist: &mut A, best_item: &mut T) {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
-            if is_x86_feature_detected!("avx2") {
+            if is_x86_feature_detected!("avx512f") {
                 // TODO
                 unimplemented!()
-            } else if is_x86_feature_detected!("avx") {
+            } else if is_x86_feature_detected!("avx2") {
                 // TODO
                 unimplemented!()
             } else {
-                get_best_from_dists_autovec(acc, best_dist, best_item)
+                get_best_from_dists_autovec(&acc, items, best_dist, best_item)
             }
         }
 
         #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
         {
-            get_best_from_dists_autovec(&acc, best_dist, best_item)
+            get_best_from_dists_autovec(&acc, items, best_dist, best_item)
         }
     }
 }

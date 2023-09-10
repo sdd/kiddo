@@ -25,9 +25,9 @@ use serde::{Deserialize, Serialize};
 /// Immutable floating point k-d tree
 ///
 /// Offers less memory utilisation, smaller size
-/// when serialized, and faster more consistent query performace. This comes at the
+/// when serialized, and faster more consistent query performance. This comes at the
 /// expense of not being able to modify the contents of the tree after its initial
-/// construction, and longer construction times - perhaps prohiitively so.
+/// construction, and longer construction times - perhaps prohibitively so.
 /// As with the vanilla tree, `f64` or `f32` are supported currently for co-ordinate
 /// values.
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
