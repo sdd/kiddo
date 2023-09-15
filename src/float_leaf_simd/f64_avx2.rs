@@ -1,15 +1,14 @@
 // #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{
-    _mm256_testz_si256, _mm_add_epi32, _mm_set1_epi32, _mm_setzero_si128, _mm_store_epi32,
-    _CMP_NLT_UQ,
+    _mm256_testz_si256, _mm_add_epi32, _mm_set1_epi32, _mm_store_epi32, _CMP_NLT_UQ,
 };
 
 // #[cfg(target_feature = "avx2")]
 // #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{_mm256_cmp_pd, _mm256_loadu_pd, _mm256_min_pd, _mm256_storeu_pd};
 use std::arch::x86_64::{
-    __m256i, _mm256_castpd256_pd128, _mm256_permutevar8x32_epi32, _mm256_set_epi16,
-    _mm256_set_epi32, _mm256_shuffle_epi8, _mm_blendv_ps, _mm_set_epi32, _CMP_LT_OQ,
+    __m256i, _mm256_castpd256_pd128, _mm256_permutevar8x32_epi32, _mm256_set_epi32, _mm_blendv_ps,
+    _mm_set_epi32, _CMP_LT_OQ,
 };
 use std::ptr;
 
@@ -73,7 +72,6 @@ pub(crate) unsafe fn get_best_from_dists_f64_avx2<T: Content, const B: usize>(
     for (i, dist) in min_dists.iter().enumerate() {
         if *dist < *best_dist {
             *best_dist = *dist;
-            // *best_item = items[min_dist_indexes[i] as usize + i];
             *best_item = items[min_dist_indexes[i] as usize];
         }
     }
