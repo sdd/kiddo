@@ -87,7 +87,7 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
         serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
     )]
     // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
-    pub(crate) content_points: [[A; K]; B],
+    pub content_points: [[A; K]; B],
 
     #[cfg_attr(feature = "serialize", serde(with = "array"))]
     #[cfg_attr(
@@ -97,9 +97,9 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
             deserialize = "A: Deserialize<'de>, T: Deserialize<'de> + Copy + Default"
         ))
     )]
-    pub(crate) content_items: [T; B],
+    pub content_items: [T; B],
 
-    pub(crate) size: IDX,
+    pub size: IDX,
 }
 
 impl<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX>

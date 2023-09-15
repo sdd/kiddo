@@ -55,7 +55,7 @@ fn perform_query_immutable_float<A: Axis, T: Content + 'static, const K: usize, 
     kdtree: &ImmutableKdTree<A, T, K, BUCKET_SIZE>,
     point: &[A; K],
 ) where
-    A: BestFromDists<T, 32>,
+    A: BestFromDists<T, BUCKET_SIZE>,
     usize: Cast<T>,
 {
     kdtree.nearest_one::<SquaredEuclidean>(&point);
@@ -72,7 +72,7 @@ fn bench_query_nearest_one_immutable_float<
     query_point_qty: usize,
     subtype: &str,
 ) where
-    A: BestFromDists<T, 32>,
+    A: BestFromDists<T, BUCKET_SIZE>,
     usize: Cast<T>,
     Standard: Distribution<T>,
     Standard: Distribution<[A; K]>,
