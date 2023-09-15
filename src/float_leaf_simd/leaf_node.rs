@@ -3,7 +3,7 @@ use az::Cast;
 
 // #[cfg(target_feature = "avx2")]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use super::f64_avx2::get_best_from_dists_f64_avx2;
+use super::{f32_avx2::get_best_from_dists_f32_avx2, f64_avx2::get_best_from_dists_f64_avx2};
 
 #[cfg(target_feature = "avx512f")]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -111,8 +111,7 @@ where
                 // TODO
                 unimplemented!()
             } else if is_x86_feature_detected!("avx2") {
-                // TODO
-                unimplemented!()
+                unsafe { get_best_from_dists_f32_avx2(&acc, items, best_dist, best_item) }
             } else {
                 get_best_from_dists_autovec(&acc, items, best_dist, best_item)
             }
