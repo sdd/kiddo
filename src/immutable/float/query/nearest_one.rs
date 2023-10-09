@@ -55,12 +55,11 @@ where
 #[cfg(feature = "rkyv")]
 use crate::immutable::float::kdtree::ArchivedImmutableKdTree;
 #[cfg(feature = "rkyv")]
-impl<
-        A: Axis + rkyv::Archive<Archived = A>,
-        T: Content + rkyv::Archive<Archived = T>,
-        const K: usize,
-        const B: usize,
-    > ArchivedImmutableKdTree<A, T, K, B>
+impl<A, T, const K: usize, const B: usize> ArchivedImmutableKdTree<A, T, K, B>
+where
+    A: Axis + BestFromDists<T, B> + rkyv::Archive<Archived = A>,
+    T: Content + rkyv::Archive<Archived = T>,
+    usize: Cast<T>,
 {
     generate_immutable_float_nearest_one!(
         "use std::fs::File;

@@ -1,3 +1,4 @@
+#[doc(hidden)]
 #[macro_export]
 macro_rules! generate_nearest_one {
     ($leafnode:ident, $comments:tt) => {
