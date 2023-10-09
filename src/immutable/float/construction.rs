@@ -37,8 +37,8 @@ where
         debug_assert!(node.size < B);
 
         // *unsafe { node.content_points.get_unchecked_mut(node.size) } = *query;
-        for dim in 0..K {
-            *unsafe { node.content_points[dim].get_unchecked_mut(node.size) } = query[dim];
+        for (dim, &val) in query.iter().enumerate() {
+            *unsafe { node.content_points[dim].get_unchecked_mut(node.size) } = val;
         }
 
         *unsafe { node.content_items.get_unchecked_mut(node.size) } = item;
@@ -77,9 +77,8 @@ where
         let node = self.leaves.get_mut(idx).unwrap();
         debug_assert!(node.size < B);
 
-        // *node.content_points.get_mut(node.size).unwrap() = *query;
-        for dim in 0..K {
-            *node.content_points[dim].get_mut(node.size).unwrap() = query[dim];
+        for (dim, &val) in query.iter().enumerate() {
+            *node.content_points[dim].get_mut(node.size).unwrap() = val;
         }
 
         *node.content_items.get_mut(node.size).unwrap() = item;

@@ -97,7 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     for leaf_idx in &traverse_seq {
         let leaf_node = unsafe { simd_leaves.get_unchecked(*leaf_idx) };
 
-        leaf_node.nearest_one(&query, &mut best_dist_simd, &mut best_idx_simd)
+        leaf_node.nearest_one::<SquaredEuclidean>(&query, &mut best_dist_simd, &mut best_idx_simd)
     }
     println!(
         "Searched simd leaves: best point = {:?}, best dist = {:?} ({})",
