@@ -20,7 +20,7 @@ impl<A: PartialOrd, T: Content> Ord for NearestNeighbour<A, T> {
 }
 
 #[allow(unknown_lints)]
-#[allow(clippy::incorrect_partial_ord_impl_on_ord_type)]
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl<A: PartialOrd, T: Content> PartialOrd for NearestNeighbour<A, T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.distance.partial_cmp(&other.distance)

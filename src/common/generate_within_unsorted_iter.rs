@@ -1,3 +1,4 @@
+#[doc(hidden)]
 #[macro_export]
 macro_rules! generate_within_unsorted_iter {
     ($comments:tt) => {

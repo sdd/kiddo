@@ -7,3 +7,4 @@ pub mod distance;
 pub mod kdtree;
 #[doc(hidden)]
 pub mod query;
+pub(crate) mod result_collection;

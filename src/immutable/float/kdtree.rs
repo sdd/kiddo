@@ -19,8 +19,6 @@ use crate::float_leaf_simd::leaf_node::{BestFromDists, LeafNode};
 use crate::types::Content;
 
 #[cfg(feature = "serialize")]
-use crate::custom_serde::*;
-#[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
 
 /// Immutable floating point k-d tree

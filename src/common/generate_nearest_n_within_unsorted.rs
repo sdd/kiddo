@@ -1,19 +1,34 @@
 #[doc(hidden)]
 #[macro_export]
-macro_rules! generate_within_unsorted {
+macro_rules! generate_nearest_n_within_unsorted {
     ($comments:tt) => {
         doc_comment! {
             concat!$comments,
+
             #[inline]
-            pub fn within_unsorted<D>(&self, query: &[A; K], dist: A) -> Vec<NearestNeighbour<A, T>>
+            pub fn nearest_n_within<D>(&self, query: &[A; K], dist: A, max_items: usize, sorted: bool) -> Vec<NearestNeighbour<A, T>>
             where
                 D: DistanceMetric<A, K>,
             {
+                if sorted && max_items < usize::MAX {
+                    if max_items <= MAX_VEC_RESULT_SIZE {
+                        self.nearest_n_within_stub::<D, SortedVec<NearestNeighbour<A, T>>>(query, dist, max_items, sorted)
+                    } else {
+                        self.nearest_n_within_stub::<D, BinaryHeap<NearestNeighbour<A, T>>>(query, dist, max_items, sorted)
+                    }
+                } else {
+                    self.nearest_n_within_stub::<D, Vec<NearestNeighbour<A,T>>>(query, dist, 0, sorted)
+                }
+            }
+
+            fn nearest_n_within_stub<D: DistanceMetric<A, K>, H: ResultCollection<A, T>>(
+                &self, query: &[A; K], dist: A, res_capacity: usize, sorted: bool
+            ) -> Vec<NearestNeighbour<A, T>> {
+                let mut matching_items = H::new_with_capacity(res_capacity);
                 let mut off = [A::zero(); K];
-                let mut matching_items = Vec::new();
 
                 unsafe {
-                    self.within_unsorted_recurse::<D>(
+                    self.nearest_n_within_unsorted_recurse::<D, H>(
                         query,
                         dist,
                         self.root_index,
@@ -24,17 +39,21 @@ macro_rules! generate_within_unsorted {
                     );
                 }
 
-                matching_items
+                if sorted {
+                    matching_items.into_sorted_vec()
+                } else {
+                    matching_items.into_vec()
+                }
             }
 
             #[allow(clippy::too_many_arguments)]
-            unsafe fn within_unsorted_recurse<D>(
+            unsafe fn nearest_n_within_unsorted_recurse<D, R: ResultCollection<A, T>>(
                 &self,
                 query: &[A; K],
                 radius: A,
                 curr_node_idx: IDX,
                 split_dim: usize,
-                matching_items: &mut Vec<NearestNeighbour<A, T>>,
+                matching_items: &mut R,
                 off: &mut [A; K],
                 rd: A,
             ) where
@@ -55,7 +74,7 @@ macro_rules! generate_within_unsorted {
                         };
                     let next_split_dim = (split_dim + 1).rem(K);
 
-                    self.within_unsorted_recurse::<D>(
+                    self.nearest_n_within_unsorted_recurse::<D, R>(
                         query,
                         radius,
                         closer_node_idx,
@@ -69,7 +88,7 @@ macro_rules! generate_within_unsorted {
 
                     if rd <= radius {
                         off[split_dim] = new_off;
-                        self.within_unsorted_recurse::<D>(
+                        self.nearest_n_within_unsorted_recurse::<D, R>(
                             query,
                             radius,
                             further_node_idx,
@@ -94,7 +113,7 @@ macro_rules! generate_within_unsorted {
                             let distance = D::dist(query, entry);
 
                             if distance < radius {
-                                matching_items.push(NearestNeighbour {
+                                matching_items.add(NearestNeighbour {
                                     distance,
                                     item: *leaf_node.content_items.get_unchecked(idx.az::<usize>()),
                                 })
