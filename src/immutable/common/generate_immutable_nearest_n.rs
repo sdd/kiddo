@@ -64,6 +64,8 @@ macro_rules! generate_immutable_nearest_n {
         }
 
         let left_child_idx = stem_idx << 1;
+
+        #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
         self.prefetch_stems(left_child_idx);
 
         let val = *unsafe { self.stems.get_unchecked(stem_idx) };
