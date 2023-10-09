@@ -54,6 +54,7 @@ csv="1"
 flate2 = { version = "1.0", features = ["zlib-ng-compat"], default-features = false }
 log = "0.4"
 memmap = "0.7"
+proc-macro2 = { version = "1.0.69", features=["default", "proc-macro"] }
 radians = "0.3"
 rayon = "1"
 rand = "0.8"
@@ -84,7 +85,7 @@ serialize = ["serde", "serde_derive", "serde_with", "fixed/serde"]
 serialize_rkyv = ["rkyv"]
 simd = []
 immutable = []
-default = ["simd", "immutable"]
+default = []
 
 [package.metadata.docs.rs]
 all-features = true
