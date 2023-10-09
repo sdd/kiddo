@@ -26,10 +26,10 @@ opt-level = 3
 log = "0.4"
 num-traits = "0.2"
 rand = "0.8" # delete at some point, only used in test bin
-rayon = "1.7"
+rayon = "1.8"
 aligned = "0.4"
 aligned-array = "1.0"
-fixed = "1.23"
+fixed = { version = "1.24", features = ["num-traits"] }
 az = "1.2"
 min-max-heap = "1.3"
 doc-comment = "0.3"
