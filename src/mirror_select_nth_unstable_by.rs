@@ -583,7 +583,7 @@ where
     }
 }
 
-//// UNCHANGED FROM sort.rs
+// UNCHANGED FROM sort.rs
 fn choose_pivot<AA, BB, F>(v: &mut [AA], w: &mut [BB], is_less: &mut F) -> (usize, bool)
 where
     F: FnMut(&AA, &AA) -> bool,
