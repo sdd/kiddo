@@ -105,7 +105,10 @@ where
 
                 let left_child_idx = stem_idx << 1;
                 let right_child_idx = (stem_idx << 1) + IDX::one();
+
+                #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
                 self.prefetch_stems(left_child_idx.az::<usize>());
+
                 let is_left_child =
                     usize::from(*unsafe { query.get_unchecked(split_dim) } < val).az::<IDX>();
 
@@ -224,6 +227,7 @@ where
     }
 
     #[inline]
+    #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
     fn prefetch_stems(&self, idx: usize) {
         #[cfg(target_arch = "x86_64")]
         unsafe {

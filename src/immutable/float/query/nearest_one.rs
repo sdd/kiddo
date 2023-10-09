@@ -77,7 +77,7 @@ mod tests {
     use crate::float::kdtree::Axis;
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use crate::nearest_neighbour::NearestNeighbour;
-    use rand::Rng;
+    use rand::{Rng, SeedableRng};
 
     type AX = f64;
 
@@ -134,11 +134,12 @@ mod tests {
 
     #[test]
     fn can_query_nearest_one_item_large_scale() {
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(1);
+
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
 
-        let content_to_add: Vec<[f64; 4]> =
-            (0..TREE_SIZE).map(|_| rand::random::<[f64; 4]>()).collect();
+        let content_to_add: Vec<[f64; 4]> = (0..TREE_SIZE).map(|_| rng.gen::<[f64; 4]>()).collect();
 
         let tree: ImmutableKdTree<AX, u32, 4, 32> =
             ImmutableKdTree::new_from_slice(&content_to_add);
@@ -155,6 +156,7 @@ mod tests {
             let result = tree.nearest_one::<SquaredEuclidean>(&query_point);
 
             assert_eq!(result.distance, expected.distance);
+            println!("{} should equal {}", result.item, expected.item);
             assert_eq!(result.item as usize, expected.item);
         }
     }
