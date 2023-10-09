@@ -20,24 +20,10 @@ use serde::{Deserialize, Serialize};
 /// on [`FixedKdTree`](crate::fixed::kdtree::KdTree). A type from the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate will implement
 /// all of the traits required by Axis. For example [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html).
 pub trait Axis: Fixed + Default + Debug + Copy + Sync + Send {
-    /// Returns the maximum value that the type implementing this trait can have
-    fn max_value() -> Self;
-
-    /// returns the zero value for this type
-    fn zero() -> Self;
-
     /// used in query methods to update the rd value. Basically a saturating add for Fixed and an add for Float
     fn rd_update(rd: Self, delta: Self) -> Self;
 }
 impl<T: Fixed + Default + Debug + Copy + Sync + Send> Axis for T {
-    fn max_value() -> Self {
-        Self::MAX
-    }
-
-    fn zero() -> Self {
-        Self::ZERO
-    }
-
     #[inline]
     fn rd_update(rd: Self, delta: Self) -> Self {
         rd.saturating_add(delta)

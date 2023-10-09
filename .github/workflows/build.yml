@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Get latest stable Rust version
         run: |
@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Get latest stable Rust version
         run: |
@@ -107,7 +107,7 @@ jobs:
     name: Cargo Check (Stable)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Get latest stable Rust version
         run: |
@@ -172,7 +172,7 @@ jobs:
     name: Run Tests (Stable, no crate features enabled that require unstable Rust)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Get latest stable Rust version
         run: |

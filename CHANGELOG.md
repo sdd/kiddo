@@ -1,5 +1,13 @@
 # Kiddo Changelog
 
+
+## [2.1.2] - 2023-10-10
+
+### Fixes
+
+- fix incompatibility with the `num-traits` feature of the `fixed` crate
+
+
 ## [3.0.0-beta.4] - 2023-08-28
 
 ### Style / Tests
@@ -45,6 +53,7 @@ These capabilities come with a few trade-offs:
   sort the `Vec` at the end.
   Benchmarking shows that this change improves performance by anything from
   5 to 60% in practice.
+
 
 ## [2.1.1] - 2023-06-07
 
