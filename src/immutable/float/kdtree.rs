@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 /// Offers less memory utilisation, smaller size
 /// when serialized, and faster more consistent query performance. This comes at the
 /// expense of not being able to modify the contents of the tree after its initial
-/// construction, and longer construction times - perhaps prohibitively so.
+/// construction, and longer construction times.
 /// As with the vanilla tree, `f64` or `f32` are supported currently for co-ordinate
 /// values.
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
@@ -40,48 +40,6 @@ pub struct ImmutableKdTree<A: Copy + Default, T: Copy + Default, const K: usize,
     pub(crate) size: usize,
 }
 
-// #[doc(hidden)]
-// #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-// #[cfg_attr(
-//     feature = "serialize_rkyv",
-//     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
-// )]
-// #[derive(Clone, Debug, PartialEq)]
-// pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize> {
-//     #[cfg_attr(feature = "serialize", serde(with = "array_of_arrays"))]
-//     #[cfg_attr(
-//         feature = "serialize",
-//         serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
-//     )]
-//     // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation?
-//     pub(crate) content_points: [[A; K]; B],
-//
-//     #[cfg_attr(feature = "serialize", serde(with = "array"))]
-//     #[cfg_attr(
-//         feature = "serialize",
-//         serde(bound(
-//             serialize = "A: Serialize, T: Serialize",
-//             deserialize = "A: Deserialize<'de>, T: Deserialize<'de> + Copy + Default"
-//         ))
-//     )]
-//     pub(crate) content_items: [T; B],
-//
-//     pub(crate) size: usize,
-// }
-
-/*impl<A, T, const K: usize, const B: usize> LeafNode<A, T, K, B>
-where
-    A: Axis,
-    T: Content,
-{
-    fn new() -> Self {
-        LeafNode {
-            content_items: [T::zero(); B],
-            content_points: [[A::zero(); B]; K],
-            size: 0,
-        }
-    }
-}*/
 /// Encapsulates stats on a particular `ImmutableTree`'s contents and
 /// memory usage at the time of calling `generate_stats()`
 #[allow(dead_code)]
@@ -301,9 +259,6 @@ where
         // only bother with this if we are putting at least one item in the right hand child
         if pivot < chunk_length {
             pivot = Self::update_pivot(source, sort_index, dim, pivot);
-
-            // TODO: if pivot gets to 0, start again at orig pivot and try
-            //       nudging the other way?
 
             // if we end up with a pivot of 0, something has gone wrong,
             // unless we only had a slice of len 1 anyway
