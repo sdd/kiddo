@@ -1,19 +1,13 @@
-#[cfg(target_feature = "avx2")]
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{
     _mm256_cmp_pd, _mm256_loadu_pd, _mm256_min_pd, _mm256_storeu_pd, _mm256_testz_si256,
     _mm_add_epi32, _mm_set1_epi32, _mm_store_epi32,
 };
 
-#[cfg(target_feature = "avx2")]
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use std::arch::x86_64::{
     __m256i, _mm256_castpd256_pd128, _mm256_permutevar8x32_epi32, _mm256_set_epi32, _mm_blendv_ps,
     _mm_set_epi32, _CMP_LT_OQ,
 };
 
-#[cfg(target_feature = "avx2")]
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub(crate) unsafe fn get_best_from_dists_f64_avx2<T: crate::types::Content, const B: usize>(
     acc: &[f64; B],
     items: &[T; B],

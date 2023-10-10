@@ -21,8 +21,6 @@ macro_rules! generate_immutable_float_nearest_n_within {
             "Finds up to n elements within `dist` of `query`, using the specified
 distance metric function.
 
-Results are returned in as a ResultCollection, which can return a sorted or unsorted Vec.
-
 # Examples
 
 ```rust
