@@ -20,10 +20,6 @@ impl<A: Axis, T: Content> Ord for Neighbour<A, T> {
     }
 }
 
-#[allow(renamed_and_removed_lints)]
-#[allow(unknown_lints)]
-#[allow(clippy::incorrect_partial_ord_impl_on_ord_type)]
-#[allow(clippy::non_canonical_partial_ord_impl)]
 impl<A: Axis, T: Content> PartialOrd for Neighbour<A, T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.distance.partial_cmp(&other.distance)

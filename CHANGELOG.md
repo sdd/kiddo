@@ -1,12 +1,5 @@
 # Kiddo Changelog
 
-
-## [2.1.2] - 2023-10-10
-
-### Fixes
-
-- fix incompatibility with the `num-traits` feature of the `fixed` crate
-
 ## [2.1.1] - 2023-06-07
 
 ### Refactor

@@ -9,7 +9,7 @@ jobs:
     name: Pre Release String Updater
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Crate Version
         id: crate-version
@@ -45,7 +45,7 @@ jobs:
           git commit -a -m "chore: update version references"
 
       - name: Push changes
-        uses: ad-m/github-push-action@v0.8.0
+        uses: ad-m/github-push-action@v0.6.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           branch: ${{ github.ref }}
