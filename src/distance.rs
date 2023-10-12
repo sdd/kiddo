@@ -3,10 +3,10 @@
 
 use num_traits::Float;
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(any(target_arch = "x86_64"))]
 use std::arch::x86_64::*;
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(any(target_arch = "x86_64"))]
 union SimdToArray {
     array: [f32; 4],
     simd: __m128,
@@ -26,7 +26,7 @@ pub fn dot_product<const K: usize>(a: &[f32; K], b: &[f32; K]) -> f32 {
         .fold(0f32, ::std::ops::Sub::sub)
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(any(target_arch = "x86_64"))]
 #[target_feature(enable = "sse4.1")]
 #[allow(clippy::missing_safety_doc)]
 pub unsafe fn dot_sse(a: *const f32, b: *const f32) -> f32 {
@@ -39,7 +39,7 @@ pub unsafe fn dot_sse(a: *const f32, b: *const f32) -> f32 {
     res.array[0]
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(any(target_arch = "x86_64"))]
 #[target_feature(enable = "sse4.1")]
 #[allow(clippy::missing_safety_doc)]
 pub unsafe fn dot_sse_aligned(a: *const f32, b: *const f32) -> f32 {
@@ -52,7 +52,7 @@ pub unsafe fn dot_sse_aligned(a: *const f32, b: *const f32) -> f32 {
     res.array[0]
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(any(target_arch = "x86_64"))]
 pub fn dot_product_sse<const K: usize>(a: &[f32; K], b: &[f32; K]) -> f32 {
     if K == 3 {
         dot_product_sse_3(&a[0..3], &a[0..3])
@@ -63,19 +63,19 @@ pub fn dot_product_sse<const K: usize>(a: &[f32; K], b: &[f32; K]) -> f32 {
     }
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(any(target_arch = "x86_64"))]
 pub fn dot_product_sse_3(a: &[f32], b: &[f32]) -> f32 {
     let ap = [a[0], a[1], a[2], 0f32].as_ptr();
     let bp = [b[0], b[1], b[2], 0f32].as_ptr();
     unsafe { dot_sse(ap, bp) }
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(any(target_arch = "x86_64"))]
 pub fn dot_product_sse_4(a: &[f32], b: &[f32]) -> f32 {
     unsafe { dot_sse(a.as_ptr(), b.as_ptr()) }
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(any(target_arch = "x86_64"))]
 pub fn dot_product_sse_aligned(a: &[f32; 4], b: &[f32; 4]) -> f32 {
     let ap = a.as_ptr();
     let bp = b.as_ptr();

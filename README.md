@@ -27,7 +27,7 @@ Version 2.x is a complete rewrite, providing:
 Add `kiddo` to `Cargo.toml`
 ```toml
 [dependencies]
-kiddo = "2.1.2"
+kiddo = "2.1.1"
 ```
 
 Add points to kdtree and query nearest n points with distance function

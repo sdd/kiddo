@@ -10,7 +10,7 @@ jobs:
     if: ${{ github.event.pull_request.merged }} && contains(github.event.pull_request.labels.*.name, 'release')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Get latest stable Rust version
         run: |
