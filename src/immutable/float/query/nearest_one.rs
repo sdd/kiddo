@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn can_query_nearest_one_item_large_scale() {
-        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(1);
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(3);
 
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
