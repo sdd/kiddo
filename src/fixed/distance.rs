@@ -20,11 +20,11 @@ use crate::fixed::kdtree::Axis;
 /// use fixed::FixedU16;
 /// use kiddo::distance_metric::DistanceMetric;
 /// use kiddo::fixed::distance::Manhattan;
-/// type FXD = FixedU16<U0>;
+/// type Fxd = FixedU16<U0>;
 ///
-/// let ZERO = FXD::from_num(0);
-/// let ONE = FXD::from_num(1);
-/// let TWO = FXD::from_num(2);
+/// let ZERO = Fxd::from_num(0);
+/// let ONE = Fxd::from_num(1);
+/// let TWO = Fxd::from_num(2);
 ///
 /// assert_eq!(ZERO, Manhattan::dist(&[ZERO, ZERO], &[ZERO, ZERO]));
 /// assert_eq!(ONE, Manhattan::dist(&[ZERO, ZERO], &[ONE, ZERO]));
@@ -69,12 +69,12 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
 /// use fixed::FixedU16;
 /// use kiddo::distance_metric::DistanceMetric;
 /// use kiddo::fixed::distance::SquaredEuclidean;
-/// type FXD = FixedU16<U0>;
+/// type Fxd = FixedU16<U0>;
 ///
-/// let ZERO = FXD::from_num(0);
-/// let ONE = FXD::from_num(1);
-/// let TWO = FXD::from_num(2);
-/// let EIGHT = FXD::from_num(8);
+/// let ZERO = Fxd::from_num(0);
+/// let ONE = Fxd::from_num(1);
+/// let TWO = Fxd::from_num(2);
+/// let EIGHT = Fxd::from_num(8);
 ///
 /// assert_eq!(SquaredEuclidean::dist(&[ZERO, ZERO], &[ZERO, ZERO]), ZERO);
 /// assert_eq!(SquaredEuclidean::dist(&[ZERO, ZERO], &[ONE, ZERO]), ONE);

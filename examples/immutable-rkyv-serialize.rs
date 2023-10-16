@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let buf = serializer.into_serializer().into_inner();
     let mut file = File::create("./examples/immutable-doctest-tree.rkyv")?;
-    file.write_all(&buf)
+    file.write_all(buf)
         .expect("Could not write serialized rkyv to file");
 
     // build and serialize a larger tree
@@ -84,7 +84,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let buf = serializer.into_serializer().into_inner();
     let mut file = File::create("./examples/immutable-test-tree.rkyv")?;
-    file.write_all(&buf)
+    file.write_all(buf)
         .expect("Could not write serialized rkyv to file");
 
     let file_size = file.metadata().unwrap().len().bytes();

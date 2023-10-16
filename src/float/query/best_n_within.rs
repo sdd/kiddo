@@ -200,11 +200,9 @@ mod tests {
             if distance <= radius {
                 if best_items.len() < max_qty {
                     best_items.push(BestNeighbour { distance, item });
-                } else {
-                    if item < (*best_items.last().unwrap()).item {
-                        best_items.pop().unwrap();
-                        best_items.push(BestNeighbour { distance, item });
-                    }
+                } else if item < best_items.last().unwrap().item {
+                    best_items.pop().unwrap();
+                    best_items.push(BestNeighbour { distance, item });
                 }
             }
             best_items.sort_unstable();

@@ -341,17 +341,17 @@ mod tests {
     use crate::float::kdtree::KdTree;
     use rand::Rng;
 
-    type FLT = f32;
+    type Flt = f32;
 
-    fn n(num: FLT) -> FLT {
+    fn n(num: Flt) -> Flt {
         num
     }
 
     #[test]
     fn can_add_an_item() {
-        let mut tree: KdTree<FLT, u32, 4, 32, u32> = KdTree::new();
+        let mut tree: KdTree<Flt, u32, 4, 32, u32> = KdTree::new();
 
-        let point: [FLT; 4] = [n(0.1f32), n(0.2f32), n(0.3f32), n(0.4f32)];
+        let point: [Flt; 4] = [n(0.1f32), n(0.2f32), n(0.3f32), n(0.4f32)];
         let item = 123;
 
         tree.add(&point, item);
@@ -361,9 +361,9 @@ mod tests {
 
     #[test]
     fn can_add_enough_items_to_cause_a_split() {
-        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::new();
+        let mut tree: KdTree<Flt, u32, 4, 4, u32> = KdTree::new();
 
-        let content_to_add: [([FLT; 4], u32); 16] = [
+        let content_to_add: [([Flt; 4], u32); 16] = [
             ([n(0.9f32), n(0.0f32), n(0.9f32), n(0.0f32)], 9),
             ([n(0.4f32), n(0.5f32), n(0.4f32), n(0.5f32)], 4),
             ([n(0.12f32), n(0.3f32), n(0.12f32), n(0.3f32)], 12),
@@ -391,9 +391,9 @@ mod tests {
 
     #[test]
     fn can_remove_an_item() {
-        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::new();
+        let mut tree: KdTree<Flt, u32, 4, 4, u32> = KdTree::new();
 
-        let content_to_add: [([FLT; 4], u32); 16] = [
+        let content_to_add: [([Flt; 4], u32); 16] = [
             ([n(0.9f32), n(0.0f32), n(0.9f32), n(0.0f32)], 9),
             ([n(0.4f32), n(0.5f32), n(0.4f32), n(0.5f32)], 4),
             ([n(0.12f32), n(0.3f32), n(0.12f32), n(0.3f32)], 12),
@@ -426,7 +426,7 @@ mod tests {
 
     #[test]
     fn can_add_shitloads_of_points() {
-        let mut tree: KdTree<FLT, u32, 4, 5, u32> = KdTree::new();
+        let mut tree: KdTree<Flt, u32, 4, 5, u32> = KdTree::new();
 
         let mut rng = rand::thread_rng();
         for i in 0..1000 {
@@ -449,16 +449,15 @@ mod tests {
             rand::random()
         }
 
-        let points_to_add: Vec<([f64; 2], u32)> =
-            (0..100_000).into_iter().map(|_| rand_data_2d()).collect();
+        let points_to_add: Vec<([f64; 2], u32)> = (0..100_000).map(|_| rand_data_2d()).collect();
 
         let mut points = vec![];
         let mut kdtree = KdTree::<f64, u32, 2, 32, u32>::with_capacity(200_000);
         for _ in 0..100_000 {
             points.push(rand_data_2d());
         }
-        for i in 0..points.len() {
-            kdtree.add(&points[i].0, points[i].1);
+        for point in &points {
+            kdtree.add(&point.0, point.1);
         }
 
         points_to_add
@@ -520,7 +519,7 @@ mod tests {
 
     #[test]
     fn test_can_handle_split_that_needs_pivot_to_move_towards_end_of_bucket() {
-        let pts = vec![
+        let pts = [
             [19.2023, 6.2364],
             [19.2023, 7.1812],
             [19.2023, 7.1812],

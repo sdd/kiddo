@@ -22,7 +22,7 @@ use rand_distr::Distribution;
 const BUCKET_SIZE: usize = 32;
 const QUERY_POINTS_PER_LOOP: usize = 100;
 
-type FXP = U16; // FixedU16<U16>;
+type Fxd = U16; // FixedU16<U16>;
 
 macro_rules! bench_float_10 {
     ($group:ident, $a:ty, $t:ty, $k:tt, $idx: ty, $size:tt, $subtype: expr) => {
@@ -58,7 +58,7 @@ pub fn nearest_10(c: &mut Criterion) {
     batch_benches!(
         group,
         bench_fixed_10,
-        [(FXP, 3)],
+        [(Fxd, 3)],
         [
             (100, u16, u16),
             (1_000, u16, u16),
@@ -84,12 +84,13 @@ fn perform_query_float_10<
     usize: Cast<IDX>,
 {
     kdtree
-        .nearest_n::<SquaredEuclidean>(&point, 10)
+        .nearest_n::<SquaredEuclidean>(point, 10)
         .into_iter()
         .for_each(|res_item| {
-            black_box({
+            {
                 let _x = res_item;
-            });
+            };
+            black_box(());
         })
 }
 
@@ -107,23 +108,23 @@ fn perform_query_fixed_10<
     FixedU16<A>: AxisFixed,
 {
     kdtree
-        .nearest_n::<SquaredEuclideanFixed>(&point, 10)
+        .nearest_n::<SquaredEuclideanFixed>(point, 10)
         .into_iter()
         .for_each(|res_item| {
-            black_box({
+            {
                 let _x = res_item;
-            });
+            };
+            black_box(());
         })
 }
 
 fn bench_query_nearest_n_float_10<
-    'a,
     A: Axis + 'static,
     T: Content + 'static,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(
-    group: &'a mut BenchmarkGroup<WallTime>,
+    group: &mut BenchmarkGroup<WallTime>,
     initial_size: usize,
     subtype: &str,
 ) where
@@ -150,13 +151,12 @@ fn bench_query_nearest_n_float_10<
 }
 
 fn bench_query_nearest_n_fixed_10<
-    'a,
     A: Unsigned,
     T: Content + 'static,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(
-    group: &'a mut BenchmarkGroup<WallTime>,
+    group: &mut BenchmarkGroup<WallTime>,
     initial_size: usize,
     subtype: &str,
 ) where
@@ -216,7 +216,7 @@ pub fn nearest_100(c: &mut Criterion) {
     batch_benches!(
         group,
         bench_fixed_100,
-        [(FXP, 3)],
+        [(Fxd, 3)],
         [
             (100, u16, u16),
             (1_000, u16, u16),
@@ -242,12 +242,13 @@ fn perform_query_float_100<
     usize: Cast<IDX>,
 {
     kdtree
-        .nearest_n::<SquaredEuclidean>(&point, 100)
+        .nearest_n::<SquaredEuclidean>(point, 100)
         .into_iter()
         .for_each(|res_item| {
-            black_box({
+            {
                 let _x = res_item;
-            });
+            };
+            black_box(());
         })
 }
 
@@ -265,23 +266,23 @@ fn perform_query_fixed_100<
     FixedU16<A>: AxisFixed,
 {
     kdtree
-        .nearest_n::<SquaredEuclideanFixed>(&point, 100)
+        .nearest_n::<SquaredEuclideanFixed>(point, 100)
         .into_iter()
         .for_each(|res_item| {
-            black_box({
+            {
                 let _x = res_item;
-            });
+            };
+            black_box(());
         })
 }
 
 fn bench_query_nearest_n_float_100<
-    'a,
     A: Axis + 'static,
     T: Content + 'static,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(
-    group: &'a mut BenchmarkGroup<WallTime>,
+    group: &mut BenchmarkGroup<WallTime>,
     initial_size: usize,
     subtype: &str,
 ) where
@@ -308,13 +309,12 @@ fn bench_query_nearest_n_float_100<
 }
 
 fn bench_query_nearest_n_fixed_100<
-    'a,
     A: Unsigned,
     T: Content + 'static,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(
-    group: &'a mut BenchmarkGroup<WallTime>,
+    group: &mut BenchmarkGroup<WallTime>,
     initial_size: usize,
     subtype: &str,
 ) where

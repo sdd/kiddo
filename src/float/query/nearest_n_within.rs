@@ -214,7 +214,7 @@ mod tests {
         matching_items
     }
 
-    fn stabilize_sort<A: Axis>(matching_items: &mut Vec<(A, u32)>) {
+    fn stabilize_sort<A: Axis>(matching_items: &mut [(A, u32)]) {
         matching_items.sort_unstable_by(|a, b| {
             let dist_cmp = a.0.partial_cmp(&b.0).unwrap();
             if dist_cmp == Ordering::Equal {

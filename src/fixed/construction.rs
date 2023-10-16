@@ -21,12 +21,12 @@ where
     /// use fixed::types::extra::U0;
     /// use kiddo::fixed::kdtree::KdTree;
     ///
-    /// type FXD = FixedU16<U0>;
+    /// type Fxd = FixedU16<U0>;
     ///
-    /// let mut tree: KdTree<FXD, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
+    /// let mut tree: KdTree<Fxd, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
     ///
-    /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
-    /// tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
+    /// tree.add(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 100);
+    /// tree.add(&[Fxd::from_num(2), Fxd::from_num(3), Fxd::from_num(6)], 101);
     ///
     /// assert_eq!(tree.size(), 2);
     /// ```
@@ -94,18 +94,18 @@ where
     /// use fixed::types::extra::U0;
     /// use kiddo::fixed::kdtree::KdTree;
     ///
-    /// type FXD = FixedU16<U0>;
+    /// type Fxd = FixedU16<U0>;
     ///
-    /// let mut tree: KdTree<FXD, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
+    /// let mut tree: KdTree<Fxd, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
     ///
-    /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
-    /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 101);
+    /// tree.add(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 100);
+    /// tree.add(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 101);
     /// assert_eq!(tree.size(), 2);
     ///
-    /// tree.remove(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
+    /// tree.remove(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 100);
     /// assert_eq!(tree.size(), 1);
     ///
-    /// tree.remove(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 101);
+    /// tree.remove(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 101);
     /// assert_eq!(tree.size(), 0);
     /// ```
     #[inline]
@@ -352,17 +352,17 @@ mod tests {
 
     use crate::fixed::kdtree::KdTree;
 
-    type FXD = FixedU16<U16>;
+    type Fxd = FixedU16<U16>;
 
-    fn n(num: f32) -> FXD {
-        FXD::from_num(num)
+    fn n(num: f32) -> Fxd {
+        Fxd::from_num(num)
     }
 
     #[test]
     fn can_add_an_item() {
-        let mut tree: KdTree<FXD, u32, 4, 32, u32> = KdTree::new();
+        let mut tree: KdTree<Fxd, u32, 4, 32, u32> = KdTree::new();
 
-        let point: [FXD; 4] = [n(0.1f32), n(0.2f32), n(0.3f32), n(0.4f32)];
+        let point: [Fxd; 4] = [n(0.1f32), n(0.2f32), n(0.3f32), n(0.4f32)];
         let item = 123;
 
         tree.add(&point, item);
@@ -372,9 +372,9 @@ mod tests {
 
     #[test]
     fn can_add_enough_items_to_cause_a_split() {
-        let mut tree: KdTree<FXD, u32, 4, 4, u32> = KdTree::new();
+        let mut tree: KdTree<Fxd, u32, 4, 4, u32> = KdTree::new();
 
-        let content_to_add: [([FXD; 4], u32); 16] = [
+        let content_to_add: [([Fxd; 4], u32); 16] = [
             ([n(0.9f32), n(0.0f32), n(0.9f32), n(0.0f32)], 9),
             ([n(0.4f32), n(0.5f32), n(0.4f32), n(0.5f32)], 4),
             ([n(0.12f32), n(0.3f32), n(0.12f32), n(0.3f32)], 12),
@@ -402,9 +402,9 @@ mod tests {
 
     #[test]
     fn can_remove_an_item() {
-        let mut tree: KdTree<FXD, u32, 4, 4, u32> = KdTree::new();
+        let mut tree: KdTree<Fxd, u32, 4, 4, u32> = KdTree::new();
 
-        let content_to_add: [([FXD; 4], u32); 16] = [
+        let content_to_add: [([Fxd; 4], u32); 16] = [
             ([n(0.9f32), n(0.0f32), n(0.9f32), n(0.0f32)], 9),
             ([n(0.4f32), n(0.5f32), n(0.4f32), n(0.5f32)], 4),
             ([n(0.12f32), n(0.3f32), n(0.12f32), n(0.3f32)], 12),

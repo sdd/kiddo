@@ -3,7 +3,6 @@ use std::error::Error;
 use kiddo::float::distance::SquaredEuclidean;
 use kiddo::float_leaf_simd::leaf_node::LeafNode;
 use rand::{Rng, SeedableRng};
-use tracing_subscriber;
 
 fn main() -> Result<(), Box<dyn Error>> {
     tracing_subscriber::fmt::init();

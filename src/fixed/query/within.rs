@@ -26,15 +26,15 @@ Results are returned sorted nearest-first
     use kiddo::fixed::kdtree::KdTree;
     use kiddo::fixed::distance::SquaredEuclidean;
 
-    type FXD = FixedU16<U0>;
+    type Fxd = FixedU16<U0>;
 
-    let mut tree: KdTree<FXD, u32, 3, 32, u32> = KdTree::new();
+    let mut tree: KdTree<Fxd, u32, 3, 32, u32> = KdTree::new();
 
-    tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
-    tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
-    tree.add(&[FXD::from_num(20), FXD::from_num(30), FXD::from_num(60)], 102);
+    tree.add(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 100);
+    tree.add(&[Fxd::from_num(2), Fxd::from_num(3), Fxd::from_num(6)], 101);
+    tree.add(&[Fxd::from_num(20), Fxd::from_num(30), Fxd::from_num(60)], 102);
 
-    let within = tree.within::<SquaredEuclidean>(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], FXD::from_num(10));
+    let within = tree.within::<SquaredEuclidean>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], Fxd::from_num(10));
 
     assert_eq!(within.len(), 2);
 ```"#)
@@ -52,17 +52,17 @@ mod tests {
     use rand::Rng;
     use std::cmp::Ordering;
 
-    type FXD = FixedU16<U14>;
+    type Fxd = FixedU16<U14>;
 
-    fn n(num: f32) -> FXD {
-        FXD::from_num(num)
+    fn n(num: f32) -> Fxd {
+        Fxd::from_num(num)
     }
 
     #[test]
     fn can_query_items_within_radius() {
-        let mut tree: KdTree<FXD, u32, 4, 4, u32> = KdTree::new();
+        let mut tree: KdTree<Fxd, u32, 4, 4, u32> = KdTree::new();
 
-        let content_to_add: [([FXD; 4], u32); 16] = [
+        let content_to_add: [([Fxd; 4], u32); 16] = [
             ([n(0.9f32), n(0.0f32), n(0.9f32), n(0.0f32)], 9),
             ([n(0.4f32), n(0.5f32), n(0.4f32), n(0.5f32)], 4),
             ([n(0.12f32), n(0.3f32), n(0.12f32), n(0.3f32)], 12),
@@ -126,19 +126,19 @@ mod tests {
     fn can_query_items_within_radius_large_scale() {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
-        let radius: FXD = n(0.2);
+        let radius: Fxd = n(0.2);
 
-        let content_to_add: Vec<([FXD; 4], u32)> = (0..TREE_SIZE)
+        let content_to_add: Vec<([Fxd; 4], u32)> = (0..TREE_SIZE)
             .map(|_| rand_data_fixed_u16_entry::<U14, u32, 4>())
             .collect();
 
-        let mut tree: KdTree<FXD, u32, 4, 4, u32> = KdTree::with_capacity(TREE_SIZE);
+        let mut tree: KdTree<Fxd, u32, 4, 4, u32> = KdTree::with_capacity(TREE_SIZE);
         content_to_add
             .iter()
             .for_each(|(point, content)| tree.add(point, *content));
         assert_eq!(tree.size(), TREE_SIZE as u32);
 
-        let query_points: Vec<[FXD; 4]> = (0..NUM_QUERIES)
+        let query_points: Vec<[Fxd; 4]> = (0..NUM_QUERIES)
             .map(|_| rand_data_fixed_u16_point::<U14, 4>())
             .collect();
 
@@ -173,7 +173,7 @@ mod tests {
         matching_items
     }
 
-    fn stabilize_sort<A: Axis>(matching_items: &mut Vec<(A, u32)>) {
+    fn stabilize_sort<A: Axis>(matching_items: &mut [(A, u32)]) {
         matching_items.sort_unstable_by(|a, b| {
             let dist_cmp = a.0.partial_cmp(&b.0).unwrap();
             if dist_cmp == Ordering::Equal {

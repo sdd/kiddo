@@ -25,7 +25,7 @@ const RADIUS_SMALL: f64 = 0.01;
 const RADIUS_MEDIUM: f64 = 0.05;
 const RADIUS_LARGE: f64 = 0.25;
 
-type FXP = U16; // FixedU16<U16>;
+type Fxd = U16; // FixedU16<U16>;
 
 macro_rules! bench_float {
     ($group:ident, $a:ty, $t:ty, $k:tt, $idx: ty, $size:tt, $radius:tt,  $subtype: expr) => {
@@ -75,7 +75,7 @@ fn within_unsorted(c: &mut Criterion, radius: f64, radius_name: &str) {
         group,
         bench_fixed,
         radius,
-        [(FXP, 3)],
+        [(Fxd, 3)],
         [
             (100, u16, u16),
             (1_000, u16, u16),
@@ -102,9 +102,10 @@ fn perform_query_float<
     usize: Cast<IDX>,
     f64: Cast<A>,
 {
-    black_box({
-        let _res = black_box(kdtree.within_unsorted::<SquaredEuclidean>(&point, radius.az::<A>()));
-    });
+    {
+        let _res = black_box(kdtree.within_unsorted::<SquaredEuclidean>(point, radius.az::<A>()));
+    };
+    black_box(());
     // .for_each(|res_item| {
     //     black_box({
     //         let _x = res_item;
@@ -127,12 +128,12 @@ fn perform_query_fixed<
     FixedU16<A>: AxisFixed,
     A: LeEqU16,
 {
-    black_box({
+    {
         let _res = black_box(
-            kdtree
-                .within_unsorted::<SquaredEuclideanFixed>(&point, FixedU16::<A>::from_num(radius)),
+            kdtree.within_unsorted::<SquaredEuclideanFixed>(point, FixedU16::<A>::from_num(radius)),
         );
-    });
+    };
+    black_box(());
     // .for_each(|res_item| {
     //     black_box({
     //         let _x = res_item;
@@ -141,13 +142,12 @@ fn perform_query_fixed<
 }
 
 fn bench_query_float<
-    'a,
     A: Axis + 'static,
     T: Content + 'static,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(
-    group: &'a mut BenchmarkGroup<WallTime>,
+    group: &mut BenchmarkGroup<WallTime>,
     initial_size: usize,
     radius: f64,
     subtype: &str,
@@ -179,13 +179,12 @@ fn bench_query_float<
 }
 
 fn bench_query_fixed<
-    'a,
     A: Unsigned,
     T: Content + 'static,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(
-    group: &'a mut BenchmarkGroup<WallTime>,
+    group: &mut BenchmarkGroup<WallTime>,
     initial_size: usize,
     radius: f64,
     subtype: &str,

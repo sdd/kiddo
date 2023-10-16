@@ -22,7 +22,7 @@ use rand_distr::Distribution;
 const BUCKET_SIZE: usize = 32;
 const QUERY_POINTS_PER_LOOP: usize = 100;
 
-type FXP = U16; // FixedU16<U16>;
+type Fxd = U16; // FixedU16<U16>;
 
 macro_rules! bench_float_10 {
     ($group:ident, $a:ty, $t:ty, $k:tt, $idx: ty, $size:tt, $subtype: expr) => {
@@ -58,7 +58,7 @@ pub fn best_10(c: &mut Criterion) {
     batch_benches!(
         group,
         bench_fixed_10,
-        [(FXP, 3)],
+        [(Fxd, 3)],
         [
             (100, u16, u16),
             (1_000, u16, u16),
@@ -85,11 +85,12 @@ fn perform_query_float_10<
     f64: Cast<A>,
 {
     kdtree
-        .best_n_within::<SquaredEuclidean>(&point, 0.05f64.az::<A>(), 10)
+        .best_n_within::<SquaredEuclidean>(point, 0.05f64.az::<A>(), 10)
         .for_each(|res_item| {
-            black_box({
+            {
                 let _x = res_item;
-            });
+            };
+            black_box(());
         })
 }
 
@@ -108,22 +109,22 @@ fn perform_query_fixed_10<
     A: LeEqU16,
 {
     kdtree
-        .best_n_within::<SquaredEuclideanFixed>(&point, FixedU16::<A>::from_num(0.05f64), 10)
+        .best_n_within::<SquaredEuclideanFixed>(point, FixedU16::<A>::from_num(0.05f64), 10)
         .for_each(|res_item| {
-            black_box({
+            {
                 let _x = res_item;
-            });
+            };
+            black_box(());
         })
 }
 
 fn bench_query_float_10<
-    'a,
     A: Axis + 'static,
     T: Content + 'static,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(
-    group: &'a mut BenchmarkGroup<WallTime>,
+    group: &mut BenchmarkGroup<WallTime>,
     initial_size: usize,
     subtype: &str,
 ) where
@@ -151,13 +152,12 @@ fn bench_query_float_10<
 }
 
 fn bench_query_fixed_10<
-    'a,
     A: Unsigned,
     T: Content + 'static,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(
-    group: &'a mut BenchmarkGroup<WallTime>,
+    group: &mut BenchmarkGroup<WallTime>,
     initial_size: usize,
     subtype: &str,
 ) where

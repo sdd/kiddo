@@ -153,7 +153,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .into_iter()
         .map(|neighbour| {
             (
-                &cities[neighbour.item as usize].name,
+                &cities[neighbour.item].name,
                 format!(
                     "{dist:.1}km",
                     dist = unit_sphere_squared_euclidean_to_kilometres(neighbour.distance)
@@ -173,7 +173,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let all_within = kdtree
         .within::<SquaredEuclidean>(&query, dist)
         .iter()
-        .map(|neighbour| &cities[neighbour.item as usize].name)
+        .map(|neighbour| &cities[neighbour.item].name)
         .collect::<Vec<_>>();
     println!("\nAll cities within 1000km of 0N, 0W: {:?}", all_within);
 
@@ -191,7 +191,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let dist = kilometres_to_unit_sphere_squared_euclidean(1000.0);
     let best_3_iter = kdtree.best_n_within::<SquaredEuclidean>(&query, dist, 3);
     let best_3 = best_3_iter
-        .map(|neighbour| (&cities[neighbour.item as usize].name))
+        .map(|neighbour| (&cities[neighbour.item].name))
         .collect::<Vec<_>>();
     println!(
         "\nMost populous 3 cities within 1000km of 0N, 0W: {:?}",

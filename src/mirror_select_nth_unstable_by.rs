@@ -693,8 +693,8 @@ fn test_mirror_select_nth_unstable_by() {
 
             // Sort in ascending order.
             for pivot in 0..LEN {
-                let mut v = orig.clone();
-                let mut w = orig_mirror.clone();
+                let mut v = orig;
+                let mut w = orig_mirror;
                 // let (left, pivot, right) = mirror_select_nth_unstable_by(&mut v, &mut w,pivot, |a, b| a.cmp(b));
                 let f = |a: &i32, b: &i32| a.cmp(b);
                 mirror_select_nth_unstable_by(&mut v, &mut w, pivot, f);
@@ -716,14 +716,14 @@ fn test_mirror_select_nth_unstable_by() {
             // Sort in descending order.
             let sort_descending_comparator = |a: &i32, b: &i32| b.cmp(a);
             let v_sorted_descending = {
-                let mut v = orig.clone();
+                let mut v = orig;
                 v.sort_by(sort_descending_comparator);
                 v
             };
 
             for pivot in 0..LEN {
-                let mut v = orig.clone();
-                let mut w = orig_mirror.clone();
+                let mut v = orig;
+                let mut w = orig_mirror;
                 mirror_select_nth_unstable_by(&mut v, &mut w, pivot, sort_descending_comparator);
 
                 assert_eq!(v_sorted_descending[pivot], v[pivot]);

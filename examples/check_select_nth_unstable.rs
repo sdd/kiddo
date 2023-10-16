@@ -53,8 +53,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         // 5) Assert that our expectation on the behaviour of select_nth_unstable holds
         let window_min = NUM_DISTINCT_VALS * TIMES_REPEATED / 2;
-        for i in window_min..selection_index {
-            assert_eq!(items[i], expected_value);
+        for &item in items.iter().take(selection_index).skip(window_min) {
+            assert_eq!(item, expected_value);
         }
         assert_ne!(items[window_min - 1], expected_value);
     }

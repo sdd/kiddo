@@ -188,10 +188,10 @@ mod tests {
             let dist = SquaredEuclidean::dist(query_point, &p);
             if results.len() < qty {
                 results.push((dist, item));
-                results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(&b_dist).unwrap());
+                results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(b_dist).unwrap());
             } else if dist < results[qty - 1].0 {
                 results[qty - 1] = (dist, item);
-                results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(&b_dist).unwrap());
+                results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(b_dist).unwrap());
             }
         }
 

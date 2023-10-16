@@ -239,12 +239,12 @@ where
     /// use fixed::types::extra::U0;
     /// use kiddo::fixed::kdtree::KdTree;
     ///
-    /// type FXD = FixedU16<U0>;
+    /// type Fxd = FixedU16<U0>;
     ///
-    /// let mut tree: KdTree<FXD, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
+    /// let mut tree: KdTree<Fxd, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
     ///
-    /// tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
-    /// tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
+    /// tree.add(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 100);
+    /// tree.add(&[Fxd::from_num(2), Fxd::from_num(3), Fxd::from_num(6)], 101);
     ///
     /// assert_eq!(tree.size(), 2);
     /// ```
@@ -261,25 +261,25 @@ mod tests {
 
     use crate::fixed::kdtree::KdTree;
 
-    type FXD = FixedU16<U14>;
+    type Fxd = FixedU16<U14>;
 
     #[test]
     fn it_can_be_constructed_with_new() {
-        let tree: KdTree<FXD, u32, 4, 32, u32> = KdTree::new();
+        let tree: KdTree<Fxd, u32, 4, 32, u32> = KdTree::new();
 
         assert_eq!(tree.size(), 0);
     }
 
     #[test]
     fn it_can_be_constructed_with_a_defined_capacity() {
-        let tree: KdTree<FXD, u32, 4, 32, u32> = KdTree::with_capacity(10);
+        let tree: KdTree<Fxd, u32, 4, 32, u32> = KdTree::with_capacity(10);
 
         assert_eq!(tree.size(), 0);
     }
 
     #[test]
     fn it_can_be_constructed_with_a_capacity_of_zero() {
-        let tree: KdTree<FXD, u32, 4, 32, u32> = KdTree::with_capacity(0);
+        let tree: KdTree<Fxd, u32, 4, 32, u32> = KdTree::with_capacity(0);
 
         assert_eq!(tree.size(), 0);
     }
@@ -287,150 +287,150 @@ mod tests {
     #[cfg(feature = "serialize")]
     #[test]
     fn can_serde() {
-        let mut tree: KdTree<FXD, u32, 4, 32, u32> = KdTree::new();
+        let mut tree: KdTree<Fxd, u32, 4, 32, u32> = KdTree::new();
 
-        let content_to_add: [([FXD; 4], u32); 16] = [
+        let content_to_add: [([Fxd; 4], u32); 16] = [
             (
                 [
-                    FXD::from_num(0.9),
-                    FXD::from_num(0),
-                    FXD::from_num(0.9),
-                    FXD::from_num(0),
+                    Fxd::from_num(0.9),
+                    Fxd::from_num(0),
+                    Fxd::from_num(0.9),
+                    Fxd::from_num(0),
                 ],
                 9,
             ),
             (
                 [
-                    FXD::from_num(0.4),
-                    FXD::from_num(0.5),
-                    FXD::from_num(0.4),
-                    FXD::from_num(0.50),
+                    Fxd::from_num(0.4),
+                    Fxd::from_num(0.5),
+                    Fxd::from_num(0.4),
+                    Fxd::from_num(0.50),
                 ],
                 4,
             ),
             (
                 [
-                    FXD::from_num(0.12),
-                    FXD::from_num(0.3),
-                    FXD::from_num(0.12),
-                    FXD::from_num(0.3),
+                    Fxd::from_num(0.12),
+                    Fxd::from_num(0.3),
+                    Fxd::from_num(0.12),
+                    Fxd::from_num(0.3),
                 ],
                 12,
             ),
             (
                 [
-                    FXD::from_num(0.7),
-                    FXD::from_num(0.2),
-                    FXD::from_num(0.7),
-                    FXD::from_num(0.2),
+                    Fxd::from_num(0.7),
+                    Fxd::from_num(0.2),
+                    Fxd::from_num(0.7),
+                    Fxd::from_num(0.2),
                 ],
                 7,
             ),
             (
                 [
-                    FXD::from_num(0.13),
-                    FXD::from_num(0.4),
-                    FXD::from_num(0.13),
-                    FXD::from_num(0.4),
+                    Fxd::from_num(0.13),
+                    Fxd::from_num(0.4),
+                    Fxd::from_num(0.13),
+                    Fxd::from_num(0.4),
                 ],
                 13,
             ),
             (
                 [
-                    FXD::from_num(0.6),
-                    FXD::from_num(0.3),
-                    FXD::from_num(0.6),
-                    FXD::from_num(0.3),
+                    Fxd::from_num(0.6),
+                    Fxd::from_num(0.3),
+                    Fxd::from_num(0.6),
+                    Fxd::from_num(0.3),
                 ],
                 6,
             ),
             (
                 [
-                    FXD::from_num(0.2),
-                    FXD::from_num(0.7),
-                    FXD::from_num(0.2),
-                    FXD::from_num(0.7),
+                    Fxd::from_num(0.2),
+                    Fxd::from_num(0.7),
+                    Fxd::from_num(0.2),
+                    Fxd::from_num(0.7),
                 ],
                 2,
             ),
             (
                 [
-                    FXD::from_num(0.14),
-                    FXD::from_num(0.5),
-                    FXD::from_num(0.14),
-                    FXD::from_num(0.5),
+                    Fxd::from_num(0.14),
+                    Fxd::from_num(0.5),
+                    Fxd::from_num(0.14),
+                    Fxd::from_num(0.5),
                 ],
                 14,
             ),
             (
                 [
-                    FXD::from_num(0.3),
-                    FXD::from_num(0.6),
-                    FXD::from_num(0.3),
-                    FXD::from_num(0.6),
+                    Fxd::from_num(0.3),
+                    Fxd::from_num(0.6),
+                    Fxd::from_num(0.3),
+                    Fxd::from_num(0.6),
                 ],
                 3,
             ),
             (
                 [
-                    FXD::from_num(0.1),
-                    FXD::from_num(0.1),
-                    FXD::from_num(0.10),
-                    FXD::from_num(0.1),
+                    Fxd::from_num(0.1),
+                    Fxd::from_num(0.1),
+                    Fxd::from_num(0.10),
+                    Fxd::from_num(0.1),
                 ],
                 10,
             ),
             (
                 [
-                    FXD::from_num(0.16),
-                    FXD::from_num(0.7),
-                    FXD::from_num(0.16),
-                    FXD::from_num(0.7),
+                    Fxd::from_num(0.16),
+                    Fxd::from_num(0.7),
+                    Fxd::from_num(0.16),
+                    Fxd::from_num(0.7),
                 ],
                 16,
             ),
             (
                 [
-                    FXD::from_num(0.1),
-                    FXD::from_num(0.8),
-                    FXD::from_num(0.1),
-                    FXD::from_num(0.8),
+                    Fxd::from_num(0.1),
+                    Fxd::from_num(0.8),
+                    Fxd::from_num(0.1),
+                    Fxd::from_num(0.8),
                 ],
                 1,
             ),
             (
                 [
-                    FXD::from_num(0.15),
-                    FXD::from_num(0.6),
-                    FXD::from_num(0.15),
-                    FXD::from_num(0.6),
+                    Fxd::from_num(0.15),
+                    Fxd::from_num(0.6),
+                    Fxd::from_num(0.15),
+                    Fxd::from_num(0.6),
                 ],
                 15,
             ),
             (
                 [
-                    FXD::from_num(0.5),
-                    FXD::from_num(0.4),
-                    FXD::from_num(0.5),
-                    FXD::from_num(0.4),
+                    Fxd::from_num(0.5),
+                    Fxd::from_num(0.4),
+                    Fxd::from_num(0.5),
+                    Fxd::from_num(0.4),
                 ],
                 5,
             ),
             (
                 [
-                    FXD::from_num(0.8),
-                    FXD::from_num(0.1),
-                    FXD::from_num(0.8),
-                    FXD::from_num(0.1),
+                    Fxd::from_num(0.8),
+                    Fxd::from_num(0.1),
+                    Fxd::from_num(0.8),
+                    Fxd::from_num(0.1),
                 ],
                 8,
             ),
             (
                 [
-                    FXD::from_num(0.11),
-                    FXD::from_num(0.2),
-                    FXD::from_num(0.11),
-                    FXD::from_num(0.2),
+                    Fxd::from_num(0.11),
+                    Fxd::from_num(0.2),
+                    Fxd::from_num(0.11),
+                    Fxd::from_num(0.2),
                 ],
                 11,
             ),
@@ -444,7 +444,7 @@ mod tests {
         let serialized = serde_json::to_string(&tree).unwrap();
         println!("JSON: {:?}", &serialized);
 
-        let deserialized: KdTree<FXD, u32, 4, 32, u32> = serde_json::from_str(&serialized).unwrap();
+        let deserialized: KdTree<Fxd, u32, 4, 32, u32> = serde_json::from_str(&serialized).unwrap();
         assert_eq!(tree, deserialized);
     }
 }

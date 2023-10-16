@@ -116,7 +116,7 @@ mod tests {
         let query_point = [0.78f32, 0.55f32, 0.78f32, 0.55f32];
 
         let expected = NearestNeighbour {
-            distance: 0.819999933,
+            distance: 0.819_999_93,
             item: 5,
         };
 
