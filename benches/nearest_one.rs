@@ -22,7 +22,7 @@ use rand_distr::Distribution;
 const BUCKET_SIZE: usize = 32;
 const QUERY_POINTS_PER_LOOP: usize = 1000;
 
-type FXP = U16; // FixedU16<U16>;
+type Fxd = U16; // FixedU16<U16>;
 
 macro_rules! bench_float {
     ($group:ident, $a:ty, $t:ty, $k:tt, $idx: ty, $size:tt, $subtype: expr) => {
@@ -68,7 +68,7 @@ pub fn nearest_one(c: &mut Criterion) {
     batch_benches!(
         group,
         bench_fixed,
-        [(FXP, 3)],
+        [(Fxd, 3)],
         [
             (100, u16, u16),
             (1_000, u16, u16),
@@ -93,7 +93,7 @@ fn perform_query_float<
 ) where
     usize: Cast<IDX>,
 {
-    kdtree.nearest_one::<SquaredEuclidean>(&point);
+    kdtree.nearest_one::<SquaredEuclidean>(point);
 }
 
 fn perform_query_fixed<
@@ -109,17 +109,16 @@ fn perform_query_fixed<
     usize: Cast<IDX>,
     FixedU16<A>: AxisFixed,
 {
-    kdtree.nearest_one::<SquaredEuclideanFixed>(&point);
+    kdtree.nearest_one::<SquaredEuclideanFixed>(point);
 }
 
 fn bench_query_nearest_one_float<
-    'a,
     A: Axis + 'static,
     T: Content + 'static,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(
-    group: &'a mut BenchmarkGroup<WallTime>,
+    group: &mut BenchmarkGroup<WallTime>,
     initial_size: usize,
     query_point_qty: usize,
     subtype: &str,
@@ -147,13 +146,12 @@ fn bench_query_nearest_one_float<
 }
 
 fn bench_query_nearest_one_fixed<
-    'a,
     A: Unsigned,
     T: Content + 'static,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(
-    group: &'a mut BenchmarkGroup<WallTime>,
+    group: &mut BenchmarkGroup<WallTime>,
     initial_size: usize,
     query_point_qty: usize,
     subtype: &str,

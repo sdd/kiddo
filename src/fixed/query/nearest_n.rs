@@ -26,17 +26,17 @@ distance metric function.
     use kiddo::fixed::kdtree::KdTree;
     use kiddo::fixed::distance::SquaredEuclidean;
 
-    type FXD = FixedU16<U0>;
+    type Fxd = FixedU16<U0>;
 
-    let mut tree: KdTree<FXD, u32, 3, 32, u32> = KdTree::new();
+    let mut tree: KdTree<Fxd, u32, 3, 32, u32> = KdTree::new();
 
-    tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
-    tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 101);
+    tree.add(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 100);
+    tree.add(&[Fxd::from_num(2), Fxd::from_num(3), Fxd::from_num(6)], 101);
 
-    let nearest: Vec<_> = tree.nearest_n::<SquaredEuclidean>(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 1);
+    let nearest: Vec<_> = tree.nearest_n::<SquaredEuclidean>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 1);
 
     assert_eq!(nearest.len(), 1);
-    assert_eq!(nearest[0].distance, FXD::from_num(0));
+    assert_eq!(nearest[0].distance, Fxd::from_num(0));
     assert_eq!(nearest[0].item, 100);
 ```"#)
     );
@@ -52,17 +52,17 @@ mod tests {
     use fixed::FixedU16;
     use rand::Rng;
 
-    type FXD = FixedU16<U14>;
+    type Fxd = FixedU16<U14>;
 
-    fn n(num: f32) -> FXD {
-        FXD::from_num(num)
+    fn n(num: f32) -> Fxd {
+        Fxd::from_num(num)
     }
 
     #[test]
     fn can_query_nearest_n_items() {
-        let mut tree: KdTree<FXD, u32, 4, 4, u32> = KdTree::new();
+        let mut tree: KdTree<Fxd, u32, 4, 4, u32> = KdTree::new();
 
-        let content_to_add: [([FXD; 4], u32); 16] = [
+        let content_to_add: [([Fxd; 4], u32); 16] = [
             ([n(0.9f32), n(0.0f32), n(0.9f32), n(0.0f32)], 9),
             ([n(0.4f32), n(0.5f32), n(0.4f32), n(0.5f32)], 4),
             ([n(0.12f32), n(0.3f32), n(0.12f32), n(0.3f32)], 12),
@@ -128,17 +128,17 @@ mod tests {
         const NUM_QUERIES: usize = 100;
         const N: usize = 10;
 
-        let content_to_add: Vec<([FXD; 4], u32)> = (0..TREE_SIZE)
+        let content_to_add: Vec<([Fxd; 4], u32)> = (0..TREE_SIZE)
             .map(|_| rand_data_fixed_u16_entry::<U14, u32, 4>())
             .collect();
 
-        let mut tree: KdTree<FXD, u32, 4, 4, u32> = KdTree::with_capacity(TREE_SIZE);
+        let mut tree: KdTree<Fxd, u32, 4, 4, u32> = KdTree::with_capacity(TREE_SIZE);
         content_to_add
             .iter()
             .for_each(|(point, content)| tree.add(point, *content));
         assert_eq!(tree.size(), TREE_SIZE as u32);
 
-        let query_points: Vec<[FXD; 4]> = (0..NUM_QUERIES)
+        let query_points: Vec<[Fxd; 4]> = (0..NUM_QUERIES)
             .map(|_| rand_data_fixed_u16_point::<U14, 4>())
             .collect();
 

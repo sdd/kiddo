@@ -17,7 +17,7 @@ use kiddo::types::{Content, Index};
 const BUCKET_SIZE: usize = 32;
 const QTY_TO_ADD_TO_POPULATED: u64 = 100;
 
-type FXP = U16; // FixedU16<U16>;
+type Fxd = U16; // FixedU16<U16>;
 
 macro_rules! bench_empty_float {
     ($group:ident, $a:ty, $t:ty, $k:tt, $idx: ty, $size:tt, $subtype: expr) => {
@@ -53,7 +53,7 @@ pub fn add_to_empty(c: &mut Criterion) {
     batch_benches!(
         group,
         bench_empty_fixed,
-        [(FXP, 3)],
+        [(Fxd, 3)],
         [
             (100, u16, u16),
             (1_000, u16, u16),
@@ -90,7 +90,7 @@ pub fn add_to_populated(c: &mut Criterion) {
     batch_benches!(
         group,
         bench_populated_fixed,
-        [(FXP, 3)],
+        [(Fxd, 3)],
         [
             (100, u16, u16),
             (1_000, u16, u16),
@@ -130,10 +130,8 @@ fn bench_add_to_empty_float<A: Axis, T: Content, const K: usize, IDX: Index<T = 
         |b, &size| {
             b.iter_batched(
                 || {
-                    let points_to_add: Vec<([A; K], T)> = (0..size)
-                        .into_iter()
-                        .map(|_| rand::random::<([A; K], T)>())
-                        .collect();
+                    let points_to_add: Vec<([A; K], T)> =
+                        (0..size).map(|_| rand::random::<([A; K], T)>()).collect();
 
                     let kdtree =
                         KdTree::<A, T, K, BUCKET_SIZE, IDX>::with_capacity(points_to_add.len());
@@ -141,11 +139,10 @@ fn bench_add_to_empty_float<A: Axis, T: Content, const K: usize, IDX: Index<T = 
                     (kdtree, points_to_add)
                 },
                 |(mut kdtree, points_to_add)| {
-                    black_box(
-                        points_to_add
-                            .iter()
-                            .for_each(|point| kdtree.add(&point.0, point.1)),
-                    )
+                    points_to_add
+                        .iter()
+                        .for_each(|point| kdtree.add(&point.0, point.1));
+                    black_box(())
                 },
                 BatchSize::SmallInput,
             );
@@ -168,7 +165,6 @@ fn bench_add_to_populated_float<A: Axis, T: Content, const K: usize, IDX: Index<
             b.iter_batched(
                 || {
                     let points_to_add: Vec<([A; K], T)> = (0..QTY_TO_ADD_TO_POPULATED)
-                        .into_iter()
                         .map(|_| rand::random::<([A; K], T)>())
                         .collect();
 
@@ -180,18 +176,17 @@ fn bench_add_to_populated_float<A: Axis, T: Content, const K: usize, IDX: Index<
                         size + points_to_add.len(),
                     );
 
-                    for i in 0..initial_points.len() {
-                        kdtree.add(&initial_points[i].0, initial_points[i].1);
+                    for point in &initial_points {
+                        kdtree.add(&point.0, point.1);
                     }
 
                     (kdtree, points_to_add)
                 },
                 |(mut kdtree, points_to_add)| {
-                    black_box(
-                        points_to_add
-                            .iter()
-                            .for_each(|point| kdtree.add(&point.0, point.1)),
-                    )
+                    points_to_add
+                        .iter()
+                        .for_each(|point| kdtree.add(&point.0, point.1));
+                    black_box(())
                 },
                 BatchSize::SmallInput,
             );
@@ -225,9 +220,10 @@ fn bench_add_to_empty_fixed_u16<A: Unsigned, T: Content, const K: usize, IDX: In
                     (kdtree, points_to_add)
                 },
                 |(mut kdtree, points_to_add)| {
-                    points_to_add
-                        .iter()
-                        .for_each(|point| black_box(kdtree.add(black_box(&point.0), point.1)))
+                    points_to_add.iter().for_each(|point| {
+                        kdtree.add(black_box(&point.0), point.1);
+                        black_box(())
+                    })
                 },
                 BatchSize::SmallInput,
             );
@@ -263,16 +259,17 @@ fn bench_add_to_populated_fixed_u16<A: Unsigned, T: Content, const K: usize, IDX
                         FixedKdTree::<FixedU16<A>, T, K, BUCKET_SIZE, IDX>::with_capacity(
                             size + points.len(),
                         );
-                    for i in 0..initial_points.len() {
-                        kdtree.add(&initial_points[i].0, initial_points[i].1);
+                    for point in &initial_points {
+                        kdtree.add(&point.0, point.1);
                     }
 
                     (kdtree, points)
                 },
                 |(mut kdtree, points_to_add)| {
-                    points_to_add
-                        .iter()
-                        .for_each(|point| black_box(kdtree.add(black_box(&point.0), point.1)))
+                    points_to_add.iter().for_each(|point| {
+                        kdtree.add(black_box(&point.0), point.1);
+                        black_box(())
+                    })
                 },
                 BatchSize::SmallInput,
             );

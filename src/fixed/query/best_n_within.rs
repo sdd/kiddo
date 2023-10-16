@@ -32,18 +32,18 @@ performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt
     use kiddo::fixed::kdtree::KdTree;
     use kiddo::fixed::distance::SquaredEuclidean;
 
-    type FXD = FixedU16<U0>;
+    type Fxd = FixedU16<U0>;
 
-    let mut tree: KdTree<FXD, u32, 3, 32, u32> = KdTree::new();
+    let mut tree: KdTree<Fxd, u32, 3, 32, u32> = KdTree::new();
 
-    tree.add(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], 100);
-    tree.add(&[FXD::from_num(2), FXD::from_num(3), FXD::from_num(6)], 1);
-    tree.add(&[FXD::from_num(20), FXD::from_num(30), FXD::from_num(60)], 102);
+    tree.add(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 100);
+    tree.add(&[Fxd::from_num(2), Fxd::from_num(3), Fxd::from_num(6)], 1);
+    tree.add(&[Fxd::from_num(20), Fxd::from_num(30), Fxd::from_num(60)], 102);
 
-    let mut best_n_within_iter = tree.best_n_within::<SquaredEuclidean>(&[FXD::from_num(1), FXD::from_num(2), FXD::from_num(5)], FXD::from_num(10), 1);
+    let mut best_n_within_iter = tree.best_n_within::<SquaredEuclidean>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], Fxd::from_num(10), 1);
     let first = best_n_within_iter.next().unwrap();
 
-    assert_eq!(first, BestNeighbour { distance: FXD::from_num(3), item: 1 });
+    assert_eq!(first, BestNeighbour { distance: Fxd::from_num(3), item: 1 });
 ```"#)
     );
 }
@@ -59,17 +59,17 @@ mod tests {
     use fixed::FixedU16;
     use rand::Rng;
 
-    type FXD = FixedU16<U14>;
+    type Fxd = FixedU16<U14>;
 
-    fn n(num: f32) -> FXD {
-        FXD::from_num(num)
+    fn n(num: f32) -> Fxd {
+        Fxd::from_num(num)
     }
 
     #[test]
     fn can_query_best_n_items_within_radius() {
-        let mut tree: KdTree<FXD, u32, 2, 4, u32> = KdTree::new();
+        let mut tree: KdTree<Fxd, u32, 2, 4, u32> = KdTree::new();
 
-        let content_to_add: [([FXD; 2], u32); 16] = [
+        let content_to_add: [([Fxd; 2], u32); 16] = [
             ([n(0.9f32), n(0.0f32)], 9),
             ([n(0.4f32), n(0.5f32)], 4),
             ([n(0.12f32), n(0.3f32)], 12),
@@ -147,20 +147,20 @@ mod tests {
     fn can_query_best_items_within_radius_large_scale() {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
-        let radius: FXD = n(0.6);
+        let radius: Fxd = n(0.6);
         let max_qty = 5;
 
-        let content_to_add: Vec<([FXD; 4], u32)> = (0..TREE_SIZE)
+        let content_to_add: Vec<([Fxd; 4], u32)> = (0..TREE_SIZE)
             .map(|_| rand_data_fixed_u16_entry::<U14, u32, 4>())
             .collect();
 
-        let mut tree: KdTree<FXD, u32, 4, 4, u32> = KdTree::with_capacity(TREE_SIZE);
+        let mut tree: KdTree<Fxd, u32, 4, 4, u32> = KdTree::with_capacity(TREE_SIZE);
         content_to_add
             .iter()
             .for_each(|(point, content)| tree.add(point, *content));
         assert_eq!(tree.size(), TREE_SIZE as u32);
 
-        let query_points: Vec<[FXD; 4]> = (0..NUM_QUERIES)
+        let query_points: Vec<[Fxd; 4]> = (0..NUM_QUERIES)
             .map(|_| rand_data_fixed_u16_point::<U14, 4>())
             .collect();
 
@@ -189,11 +189,9 @@ mod tests {
             if distance <= radius {
                 if best_items.len() < max_qty {
                     best_items.push(BestNeighbour { distance, item });
-                } else {
-                    if item < (*best_items.last().unwrap()).item {
-                        best_items.pop().unwrap();
-                        best_items.push(BestNeighbour { distance, item });
-                    }
+                } else if item < best_items.last().unwrap().item {
+                    best_items.pop().unwrap();
+                    best_items.push(BestNeighbour { distance, item });
                 }
             }
             best_items.sort_unstable();

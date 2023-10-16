@@ -443,17 +443,17 @@ mod tests {
     };
     use rand::Rng;
 
-    type FLT = f32;
+    type Flt = f32;
 
-    fn n(num: FLT) -> FLT {
+    fn n(num: Flt) -> Flt {
         num
     }
 
     #[test]
     fn can_add_an_item() {
-        let mut tree: KdTree<FLT, u32, 4, 32, u32> = KdTree::new();
+        let mut tree: KdTree<Flt, u32, 4, 32, u32> = KdTree::new();
 
-        let point: [FLT; 4] = [n(0.1f32), n(0.2f32), n(0.3f32), n(0.4f32)];
+        let point: [Flt; 4] = [n(0.1f32), n(0.2f32), n(0.3f32), n(0.4f32)];
         let item = 123;
 
         tree.add(&point, item);
@@ -468,16 +468,16 @@ mod tests {
 
     #[test]
     fn can_add_items_root_stem_specified() {
-        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+        let mut tree: KdTree<Flt, u32, 4, 4, u32> = KdTree::with_capacity(16);
 
         //      01      Stems
         //   02    03   Stems
         //  0  1  2  3  Leaves
 
-        let point_1: [FLT; 4] = [n(0.1f32), n(0.6f32), n(0.6f32), n(0.6f32)];
+        let point_1: [Flt; 4] = [n(0.1f32), n(0.6f32), n(0.6f32), n(0.6f32)];
         let item_1 = 123;
 
-        let point_2: [FLT; 4] = [n(0.6f32), n(0.1f32), n(0.1f32), n(0.1f32)];
+        let point_2: [Flt; 4] = [n(0.6f32), n(0.1f32), n(0.1f32), n(0.1f32)];
         let item_2 = 456;
 
         tree.stems[1] = n(0.5f32);
@@ -505,19 +505,19 @@ mod tests {
 
     #[test]
     fn can_add_items_root_and_one_base_stem_specified() {
-        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+        let mut tree: KdTree<Flt, u32, 4, 4, u32> = KdTree::with_capacity(16);
 
         //      01      Stems
         //   02    03   Stems
         //  0  1  2  3  Leaves
 
-        let point_1: [FLT; 4] = [n(0.1f32), n(0.6f32), n(0.6f32), n(0.6f32)];
+        let point_1: [Flt; 4] = [n(0.1f32), n(0.6f32), n(0.6f32), n(0.6f32)];
         let item_1 = 123;
 
-        let point_2: [FLT; 4] = [n(0.6f32), n(0.1f32), n(0.1f32), n(0.1f32)];
+        let point_2: [Flt; 4] = [n(0.6f32), n(0.1f32), n(0.1f32), n(0.1f32)];
         let item_2 = 456;
 
-        let point_3: [FLT; 4] = [n(0.6f32), n(0.6f32), n(0.1f32), n(0.1f32)];
+        let point_3: [Flt; 4] = [n(0.6f32), n(0.6f32), n(0.1f32), n(0.1f32)];
         let item_3 = 789;
 
         tree.stems[1] = n(0.5f32);
@@ -559,25 +559,25 @@ mod tests {
 
     #[test]
     fn can_add_items_root_and_both_base_stem_specified_plus_dstems() {
-        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+        let mut tree: KdTree<Flt, u32, 4, 4, u32> = KdTree::with_capacity(16);
 
         //      01      Stems
         //   02    03   Stems
         //  0  1  2  3  Leaves
 
-        let point_1: [FLT; 4] = [n(0.1f32), n(0.1f32), n(0.1f32), n(0.6f32)];
+        let point_1: [Flt; 4] = [n(0.1f32), n(0.1f32), n(0.1f32), n(0.6f32)];
         let item_1 = 111;
 
-        let point_2: [FLT; 4] = [n(0.1f32), n(0.1f32), n(0.6f32), n(0.1f32)];
+        let point_2: [Flt; 4] = [n(0.1f32), n(0.1f32), n(0.6f32), n(0.1f32)];
         let item_2 = 222;
 
-        let point_3: [FLT; 4] = [n(0.1f32), n(0.6f32), n(0.1f32), n(0.1f32)];
+        let point_3: [Flt; 4] = [n(0.1f32), n(0.6f32), n(0.1f32), n(0.1f32)];
         let item_3 = 333;
 
-        let point_4: [FLT; 4] = [n(0.6f32), n(0.6f32), n(0.1f32), n(0.6f32)];
+        let point_4: [Flt; 4] = [n(0.6f32), n(0.6f32), n(0.1f32), n(0.6f32)];
         let item_4 = 444;
 
-        let point_5: [FLT; 4] = [n(0.6f32), n(0.6f32), n(0.6f32), n(0.1f32)];
+        let point_5: [Flt; 4] = [n(0.6f32), n(0.6f32), n(0.6f32), n(0.1f32)];
         let item_5 = 555;
 
         tree.stems[1] = n(0.5f32);
@@ -656,26 +656,26 @@ mod tests {
 
     #[test]
     fn can_handle_initial_split_new_item_to_original_bucket() {
-        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+        let mut tree: KdTree<Flt, u32, 4, 4, u32> = KdTree::with_capacity(16);
 
         //      01      Stems
         //   02    03   Stems
         //  0  1  2  3  Leaves
 
-        let point_1: [FLT; 4] = [n(0.12f32), n(0.1f32), n(0.1f32), n(0.6f32)];
+        let point_1: [Flt; 4] = [n(0.12f32), n(0.1f32), n(0.1f32), n(0.6f32)];
         let item_1 = 111;
 
-        let point_2: [FLT; 4] = [n(0.11f32), n(0.1f32), n(0.6f32), n(0.1f32)];
+        let point_2: [Flt; 4] = [n(0.11f32), n(0.1f32), n(0.6f32), n(0.1f32)];
         let item_2 = 222;
 
-        let point_3: [FLT; 4] = [n(0.22f32), n(0.6f32), n(0.1f32), n(0.1f32)];
+        let point_3: [Flt; 4] = [n(0.22f32), n(0.6f32), n(0.1f32), n(0.1f32)];
         let item_3 = 333;
 
-        let point_4: [FLT; 4] = [n(0.21f32), n(0.6f32), n(0.1f32), n(0.6f32)];
+        let point_4: [Flt; 4] = [n(0.21f32), n(0.6f32), n(0.1f32), n(0.6f32)];
         let item_4 = 444;
 
         // to be added
-        let point_5: [FLT; 4] = [n(0.13f32), n(0.6f32), n(0.1f32), n(0.6f32)];
+        let point_5: [Flt; 4] = [n(0.13f32), n(0.6f32), n(0.1f32), n(0.6f32)];
         let item_5 = 555;
 
         tree.leaves[0].content_items[0] = item_1;
@@ -714,26 +714,26 @@ mod tests {
 
     #[test]
     fn can_handle_initial_split_new_item_to_right_bucket() {
-        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+        let mut tree: KdTree<Flt, u32, 4, 4, u32> = KdTree::with_capacity(16);
 
         //      01      Stems
         //   02    03   Stems
         //  0  1  2  3  Leaves
 
-        let point_1: [FLT; 4] = [n(0.12f32), n(0.1f32), n(0.1f32), n(0.6f32)];
+        let point_1: [Flt; 4] = [n(0.12f32), n(0.1f32), n(0.1f32), n(0.6f32)];
         let item_1 = 111;
 
-        let point_2: [FLT; 4] = [n(0.11f32), n(0.1f32), n(0.6f32), n(0.1f32)];
+        let point_2: [Flt; 4] = [n(0.11f32), n(0.1f32), n(0.6f32), n(0.1f32)];
         let item_2 = 222;
 
-        let point_3: [FLT; 4] = [n(0.22f32), n(0.6f32), n(0.1f32), n(0.1f32)];
+        let point_3: [Flt; 4] = [n(0.22f32), n(0.6f32), n(0.1f32), n(0.1f32)];
         let item_3 = 333;
 
-        let point_4: [FLT; 4] = [n(0.21f32), n(0.6f32), n(0.1f32), n(0.6f32)];
+        let point_4: [Flt; 4] = [n(0.21f32), n(0.6f32), n(0.1f32), n(0.6f32)];
         let item_4 = 444;
 
         // to be added
-        let point_5: [FLT; 4] = [n(0.23f32), n(0.6f32), n(0.1f32), n(0.6f32)];
+        let point_5: [Flt; 4] = [n(0.23f32), n(0.6f32), n(0.1f32), n(0.6f32)];
         let item_5 = 555;
 
         tree.leaves[0].content_items[0] = item_1;
@@ -772,26 +772,26 @@ mod tests {
 
     #[test]
     fn can_handle_root_split_new_item_to_right_bucket() {
-        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+        let mut tree: KdTree<Flt, u32, 4, 4, u32> = KdTree::with_capacity(16);
 
         //      01      Stems
         //   02    03   Stems
         //  0  1  2  3  Leaves
 
-        let point_1: [FLT; 4] = [n(0.12f32), n(0.2f32), n(0.1f32), n(0.6f32)];
+        let point_1: [Flt; 4] = [n(0.12f32), n(0.2f32), n(0.1f32), n(0.6f32)];
         let item_1 = 111;
 
-        let point_2: [FLT; 4] = [n(0.11f32), n(0.1f32), n(0.6f32), n(0.1f32)];
+        let point_2: [Flt; 4] = [n(0.11f32), n(0.1f32), n(0.6f32), n(0.1f32)];
         let item_2 = 222;
 
-        let point_3: [FLT; 4] = [n(0.16f32), n(0.6f32), n(0.1f32), n(0.1f32)];
+        let point_3: [Flt; 4] = [n(0.16f32), n(0.6f32), n(0.1f32), n(0.1f32)];
         let item_3 = 333;
 
-        let point_4: [FLT; 4] = [n(0.17f32), n(0.5f32), n(0.1f32), n(0.6f32)];
+        let point_4: [Flt; 4] = [n(0.17f32), n(0.5f32), n(0.1f32), n(0.6f32)];
         let item_4 = 444;
 
         // to be added
-        let point_5: [FLT; 4] = [n(0.18f32), n(0.7f32), n(0.1f32), n(0.6f32)];
+        let point_5: [Flt; 4] = [n(0.18f32), n(0.7f32), n(0.1f32), n(0.6f32)];
         let item_5 = 555;
 
         tree.stems[1] = 0.21f32;
@@ -834,26 +834,26 @@ mod tests {
 
     #[test]
     fn can_handle_base_split_new_item_to_right_bucket() {
-        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+        let mut tree: KdTree<Flt, u32, 4, 4, u32> = KdTree::with_capacity(16);
 
         //      01      Stems
         //   02    03   Stems
         //  0  1  2  3  Leaves
 
-        let point_1: [FLT; 4] = [n(0.12f32), n(0.2f32), n(0.2f32), n(0.6f32)];
+        let point_1: [Flt; 4] = [n(0.12f32), n(0.2f32), n(0.2f32), n(0.6f32)];
         let item_1 = 111;
 
-        let point_2: [FLT; 4] = [n(0.11f32), n(0.1f32), n(0.1f32), n(0.1f32)];
+        let point_2: [Flt; 4] = [n(0.11f32), n(0.1f32), n(0.1f32), n(0.1f32)];
         let item_2 = 222;
 
-        let point_3: [FLT; 4] = [n(0.16f32), n(0.4f32), n(0.4f32), n(0.1f32)];
+        let point_3: [Flt; 4] = [n(0.16f32), n(0.4f32), n(0.4f32), n(0.1f32)];
         let item_3 = 333;
 
-        let point_4: [FLT; 4] = [n(0.17f32), n(0.3f32), n(0.3f32), n(0.6f32)];
+        let point_4: [Flt; 4] = [n(0.17f32), n(0.3f32), n(0.3f32), n(0.6f32)];
         let item_4 = 444;
 
         // to be added
-        let point_5: [FLT; 4] = [n(0.18f32), n(0.45f32), n(0.7f32), n(0.6f32)];
+        let point_5: [Flt; 4] = [n(0.18f32), n(0.45f32), n(0.7f32), n(0.6f32)];
         let item_5 = 555;
 
         tree.stems[1] = 0.21f32;
@@ -923,7 +923,7 @@ mod tests {
 
     #[test]
     fn can_handle_dstem_split_new_item_to_right_bucket() {
-        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+        let mut tree: KdTree<Flt, u32, 4, 4, u32> = KdTree::with_capacity(16);
         ///// BEFORE /////////////////////////
         //       01       Stems
         //   02      03   Stems
@@ -937,20 +937,20 @@ mod tests {
         //  D4   4            DStems / Leaves (D1-D3 reserved)
         // 0  5               Leaves
 
-        let point_1: [FLT; 4] = [n(0.12f32), n(0.2f32), n(0.2f32), n(0.102f32)];
+        let point_1: [Flt; 4] = [n(0.12f32), n(0.2f32), n(0.2f32), n(0.102f32)];
         let item_1 = 111;
 
-        let point_2: [FLT; 4] = [n(0.11f32), n(0.1f32), n(0.1f32), n(0.101f32)];
+        let point_2: [Flt; 4] = [n(0.11f32), n(0.1f32), n(0.1f32), n(0.101f32)];
         let item_2 = 222;
 
-        let point_3: [FLT; 4] = [n(0.16f32), n(0.4f32), n(0.4f32), n(0.106f32)];
+        let point_3: [Flt; 4] = [n(0.16f32), n(0.4f32), n(0.4f32), n(0.106f32)];
         let item_3 = 333;
 
-        let point_4: [FLT; 4] = [n(0.17f32), n(0.3f32), n(0.3f32), n(0.107f32)];
+        let point_4: [Flt; 4] = [n(0.17f32), n(0.3f32), n(0.3f32), n(0.107f32)];
         let item_4 = 444;
 
         // to be added
-        let point_5: [FLT; 4] = [n(0.18f32), n(0.45f32), n(0.45f32), n(0.108f32)];
+        let point_5: [Flt; 4] = [n(0.18f32), n(0.45f32), n(0.45f32), n(0.108f32)];
         let item_5 = 555;
 
         tree.stems[1] = 0.21f32;
@@ -1036,27 +1036,27 @@ mod tests {
 
     #[test]
     fn can_handle_interior_stem_split_new_item_to_right_bucket() {
-        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(32);
+        let mut tree: KdTree<Flt, u32, 4, 4, u32> = KdTree::with_capacity(32);
 
         //             01              Stems
         //      02            03       Stems
         //  04     05     06     07    Stems
         // 0  1   2  3   4  5   6  7   Leaves
 
-        let point_1: [FLT; 4] = [n(0.12f32), n(0.2f32), n(0.2f32), n(0.6f32)];
+        let point_1: [Flt; 4] = [n(0.12f32), n(0.2f32), n(0.2f32), n(0.6f32)];
         let item_1 = 111;
 
-        let point_2: [FLT; 4] = [n(0.11f32), n(0.1f32), n(0.1f32), n(0.1f32)];
+        let point_2: [Flt; 4] = [n(0.11f32), n(0.1f32), n(0.1f32), n(0.1f32)];
         let item_2 = 222;
 
-        let point_3: [FLT; 4] = [n(0.16f32), n(0.4f32), n(0.4f32), n(0.1f32)];
+        let point_3: [Flt; 4] = [n(0.16f32), n(0.4f32), n(0.4f32), n(0.1f32)];
         let item_3 = 333;
 
-        let point_4: [FLT; 4] = [n(0.17f32), n(0.3f32), n(0.3f32), n(0.6f32)];
+        let point_4: [Flt; 4] = [n(0.17f32), n(0.3f32), n(0.3f32), n(0.6f32)];
         let item_4 = 444;
 
         // to be added
-        let point_5: [FLT; 4] = [n(0.18f32), n(0.45f32), n(0.7f32), n(0.6f32)];
+        let point_5: [Flt; 4] = [n(0.18f32), n(0.45f32), n(0.7f32), n(0.6f32)];
         let item_5 = 555;
 
         tree.stems[1] = 0.21f32;
@@ -1103,9 +1103,9 @@ mod tests {
 
     #[test]
     fn can_add_enough_items_to_cause_a_split() {
-        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(16);
+        let mut tree: KdTree<Flt, u32, 4, 4, u32> = KdTree::with_capacity(16);
 
-        let content_to_add: [([FLT; 4], u32); 16] = [
+        let content_to_add: [([Flt; 4], u32); 16] = [
             ([n(0.9f32), n(0.0f32), n(0.9f32), n(0.0f32)], 9),
             ([n(0.4f32), n(0.5f32), n(0.4f32), n(0.5f32)], 4),
             ([n(0.12f32), n(0.3f32), n(0.12f32), n(0.3f32)], 12),
@@ -1133,9 +1133,9 @@ mod tests {
 
     /* #[test]
     fn can_remove_an_item() {
-        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::new();
+        let mut tree: KdTree<Flt, u32, 4, 4, u32> = KdTree::new();
 
-        let content_to_add: [([FLT; 4], u32); 16] = [
+        let content_to_add: [([Flt; 4], u32); 16] = [
             ([n(0.9f32), n(0.0f32), n(0.9f32), n(0.0f32)], 9),
             ([n(0.4f32), n(0.5f32), n(0.4f32), n(0.5f32)], 4),
             ([n(0.12f32), n(0.3f32), n(0.12f32), n(0.3f32)], 12),
@@ -1168,7 +1168,7 @@ mod tests {
 
     #[test]
     fn can_add_shitloads_of_points() {
-        let mut tree: KdTree<FLT, u32, 4, 4, u32> = KdTree::with_capacity(1000);
+        let mut tree: KdTree<Flt, u32, 4, 4, u32> = KdTree::with_capacity(1000);
 
         let mut rng = rand::thread_rng();
         for i in 0..1000 {

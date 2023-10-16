@@ -56,12 +56,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Performing {:?} random NN queries...", QUERY_POINT_QTY);
 
     let start = Instant::now();
-    black_box({
-        query_points.par_iter().for_each(|point| {
-            black_box({
-                tree.nearest_one::<SquaredEuclidean>(point);
-            })
-        });
+    query_points.par_iter().for_each(|point| {
+        black_box(tree.nearest_one::<SquaredEuclidean>(point));
     });
     println!(
         "Queries complete. ({})",

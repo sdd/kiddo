@@ -151,9 +151,9 @@ mod tests {
             .collect();
 
         for (_i, query_point) in query_points.iter().enumerate() {
-            let expected = linear_search(&content_to_add, &query_point);
+            let expected = linear_search(&content_to_add, query_point);
 
-            let result = tree.nearest_one::<SquaredEuclidean>(&query_point);
+            let result = tree.nearest_one::<SquaredEuclidean>(query_point);
 
             assert_eq!(result.distance, expected.distance);
             println!("{} should equal {}", result.item, expected.item);

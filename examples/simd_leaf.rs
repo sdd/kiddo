@@ -11,7 +11,6 @@ use kiddo::distance_metric::DistanceMetric;
 use kiddo::float::distance::SquaredEuclidean;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
-use tracing_subscriber;
 
 type AX = f32;
 const K: usize = 4;
@@ -35,15 +34,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         let items = <[usize; BUCKET_SIZE]>::init_with_indices(|i| leaf_idx * BUCKET_SIZE + i);
 
         let mut simd_points = [[AX::zero(); BUCKET_SIZE]; K];
-        for dim in 0..K {
-            for idx in 0..BUCKET_SIZE {
-                simd_points[dim][idx] = points[idx][dim];
+        for (dim, simd_axis) in simd_points.iter_mut().enumerate() {
+            for (idx, point) in points.iter().enumerate() {
+                simd_axis[idx] = point[dim];
             }
         }
 
         let simd_leaf: SimdLeafNode<AX, usize, 4, BUCKET_SIZE> = SimdLeafNode {
             content_points: simd_points,
-            content_items: items.clone(),
+            content_items: items,
             size: BUCKET_SIZE,
         };
 

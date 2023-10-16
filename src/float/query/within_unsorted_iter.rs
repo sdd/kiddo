@@ -191,7 +191,7 @@ mod tests {
         matching_items
     }
 
-    fn stabilize_sort<A: Axis>(matching_items: &mut Vec<NearestNeighbour<A, u32>>) {
+    fn stabilize_sort<A: Axis>(matching_items: &mut [NearestNeighbour<A, u32>]) {
         matching_items.sort_unstable_by(|a, b| {
             let dist_cmp = a.distance.partial_cmp(&b.distance).unwrap();
             if dist_cmp == Ordering::Equal {

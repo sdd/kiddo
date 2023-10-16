@@ -183,6 +183,7 @@ fn serialize_to_rkyv(file: &mut File, tree: Tree) {
         .serialize_value(&tree)
         .expect("Could not serialize with rkyv");
     let buf = serializer.into_serializer().into_inner();
-    file.write(&buf)
+    let _ = file
+        .write(buf)
         .expect("Could not write serialized rkyv to file");
 }

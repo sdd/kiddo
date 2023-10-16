@@ -107,7 +107,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let buf = serializer.into_serializer().into_inner();
     let mut file2 = File::create("./examples/random-big-mutable.rkyv")?;
     file2
-        .write_all(&buf)
+        .write_all(buf)
         .expect("Could not write serialized rkyv to file");
 
     let file_size = file2.metadata().unwrap().len().bytes();

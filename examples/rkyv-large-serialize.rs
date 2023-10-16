@@ -80,6 +80,6 @@ fn serialize_to_rkyv(file: &mut File, tree: Tree) {
 
     let buf = serializer.into_serializer().into_inner();
 
-    file.write_all(&buf)
+    file.write_all(buf)
         .expect("Could not write serialized rkyv to file");
 }
