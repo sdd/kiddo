@@ -192,7 +192,7 @@ jobs:
           components: rustfmt,clippy
 
       - name: Cargo test
-        run: cargo test --workspace --features=serialize,serialize_rkyv --lib --bins --tests --examples
+        run: cargo test --workspace --features=serialize,serialize_rkyv
 
   test-all-features:
     name: Run Tests (Nightly, all features enabled except SIMD)
@@ -219,4 +219,4 @@ jobs:
           components: rustfmt,clippy
 
       - name: Cargo test
-        run: cargo test --workspace --features serialize,serialize_rkyv,immutable --lib --bins --tests --examples
+        run: cargo test --workspace --features serialize,serialize_rkyv,immutable
