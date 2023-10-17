@@ -1,5 +1,19 @@
 # Kiddo Changelog
 
+## [3.0.0-rc.1] - 2023-10-17
+
+### Features
+* the `ImmutableKdTree` is now only usable by enabling the `immutable` crate feature. This ensures that the crate as a whole retains compatible with stable rust, as `ImmutableKdTree` depends on some unstable features at present.
+
+### Refactors
+* Leaf nodes for Immutable now store their points in columnar format. Searches across them have been re-written to autovectorise better. This has been tested on Compiler Explorer to demonstrate that AVX512 instructions are generated, ensuring vectorization is as wide as is possible. Handwritten SIMD intrinsics have been used (activated by enabling the `simd` crate feature) to manually vectorise code that the compiler could not autovectorize. **NOTE** `simd` is currently quite unstable and not as well tested as the rest of the library, so use it with caution until it stabilizes in the full `v3.0.0` release!
+
+
+### Style / Tests
+* Increase reliability of `within()` test for `ImmutableKdTree`.
+* Remove some commented-out code and some useless comments
+
+
 
 ## [2.1.2] - 2023-10-10
 
