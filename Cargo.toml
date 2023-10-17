@@ -26,14 +26,14 @@ opt-level = 3
 log = "0.4"
 num-traits = "0.2"
 rand = "0.8" # delete at some point, only used in test bin
-rayon = "1.8"
-fixed = { version = "1.24", features = ["num-traits"] }
-az = "1.2"
+rayon = "1"
+fixed = { version = "1", features = ["num-traits"] }
+az = "1"
 doc-comment = "0.3"
 generator = "0.7"
 elapsed = "0.1"
-divrem = "1.0"
-ordered-float = "3.7"
+divrem = "1"
+ordered-float = "4"
 rand_chacha = "0.3"
 itertools = "0.11"
 tracing = "0.1"
