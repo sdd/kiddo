@@ -1,8 +1,7 @@
 use az::Cast;
-use criterion::measurement::WallTime;
-use criterion::{
-    criterion_group, criterion_main, AxisScale, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
-    PlotConfiguration, Throughput,
+use codspeed_criterion_compat::{
+    criterion_group, criterion_main, measurement::WallTime, AxisScale, BatchSize, BenchmarkGroup,
+    BenchmarkId, Criterion, PlotConfiguration, Throughput,
 };
 use kiddo::batch_benches;
 use kiddo::float::distance::SquaredEuclidean;

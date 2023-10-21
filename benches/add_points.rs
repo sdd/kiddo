@@ -1,9 +1,9 @@
 use az::Cast;
-use criterion::measurement::WallTime;
-use criterion::{
-    black_box, criterion_group, criterion_main, AxisScale, BatchSize, BenchmarkGroup, BenchmarkId,
-    Criterion, PlotConfiguration, Throughput,
+use codspeed_criterion_compat::{
+    black_box, criterion_group, criterion_main, measurement::WallTime, AxisScale, BatchSize,
+    BenchmarkGroup, BenchmarkId, Criterion, PlotConfiguration, Throughput,
 };
+
 use fixed::types::extra::{Unsigned, U16};
 use fixed::FixedU16;
 use rand::distributions::{Distribution, Standard};
@@ -47,7 +47,6 @@ pub fn add_to_empty(c: &mut Criterion) {
     let mut group = c.benchmark_group("Add to Empty Tree");
 
     let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
-
     group.plot_config(plot_config);
 
     batch_benches!(
@@ -84,7 +83,6 @@ pub fn add_to_populated(c: &mut Criterion) {
     group.throughput(Throughput::Elements(QTY_TO_ADD_TO_POPULATED));
 
     let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
-
     group.plot_config(plot_config);
 
     batch_benches!(
