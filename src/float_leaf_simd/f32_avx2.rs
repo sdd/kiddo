@@ -1,7 +1,7 @@
 use core::arch::x86_64::_mm256_testz_si256;
 use std::arch::x86_64::{
     _mm256_add_epi32, _mm256_blendv_ps, _mm256_cmp_ps, _mm256_loadu_ps, _mm256_min_ps,
-    _mm256_set1_epi32, _mm256_set_epi32, _mm256_store_epi32, _mm256_storeu_ps, _CMP_LT_OQ,
+    _mm256_set1_epi32, _mm256_set_epi32, _mm256_store_si256, _mm256_storeu_ps, _CMP_LT_OQ,
 };
 
 pub(crate) unsafe fn get_best_from_dists_f32_avx2<T: crate::types::Content, const B: usize>(
@@ -45,8 +45,9 @@ pub(crate) unsafe fn get_best_from_dists_f32_avx2<T: crate::types::Content, cons
     }
 
     let mut min_dist_indexes = [0i32; 8];
-    _mm256_store_epi32(
-        std::ptr::addr_of_mut!(min_dist_indexes[0]),
+
+    _mm256_store_si256(
+        std::mem::transmute(std::ptr::addr_of_mut!(min_dist_indexes[0])),
         min_dist_indexes_v,
     );
     _mm256_storeu_ps(std::ptr::addr_of_mut!(min_dists[0]), min_dists_v);

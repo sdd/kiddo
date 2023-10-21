@@ -13,15 +13,17 @@ pub(crate) unsafe fn get_best_from_dists_f64_avx512<A: Axis, T: Content, const B
     best_dist: &mut A,
     best_item: &mut T,
 ) {
+    // SSE2 (_mm_setzero_si128 & _mm_set1_epi16)
     let mut index_v = _mm_setzero_si128();
     let mut min_dist_indexes_v = _mm_set1_epi16(-1);
     let all_ones = _mm_set1_epi16(1);
+
     let mut min_dists = [*best_dist; 8];
     let mut min_dists_v = _mm512_loadu_pd(ptr::addr_of!(min_dists[0]));
 
     let mut any_is_better = false;
 
-    // AVX512, 64 iterations, unrolled x2
+    // AVX512: 64 iterations
     for chunk in acc.as_chunks_unchecked::<8>().iter() {
         let chunk_v = _mm512_loadu_pd(ptr::addr_of!(chunk[0]));
 
@@ -30,8 +32,10 @@ pub(crate) unsafe fn get_best_from_dists_f64_avx512<A: Axis, T: Content, const B
 
         min_dists_v = _mm512_min_pd(min_dists_v, chunk_v);
 
+        // AVX512BW + AVX512VL
         min_dist_indexes_v = _mm_mask_mov_epi16(min_dist_indexes_v, is_better_mask, index_v);
 
+        // SSE2
         index_v = _mm_add_epi16(index_v, all_ones);
     }
 
@@ -40,6 +44,7 @@ pub(crate) unsafe fn get_best_from_dists_f64_avx512<A: Axis, T: Content, const B
     }
 
     let mut min_dist_indexes = [0i16; 8];
+    // AVX512BW + AVX512VL
     _mm_storeu_epi16(ptr::addr_of_mut!(min_dist_indexes[0]), min_dist_indexes_v);
     _mm512_storeu_pd(ptr::addr_of_mut!(min_dists[0]), min_dists_v);
 
