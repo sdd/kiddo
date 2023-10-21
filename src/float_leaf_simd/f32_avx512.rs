@@ -12,6 +12,7 @@ unsafe fn get_best_from_dists_f32_avx512<A: Axis, T: Content, const B: usize>(
     best_dist: &mut A,
     best_item: &mut T,
 ) {
+    // SSE2 (_mm_setzero_si128 & _mm_set1_epi16)
     let mut index_v = _mm_setzero_si128();
     let mut min_dist_indexes_v = _mm_set1_epi16(-1);
     let all_ones = _mm_set1_epi16(1);
@@ -29,8 +30,10 @@ unsafe fn get_best_from_dists_f32_avx512<A: Axis, T: Content, const B: usize>(
 
         min_dists_v = _mm512_min_ps(min_dists_v, chunk_v);
 
+        // AVX512BW + AVX512VL
         min_dist_indexes_v = _mm_mask_mov_epi16(min_dist_indexes_v, is_better_mask, index_v);
 
+        // SSE2
         index_v = _mm_add_epi16(index_v, all_ones);
     }
 
@@ -39,6 +42,7 @@ unsafe fn get_best_from_dists_f32_avx512<A: Axis, T: Content, const B: usize>(
     }
 
     let mut min_dist_indexes = [0i16; 16];
+    // AVX512BW + AVX512VL
     _mm_storeu_epi16(ptr::addr_of_mut!(min_dist_indexes[0]), min_dist_indexes_v);
     _mm512_storeu_ps(ptr::addr_of_mut!(min_dists[0]), min_dists_v);
 

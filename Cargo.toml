@@ -164,3 +164,7 @@ path = "examples/broken.rs"
 [[example]]
 name = "simd_leaf"
 path = "examples/simd_leaf.rs"
+
+[[example]]
+name = "avx2-check"
+path = "examples/avx2-check.rs"
