@@ -195,8 +195,8 @@ jobs:
         run: cargo test --workspace --features=serialize,serialize_rkyv
 
   test-all-features:
-    name: Run Tests (Nightly, all features enabled except SIMD)
-    runs-on: ubuntu-latest
+    name: Run Tests (Nightly, all features)
+    runs-on: buildjet-8vcpu-ubuntu-2204	
     steps:
       - uses: actions/checkout@v4
 
@@ -219,4 +219,4 @@ jobs:
           components: rustfmt,clippy
 
       - name: Cargo test
-        run: cargo test --workspace --features serialize,serialize_rkyv,immutable
+        run: cargo test --workspace --features serialize,serialize_rkyv,immutable,simd
