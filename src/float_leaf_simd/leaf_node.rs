@@ -1,6 +1,5 @@
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;
-use az::Az;
 use az::Cast;
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
@@ -87,21 +86,6 @@ where
         });
 
         A::get_best_from_dists(acc, &self.content_items, best_dist, best_item);
-
-        let (leaf_best_dist, leaf_best_item) =
-            acc.iter()
-                .enumerate()
-                .fold((*best_dist, usize::MAX), |(bd, bi), (i, &d)| {
-                    (
-                        bd.min(d),
-                        bi * usize::from(bd >= d) + i * usize::from(bd < d),
-                    )
-                });
-
-        if leaf_best_dist < *best_dist {
-            *best_dist = leaf_best_dist;
-            *best_item = leaf_best_item.az::<T>();
-        }
     }
 }
 
@@ -139,21 +123,6 @@ where
         });
 
         A::get_best_from_dists(acc, &self.content_items, best_dist, best_item);
-
-        let (leaf_best_dist, leaf_best_item) =
-            acc.iter()
-                .enumerate()
-                .fold((*best_dist, usize::MAX), |(bd, bi), (i, &d)| {
-                    (
-                        bd.min(d),
-                        bi * usize::from(bd >= d) + i * usize::from(bd < d),
-                    )
-                });
-
-        if leaf_best_dist < *best_dist {
-            *best_dist = leaf_best_dist;
-            *best_item = leaf_best_item.az::<T>();
-        }
     }
 }
 
