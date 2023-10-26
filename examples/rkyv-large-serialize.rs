@@ -12,7 +12,7 @@ use std::fs::File;
 use std::io::Write;
 use std::time::Instant;
 
-use kiddo::{float::distance::SquaredEuclidean, float::kdtree::KdTree};
+use kiddo::{KdTree, SquaredEuclidean};
 
 use kiddo::test_utils::build_populated_tree_float;
 use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
@@ -23,9 +23,8 @@ const BUFFER_LEN: usize = 10_000_000_000;
 const SCRATCH_LEN: usize = 1_000_000_000;
 
 const NUM_ITEMS: usize = 250_000_000;
-const BUCKET_SIZE: usize = 32;
 
-type Tree = KdTree<f32, u64, 3, BUCKET_SIZE, u32>;
+type Tree = KdTree<f32, 3>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // create a tree populated with random points

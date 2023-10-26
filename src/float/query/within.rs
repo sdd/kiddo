@@ -164,14 +164,6 @@ mod tests {
             //       with the same dist in a different order to the query
             stabilize_sort(&mut result);
 
-            // let slice = &mut result[..];
-            // let slice_of_cells: &[Cell<NearestNeighbour<f32, u32>>] = Cell::from_mut(slice).as_slice_of_cells();
-            // for w in slice_of_cells.windows(2) {
-            //     if w[0].get().distance == w[1].get().distance && w[0].get().item > w[1].get().item {
-            //         Cell::swap(&w[0], &w[1]);
-            //     }
-            //
-            // }
             assert_eq!(result, expected);
         }
     }
@@ -191,15 +183,6 @@ mod tests {
         }
 
         stabilize_sort(&mut matching_items);
-
-        // let slice = &mut matching_items[..];
-        // let slice_of_cells: &[Cell<NearestNeighbour<A, u32>>] = Cell::from_mut(slice).as_slice_of_cells();
-        //
-        // for w in slice_of_cells.windows(2) {
-        //     if w[0].get().distance == w[1].get().distance && w[0].get().item > w[1].get().item {
-        //         Cell::swap(&w[0], &w[1]);
-        //     }
-        // }
 
         matching_items
     }

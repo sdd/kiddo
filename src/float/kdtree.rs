@@ -47,6 +47,8 @@ impl<T: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign> 
 ///
 /// For use when the co-ordinates of the points being stored in the tree
 /// on the float [`KdTree`]. This will be [`f64`] or [`f32`].
+
+#[doc = include_str!("../../README.md")]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "serialize_rkyv",

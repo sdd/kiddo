@@ -32,8 +32,7 @@ kiddo = "3.0.0-rc.1"
 
 Add points to kdtree and query nearest n points with distance function
 ```rust
-use kiddo::KdTree;
-use kiddo::distance::squared_euclidean;
+use kiddo::{KdTree,SquaredEuclidean};
 
 let entries = vec![
     [0f64, 0f64],
@@ -43,21 +42,23 @@ let entries = vec![
 ];
 
 // use the kiddo::KdTree type to get up and running quickly with default settings
-let mut kdtree: KdTree<_, 2> = (&entries).into();
+let mut tree: KdTree<_, 2> = (&entries).into();
 
 // How many items are in tree?
-assert_eq!(kdtree.size(), 4);
+assert_eq!(tree.size(), 4);
 
 // find the nearest item to [0f64, 0f64].
-// returns a tuple of (dist, index)
-assert_eq!(
-    kdtree.nearest_one(&[0f64, 0f64], &squared_euclidean),
-    (0f64, 0)
-);
+// returns an instance of kiddo::NearestNeighbour
+let nearest = tree.nearest_one::<SquaredEuclidean>(&[0f64, 0f64]);
+assert_eq!(nearest.distance, 0f64);
+assert_eq!(nearest.item, 0);
 
-// find the nearest 3 items to [0f64, 0f64], and collect into a `Vec`
+
+// find the nearest 3 items to [0f64, 0f64]
+// // returns an Vec of kiddo::NearestNeighbour
+let nearest_n: Vec<_> = tree.nearest_n::<SquaredEuclidean>(&[0f64, 0f64], 3);
 assert_eq!(
-    kdtree.nearest_n(&[0f64, 0f64], 3, &squared_euclidean).collect::<Vec<_>>(),
+    nearest_n.iter().map(|x|(x.distance, x.item)).collect::<Vec<_>>(),
     vec![(0f64, 0), (2f64, 1), (8f64, 2)]
 );
 ```

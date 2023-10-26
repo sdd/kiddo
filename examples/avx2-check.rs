@@ -12,13 +12,12 @@ use std::arch::x86_64::{
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
-    if is_x86_feature_detected!("avx512f") {
-        println!("AVX512 Detected!");
-    } else if is_x86_feature_detected!("avx2") {
-        println!("AVX2 Detected!");
-    } else {
-        println!("No AVX2 or AVX512!");
-        return Ok(());
+    #[cfg(any(
+        not(target_feature = "avx2"),
+        all(not(target_arch = "x86"), not(target_arch = "x86_64"))
+    ))]
+    {
+        println!("Not running on x86 or x86_64. Exiting");
     }
 
     #[cfg(all(
@@ -26,6 +25,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         any(target_arch = "x86", target_arch = "x86_64")
     ))]
     {
+        if is_x86_feature_detected!("avx512f") {
+            println!("AVX512 Detected!");
+        } else if is_x86_feature_detected!("avx2") {
+            println!("AVX2 Detected!");
+        } else {
+            println!("No AVX2 or AVX512!");
+            return Ok(());
+        }
+
         let mut best_dist_val = 97f64;
         let mut best_item_val = 1usize;
 

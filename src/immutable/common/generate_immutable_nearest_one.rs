@@ -56,8 +56,8 @@ macro_rules! generate_immutable_nearest_one {
                 let new_off = query[split_dim].saturating_dist(val);
                 // let new_off = query[split_dim] - val;
 
-                // let is_left_child = usize::from(*unsafe { query.get_unchecked(split_dim) } < val);
-                let is_left_child = usize::from(query[split_dim] < val);
+                let is_left_child = usize::from(*unsafe { query.get_unchecked(split_dim) } < val);
+                // let is_left_child = usize::from(query[split_dim] < val);
 
                 let closer_node_idx = left_child_idx + (1 - is_left_child);
                 let further_node_idx = left_child_idx + is_left_child;
@@ -102,8 +102,8 @@ macro_rules! generate_immutable_nearest_one {
             ) where
                 D: DistanceMetric<A, K>,
             {
-                // let leaf_node = unsafe { self.leaves.get_unchecked(leaf_idx) };
-                let leaf_node = &self.leaves[leaf_idx];
+                let leaf_node = unsafe { self.leaves.get_unchecked(leaf_idx) };
+                // let leaf_node = &self.leaves[leaf_idx];
 
                 let mut best_item = nearest.item;
                 let mut best_dist = nearest.distance;

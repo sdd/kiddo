@@ -1,29 +1,28 @@
-/// Kiddo example: Rkyv large, deserialize
-///
-/// Deserializes a large tree of random data using memmap and Rkyv's
-/// zero-copy deserialization, and then runs a single query against
-/// it. Use this to get an idea of the kind of time-to-first-query
-/// you can achieve with Kiddo.
-///
-/// Run the rkyv-large-serialize example before this to generate the
-/// tree of random data and serialize it to a file.
 use elapsed::ElapsedDuration;
 use memmap::MmapOptions;
 use std::error::Error;
 use std::fs::File;
 use std::time::Instant;
+use tracing::Level;
+use tracing_subscriber::fmt;
 
-use kiddo::{KdTree, SquaredEuclidean};
+use kiddo::{ImmutableKdTree, SquaredEuclidean};
 
-type Tree = KdTree<f32, 3>;
+type Tree = ImmutableKdTree<f64, 3>;
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let query = [0.123f32, 0.456f32, 0.789f32];
+fn main() -> Result<(), Box<dyn Error>>
+where
+{
+    let subscriber = fmt().with_max_level(Level::TRACE).without_time().finish();
+    tracing::subscriber::set_global_default(subscriber)?;
+
+    let query = [0.123f64, 0.456f64, 0.789f64];
 
     let start = Instant::now();
 
     // memmap the file into a buffer
-    let buf = unsafe { MmapOptions::new().map(&File::open("./examples/large-random-tree.rkyv")?)? };
+    let buf =
+        unsafe { MmapOptions::new().map(&File::open("./examples/immutable-test-tree.rkyv")?)? };
 
     // zero-copy deserialize
     let tree = unsafe { rkyv::archived_root::<Tree>(&buf) };

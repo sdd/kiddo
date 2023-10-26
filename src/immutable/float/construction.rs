@@ -30,7 +30,13 @@ where
 
         let node_size = (unsafe { self.leaves.get_unchecked_mut(idx) }).size;
         if node_size == B {
-            println!("Tree Stats: {:?}", self.generate_stats())
+            event!(
+                Level::ERROR,
+                "Overflowing add to leaf #{}. item={:?}",
+                idx,
+                query
+            );
+            event!(Level::TRACE, "Tree Stats: {:?}", self.generate_stats())
         }
 
         let node = unsafe { self.leaves.get_unchecked_mut(idx) };
