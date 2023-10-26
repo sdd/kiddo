@@ -221,6 +221,4 @@ jobs:
       - name: Cargo test
         env:
           RUSTFLAGS: '-C target-cpu=native'
-        run: |
-          cat /proc/cpuinfo | grep flags
-          cargo test --workspace --all-features --release
+        run: cargo test --workspace --all-features --release

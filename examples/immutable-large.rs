@@ -1,3 +1,6 @@
+// This example builds a very large ImmutableTree with ~250M items,
+// and then performs some random queries aganst it.
+
 use std::error::Error;
 
 use criterion::black_box;
@@ -11,8 +14,11 @@ use std::time::Instant;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::test_utils::build_query_points_float;
 
+const TREE_SIZE: usize = 2usize.pow(28); // ~250M
+const QUERY_POINT_QTY: usize = 10_000_000;
+
 /*
-   Tree Construction Times (f64):
+   Tree Construction Times (f64, Ryzen 5900X):
 
    Tree Size        Time
    2^20             0.25s
@@ -26,7 +32,7 @@ use kiddo::test_utils::build_query_points_float;
    2^28             351s (20gb RAM usage)
    2^29             (OOM)
 
-   Tree Construction Times (f32):
+   Tree Construction Times (f32, Ryzen 5900X):
 
    Tree Size        Time
    2^20             0.15 - 0.46s
@@ -34,9 +40,6 @@ use kiddo::test_utils::build_query_points_float;
    2^22             5.0 - 5.8s
    2^23             20 - 50s
 */
-
-const TREE_SIZE: usize = 2usize.pow(28); // ~250M
-const QUERY_POINT_QTY: usize = 10_000_000;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut rng = rand_chacha::ChaCha8Rng::from_entropy();

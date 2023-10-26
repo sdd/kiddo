@@ -73,7 +73,7 @@ where
 use memmap::MmapOptions;
 
 let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
-let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, u32, 3, 32>>(&mmap) };"
+let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, u64, 3, 32>>(&mmap) };"
     );
 }
 

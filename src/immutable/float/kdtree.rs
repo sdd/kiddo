@@ -553,6 +553,11 @@ impl<
         const B: usize,
     > ArchivedImmutableKdTree<A, T, K, B>
 {
+    /// Returns the current number of elements stored in the tree
+    #[inline]
+    pub fn size(&self) -> usize {
+        self.size as usize
+    }
     #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
     #[inline]
     pub(crate) fn prefetch_stems(&self, idx: usize) {

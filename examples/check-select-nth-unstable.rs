@@ -1,5 +1,3 @@
-use rand::seq::SliceRandom;
-use rand::thread_rng;
 /// Check select_nth_unstable
 ///
 /// This is not really a Kiddo example. The `ImmutableTree` uses `select_nth_unstable` during
@@ -16,6 +14,9 @@ use rand::thread_rng;
 use std::error::Error;
 use std::io;
 use std::io::Write;
+
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 
 const NUM_TRIALS: usize = 1000;
 const NUM_DISTINCT_VALS: usize = 1_000_000;

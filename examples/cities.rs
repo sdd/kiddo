@@ -86,7 +86,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     //    a few orders of magnitude of each other) and performance (or memory usage)
     //    is a key concern, then you may want to experiment with converting your
     //    positions into 16-bit fixed point and using a kiddo::FixedKdTree.
-    // 2) `T`: `u16` - this specifies the type of the indices that are stored in the tree.
+    // 2) `T`: `u16` - this specifies the type of the item indexes that are stored in the tree.
     //    A `u16` will suffice for up to 2^16 (approx 65k) different items. A `u32` will allow you
     //    to store 2^32 (around 4 billion) different indices. Using a `u16` may
     //    result in your tree using less memory, and again this can help with performance
@@ -100,7 +100,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     //    out the most performance, but I've found 32 to be a good choice most of the time.
     // 5) `IDX`: `u16` - IDX is the type used internally to index the nodes. `u16` will permit
     //    `32768 * B` items to be stored in the tree. `u32` will allow up to `~2 billion * B` items.
-    //    If you want to eke out the max possible performance, benchmark with different
+    //    If you want max possible performance, benchmark with different
     //    values of this. smaller types will allow a little bit more nodes to be able to
     //    fit in the cache, but this may not necessarily equate to any improvement; YMMV.
     let mut kdtree: KdTree<f32, usize, 3, 32, u16> = KdTree::with_capacity(cities.len());

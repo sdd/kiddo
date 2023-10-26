@@ -101,4 +101,20 @@ pub mod float_leaf_simd;
 ///
 /// To manually specify more advanced parameters, use [`float::kdtree::KdTree`] directly.
 /// To store positions using integer or fixed-point types, use [`fixed::kdtree::KdTree`].
-pub type KdTree<A, const K: usize> = float::kdtree::KdTree<A, usize, K, 32, u32>;
+pub type KdTree<A, const K: usize> = float::kdtree::KdTree<A, u64, K, 32, u32>;
+
+/// An immutable floating-point k-d tree with default parameters.
+///
+/// `A` is the floating point type (`f32` or `f64`).
+/// `K` is the number of dimensions. See [`immutable::float::kdtree::KdTree`] for details of how to use.
+///
+/// To manually specify more advanced parameters, use [`immutable::float::kdtree::KdTree`] directly.
+/// To store positions using integer or fixed-point types, use [`fixed::kdtree::KdTree`].
+#[cfg(feature = "immutable")]
+pub type ImmutableKdTree<A, const K: usize> =
+    immutable::float::kdtree::ImmutableKdTree<A, u64, K, 32>;
+
+pub use best_neighbour::BestNeighbour;
+pub use float::distance::Manhattan;
+pub use float::distance::SquaredEuclidean;
+pub use nearest_neighbour::NearestNeighbour;

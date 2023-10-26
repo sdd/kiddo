@@ -139,18 +139,9 @@ path = "examples/rkyv-large-deserialize.rs"
 required-features = ["serialize_rkyv"]
 
 [[example]]
-name = "immutable_large"
-path = "examples/immutable_large.rs"
+name = "immutable-large"
+path = "examples/immutable-large.rs"
 required-features = ["immutable"]
-
-[[example]]
-name = "immutable_rkyv"
-path = "examples/immutable_rkyv.rs"
-required-features = ["immutable", "serialize_rkyv"]
-
-[[example]]
-name = "check_select_nth_unstable"
-path = "examples/check_select_nth_unstable.rs"
 
 [[example]]
 name = "immutable-rkyv-serialize"
@@ -158,8 +149,13 @@ path = "examples/immutable-rkyv-serialize.rs"
 required-features = ["immutable", "serialize_rkyv"]
 
 [[example]]
-name = "broken"
-path = "examples/broken.rs"
+name = "immutable-rkyv-deserialize"
+path = "examples/immutable-rkyv-deserialize.rs"
+required-features = ["immutable", "serialize_rkyv"]
+
+[[example]]
+name = "check-select-nth-unstable"
+path = "examples/check-select-nth-unstable.rs"
 
 [[example]]
 name = "simd_leaf"
@@ -168,3 +164,8 @@ path = "examples/simd_leaf.rs"
 [[example]]
 name = "avx2-check"
 path = "examples/avx2-check.rs"
+
+[[example]]
+name = "build-immutable-doctest-tree"
+path = "examples/build-immutable-doctest-tree.rs"
+required-features = ["immutable", "serialize_rkyv"]

@@ -17,6 +17,35 @@ These examples demonstrate the creation of a kd-tree, populated by data on world
 * Finding the three most populous cities within 1000km of a certain point o Earth by using `best_n_within`
 
 
+
+
+## Example 2: High-speed zero-copy serialization and deserialization with Rkyv ([rkyv.rs](./rkyv.rs))
+
+* Rkyv-based blazingly fast serialization / deserialization
+
+The output below was from the same machine as the serde example above -
+you can see the tremendous speed improvement that can be had by switching to
+Rkyv for serialization / deserialization
+
+```
+> cargo run --release --example rkyv --features="serialize_rkyv"
+   Compiling kiddo v3.0.0-rc.1 (~/kiddo)
+    Finished release [optimized + debuginfo] target(s) in 9.71s
+     Running `target/release/examples/rkyv`
+Cities successfully parsed from CSV: 11061987
+Parsed 11061987 rows from the CSV: (3.97 s)
+Populated kd-tree with 11061987 items (1.19 s)
+
+Nearest city to 52.5N, 1.9W: CityCsvRecord { name: "Aston", lat: 52.5, lng: -1.88333 }
+Serialized kd-tree to rkyv file (306.00 ms)
+
+
+Memmap ZC Deserialized rkyv file back into a kd-tree (23.31 μs)
+Nearest city to 52.5N, 1.9W: CityCsvRecord { name: "Aston", lat: 52.5, lng: -1.88333 }
+total elapsed: 50.53 μs
+
+```
+
 ## Example 2: Serde Serialization to binary formats ([serde.rs](./serde.rs))
 
 * Serde-based serialization to gzipped bincode
@@ -44,27 +73,3 @@ Deserialized gzipped bincode file back into a kd-tree (2.71 s)
 Nearest city to 52.5N, 1.9W: CityCsvRecord { name: "Aston", lat: 52.5, lng: -1.88333 }
 ```
 
-
-## Example 3: Rkyv high-speed zero-copy serialization and deserialization ([rkyv.rs](./rkyv.rs))
-
-* Rkyv-based blazingly fast serialization / deserialization
-
-The output below was from the same machine as the serde example above - 
-you can see the tremendous speed improvement that can be had by switching to
-Rkyv for serialization / deserialization
-
-```
-> cargo run --release --example rkyv --features="serialize_rkyv"
-   Compiling kiddo v2.0.2 (~/kiddo)
-    Finished release [optimized + debuginfo] target(s) in 3.91s
-     Running `target/release/examples/rkyv`
-Cities successfully parsed from CSV: 11061987
-Parsed 11061987 rows from the CSV: (3.31 s)
-Populated kd-tree with 11061987 items (2.72 s)
-
-Nearest city to 52.5N, 1.9W: CityCsvRecord { name: "Aston", lat: 52.5, lng: -1.88333 }
-Serialized kd-tree to rkyv file (159.66 ms)
-Deserialized rkyv file back into a kd-tree (232.59 ms)
-
-Nearest city to 52.5N, 1.9W: CityCsvRecord { name: "Aston", lat: 52.5, lng: -1.88333 }
-```
