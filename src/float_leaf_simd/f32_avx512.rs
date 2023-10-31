@@ -7,9 +7,9 @@ use std::ptr;
 use crate::{float::kdtree::Axis, types::Content};
 
 unsafe fn get_best_from_dists_f32_avx512<A: Axis, T: Content, const B: usize>(
-    acc: [A; B],
-    items: [T; B],
-    best_dist: &mut A,
+    acc: &[f32; B],
+    items: &[T; B],
+    best_dist: &mut f32,
     best_item: &mut T,
 ) {
     // SSE2 (_mm_setzero_si128 & _mm_set1_epi16)
