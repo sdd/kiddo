@@ -6,11 +6,12 @@ use core::arch::x86_64::{
 use core::arch::x86_64::{_mm512_cmp_pd_mask, _mm512_loadu_pd, _mm512_min_pd, _mm512_storeu_pd};
 use std::ptr;
 
-use crate::{float::kdtree::Axis, types::Content};
-pub(crate) unsafe fn get_best_from_dists_f64_avx512<A: Axis, T: Content, const B: usize>(
-    acc: [A; B],
-    items: [T; B],
-    best_dist: &mut A,
+use crate::types::Content;
+
+pub(crate) unsafe fn get_best_from_dists_f64_avx512<T: Content, const B: usize>(
+    acc: &[f64; B],
+    items: &[T; B],
+    best_dist: &mut f64,
     best_item: &mut T,
 ) {
     // SSE2 (_mm_setzero_si128 & _mm_set1_epi16)

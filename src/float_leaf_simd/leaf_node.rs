@@ -12,12 +12,12 @@ use serde::{Deserialize, Serialize};
 use super::f64_avx2::get_best_from_dists_f64_avx2;
 //use super::{f32_avx2::get_best_from_dists_f32_avx2};
 
-#[cfg(all(
-    feature = "simd",
-    target_feature = "avx512f",
-    any(target_arch = "x86", target_arch = "x86_64")
-))]
-use super::f64_avx512::get_best_from_dists_f64_avx512;
+// #[cfg(all(
+//     feature = "simd",
+//     target_feature = "avx512f",
+//     any(target_arch = "x86", target_arch = "x86_64")
+// ))]
+// use super::f64_avx512::get_best_from_dists_f64_avx512;
 
 use super::fallback::get_best_from_dists_autovec;
 
@@ -133,10 +133,13 @@ where
     fn get_best_from_dists(acc: [f64; B], items: &[T; B], best_dist: &mut f64, best_item: &mut T) {
         #[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
         {
-            if is_x86_feature_detected!("avx512f") {
+            /*if is_x86_feature_detected!("avx512f") {
                 #[cfg(target_feature = "avx512f")]
-                get_best_from_dists_f64_avx512(&acc, best_dist, best_item)
-            } else if is_x86_feature_detected!("avx2") {
+                unsafe {
+                    get_best_from_dists_f64_avx512(&acc, items, best_dist, best_item)
+                }
+            } else */
+            if is_x86_feature_detected!("avx2") {
                 #[cfg(target_feature = "avx2")]
                 unsafe {
                     get_best_from_dists_f64_avx2(&acc, items, best_dist, best_item)
