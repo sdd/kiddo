@@ -81,7 +81,9 @@ impl<A: Axis, T: Content> ResultCollection<A, T> for SortedVec<NearestNeighbour<
     }
 
     fn max_dist(&self) -> A {
-        if let Some(NearestNeighbour { distance, .. }) = self.last() {
+        if self.len() < self.capacity() {
+            A::infinity()
+        } else if let Some(NearestNeighbour { distance, .. }) = self.last() {
             *distance
         } else {
             A::infinity()

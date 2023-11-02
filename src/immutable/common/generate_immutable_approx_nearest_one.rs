@@ -7,7 +7,9 @@ macro_rules! generate_immutable_approx_nearest_one {
             #[inline]
             pub fn approx_nearest_one<D>(&self, query: &[A; K]) -> NearestNeighbour<A, T>
             where
+                A: BestFromDists<T, B>,
                 D: DistanceMetric<A, K>,
+                usize: Cast<T>,
             {
                 let mut split_dim = 0;
                 let mut stem_idx = 1;
@@ -34,19 +36,25 @@ macro_rules! generate_immutable_approx_nearest_one {
                 let leaf_node = unsafe { self.leaves.get_unchecked(stem_idx - stem_len) };
                 // let leaf_node = &self.leaves[leaf_idx];
 
-                leaf_node
-                    .content_points
-                    .iter()
-                    .enumerate()
-                    .take(leaf_node.size as usize)
-                    .for_each(|(idx, entry)| {
-                        let dist = D::dist(query, entry);
-                        if dist < best_dist {
-                            best_dist = dist;
-                            best_item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
-                            // *best_item = leaf_node.content_items[idx]
-                        }
-                    });
+                leaf_node.nearest_one::<D>(
+                    query,
+                    &mut best_dist,
+                    &mut best_item
+                );
+
+                // leaf_node
+                //     .content_points
+                //     .iter()
+                //     .enumerate()
+                //     .take(leaf_node.size as usize)
+                //     .for_each(|(idx, entry)| {
+                //         let dist = D::dist(query, entry);
+                //         if dist < best_dist {
+                //             best_dist = dist;
+                //             best_item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
+                //             // *best_item = leaf_node.content_items[idx]
+                //         }
+                //     });
 
                 NearestNeighbour {
                     distance: best_dist,
