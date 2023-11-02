@@ -1,10 +1,10 @@
 use crate::distance_metric::DistanceMetric;
-use crate::nearest_neighbour::NearestNeighbour;
-use std::ops::Rem;
-
 use crate::float::kdtree::Axis;
+use crate::float_leaf_simd::leaf_node::BestFromDists;
 use crate::immutable::float::kdtree::ImmutableKdTree;
+use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::Content;
+use az::Cast;
 
 use crate::generate_immutable_within_unsorted;
 
@@ -59,7 +59,7 @@ impl<
     use memmap::MmapOptions;
 
     let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
-    let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, u32, 3, 32>>(&mmap) };"
+    let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, u64, 3, 32>>(&mmap) };"
     );
 }
 
@@ -72,11 +72,9 @@ mod tests {
     use rand::Rng;
     use std::cmp::Ordering;
 
-    type AX = f32;
-
     #[test]
     fn can_query_items_within_radius() {
-        let content_to_add: [[AX; 4]; 16] = [
+        let content_to_add: [[f32; 4]; 16] = [
             [0.9f32, 0.0f32, 0.9f32, 0.0f32],
             [0.4f32, 0.5f32, 0.4f32, 0.51f32],
             [0.12f32, 0.3f32, 0.12f32, 0.3f32],
@@ -95,7 +93,8 @@ mod tests {
             [0.11f32, 0.2f32, 0.11f32, 0.2f32],
         ];
 
-        let tree: ImmutableKdTree<AX, u32, 4, 4> = ImmutableKdTree::new_from_slice(&content_to_add);
+        let tree: ImmutableKdTree<f32, u32, 4, 4> =
+            ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), 16);
 
@@ -143,7 +142,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..TREE_SIZE).map(|_| rand::random::<[f32; 4]>()).collect();
 
-        let tree: ImmutableKdTree<AX, u32, 4, 32> =
+        let tree: ImmutableKdTree<f32, u32, 4, 32> =
             ImmutableKdTree::new_from_slice(&content_to_add);
         assert_eq!(tree.size(), TREE_SIZE);
 

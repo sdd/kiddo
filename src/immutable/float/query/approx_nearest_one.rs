@@ -1,8 +1,10 @@
 use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
+use crate::float_leaf_simd::leaf_node::BestFromDists;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::Content;
+use az::Cast;
 
 use crate::generate_immutable_approx_nearest_one;
 

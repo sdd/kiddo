@@ -63,9 +63,8 @@ macro_rules! generate_immutable_nearest_n_within {
                     (0..K).step_by(1).for_each(|dim| {
                         let qd = [query[dim]; B];
 
-                        (0..B).step_by(1).for_each(|idx| {
-                            acc[idx] += (leaf_node.content_points[dim][idx] - qd[idx])
-                                    * (leaf_node.content_points[dim][idx] - qd[idx]);
+                        (0..leaf_node.size as usize).step_by(1).for_each(|idx| {
+                            acc[idx] += D::dist1(leaf_node.content_points[dim][idx], qd[idx]);
                         });
                     });
 
