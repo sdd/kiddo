@@ -106,9 +106,9 @@ pub type KdTree<A, const K: usize> = float::kdtree::KdTree<A, u64, K, 32, u32>;
 /// An immutable floating-point k-d tree with default parameters.
 ///
 /// `A` is the floating point type (`f32` or `f64`).
-/// `K` is the number of dimensions. See [`immutable::float::kdtree::KdTree`] for details of how to use.
+/// `K` is the number of dimensions. See [`immutable::float::kdtree::ImmutableKdTree`] for details of how to use.
 ///
-/// To manually specify more advanced parameters, use [`immutable::float::kdtree::KdTree`] directly.
+/// To manually specify more advanced parameters, use [`immutable::float::kdtree::ImmutableKdTree`] directly.
 /// To store positions using integer or fixed-point types, use [`fixed::kdtree::KdTree`].
 #[cfg(feature = "immutable")]
 pub type ImmutableKdTree<A, const K: usize> =
