@@ -19,8 +19,8 @@ Results are returned in arbitrary order. Faster than `within`.
 # Examples
 
 ```rust
-use kiddo::immutable::float::kdtree::ImmutableKdTree;
-use kiddo::float::distance::SquaredEuclidean;
+use kiddo::ImmutableKdTree;
+use kiddo::SquaredEuclidean;
 ",
             $doctest_build_tree,
             "
@@ -40,7 +40,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
             [2.0, 3.0, 6.0]
         );
 
-        let tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::new_from_slice(&content);"
+        let tree: ImmutableKdTree<f64, 3> = ImmutableKdTree::new_from_slice(&content);"
     );
 }
 
@@ -59,7 +59,7 @@ impl<
     use memmap::MmapOptions;
 
     let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
-    let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, u64, 3, 32>>(&mmap) };"
+    let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, 3>>(&mmap) };"
     );
 }
 

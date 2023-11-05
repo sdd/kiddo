@@ -36,7 +36,10 @@ jobs:
           crate: cargo-llvm-cov
 
       - name: Generate Coverage
-        run: cargo llvm-cov --all-features --tests --ignore-run-fail --workspace --codecov --output-path codecov.json
+        run: |
+          cargo run --example build-float-doctest-tree --features="serialize_rkyv"
+          cargo run --example build-immutable-doctest-tree --features="immutable serialize_rkyv"
+          cargo llvm-cov --all-features --tests --ignore-run-fail --workspace --codecov --output-path codecov.json
 
       - uses: codecov/codecov-action@v3
         with:

@@ -11,11 +11,13 @@ use crate::float::kdtree::Axis;
 ///
 /// Faster than squared Euclidean, and just as effective if not more so in higher-dimensional spaces
 ///
+/// re-exported as `kiddo::Manhattan` for convenience
+///
 /// # Examples
 ///
 /// ```rust
 /// use kiddo::distance_metric::DistanceMetric;
-/// use kiddo::float::distance::Manhattan;
+/// use kiddo::Manhattan;
 ///
 /// assert_eq!(0f32, Manhattan::dist(&[0f32, 0f32], &[0f32, 0f32]));
 /// assert_eq!(1f32, Manhattan::dist(&[0f32, 0f32], &[1f32, 0f32]));
@@ -43,11 +45,13 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
 /// Faster than Euclidean distance due to not needing a square root, but still
 /// preserves the same distance ordering as with Euclidean distance.
 ///
+/// re-exported as `kiddo::SquaredEuclidean` for convenience
+///
 /// # Examples
 ///
 /// ```rust
 /// use kiddo::distance_metric::DistanceMetric;
-/// use kiddo::float::distance::SquaredEuclidean;
+/// use kiddo::SquaredEuclidean;
 ///
 /// assert_eq!(0f32, SquaredEuclidean::dist(&[0f32, 0f32], &[0f32, 0f32]));
 /// assert_eq!(1f32, SquaredEuclidean::dist(&[0f32, 0f32], &[1f32, 0f32]));
