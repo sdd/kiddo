@@ -1,5 +1,10 @@
-/// This example extends the Serde deserialization from Example 1
-/// by demonstrating serialization to/from JSON and gzipped Bincode
+/// Kiddo example 2: Rkyv
+///
+/// Creates a large tree of random data and serialize it with Rkyv
+/// to a file.
+///
+/// Deserializes it back into a KdTree using four different approaches:
+/// memmapped & ZC, ZC without memmmap, Memmapped without ZC, and niether memmapped nor ZC.
 mod cities;
 
 use elapsed::ElapsedDuration;

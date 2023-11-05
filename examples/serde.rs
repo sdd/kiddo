@@ -1,4 +1,4 @@
-/// Kiddo example 2: Serde
+/// Kiddo example 3: Serde
 ///
 /// This example extends the Serde deserialization from Example 1
 /// by demonstrating serialization to/from JSON and gzipped Bincode
