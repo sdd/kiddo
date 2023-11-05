@@ -1,11 +1,13 @@
-use crate::float::kdtree::Axis;
-use crate::immutable::float::kdtree::ImmutableKdTree;
+use az::Cast;
+use std::collections::BinaryHeap;
+use std::ops::Rem;
 
 use crate::best_neighbour::BestNeighbour;
 use crate::distance_metric::DistanceMetric;
+use crate::float::kdtree::Axis;
+use crate::float_leaf_simd::leaf_node::BestFromDists;
+use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::types::Content;
-use std::collections::BinaryHeap;
-use std::ops::Rem;
 
 use crate::generate_immutable_best_n_within;
 
@@ -17,14 +19,13 @@ macro_rules! generate_immutable_float_best_n_within {
 
 Results are returned in arbitrary order. 'Best' is determined by
 performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt`]). Returns an iterator.
-Returns an iterator.
 
 # Examples
 
 ```rust
     use kiddo::immutable::float::kdtree::ImmutableKdTree;
     use kiddo::best_neighbour::BestNeighbour;
-    use kiddo::float::distance::SquaredEuclidean;
+    use kiddo::SquaredEuclidean;
 
     ",
                 $doctest_build_tree,
@@ -47,7 +48,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
             [2.0, 3.0, 6.0]
         );
 
-        let tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::new_from_slice(&content);"
+        let tree: ImmutableKdTree<f64, u64, 3, 32> = ImmutableKdTree::new_from_slice(&content);"
     );
 }
 
@@ -66,7 +67,7 @@ impl<
     use memmap::MmapOptions;
 
     let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
-    let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, u32, 3, 32>>(&mmap) };"
+    let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, u64, 3, 32>>(&mmap) };"
     );
 }
 
@@ -184,21 +185,19 @@ mod tests {
         let mut best_items = Vec::with_capacity(max_qty);
 
         for (item, p) in content.iter().enumerate() {
-            let distance = SquaredEuclidean::dist(query, &p);
+            let distance = SquaredEuclidean::dist(query, p);
             if distance <= radius {
                 if best_items.len() < max_qty {
                     best_items.push(BestNeighbour {
                         distance,
                         item: item as i32,
                     });
-                } else {
-                    if (item as i32) < (*best_items.last().unwrap()).item {
-                        best_items.pop().unwrap();
-                        best_items.push(BestNeighbour {
-                            distance,
-                            item: item as i32,
-                        });
-                    }
+                } else if (item as i32) < best_items.last().unwrap().item {
+                    best_items.pop().unwrap();
+                    best_items.push(BestNeighbour {
+                        distance,
+                        item: item as i32,
+                    });
                 }
             }
             best_items.sort_unstable();

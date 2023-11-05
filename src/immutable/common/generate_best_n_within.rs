@@ -12,6 +12,8 @@ macro_rules! generate_immutable_best_n_within {
                 max_qty: usize,
             ) -> impl Iterator<Item = BestNeighbour<A, T>>
             where
+                A: BestFromDists<T, B>,
+                usize: Cast<T>,
                 D: DistanceMetric<A, K>,
             {
                 let mut off = [A::zero(); K];
@@ -43,19 +45,28 @@ macro_rules! generate_immutable_best_n_within {
                 off: &mut [A; K],
                 rd: A,
             ) where
+                A: BestFromDists<T, B>,
+                usize: Cast<T>,
                 D: DistanceMetric<A, K>,
             {
                 if stem_idx >= self.stems.len() {
                     let leaf_node = &self.leaves[stem_idx - self.stems.len()];
 
-                    leaf_node
-                        .content_points
+                    let mut acc = [A::zero(); B];
+                    (0..K).step_by(1).for_each(|dim| {
+                        let qd = [query[dim]; B];
+
+                        (0..leaf_node.size as usize).step_by(1).for_each(|idx| {
+                            acc[idx] += D::dist1(leaf_node.content_points[dim][idx], qd[idx]);
+                        });
+                    });
+
+                    acc
                         .iter()
-                        .take(leaf_node.size as usize)
-                        .map(|entry| D::dist(query, entry))
                         .enumerate()
-                        .filter(|(_, distance)| *distance <= radius)
-                        .for_each(|(idx, distance)| {
+                        .take(leaf_node.size as usize)
+                        .filter(|(_, &distance)| distance <= radius)
+                        .for_each(|(idx, &distance)| {
                             let item = *unsafe { leaf_node.content_items.get_unchecked(idx) };
                             if best_items.len() < max_qty {
                                 best_items.push(BestNeighbour { distance, item });
