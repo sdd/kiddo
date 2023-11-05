@@ -169,3 +169,8 @@ path = "examples/avx2-check.rs"
 name = "build-immutable-doctest-tree"
 path = "examples/build-immutable-doctest-tree.rs"
 required-features = ["immutable", "serialize_rkyv"]
+
+[[example]]
+name = "build-float-doctest-tree"
+path = "examples/build-float-doctest-tree.rs"
+required-features = ["serialize_rkyv"]

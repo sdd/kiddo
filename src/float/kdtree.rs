@@ -146,9 +146,9 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
+    /// use kiddo::KdTree;
     ///
-    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+    /// let mut tree: KdTree<f64, 3> = KdTree::new();
     ///
     /// tree.add(&[1.0, 2.0, 5.0], 100);
     ///
@@ -164,9 +164,9 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
+    /// use kiddo::KdTree;
     ///
-    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
+    /// let mut tree: KdTree<f64, 3> = KdTree::with_capacity(1_000_000);
     ///
     /// tree.add(&[1.0, 2.0, 5.0], 100);
     ///
@@ -212,9 +212,9 @@ macro_rules! generate_common_methods {
         /// # Examples
         ///
         /// ```rust
-        /// use kiddo::float::kdtree::KdTree;
+        /// use kiddo::KdTree;
         ///
-        /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+        /// let mut tree: KdTree<f64, 3> = KdTree::new();
         ///
         /// tree.add(&[1.0, 2.0, 5.0], 100);
         /// tree.add(&[1.1, 2.1, 5.1], 101);

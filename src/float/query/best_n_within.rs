@@ -23,9 +23,9 @@ Returns an iterator.
 # Examples
 
 ```rust
-    use kiddo::float::kdtree::KdTree;
+    use kiddo::KdTree;
     use kiddo::best_neighbour::BestNeighbour;
-    use kiddo::float::distance::SquaredEuclidean;
+    use kiddo::SquaredEuclidean;
 
     ",
                 $doctest_build_tree,
@@ -48,7 +48,7 @@ where
 {
     generate_float_best_n_within!(
         LeafNode,
-        "let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+        "let mut tree: KdTree<f64, 3> = KdTree::new();
     tree.add(&[1.0, 2.0, 5.0], 100);
     tree.add(&[2.0, 3.0, 6.0], 101);"
     );
@@ -72,8 +72,8 @@ where
         "use std::fs::File;
     use memmap::MmapOptions;
 
-    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/test-tree.rkyv\").unwrap()).unwrap() };
-    let tree = unsafe { rkyv::archived_root::<KdTree<f64, u32, 3, 32, u32>>(&mmap) };"
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/float-doctest-tree.rkyv\").unwrap()).unwrap() };
+    let tree = unsafe { rkyv::archived_root::<KdTree<f64, 3>>(&mmap) };"
     );
 }
 

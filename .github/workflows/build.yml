@@ -192,7 +192,9 @@ jobs:
           components: rustfmt,clippy
 
       - name: Cargo test
-        run: cargo test --workspace --features=serialize,serialize_rkyv
+        run: |
+          cargo run --example build-float-doctest-tree --features="serialize_rkyv"
+          cargo test --workspace --features=serialize,serialize_rkyv
 
   test-all-features:
     name: Run Tests (Nightly, all features enabled)
@@ -221,4 +223,7 @@ jobs:
       - name: Cargo test
         env:
           RUSTFLAGS: '-C target-cpu=native'
-        run: cargo test --workspace --all-features --release
+        run: |
+          cargo run --example build-float-doctest-tree --features="serialize_rkyv"
+          cargo run --example build-immutable-doctest-tree --features="immutable serialize_rkyv"
+          cargo test --workspace --all-features --release
