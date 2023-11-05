@@ -1,5 +1,5 @@
 // This example builds a very large ImmutableTree with ~250M items,
-// and then performs some random queries aganst it.
+// and then performs some random queries against it.
 
 use std::error::Error;
 
