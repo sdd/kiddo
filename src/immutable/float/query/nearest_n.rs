@@ -267,13 +267,13 @@ mod tests {
         let mut results: Vec<(A, R)> = vec![];
 
         for (idx, p) in content.iter().enumerate() {
-            let dist = SquaredEuclidean::dist(query_point, &p);
+            let dist = SquaredEuclidean::dist(query_point, p);
             if results.len() < qty {
                 results.push((dist, idx.az::<R>()));
-                results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(&b_dist).unwrap());
+                results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(b_dist).unwrap());
             } else if dist < results[qty - 1].0 {
                 results[qty - 1] = (dist, idx.az::<R>());
-                results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(&b_dist).unwrap());
+                results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(b_dist).unwrap());
             }
         }
 
