@@ -7,7 +7,7 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::broken_intra_doc_links)]
 #![warn(rustdoc::private_intra_doc_links)]
-#![doc(html_root_url = "https://docs.rs/kiddo/3.0.0-rc.1")]
+#![doc(html_root_url = "https://docs.rs/kiddo/3.0.0")]
 #![doc(issue_tracker_base_url = "https://github.com/sdd/kiddo/issues/")]
 
 //! # Kiddo
@@ -16,11 +16,12 @@
 //!
 //! Possibly the fastest k-d tree library in the world? [See for yourself](https://sdd.github.io/kd-tree-comparison-webapp/).
 //!
-//! Version 2 and onwards is a complete rewrite over the previous v0.6.x codebase, providing:
-//! - a new internal architecture for **much-improved performance**;
-//! - Added **integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) library;
+//! Kiddo provides:
+//! - Its standard floating-point k-d tree, exposed as [`kiddo::KdTree`](`crate::KdTree`)
+//! - **integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) library;
 //! - **instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
-//! - See the [changelog](https://github.com/sdd/kiddo/blob/master/CHANGELOG.md) for a detailed run-down on all the changes made in v2.
+//! - An [`ImmutableKdTree`](`float::kdtree::ImmutableKdTree`) with space and performance advantages over the standard
+//!   k-d tree, for situations where the tree does not need to be modified after creation
 //!
 //! Kiddo is ideal for super-fast spatial / geospatial lookups and nearest-neighbour / KNN
 //! queries for low-ish numbers of dimensions, where you want to ask questions such as:
@@ -33,14 +34,14 @@
 //! Add `kiddo` to `Cargo.toml`
 //! ```toml
 //! [dependencies]
-//! kiddo = "3.0.0-rc.1"
+//! kiddo = "3.0.0"
 //! ```
 //!
 //! ## Usage
 //! ```rust
 //! use kiddo::KdTree;
-//! use kiddo::float::distance::SquaredEuclidean;
-//! use kiddo::nearest_neighbour::NearestNeighbour;
+//! use kiddo::SquaredEuclidean;
+//! use kiddo::NearestNeighbour;
 //!
 //! let entries = vec![
 //!     [0f64, 0f64],
@@ -70,6 +71,13 @@
 //! ```
 //!
 //! See the [examples documentation](https://github.com/sdd/kiddo/tree/master/examples) for some more in-depth examples.
+//! ## Optional Features
+
+//! The crate exposes the following features:
+//! * **serialize** - serialization / deserialization via [`Serde`](https://docs.rs/serde/latest/serde/)
+//! * **serialize_rkyv** - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/)
+//! * **immutable** - to use [`ImmutableKdTree`](`float::kdtree::ImmutableKdTree`)
+//! * **simd** - enables some hand written SIMD and pre-fetch intrinsics code within [`ImmutableKdTree`](`float::kdtree::ImmutableKdTree`) that may improve performance (currently only on nearest_one with `f64`)
 
 #[macro_use]
 extern crate doc_comment;
@@ -78,11 +86,13 @@ pub mod best_neighbour;
 #[doc(hidden)]
 pub(crate) mod common;
 #[cfg(feature = "serialize")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "serialize")))]
 mod custom_serde;
 pub mod distance_metric;
 pub mod fixed;
 pub mod float;
 #[cfg(feature = "immutable")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "immutable")))]
 pub mod immutable;
 mod mirror_select_nth_unstable_by;
 pub mod nearest_neighbour;
@@ -97,18 +107,18 @@ pub mod float_leaf_simd;
 /// A floating-point k-d tree with default parameters.
 ///
 /// `A` is the floating point type (`f32` or `f64`).
-/// `K` is the number of dimensions. See [`float::kdtree::KdTree`] for details of how to use.
+/// `K` is the number of dimensions. See [`KdTree`](`float::kdtree::KdTree`) for details of how to use.
 ///
-/// To manually specify more advanced parameters, use [`float::kdtree::KdTree`] directly.
+/// To manually specify more advanced parameters, use [`KdTree`](`float::kdtree::KdTree`) directly.
 /// To store positions using integer or fixed-point types, use [`fixed::kdtree::KdTree`].
 pub type KdTree<A, const K: usize> = float::kdtree::KdTree<A, u64, K, 32, u32>;
 
 /// An immutable floating-point k-d tree with default parameters.
 ///
 /// `A` is the floating point type (`f32` or `f64`).
-/// `K` is the number of dimensions. See [`immutable::float::kdtree::ImmutableKdTree`] for details of how to use.
+/// `K` is the number of dimensions. See [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) for details of how to use.
 ///
-/// To manually specify more advanced parameters, use [`immutable::float::kdtree::ImmutableKdTree`] directly.
+/// To manually specify more advanced parameters, use [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) directly.
 /// To store positions using integer or fixed-point types, use [`fixed::kdtree::KdTree`].
 #[cfg(feature = "immutable")]
 pub type ImmutableKdTree<A, const K: usize> =

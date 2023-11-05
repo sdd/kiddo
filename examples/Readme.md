@@ -29,7 +29,7 @@ Rkyv for serialization / deserialization
 
 ```
 > cargo run --release --example rkyv --features="serialize_rkyv"
-   Compiling kiddo v3.0.0-rc.1 (~/kiddo)
+   Compiling kiddo v3.0.0 (~/kiddo)
     Finished release [optimized + debuginfo] target(s) in 9.71s
      Running `target/release/examples/rkyv`
 Cities successfully parsed from CSV: 11061987
@@ -46,7 +46,7 @@ total elapsed: 50.53 μs
 
 ```
 
-## Example 2: Serde Serialization to binary formats ([serde.rs](./serde.rs))
+## Example 3: Serde Serialization to binary formats ([serde.rs](./serde.rs))
 
 * Serde-based serialization to gzipped bincode
 * Serde-based deserialization from gzipped bincode
@@ -72,4 +72,3 @@ Deserialized gzipped bincode file back into a kd-tree (2.71 s)
 
 Nearest city to 52.5N, 1.9W: CityCsvRecord { name: "Aston", lat: 52.5, lng: -1.88333 }
 ```
-

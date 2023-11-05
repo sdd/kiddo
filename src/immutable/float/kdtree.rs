@@ -1,8 +1,8 @@
 //! Immutable Floating point k-d tree. Offers less memory utilisation, smaller size
-//! when serialized, and faster more consistent query performace. This comes at the
+//! when serialized, and faster more consistent query performance. This comes at the
 //! expense of not being able to modify the contents of the tree after its initial
 //! construction, and longer construction times - perhaps prohibitively so.
-//! As with the vanilla tree, `f64` or `f32` are supported currently for co-ordinate
+//! As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
 //! values.
 
 use az::{Az, Cast};
@@ -26,8 +26,10 @@ use serde::{Deserialize, Serialize};
 /// when serialized, and faster more consistent query performance. This comes at the
 /// expense of not being able to modify the contents of the tree after its initial
 /// construction, and longer construction times.
-/// As with the vanilla tree, `f64` or `f32` are supported currently for co-ordinate
+/// As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
 /// values.
+///
+/// A convenient type alias exists for ImmutableKdTree with some sensible defaults set: [`kiddo::ImmutableKdTree`](`crate::ImmutableKdTree`).
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "serialize_rkyv",

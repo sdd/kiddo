@@ -12,12 +12,12 @@
 //!    to modify its contents after it has been constructed.
 //!    The co-ordinates of the points to be stored must
 //!    have all been generated in advance.
-//! 2) Construction time can be quite a bit slower. Typically
-//!    this can be twice as long as the default `kiddo::float::kdtree::KdTree`.
+//! 2) Construction time can be a bit slower. Typically
+//!    this can be twice as long as the default [`float::kdtree::KdTree`](`crate::float::kdtree::KdTree`).
 //! 3) The more common that duplicate values are amongst your source points,
-//!    the slower it will take to construct the tree. If you're using `f64`
+//!    the slower it will take to construct the tree. If you're using [`f64`]
 //!    data that is fairly random-ish, you will probably not encounter any issues.
-//!    I've successfully created 250 million node `ImmutableTree` instances with random
+//!    I've successfully created 250 million node [`ImmutableKdTree`](`float::kdtree::ImmutableKdTree`) instances with random
 //!    [`f64`] data with no issues, limited only by RAM during construction.
 //!    Likewise for [`f32`] based trees, up to a few million nodes.
 //!

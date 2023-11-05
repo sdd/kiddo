@@ -1,5 +1,38 @@
 # Kiddo Changelog
 
+
+## [3.0.0] - 2023-11-05
+
+I can't believe how long it has taken me to get v3 into shape, but it's finally here! :tada:
+
+The [ImmutableKdTree](https://docs.rs/kiddo/3.0.0/kiddo/immutable/float/kdtree/struct.ImmutableKdTree.html) is finally ready! :tada: Designed for use cases where all the points that you need to add
+to the tree are known up-front, and no modifications need to be made after the tree is initially populated.
+`ImmutableKdTree` balances and optimises the tree at construction time, ensuring much more efficient
+memory usage (and a correspondingly smaller size on-disk for serialized trees). Since the interior
+nodes of the `ImmutableKdTree` also take up less space in memory, more of them can fit in the CPU cache, potentially
+improving performance in some cases.
+
+The `immutable` crate feature needs to be activated in order to use `ImmutableKdTree`.
+More info on `ImmutableKdTree` can be found below in the 3.0.0 beta and RC changelog entries.
+
+Version 3.x changes the distance metrics syntax, switching from function pointers to a trait-based
+approach that permitted some ergonomics and performance improvements. This is a breaking change though:
+whereas prior to v3, you may have had queries that look like this:
+
+```
+use kiddo::distance::squared_euclidean;
+
+let result = kdtree.nearest_one(&[0f64, 0f64], &squared_euclidean);
+```
+
+Now in v3, you'll need to switch to this syntax:
+
+```
+use kiddo::SquaredEuclidean;
+
+let result = kdtree.nearest_one::<SquaredEuclidean>(&[0f64, 0f64]);
+```
+
 ## [3.0.0-rc.1] - 2023-10-17
 
 ### Features
