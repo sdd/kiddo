@@ -1,5 +1,5 @@
 // This example builds /examples/immutable-doctest-tree.rkyv, which is needed
-// if you want to run the ArchivedeImmutableTree doctests
+// if you want to run the ArchivedImmutableTree doctests
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
