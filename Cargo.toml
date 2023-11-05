@@ -80,6 +80,7 @@ serialize = ["serde", "serde_derive", "serde_with", "fixed/serde"]
 serialize_rkyv = ["rkyv"]
 simd = []
 immutable = []
+no_unsafe = []
 default = []
 
 [package.metadata.docs.rs]

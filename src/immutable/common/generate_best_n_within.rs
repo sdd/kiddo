@@ -50,7 +50,11 @@ macro_rules! generate_immutable_best_n_within {
                 D: DistanceMetric<A, K>,
             {
                 if stem_idx >= self.stems.len() {
+
+                    #[cfg(feature = "no_unsafe")]
                     let leaf_node = &self.leaves[stem_idx - self.stems.len()];
+                    #[cfg(not(feature = "no_unsafe"))]
+                    let leaf_node = *unsafe { self.leaves.get_unchecked(stem_idx - self.stems.len()) };
 
                     let mut acc = [A::zero(); B];
                     (0..K).step_by(1).for_each(|dim| {
@@ -67,7 +71,12 @@ macro_rules! generate_immutable_best_n_within {
                         .take(leaf_node.size as usize)
                         .filter(|(_, &distance)| distance <= radius)
                         .for_each(|(idx, &distance)| {
+
+                            #[cfg(not(feature = "no_unsafe"))]
                             let item = *unsafe { leaf_node.content_items.get_unchecked(idx) };
+                            #[cfg(feature = "no_unsafe")]
+                            let item = &leaf_node.content_items[idx];
+
                             if best_items.len() < max_qty {
                                 best_items.push(BestNeighbour { distance, item });
                             } else {
@@ -87,15 +96,19 @@ macro_rules! generate_immutable_best_n_within {
                 #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
                 self.prefetch_stems(left_child_idx);
 
+                #[cfg(not(feature = "no_unsafe"))]
                 let val = *unsafe { self.stems.get_unchecked(stem_idx) };
-                // let val = self.stems[stem_idx];
+                #[cfg(feature = "no_unsafe")]
+                let val = self.stems[stem_idx];
 
                 let mut rd = rd;
                 let old_off = off[split_dim];
                 let new_off = query[split_dim].saturating_dist(val);
 
+                #[cfg(not(feature = "no_unsafe"))]
                 let is_left_child = usize::from(*unsafe { query.get_unchecked(split_dim) } < val);
-                // let is_left_child = usize::from(query[split_dim] < val);
+                #[cfg(feature = "no_unsafe")]
+                let is_left_child = usize::from(query[split_dim] < val);
 
                 let closer_node_idx = left_child_idx + (1 - is_left_child);
                 let further_node_idx = left_child_idx + is_left_child;
