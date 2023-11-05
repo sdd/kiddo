@@ -74,28 +74,5 @@ fn main() -> Result<(), Box<dyn Error>> {
         file_size
     );
 
-    // let start = Instant::now();
-
-    // // memmap the file into a buffer
-    // let buf =
-    //     unsafe { MmapOptions::new().map(&File::open("./examples/immutable-test-tree.rkyv")?)? };
-
-    // // zero-copy deserialize
-    // let tree = unsafe { rkyv::archived_root::<Tree>(&buf) };
-    // println!(
-    //     "Memmap ZC Deserialized rkyv file back into a kd-tree ({})",
-    //     ElapsedDuration::new(start.elapsed())
-    // );
-
-    // // perform a query
-    // let query = [0.123f64, 0.456f64, 0.789f64];
-    // let nearest_neighbour = tree.nearest_one::<SquaredEuclidean>(&query);
-
-    // println!("Nearest item to query: {:?}", nearest_neighbour.item);
-    // println!(
-    //     "total elapsed: {}\n\n",
-    //     ElapsedDuration::new(start.elapsed())
-    // );
-
     Ok(())
 }
