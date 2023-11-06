@@ -22,7 +22,8 @@
 //!    Likewise for [`f32`] based trees, up to a few million nodes.
 //!
 //! As per the other Kiddo float-type trees, points being stored
-//! in the tree must be floats ([`f64`] or [`f32`] are supported currently).
+//! in the tree must be floats ([`f64`] or [`f32`] are supported currently,
+//! or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled).
 
 #[doc(hidden)]
 pub mod construction;
