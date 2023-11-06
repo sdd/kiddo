@@ -1,5 +1,6 @@
 //! Floating point k-d tree, for use when the co-ordinates of the points being stored in the tree
-//! are floats. f64 or f32 are supported currently.
+//! are floats. f64 or f32 are supported currently, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html)
+//! if the `f16` feature is enabled
 
 use az::{Az, Cast};
 use divrem::DivCeil;
@@ -16,7 +17,8 @@ use serde::{Deserialize, Serialize};
 
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
-/// on the float [`KdTree`]. This will be [`f64`] or [`f32`].
+/// on the float [`KdTree`]. This will be [`f64`] or [`f32`],
+/// or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
 pub trait Axis: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign {
     /// returns absolute diff between two values of a type implementing this trait
     fn saturating_dist(self, other: Self) -> Self;
@@ -47,7 +49,8 @@ impl<T: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign> 
 /// Floating point k-d tree
 ///
 /// For use when the co-ordinates of the points being stored in the tree
-/// on the float [`KdTree`]. This will be [`f64`] or [`f32`].
+/// on the float [`KdTree`]. This will be [`f64`] or [`f32`],
+/// or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
 ///
 /// A convenient type alias exists for KdTree with some sensible defaults set: [`kiddo::KdTree`](`crate::KdTree`).
 

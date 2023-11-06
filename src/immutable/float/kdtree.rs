@@ -3,7 +3,7 @@
 //! expense of not being able to modify the contents of the tree after its initial
 //! construction, and longer construction times - perhaps prohibitively so.
 //! As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
-//! values.
+//! values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
 
 use az::{Az, Cast};
 use ordered_float::OrderedFloat;
@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 /// expense of not being able to modify the contents of the tree after its initial
 /// construction, and longer construction times.
 /// As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
-/// values.
+/// values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
 ///
 /// A convenient type alias exists for ImmutableKdTree with some sensible defaults set: [`kiddo::ImmutableKdTree`](`crate::ImmutableKdTree`).
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]

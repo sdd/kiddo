@@ -18,6 +18,7 @@ Kiddo is ideal for super-fast spatial / geospatial lookups and nearest-neighbour
 Kiddo provides:
  - Its standard floating point k-d tree, exposed as [`kiddo::KdTree`](`crate::KdTree`)
  - **integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) library;
+ - **`f16` support** via the [`half`](https://docs.rs/half/latest/half/) library; 
  - **instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
  - An [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) with space and performance advantages over the standard
    k-d tree, for situations where the tree does not need to be modified after creation
@@ -26,7 +27,7 @@ Kiddo provides:
 Add `kiddo` to `Cargo.toml`
 ```toml
 [dependencies]
-kiddo = "3.0.0"
+kiddo = "4.2.0"
 ```
 
 Add points to kdtree and query nearest n points with distance function
@@ -70,6 +71,7 @@ The Kiddo crate exposes the following features. Any labelled as **(NIGHTLY)** ar
 * `serialize_rkyv` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/)
 * `global_allocate` **(NIGHTLY)** -  When enabled Kiddo will use the unstable allocator_api feature within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) to get a slight performance improvement when allocating space for leaves.
 * `simd` **(NIGHTLY)** - enables some hand-written SIMD intrinsic code within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) that may improve performance (currently only on the nearest_one method when using `f64`)
+* `f16` - enables usage of `f16` from the `half` crate for float trees.
 
 ## v3.x
 
@@ -82,7 +84,7 @@ use kiddo::distance::squared_euclidean;
 let result = kdtree.nearest_one(&[0f64, 0f64], &squared_euclidean);
 ```
 
-Now in v3, you'll need to switch to this syntax:
+Now for v3 onwards, you'll need to switch to this syntax:
 
 ```
 use kiddo::SquaredEuclidean;

@@ -17,6 +17,7 @@
 //! Kiddo provides:
 //! - Its standard floating-point k-d tree, exposed as [`kiddo::KdTree`](`crate::KdTree`)
 //! - **integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) library;
+//! - **`f16` support** via the [`half`](https://docs.rs/half/latest/half/) library;
 //! - **instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
 //! - An [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) with space and performance advantages over the standard
 //!   k-d tree, for situations where the tree does not need to be modified after creation
@@ -32,7 +33,7 @@
 //! Add `kiddo` to `Cargo.toml`
 //! ```toml
 //! [dependencies]
-//! kiddo = "3.0.0"
+//! kiddo = "4.2.0"
 //! ```
 //!
 //! ## Usage
@@ -76,6 +77,7 @@
 //! * **serialize_rkyv** - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/)
 //! * `global_allocate` **(NIGHTLY)** -  When enabled Kiddo will use the unstable allocator_api feature within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) to get a slight performance improvement when allocating space for leaves.
 //! * `simd` **(NIGHTLY)** - enables some hand written SIMD and pre-fetch intrinsics code within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) that may improve performance (currently only on nearest_one with `f64`)
+//! * `f16` - enables usage of `f16` from the `half` crate for float trees.
 
 #[macro_use]
 extern crate doc_comment;
@@ -107,7 +109,7 @@ pub mod float_leaf_simd;
 
 /// A floating-point k-d tree with default parameters.
 ///
-/// `A` is the floating point type (`f32` or `f64`).
+/// `A` is the floating point type (`f32` or `f64`, or `f16` if the `f16` feature is enabled).
 /// `K` is the number of dimensions. See [`KdTree`](`float::kdtree::KdTree`) for details of how to use.
 ///
 /// To manually specify more advanced parameters, use [`KdTree`](`float::kdtree::KdTree`) directly.
@@ -116,7 +118,7 @@ pub type KdTree<A, const K: usize> = float::kdtree::KdTree<A, u64, K, 32, u32>;
 
 /// An immutable floating-point k-d tree with default parameters.
 ///
-/// `A` is the floating point type (`f32` or `f64`).
+/// `A` is the floating point type (`f32` or `f64`, or `f16` if the `f16` feature is enabled).
 /// `K` is the number of dimensions. See [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) for details of how to use.
 ///
 /// To manually specify more advanced parameters, use [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) directly.
