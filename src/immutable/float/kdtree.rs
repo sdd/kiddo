@@ -448,15 +448,13 @@ where
     ///
     /// # Examples
     ///
-    /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
+    /// ```
+    /// use kiddo::immutable::float::kdtree::ImmutableKdTree;
     ///
-    /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
+    /// let points: Vec<[f64; 3]> = vec!([1.0f64, 2.0f64, 3.0f64]);
+    /// let tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::new_from_slice(&points);
     ///
-    /// tree.add(&[1.0, 2.0, 5.0], 100);
-    /// tree.add(&[1.1, 2.1, 5.1], 101);
-    ///
-    /// assert_eq!(tree.size(), 2);
+    /// assert_eq!(tree.size(), 1);
     /// ```
     #[inline]
     pub fn size(&self) -> usize {
