@@ -20,7 +20,7 @@
 //! - Its standard floating-point k-d tree, exposed as [`kiddo::KdTree`](`crate::KdTree`)
 //! - **integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) library;
 //! - **instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
-//! - An [`ImmutableKdTree`](`crate::immutable::float::kdtree::ImmutableKdTree`) with space and performance advantages over the standard
+//! - An [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) with space and performance advantages over the standard
 //!   k-d tree, for situations where the tree does not need to be modified after creation
 //!
 //! Kiddo is ideal for super-fast spatial / geospatial lookups and nearest-neighbour / KNN
