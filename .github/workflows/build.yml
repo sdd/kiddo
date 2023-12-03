@@ -16,6 +16,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          show-progress: false
 
       - name: Get latest stable Rust version
         run: |
@@ -43,6 +45,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          show-progress: false
 
       - name: Get latest stable Rust version
         run: |
@@ -76,6 +80,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          show-progress: false
 
       - name: Get date
         run: |
@@ -108,6 +114,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          show-progress: false
 
       - name: Get latest stable Rust version
         run: |
@@ -140,6 +148,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          show-progress: false
 
       - name: Get date
         run: |
@@ -173,6 +183,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          show-progress: false
 
       - name: Get latest stable Rust version
         run: |
@@ -201,6 +213,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          show-progress: false
 
       - name: Get date
         run: |
