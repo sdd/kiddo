@@ -130,10 +130,10 @@ jobs:
         uses: baptiste0928/cargo-install@v2
         with:
           crate: cargo-hack
-          version: "^0.5"
+          version: "^0.6"
 
       - name: Cargo check all targets and features
-        run: cargo hack check --workspace --each-feature --all-targets --exclude-features immutable,simd
+        run: cargo hack check --workspace --each-feature --all-targets --exclude-features global_allocate,simd
 
   check-unstable:
     name: Cargo Check (Nightly)
@@ -163,7 +163,7 @@ jobs:
         uses: baptiste0928/cargo-install@v2
         with:
           crate: cargo-hack
-          version: "^0.5"
+          version: "^0.6"
 
       - name: Cargo check all targets and features
         run: cargo hack check --workspace --each-feature --all-targets
@@ -225,5 +225,5 @@ jobs:
           RUSTFLAGS: '-C target-cpu=native'
         run: |
           cargo run --example build-float-doctest-tree --features="serialize_rkyv"
-          cargo run --example build-immutable-doctest-tree --features="immutable serialize_rkyv"
+          cargo run --example build-immutable-doctest-tree --features="serialize_rkyv"
           cargo test --workspace --all-features --release

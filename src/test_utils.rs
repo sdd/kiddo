@@ -10,9 +10,7 @@ use std::hint::black_box;
 
 use crate::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
 use crate::float::kdtree::{Axis, KdTree};
-#[cfg(feature = "immutable")]
 use crate::float_leaf_simd::leaf_node::BestFromDists;
-#[cfg(feature = "immutable")]
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::types::{Content, Index};
 
@@ -132,7 +130,6 @@ where
     kdtree
 }
 
-#[cfg(feature = "immutable")]
 pub fn build_populated_tree_immutable_float<A: Axis, T: Content, const K: usize, const B: usize>(
     size: usize,
 ) -> ImmutableKdTree<A, T, K, B>
@@ -313,7 +310,6 @@ where
     )
 }
 
-#[cfg(feature = "immutable")]
 pub fn build_populated_tree_and_query_points_immutable_float<
     A: Axis,
     T: Content,
@@ -386,7 +382,6 @@ where
     )
 }
 
-#[cfg(feature = "immutable")]
 #[inline]
 pub fn process_queries_immutable_float<
     A: Axis + 'static,

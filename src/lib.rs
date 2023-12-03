@@ -1,7 +1,6 @@
 #![cfg_attr(feature = "simd", feature(stdsimd))]
 #![cfg_attr(feature = "simd", feature(slice_as_chunks))]
-#![cfg_attr(feature = "immutable", feature(allocator_api))]
-#![cfg_attr(feature = "immutable", feature(int_roundings))]
+#![cfg_attr(feature = "global_allocate", feature(allocator_api))]
 #![warn(rustdoc::missing_crate_level_docs)]
 #![deny(rustdoc::invalid_codeblock_attributes)]
 #![warn(missing_docs)]
@@ -91,8 +90,6 @@ mod custom_serde;
 pub mod distance_metric;
 pub mod fixed;
 pub mod float;
-#[cfg(feature = "immutable")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "immutable")))]
 pub mod immutable;
 mod mirror_select_nth_unstable_by;
 pub mod nearest_neighbour;
@@ -120,7 +117,6 @@ pub type KdTree<A, const K: usize> = float::kdtree::KdTree<A, u64, K, 32, u32>;
 ///
 /// To manually specify more advanced parameters, use [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) directly.
 /// To store positions using integer or fixed-point types, use [`fixed::kdtree::KdTree`].
-#[cfg(feature = "immutable")]
 pub type ImmutableKdTree<A, const K: usize> =
     immutable::float::kdtree::ImmutableKdTree<A, u64, K, 32>;
 

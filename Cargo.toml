@@ -96,7 +96,6 @@ harness = false
 [[bench]]
 name = "nearest_one_immutable"
 harness = false
-required-features = ["immutable"]
 
 [[bench]]
 name = "nearest_n"
@@ -141,17 +140,16 @@ required-features = ["serialize_rkyv"]
 [[example]]
 name = "immutable-large"
 path = "examples/immutable-large.rs"
-required-features = ["immutable"]
 
 [[example]]
 name = "immutable-rkyv-serialize"
 path = "examples/immutable-rkyv-serialize.rs"
-required-features = ["immutable", "serialize_rkyv"]
+required-features = ["serialize_rkyv"]
 
 [[example]]
 name = "immutable-rkyv-deserialize"
 path = "examples/immutable-rkyv-deserialize.rs"
-required-features = ["immutable", "serialize_rkyv"]
+required-features = ["serialize_rkyv"]
 
 [[example]]
 name = "check-select-nth-unstable"
@@ -168,7 +166,7 @@ path = "examples/avx2-check.rs"
 [[example]]
 name = "build-immutable-doctest-tree"
 path = "examples/build-immutable-doctest-tree.rs"
-required-features = ["immutable", "serialize_rkyv"]
+required-features = ["serialize_rkyv"]
 
 [[example]]
 name = "build-float-doctest-tree"

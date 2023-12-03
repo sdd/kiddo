@@ -7,7 +7,6 @@
 
 use az::{Az, Cast};
 use ordered_float::OrderedFloat;
-use std::alloc::{AllocError, Allocator, Global, Layout};
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 use std::ops::Rem;
@@ -185,7 +184,7 @@ where
         let mut tree = Self {
             size: 0,
             stems,
-            leaves: Self::safe_allocate_leaves(leaf_node_count),
+            leaves: Self::allocate_leaves(leaf_node_count),
         };
 
         for (idx, point) in source.iter().enumerate() {
@@ -197,7 +196,7 @@ where
 
     fn extend_shifts(
         stem_node_count: usize,
-        shifts: &Vec<usize>,
+        shifts: &[usize],
         requested_shift: usize,
     ) -> Vec<usize> {
         let root_shift = shifts[1];
@@ -421,8 +420,10 @@ where
         pivot
     }
 
-    #[allow(dead_code)]
+    #[cfg(feature = "global_allocate")]
     fn allocate_leaves(count: usize) -> Vec<LeafNode<A, T, K, B>> {
+        use std::alloc::{AllocError, Allocator, Global, Layout};
+
         let layout = Layout::array::<LeafNode<A, T, K, B>>(count).unwrap();
         let mut leaves = unsafe {
             let mem = match Global.allocate(layout) {
@@ -439,8 +440,8 @@ where
         leaves
     }
 
-    #[allow(dead_code)]
-    fn safe_allocate_leaves(count: usize) -> Vec<LeafNode<A, T, K, B>> {
+    #[cfg(not(feature = "global_allocate"))]
+    fn allocate_leaves(count: usize) -> Vec<LeafNode<A, T, K, B>> {
         vec![LeafNode::new(); count]
     }
 
