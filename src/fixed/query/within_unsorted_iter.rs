@@ -19,6 +19,8 @@ where
         (r#"Finds all elements within `dist` of `query`, using the specified
 distance metric function.
 
+Only available on x86_64 and aarch64 target architectures (this is due to a dependency
+on the generator crate).
 Returns an Iterator. Results are returned in arbitrary order. Faster than `within`.
 
 # Examples
