@@ -206,6 +206,7 @@ jobs:
       - name: Cargo test
         run: |
           cargo run --example build-float-doctest-tree --features="serialize_rkyv"
+          cargo run --example build-immutable-doctest-tree --features="serialize_rkyv"
           cargo test --workspace --features=serialize,serialize_rkyv
 
   test-all-features:
