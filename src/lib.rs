@@ -96,6 +96,8 @@ pub mod nearest_neighbour;
 #[doc(hidden)]
 pub mod test_utils;
 pub mod types;
+
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 pub mod within_unsorted_iter;
 
 #[doc(hidden)]

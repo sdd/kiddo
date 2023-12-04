@@ -30,7 +30,6 @@ rayon = "1"
 fixed = { version = "1", features = ["num-traits"] }
 az = "1"
 doc-comment = "0.3"
-generator = "0.7"
 elapsed = "0.1"
 divrem = "1"
 ordered-float = "4"
@@ -57,6 +56,9 @@ rand_distr = "0.4"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1.0"
 codspeed-criterion-compat = "2.3.3"
+
+[target.'cfg(any(target_arch = "x86_64", target_arch = "aarch64"))'.dependencies]
+generator = "0.7"
 
 [dependencies.serde]
 version = "1"
