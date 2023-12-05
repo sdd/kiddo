@@ -1,5 +1,27 @@
 # Kiddo Changelog
 
+## [4.0.0] - 2023-12-04
+
+Despite the major version bump, this is unlikely to be a breaking change for any users. The `within_unsorted_iter` method of `ImmutableKdTree` is now only present on x86_64 and aaarch64 targets.
+Considering that v3.0.0 would not even compile on these targets when the `immutable` crate feature was activated, 
+it seems vanishingly unlikely that this breaks anyone.
+Additionally the `immutable` feature has been removed and the `global_allocate` feature added. If you were using `ImmutableKdTree` and your build
+breaks because the `immutable` feature does not exist - don't worry, you don't need it any more.
+Simply remove any reference to it ant the `ImmutableKdTree` should be available without it.
+
+### ✨ Features
+
+- `ImmutableKdTree` now works on stable
+
+### 🐛 Bug Fixes
+
+- Update rust crate itertools to 0.12
+- Re-enable support for wasm targets
+
+### 📝 Documentation
+
+- Update feature docs in lib.rs
+
 
 ## [3.0.0] - 2023-11-05
 
