@@ -3,7 +3,9 @@ use memmap::MmapOptions;
 use std::error::Error;
 use std::fs::File;
 use std::time::Instant;
+#[cfg(feature = "tracing")]
 use tracing::Level;
+#[cfg(feature = "tracing")]
 use tracing_subscriber::fmt;
 
 use kiddo::{ImmutableKdTree, SquaredEuclidean};
@@ -13,7 +15,9 @@ type Tree = ImmutableKdTree<f64, 3>;
 fn main() -> Result<(), Box<dyn Error>>
 where
 {
+    #[cfg(feature = "tracing")]
     let subscriber = fmt().with_max_level(Level::TRACE).without_time().finish();
+    #[cfg(feature = "tracing")]
     tracing::subscriber::set_global_default(subscriber)?;
 
     let query = [0.123f64, 0.456f64, 0.789f64];
