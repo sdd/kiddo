@@ -10,6 +10,7 @@ use ordered_float::OrderedFloat;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 use std::ops::Rem;
+#[cfg(feature = "tracing")]
 use tracing::{event, span, Level};
 
 pub use crate::float::kdtree::Axis;
@@ -146,6 +147,7 @@ where
             // the tree to overflow into. Add just enough extra leaf nodes to accommodate
             // the shift.
             leaf_node_count += requested_shift.div_ceil(B);
+            #[cfg(feature = "tracing")]
             event!(
                 Level::TRACE,
                 requested_shift,
@@ -157,6 +159,7 @@ where
             // bump up the stem count to the next power of two.
             if leaf_node_count > stem_node_count {
                 stem_node_count = (stem_node_count + 1).next_power_of_two();
+                #[cfg(feature = "tracing")]
                 event!(Level::TRACE, stem_node_count, "extending stems");
 
                 stems = vec![A::infinity(); stem_node_count];
@@ -239,7 +242,9 @@ where
         dim: usize,
         capacity: usize,
     ) -> usize {
+        #[cfg(feature = "tracing")]
         let span = span!(Level::TRACE, "opt", idx = stem_index);
+        #[cfg(feature = "tracing")]
         let _enter = span.enter();
         let chunk_length = sort_index.len();
         if chunk_length <= B {
@@ -275,6 +280,7 @@ where
 
         // if the right chunk is bigger than it's capacity, return the overflow amount
         if chunk_length - pivot > right_capacity {
+            #[cfg(feature = "tracing")]
             event!(
                 Level::TRACE,
                 val = chunk_length - pivot - right_capacity,
@@ -305,6 +311,7 @@ where
                 break;
             }
 
+            #[cfg(feature = "tracing")]
             event!(Level::TRACE, req = requested_shift_amount, "LHS shift");
 
             pivot -= requested_shift_amount;
@@ -315,9 +322,11 @@ where
             // return with a value so that the parent reduces our
             // total allocation
             if chunk_length - pivot > right_capacity {
+                #[cfg(feature = "tracing")]
                 event!(Level::TRACE, val = requested_shift_amount, "shift A");
                 shifts[stem_index] += requested_shift_amount;
 
+                #[cfg(feature = "tracing")]
                 event!(
                     Level::TRACE,
                     val = chunk_length - pivot - right_capacity,
@@ -329,6 +338,7 @@ where
             sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
             stems[stem_index] = source[sort_index[pivot]][dim];
 
+            #[cfg(feature = "tracing")]
             event!(
                 Level::TRACE,
                 idx = stem_index,
@@ -349,6 +359,7 @@ where
             next_dim,
             right_capacity,
         );
+        #[cfg(feature = "tracing")]
         if res != 0 {
             event!(Level::TRACE, val = res, "RHS shift");
         }
@@ -378,6 +389,7 @@ where
         // if the pivot straddles two values that are equal, keep nudging it left until they aren't
         while source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim] && pivot > 0 {
             pivot -= 1;
+            #[cfg(feature = "tracing")]
             event!(
                 Level::INFO,
                 pivot,
@@ -504,6 +516,7 @@ where
         if stem_index == 1 {
             // If at the top level, check if there's been a shift
             pivot = if chunk_length & 1 == 1 {
+                #[cfg(feature = "tracing")]
                 event!(Level::DEBUG, "calc_pivot: unusual route");
                 (pivot + 1).next_power_of_two()
             } else {
@@ -511,6 +524,7 @@ where
                 pivot.next_power_of_two()
             };
         } else if chunk_length & 0x01 == 1 && shifted == 0 {
+            //#[cfg(feature = "tracing")]
             //event!(Level::TRACE, "cp D");
             pivot = (pivot + 1).next_power_of_two()
         } else {
@@ -518,6 +532,7 @@ where
         }
         pivot -= shifted;
         pivot = pivot.max(chunk_length.saturating_sub(right_capacity));
+        //#[cfg(feature = "tracing")]
         //event!(Level::TRACE, pivot, "pivot");
         pivot
         // pivot - shifted

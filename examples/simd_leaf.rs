@@ -18,6 +18,7 @@ const NUM_LEAVES: usize = 2usize.pow(21); // 2M
 const BUCKET_SIZE: usize = 32;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    #[cfg(feature = "tracing")]
     tracing_subscriber::fmt::init();
 
     let seed: u64 = 1; //31851;

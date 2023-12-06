@@ -4,6 +4,7 @@ use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::types::Content;
 use az::Cast;
 use std::ops::Rem;
+#[cfg(feature = "tracing")]
 use tracing::{event, Level};
 
 impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
@@ -28,7 +29,9 @@ where
         }
         idx -= self.stems.len();
 
+        #[cfg(feature = "tracing")]
         let node_size = (unsafe { self.leaves.get_unchecked_mut(idx) }).size;
+        #[cfg(feature = "tracing")]
         if node_size == B {
             event!(
                 Level::ERROR,
@@ -69,7 +72,9 @@ where
         }
         idx -= self.stems.len();
 
+        #[cfg(feature = "tracing")]
         let node_size = self.leaves[idx].size;
+        #[cfg(feature = "tracing")]
         if node_size == B {
             event!(
                 Level::ERROR,
