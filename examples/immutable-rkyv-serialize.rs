@@ -6,7 +6,9 @@ use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::time::Instant;
+#[cfg(feature = "tracing")]
 use tracing::Level;
+#[cfg(feature = "tracing")]
 use tracing_subscriber::fmt;
 use ubyte::ToByteUnit;
 
@@ -25,7 +27,9 @@ const NUM_ITEMS: usize = 50_000_000;
 type Tree = ImmutableKdTree<f64, 3>;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    #[cfg(feature = "tracing")]
     let subscriber = fmt().with_max_level(Level::TRACE).without_time().finish();
+    #[cfg(feature = "tracing")]
     tracing::subscriber::set_global_default(subscriber)?;
 
     let query = [0.123f64, 0.456f64, 0.789f64];
