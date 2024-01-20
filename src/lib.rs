@@ -93,6 +93,7 @@ pub mod immutable;
 mod mirror_select_nth_unstable_by;
 pub mod nearest_neighbour;
 #[doc(hidden)]
+#[cfg(feature = "test_utils")]
 pub mod test_utils;
 pub mod types;
 

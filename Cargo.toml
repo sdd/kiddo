@@ -25,15 +25,12 @@ opt-level = 3
 [dependencies]
 log = "0.4"
 num-traits = "0.2"
-rand = "0.8" # delete at some point, only used in test bin
-rayon = "1"
 fixed = { version = "1", features = ["num-traits"] }
 az = "1"
 doc-comment = "0.3"
 elapsed = "0.1"
 divrem = "1"
 ordered-float = "4"
-rand_chacha = "0.3"
 itertools = "0.12"
 ubyte = "0.10.3"
 init_with = "1.1.0"
@@ -57,6 +54,18 @@ codspeed-criterion-compat = "2.3.3"
 
 [target.'cfg(any(target_arch = "x86_64", target_arch = "aarch64"))'.dependencies]
 generator = "0.7"
+
+[dependencies.rayon]
+version = "1"
+optional = true
+
+[dependencies.rand]
+version = "0.8"
+optional = true
+
+[dependencies.rand_chacha]
+version = "0.3"
+optional = true
 
 [dependencies.tracing]
 version = "0.1"
@@ -92,6 +101,7 @@ serialize_rkyv = ["rkyv"]
 simd = []
 tracing = ["dep:tracing", "tracing-subscriber"]
 default = ["tracing"]
+test_utils = ["rand", "rand_chacha", "rayon"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -151,6 +161,7 @@ required-features = ["serialize_rkyv"]
 [[example]]
 name = "immutable-large"
 path = "examples/immutable-large.rs"
+required-features = ["test_utils"]
 
 [[example]]
 name = "immutable-rkyv-serialize"
@@ -169,6 +180,7 @@ path = "examples/check-select-nth-unstable.rs"
 [[example]]
 name = "simd_leaf"
 path = "examples/simd_leaf.rs"
+required-features = ["test_utils"]
 
 [[example]]
 name = "avx2-check"
