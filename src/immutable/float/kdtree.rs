@@ -8,6 +8,7 @@
 use az::{Az, Cast};
 use ordered_float::OrderedFloat;
 use std::cmp::PartialEq;
+use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::ops::Rem;
 #[cfg(feature = "tracing")]
@@ -15,6 +16,7 @@ use tracing::{event, span, Level};
 
 pub use crate::float::kdtree::Axis;
 use crate::float_leaf_simd::leaf_node::{BestFromDists, LeafNode};
+use crate::iter::{IterableTreeData, TreeIter};
 use crate::types::Content;
 
 #[cfg(feature = "serialize")]
@@ -82,6 +84,24 @@ where
     /// ```
     fn from(slice: &[[A; K]]) -> Self {
         ImmutableKdTree::new_from_slice(slice)
+    }
+}
+
+impl<A: Axis, T: Content, const K: usize, const B: usize> IterableTreeData<A, T, K>
+    for ImmutableKdTree<A, T, K, B>
+{
+    fn get_leaf_data(&self, idx: usize) -> Option<VecDeque<(T, [A; K])>> {
+        let leaf = self.leaves.get(idx)?;
+        let max = leaf.size;
+        let mut pts = VecDeque::with_capacity(max);
+        for (pt_idx, content) in leaf.content_items[..max].iter().cloned().enumerate() {
+            let mut arr = [A::default(); K];
+            for (elem_idx, elem) in arr.iter_mut().enumerate() {
+                *elem = leaf.content_points[pt_idx][elem_idx];
+            }
+            pts.push_back((content, arr));
+        }
+        Some(pts)
     }
 }
 
@@ -558,6 +578,22 @@ where
                 core::arch::aarch64::_PREFETCH_LOCALITY3,
             );
         }
+    }
+
+    /// Iterate over all `(index, point)` tuples in arbitrary order.
+    ///
+
+    /// ```
+    /// use kiddo::immutable::float::kdtree::ImmutableKdTree;
+    ///
+    /// let points: Vec<[f64; 3]> = vec!([1.0f64, 2.0f64, 3.0f64]);
+    /// let tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::new_from_slice(&points);
+    ///
+    /// let mut pairs: Vec<_> = tree.iter().collect()
+    /// assert_eq!(pairs.pop(), (0, [1.0, 2.0, 3.0]));
+    /// ```
+    pub fn iter(&self) -> impl Iterator<Item = (T, [A; K])> + '_ {
+        TreeIter::new(self)
     }
 }
 

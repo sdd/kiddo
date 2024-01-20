@@ -97,6 +97,8 @@ pub mod nearest_neighbour;
 pub mod test_utils;
 pub mod types;
 
+pub mod iter;
+
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 pub mod within_unsorted_iter;
 
