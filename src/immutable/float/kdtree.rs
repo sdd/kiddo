@@ -635,7 +635,7 @@ impl<
 
 #[cfg(test)]
 mod tests {
-    use std::panic;
+    use std::{collections::HashMap, panic};
 
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use ordered_float::OrderedFloat;
@@ -1042,5 +1042,16 @@ mod tests {
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
+    }
+
+    #[test]
+    fn can_iterate() {
+        let pts = vec![[1.0, 2.0, 3.0], [10.0, 2.0, 3.0], [1.0, 20.0, 3.0]];
+        let mut t: ImmutableKdTree<f64, usize, 3, 2> =
+            ImmutableKdTree::new_from_slice(pts.as_slice());
+
+        let expected = pts.iter().cloned().enumerate().collect();
+        let actual: HashMap<_, _> = t.iter().collect();
+        assert_eq!(actual, expected);
     }
 }
