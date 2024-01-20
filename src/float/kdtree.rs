@@ -292,6 +292,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::float::kdtree::KdTree;
     type AX = f64;
 
@@ -350,5 +352,23 @@ mod tests {
 
         let deserialized: KdTree<f32, u32, 4, 32, u32> = serde_json::from_str(&serialized).unwrap();
         assert_eq!(tree, deserialized);
+    }
+
+    #[test]
+    fn can_iterate() {
+        let mut t: KdTree<f64, i32, 3, 2, u16> = KdTree::new();
+        let expected: HashMap<_, _> = vec![
+            (10, [1.0, 2.0, 3.0]),
+            (12, [10.0, 2.0, 3.0]),
+            (15, [1.0, 20.0, 3.0]),
+        ]
+        .into_iter()
+        .collect();
+
+        for (k, v) in expected.iter() {
+            t.add(v, *k);
+        }
+        let actual: HashMap<_, _> = t.iter().collect();
+        assert_eq!(actual, expected);
     }
 }
