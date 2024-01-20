@@ -7,7 +7,12 @@ use num_traits::float::FloatCore;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 
-use crate::types::{Content, Index};
+#[cfg(feature = "serialize")]
+use crate::custom_serde::*;
+use crate::{
+    iter::{IterableTreeData, TreeIter},
+    types::{Content, Index},
+};
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
 
@@ -188,6 +193,40 @@ where
 
         tree
     }
+
+    /// Iterate over all `(index, point)` tuples in arbitrary order.
+    ///
+
+    /// ```
+    /// use kiddo::float::kdtree::KdTree;
+    ///
+    /// let point = [1.0f64, 2.0f64, 3.0f64];
+    /// let tree: KdTree<f64, u32, 3, 32> = KdTree::new();
+    /// tree.add(point, 10);
+    ///
+    /// let mut pairs: Vec<_> = tree.iter().collect()
+    /// assert_eq!(pairs.pop(), (10, point));
+    /// ```
+    pub fn iter(&self) -> impl Iterator<Item = (T, [A; K])> + '_ {
+        TreeIter::new(self, B)
+    }
+}
+
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    IterableTreeData<A, T, K> for KdTree<A, T, K, B, IDX>
+{
+    fn get_leaf_data(&self, idx: usize, out: &mut Vec<(T, [A; K])>) -> Option<usize> {
+        let leaf = self.leaves.get(idx)?;
+        let max = leaf.size.cast();
+        out.extend(
+            leaf.content_items
+                .iter()
+                .cloned()
+                .zip(leaf.content_points.iter().cloned())
+                .take(max),
+        );
+        Some(max)
+    }
 }
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> From<&Vec<[A; K]>>
@@ -256,6 +295,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::float::kdtree::KdTree;
     type AX = f64;
 
@@ -314,5 +355,23 @@ mod tests {
 
         let deserialized: KdTree<f32, u32, 4, 32, u32> = serde_json::from_str(&serialized).unwrap();
         assert_eq!(tree, deserialized);
+    }
+
+    #[test]
+    fn can_iterate() {
+        let mut t: KdTree<f64, i32, 3, 2, u16> = KdTree::new();
+        let expected: HashMap<_, _> = vec![
+            (10, [1.0, 2.0, 3.0]),
+            (12, [10.0, 2.0, 3.0]),
+            (15, [1.0, 20.0, 3.0]),
+        ]
+        .into_iter()
+        .collect();
+
+        for (k, v) in expected.iter() {
+            t.add(v, *k);
+        }
+        let actual: HashMap<_, _> = t.iter().collect();
+        assert_eq!(actual, expected);
     }
 }
