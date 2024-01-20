@@ -6,10 +6,17 @@
 use az::{Az, Cast};
 use divrem::DivCeil;
 use fixed::traits::Fixed;
-use std::cmp::PartialEq;
 use std::fmt::Debug;
+use std::{cmp::PartialEq, collections::VecDeque};
 
-use crate::types::{Content, Index};
+#[cfg(feature = "serialize")]
+use crate::custom_serde::*;
+use crate::iter::TreeIter;
+use crate::{
+    iter::IterableTreeData,
+    types::{Content, Index},
+};
+
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
 
@@ -252,6 +259,40 @@ where
     #[inline]
     pub fn size(&self) -> T {
         self.size
+    }
+
+    /// Iterate over all `(index, point)` tuples in arbitrary order.
+    ///
+
+    /// ```
+    /// use kiddo::fixed::kdtree::KdTree;
+    ///
+    /// let point = [1u16, 2, 3];
+    /// let tree: KdTree<f16, u32, 3, 32> = KdTree::new();
+    /// tree.add(point, 10);
+    ///
+    /// let mut pairs: Vec<_> = tree.iter().collect()
+    /// assert_eq!(pairs.pop(), (10, point));
+    /// ```
+    pub fn iter(&self) -> impl Iterator<Item = (T, [A; K])> + '_ {
+        TreeIter::new(self)
+    }
+}
+
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    IterableTreeData<A, T, K> for KdTree<A, T, K, B, IDX>
+{
+    fn get_leaf_data(&self, idx: usize) -> Option<VecDeque<(T, [A; K])>> {
+        let leaf = self.leaves.get(idx)?;
+        let max = leaf.size.cast();
+        Some(
+            leaf.content_items
+                .iter()
+                .cloned()
+                .zip(leaf.content_points.iter().cloned())
+                .take(max)
+                .collect(),
+        )
     }
 }
 
