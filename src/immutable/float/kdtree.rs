@@ -8,7 +8,6 @@
 use az::{Az, Cast};
 use ordered_float::OrderedFloat;
 use std::cmp::PartialEq;
-use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::ops::Rem;
 #[cfg(feature = "tracing")]
@@ -90,18 +89,17 @@ where
 impl<A: Axis, T: Content, const K: usize, const B: usize> IterableTreeData<A, T, K>
     for ImmutableKdTree<A, T, K, B>
 {
-    fn get_leaf_data(&self, idx: usize) -> Option<VecDeque<(T, [A; K])>> {
+    fn get_leaf_data(&self, idx: usize, out: &mut Vec<(T, [A; K])>) -> Option<usize> {
         let leaf = self.leaves.get(idx)?;
         let max = leaf.size;
-        let mut pts = VecDeque::with_capacity(max);
         for (pt_idx, content) in leaf.content_items[..max].iter().cloned().enumerate() {
             let mut arr = [A::default(); K];
             for (elem_idx, elem) in arr.iter_mut().enumerate() {
                 *elem = leaf.content_points[pt_idx][elem_idx];
             }
-            pts.push_back((content, arr));
+            out.push((content, arr));
         }
-        Some(pts)
+        Some(max)
     }
 }
 
