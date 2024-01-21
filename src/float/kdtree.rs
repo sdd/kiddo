@@ -4,8 +4,8 @@
 use az::{Az, Cast};
 use divrem::DivCeil;
 use num_traits::float::FloatCore;
+use std::cmp::PartialEq;
 use std::fmt::Debug;
-use std::{cmp::PartialEq};
 
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;
@@ -208,7 +208,7 @@ where
     /// assert_eq!(pairs.pop(), (10, point));
     /// ```
     pub fn iter(&self) -> impl Iterator<Item = (T, [A; K])> + '_ {
-        TreeIter::new(self)
+        TreeIter::new(self, B)
     }
 }
 
