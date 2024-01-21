@@ -20,11 +20,11 @@ pub(crate) struct TreeIter<
 impl<'a, A: Copy + Default, T: Content, const K: usize, X: IterableTreeData<A, T, K>>
     TreeIter<'a, A, T, K, X>
 {
-    pub(crate) fn new(tree: &'a X) -> Self {
+    pub(crate) fn new(tree: &'a X, bucket_size: usize) -> Self {
         Self {
             tree,
             leaf_idx: 0,
-            leaf_data: Default::default(),
+            leaf_data: Vec::with_capacity(bucket_size),
         }
     }
 }

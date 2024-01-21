@@ -275,7 +275,7 @@ where
     /// assert_eq!(pairs.pop(), (10, point));
     /// ```
     pub fn iter(&self) -> impl Iterator<Item = (T, [A; K])> + '_ {
-        TreeIter::new(self)
+        TreeIter::new(self, B)
     }
 }
 

@@ -591,7 +591,7 @@ where
     /// assert_eq!(pairs.pop(), (0, [1.0, 2.0, 3.0]));
     /// ```
     pub fn iter(&self) -> impl Iterator<Item = (T, [A; K])> + '_ {
-        TreeIter::new(self)
+        TreeIter::new(self, B)
     }
 }
 
