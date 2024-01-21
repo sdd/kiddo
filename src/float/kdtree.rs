@@ -5,7 +5,7 @@ use az::{Az, Cast};
 use divrem::DivCeil;
 use num_traits::float::FloatCore;
 use std::fmt::Debug;
-use std::{cmp::PartialEq, collections::VecDeque};
+use std::{cmp::PartialEq};
 
 #[cfg(feature = "serialize")]
 use crate::custom_serde::*;
@@ -212,17 +212,17 @@ where
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     IterableTreeData<A, T, K> for KdTree<A, T, K, B, IDX>
 {
-    fn get_leaf_data(&self, idx: usize) -> Option<VecDeque<(T, [A; K])>> {
+    fn get_leaf_data(&self, idx: usize, out: &mut Vec<(T, [A; K])>) -> Option<usize> {
         let leaf = self.leaves.get(idx)?;
         let max = leaf.size.cast();
-        Some(
+        out.extend(
             leaf.content_items
                 .iter()
                 .cloned()
                 .zip(leaf.content_points.iter().cloned())
-                .take(max)
-                .collect(),
-        )
+                .take(max),
+        );
+        Some(max)
     }
 }
 
