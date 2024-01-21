@@ -1,11 +1,7 @@
-use std::collections::VecDeque;
-
 use crate::types::Content;
 
-pub(crate) type LeafData<A, T, const K: usize> = VecDeque<(T, [A; K])>;
-
 pub(crate) trait IterableTreeData<A: Copy + Default, T: Content, const K: usize> {
-    fn get_leaf_data(&self, idx: usize) -> Option<LeafData<A, T, K>>;
+    fn get_leaf_data(&self, idx: usize, out: &mut Vec<(T, [A; K])>) -> Option<usize>;
 }
 
 #[derive(Debug)]
@@ -18,7 +14,7 @@ pub(crate) struct TreeIter<
 > {
     tree: &'a X,
     leaf_idx: usize,
-    leaf_data: Option<LeafData<A, T, K>>,
+    leaf_data: Vec<(T, [A; K])>,
 }
 
 impl<'a, A: Copy + Default, T: Content, const K: usize, X: IterableTreeData<A, T, K>>
@@ -28,7 +24,7 @@ impl<'a, A: Copy + Default, T: Content, const K: usize, X: IterableTreeData<A, T
         Self {
             tree,
             leaf_idx: 0,
-            leaf_data: Some(LeafData::default()),
+            leaf_data: Default::default(),
         }
     }
 }
@@ -39,10 +35,11 @@ impl<'a, A: Copy + Default, T: Content, const K: usize, X: IterableTreeData<A, T
     type Item = (T, [A; K]);
 
     fn next(&mut self) -> Option<Self::Item> {
-        while self.leaf_data.as_ref()?.is_empty() {
-            self.leaf_data = self.tree.get_leaf_data(self.leaf_idx);
+        while self.leaf_data.is_empty() {
+            self.tree
+                .get_leaf_data(self.leaf_idx, &mut self.leaf_data)?;
             self.leaf_idx += 1;
         }
-        self.leaf_data.as_mut()?.pop_front()
+        self.leaf_data.pop()
     }
 }
