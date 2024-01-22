@@ -294,6 +294,8 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use fixed::types::extra::U14;
     use fixed::FixedU16;
 
@@ -484,5 +486,26 @@ mod tests {
 
         let deserialized: KdTree<Fxd, u32, 4, 32, u32> = serde_json::from_str(&serialized).unwrap();
         assert_eq!(tree, deserialized);
+    }
+
+    #[test]
+    fn can_iterate() {
+        let pts = vec![[1, 2], [3, 4], [5, 6]];
+        let mut tree: KdTree<Fxd, u32, 2, 2, u32> = KdTree::new();
+
+        let content_to_add: Vec<(u32, [Fxd; 2])> = vec![
+            (9, [Fxd::from_num(0.9), Fxd::from_num(0)]),
+            (4, [Fxd::from_num(0.4), Fxd::from_num(0.5)]),
+            (12, [Fxd::from_num(0.12), Fxd::from_num(0.3)]),
+        ];
+
+        let mut expected: HashMap<u32, _> = HashMap::default();
+        for (item, point) in content_to_add {
+            tree.add(&point, item);
+            expected.insert(item, point);
+        }
+
+        let actual: HashMap<u32, _> = tree.iter().collect();
+        assert_eq!(actual, expected);
     }
 }

@@ -95,7 +95,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> IterableTreeData<A, T,
         for (pt_idx, content) in leaf.content_items[..max].iter().cloned().enumerate() {
             let mut arr = [A::default(); K];
             for (elem_idx, elem) in arr.iter_mut().enumerate() {
-                *elem = leaf.content_points[pt_idx][elem_idx];
+                *elem = leaf.content_points[elem_idx][pt_idx];
             }
             out.push((content, arr));
         }
@@ -1045,8 +1045,7 @@ mod tests {
     #[test]
     fn can_iterate() {
         let pts = vec![[1.0, 2.0, 3.0], [10.0, 2.0, 3.0], [1.0, 20.0, 3.0]];
-        let mut t: ImmutableKdTree<f64, usize, 3, 2> =
-            ImmutableKdTree::new_from_slice(pts.as_slice());
+        let t: ImmutableKdTree<f64, usize, 3, 2> = ImmutableKdTree::new_from_slice(pts.as_slice());
 
         let expected = pts.iter().cloned().enumerate().collect();
         let actual: HashMap<_, _> = t.iter().collect();
