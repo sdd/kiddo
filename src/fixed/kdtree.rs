@@ -122,7 +122,10 @@ pub(crate) struct LeafNode<
     const B: usize,
     IDX,
 > {
-    #[cfg_attr(feature = "serialize", serde(with = "array_of_arrays"))]
+    #[cfg_attr(
+        feature = "serialize",
+        serde(with = "crate::custom_serde::array_of_arrays")
+    )]
     #[cfg_attr(
         feature = "serialize",
         serde(bound(
@@ -133,7 +136,7 @@ pub(crate) struct LeafNode<
     // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
     pub(crate) content_points: [[A; K]; B],
 
-    #[cfg_attr(feature = "serialize", serde(with = "array"))]
+    #[cfg_attr(feature = "serialize", serde(with = "crate::custom_serde::array"))]
     #[cfg_attr(
         feature = "serialize",
         serde(bound(
