@@ -85,11 +85,12 @@ default-features = false
 features = ["alloc", "copy_unsafe", "size_64"]
 
 [features]
+global_allocate = []
+immutable = []
 serialize = ["serde", "serde_derive", "serde_with", "fixed/serde"]
 serialize_rkyv = ["rkyv"]
 simd = []
 tracing = ["dep:tracing", "tracing-subscriber"]
-immutable = []
 default = ["tracing"]
 
 [package.metadata.docs.rs]
