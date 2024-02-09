@@ -9,8 +9,6 @@ use fixed::traits::Fixed;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 
-#[cfg(feature = "serialize")]
-use crate::custom_serde::*;
 use crate::iter::TreeIter;
 use crate::{
     iter::IterableTreeData,
@@ -265,14 +263,19 @@ where
     ///
 
     /// ```
+    /// use fixed::FixedU16;
+    /// use fixed::types::extra::U0;
     /// use kiddo::fixed::kdtree::KdTree;
     ///
-    /// let point = [1u16, 2, 3];
-    /// let tree: KdTree<f16, u32, 3, 32> = KdTree::new();
-    /// tree.add(point, 10);
+    /// type Fxd = FixedU16<U0>;
     ///
-    /// let mut pairs: Vec<_> = tree.iter().collect()
-    /// assert_eq!(pairs.pop(), (10, point));
+    /// let point = [Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(3)];
+    /// let mut tree: KdTree<Fxd, u32, 3, 32, u32> = KdTree::new();
+    ///
+    /// tree.add(&point, 10);
+    ///
+    /// let mut pairs: Vec<_> = tree.iter().collect();
+    /// assert_eq!(pairs.pop().unwrap(), (10, point));
     /// ```
     pub fn iter(&self) -> impl Iterator<Item = (T, [A; K])> + '_ {
         TreeIter::new(self, B)
@@ -494,7 +497,6 @@ mod tests {
 
     #[test]
     fn can_iterate() {
-        let pts = vec![[1, 2], [3, 4], [5, 6]];
         let mut tree: KdTree<Fxd, u32, 2, 2, u32> = KdTree::new();
 
         let content_to_add: Vec<(u32, [Fxd; 2])> = vec![
