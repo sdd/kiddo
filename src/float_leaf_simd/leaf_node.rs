@@ -30,14 +30,17 @@ use crate::{float::kdtree::Axis, types::Content};
 )]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize> {
-    #[cfg_attr(feature = "serialize", serde(with = "array_of_arrays"))]
+    #[cfg_attr(
+        feature = "serialize",
+        serde(with = "crate::custom_serde::array_of_arrays")
+    )]
     #[cfg_attr(
         feature = "serialize",
         serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
     )]
     pub content_points: [[A; B]; K],
 
-    #[cfg_attr(feature = "serialize", serde(with = "array"))]
+    #[cfg_attr(feature = "serialize", serde(with = "crate::custom_serde::array"))]
     #[cfg_attr(
         feature = "serialize",
         serde(bound(

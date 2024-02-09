@@ -82,7 +82,10 @@ pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
 )]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
-    #[cfg_attr(feature = "serialize", serde(with = "array_of_arrays"))]
+    #[cfg_attr(
+        feature = "serialize",
+        serde(with = "crate::custom_serde::array_of_arrays")
+    )]
     #[cfg_attr(
         feature = "serialize",
         serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
@@ -90,7 +93,7 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
     // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
     pub content_points: [[A; K]; B],
 
-    #[cfg_attr(feature = "serialize", serde(with = "array"))]
+    #[cfg_attr(feature = "serialize", serde(with = "crate::custom_serde::array"))]
     #[cfg_attr(
         feature = "serialize",
         serde(bound(
