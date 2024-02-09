@@ -9,8 +9,6 @@ use fixed::traits::Fixed;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 
-#[cfg(feature = "serialize")]
-use crate::custom_serde::*;
 use crate::types::{Content, Index};
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
