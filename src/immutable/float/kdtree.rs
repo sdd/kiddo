@@ -587,8 +587,8 @@ where
     /// let points: Vec<[f64; 3]> = vec!([1.0f64, 2.0f64, 3.0f64]);
     /// let tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::new_from_slice(&points);
     ///
-    /// let mut pairs: Vec<_> = tree.iter().collect()
-    /// assert_eq!(pairs.pop(), (0, [1.0, 2.0, 3.0]));
+    /// let mut pairs: Vec<_> = tree.iter().collect();
+    /// assert_eq!(pairs.pop().unwrap(), (0, [1.0, 2.0, 3.0]));
     /// ```
     pub fn iter(&self) -> impl Iterator<Item = (T, [A; K])> + '_ {
         TreeIter::new(self, B)
