@@ -1,5 +1,3 @@
-#[cfg(feature = "serialize")]
-use crate::custom_serde::*;
 use az::Cast;
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
