@@ -88,7 +88,7 @@ version = "1"
 optional = true
 
 [dependencies.serde_with]
-version = "3.3"
+version = "3.6"
 optional = true
 
 [dependencies.rkyv]
