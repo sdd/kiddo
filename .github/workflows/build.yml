@@ -69,6 +69,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           options: --features=serialize,serialize_rkyv --no-deps
+          name: Clippy (stable)
 
       - name: Check Rustdoc Links
         run: RUSTDOCFLAGS="--deny broken_intra_doc_links" cargo doc --verbose --workspace --no-deps --document-private-items
@@ -105,6 +106,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           options: --all-features --no-deps
+          name: Clippy (nightly)
 
       - name: Check Rustdoc Links
         run: RUSTDOCFLAGS="--deny broken_intra_doc_links" cargo doc --verbose --workspace --no-deps --document-private-items
