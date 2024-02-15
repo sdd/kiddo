@@ -109,30 +109,37 @@ all-features = true
 [[bench]]
 name = "add_points"
 harness = false
+required-features = ["test_utils"]
 
 [[bench]]
 name = "nearest_one"
 harness = false
+required-features = ["test_utils"]
 
 [[bench]]
 name = "nearest_one_immutable"
 harness = false
+required-features = ["test_utils"]
 
 [[bench]]
 name = "nearest_n"
 harness = false
+required-features = ["test_utils"]
 
 [[bench]]
 name = "within"
 harness = false
+required-features = ["test_utils"]
 
 [[bench]]
 name = "within_unsorted"
 harness = false
+required-features = ["test_utils"]
 
 [[bench]]
 name = "best_n"
 harness = false
+required-features = ["test_utils"]
 
 [[example]]
 name = "cities"
