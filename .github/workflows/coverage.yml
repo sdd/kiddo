@@ -43,7 +43,7 @@ jobs:
           cargo run --example build-immutable-doctest-tree --features="immutable serialize_rkyv"
           cargo llvm-cov --all-features --tests --ignore-run-fail --workspace --codecov --output-path codecov.json
 
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: codecov.json
