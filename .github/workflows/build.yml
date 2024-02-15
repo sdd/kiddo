@@ -26,7 +26,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Toolchain
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.rustup
           key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
@@ -55,7 +55,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Toolchain
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.rustup
           key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
@@ -91,7 +91,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Toolchain
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.rustup
           key: toolchain-x86-64-nightly-${{ env.TODAY_DATE }}
@@ -126,7 +126,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Toolchain
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.rustup
           key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
@@ -160,7 +160,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Toolchain
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.rustup
           key: toolchain-x86-64-nightly-${{ env.TODAY_DATE }}
@@ -195,7 +195,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Toolchain
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.rustup
           key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
@@ -226,7 +226,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Toolchain
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.rustup
           key: toolchain-x86-64-nightly-${{ env.TODAY_DATE }}
