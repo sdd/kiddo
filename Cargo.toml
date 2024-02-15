@@ -10,6 +10,7 @@ repository = "https://github.com/sdd/kiddo"
 documentation = "https://docs.rs/kiddo"
 license = "MIT OR Apache-2.0"
 autobenches = false
+resolver = "2"
 
 [profile.release]
 debug = true
@@ -51,6 +52,9 @@ rand_distr = "0.4"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1.0"
 codspeed-criterion-compat = "2.3.3"
+# required to be able to run tests without specifying --features=test_utils
+# see https://github.com/rust-lang/cargo/issues/2911#issuecomment-749580481
+kiddo = { path = ".", features = ["test_utils"] }
 
 [target.'cfg(any(target_arch = "x86_64", target_arch = "aarch64"))'.dependencies]
 generator = "0.7"
