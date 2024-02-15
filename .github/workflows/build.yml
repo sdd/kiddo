@@ -137,7 +137,7 @@ jobs:
           components: rustfmt,clippy
 
       - name: Install cargo-hack
-        uses: baptiste0928/cargo-install@v2
+        uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-hack
           version: "^0.6"
@@ -172,7 +172,7 @@ jobs:
           components: rustfmt,clippy
 
       - name: Install cargo-hack
-        uses: baptiste0928/cargo-install@v2
+        uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-hack
           version: "^0.6"
