@@ -15,6 +15,7 @@ use tracing::{event, span, Level};
 
 pub use crate::float::kdtree::Axis;
 use crate::float_leaf_simd::leaf_node::{BestFromDists, LeafNode};
+use crate::iter::{IterableTreeData, TreeIter};
 use crate::types::Content;
 
 #[cfg(feature = "serialize")]
@@ -82,6 +83,23 @@ where
     /// ```
     fn from(slice: &[[A; K]]) -> Self {
         ImmutableKdTree::new_from_slice(slice)
+    }
+}
+
+impl<A: Axis, T: Content, const K: usize, const B: usize> IterableTreeData<A, T, K>
+    for ImmutableKdTree<A, T, K, B>
+{
+    fn get_leaf_data(&self, idx: usize, out: &mut Vec<(T, [A; K])>) -> Option<usize> {
+        let leaf = self.leaves.get(idx)?;
+        let max = leaf.size;
+        for (pt_idx, content) in leaf.content_items[..max].iter().cloned().enumerate() {
+            let mut arr = [A::default(); K];
+            for (elem_idx, elem) in arr.iter_mut().enumerate() {
+                *elem = leaf.content_points[elem_idx][pt_idx];
+            }
+            out.push((content, arr));
+        }
+        Some(max)
     }
 }
 
@@ -559,6 +577,22 @@ where
             );
         }
     }
+
+    /// Iterate over all `(index, point)` tuples in arbitrary order.
+    ///
+
+    /// ```
+    /// use kiddo::immutable::float::kdtree::ImmutableKdTree;
+    ///
+    /// let points: Vec<[f64; 3]> = vec!([1.0f64, 2.0f64, 3.0f64]);
+    /// let tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::new_from_slice(&points);
+    ///
+    /// let mut pairs: Vec<_> = tree.iter().collect();
+    /// assert_eq!(pairs.pop().unwrap(), (0, [1.0, 2.0, 3.0]));
+    /// ```
+    pub fn iter(&self) -> impl Iterator<Item = (T, [A; K])> + '_ {
+        TreeIter::new(self, B)
+    }
 }
 
 #[cfg(feature = "rkyv")]
@@ -599,7 +633,7 @@ impl<
 
 #[cfg(test)]
 mod tests {
-    use std::panic;
+    use std::{collections::HashMap, panic};
 
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use ordered_float::OrderedFloat;
@@ -1006,5 +1040,15 @@ mod tests {
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("Tree Stats: {:?}", tree.generate_stats())
+    }
+
+    #[test]
+    fn can_iterate() {
+        let pts = vec![[1.0, 2.0, 3.0], [10.0, 2.0, 3.0], [1.0, 20.0, 3.0]];
+        let t: ImmutableKdTree<f64, usize, 3, 2> = ImmutableKdTree::new_from_slice(pts.as_slice());
+
+        let expected = pts.iter().cloned().enumerate().collect();
+        let actual: HashMap<_, _> = t.iter().collect();
+        assert_eq!(actual, expected);
     }
 }

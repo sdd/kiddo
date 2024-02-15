@@ -7,9 +7,10 @@ use num_traits::float::FloatCore;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 
-#[cfg(feature = "serialize")]
-use crate::custom_serde::*;
-use crate::types::{Content, Index};
+use crate::{
+    iter::{IterableTreeData, TreeIter},
+    types::{Content, Index},
+};
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
 
@@ -84,7 +85,10 @@ pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
 )]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
-    #[cfg_attr(feature = "serialize", serde(with = "array_of_arrays"))]
+    #[cfg_attr(
+        feature = "serialize",
+        serde(with = "crate::custom_serde::array_of_arrays")
+    )]
     #[cfg_attr(
         feature = "serialize",
         serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
@@ -92,7 +96,7 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
     // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
     pub content_points: [[A; K]; B],
 
-    #[cfg_attr(feature = "serialize", serde(with = "array"))]
+    #[cfg_attr(feature = "serialize", serde(with = "crate::custom_serde::array"))]
     #[cfg_attr(
         feature = "serialize",
         serde(bound(
@@ -187,6 +191,43 @@ where
 
         tree
     }
+
+    /// Iterate over all `(index, point)` tuples in arbitrary order.
+    ///
+
+    /// ```
+    /// use kiddo::KdTree;
+    ///
+    /// let mut tree: KdTree<f64, 3> = KdTree::new();
+    /// tree.add(&[1.0f64, 2.0f64, 3.0f64], 10);
+    /// tree.add(&[11.0f64, 12.0f64, 13.0f64], 20);
+    /// tree.add(&[21.0f64, 22.0f64, 23.0f64], 30);
+    ///
+    /// let mut pairs: Vec<_> = tree.iter().collect();
+    /// assert_eq!(pairs.pop().unwrap(), (10, [1.0f64, 2.0f64, 3.0f64]));
+    /// assert_eq!(pairs.pop().unwrap(), (20, [11.0f64, 12.0f64, 13.0f64]));
+    /// assert_eq!(pairs.pop().unwrap(), (30, [21.0f64, 22.0f64, 23.0f64]));
+    /// ```
+    pub fn iter(&self) -> impl Iterator<Item = (T, [A; K])> + '_ {
+        TreeIter::new(self, B)
+    }
+}
+
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    IterableTreeData<A, T, K> for KdTree<A, T, K, B, IDX>
+{
+    fn get_leaf_data(&self, idx: usize, out: &mut Vec<(T, [A; K])>) -> Option<usize> {
+        let leaf = self.leaves.get(idx)?;
+        let max = leaf.size.cast();
+        out.extend(
+            leaf.content_items
+                .iter()
+                .cloned()
+                .zip(leaf.content_points.iter().cloned())
+                .take(max),
+        );
+        Some(max)
+    }
 }
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> From<&Vec<[A; K]>>
@@ -255,6 +296,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::float::kdtree::KdTree;
     type AX = f64;
 
@@ -313,5 +356,23 @@ mod tests {
 
         let deserialized: KdTree<f32, u32, 4, 32, u32> = serde_json::from_str(&serialized).unwrap();
         assert_eq!(tree, deserialized);
+    }
+
+    #[test]
+    fn can_iterate() {
+        let mut t: KdTree<f64, i32, 3, 32, u16> = KdTree::new();
+        let expected: HashMap<_, _> = vec![
+            (10, [1.0, 2.0, 3.0]),
+            (12, [10.0, 2.0, 3.0]),
+            (15, [1.0, 20.0, 3.0]),
+        ]
+        .into_iter()
+        .collect();
+
+        for (k, v) in expected.iter() {
+            t.add(v, *k);
+        }
+        let actual: HashMap<_, _> = t.iter().collect();
+        assert_eq!(actual, expected);
     }
 }

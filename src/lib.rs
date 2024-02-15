@@ -1,4 +1,3 @@
-#![cfg_attr(feature = "simd", feature(stdsimd))]
 #![cfg_attr(feature = "simd", feature(slice_as_chunks))]
 #![cfg_attr(feature = "global_allocate", feature(allocator_api))]
 #![warn(rustdoc::missing_crate_level_docs)]
@@ -97,6 +96,8 @@ pub mod nearest_neighbour;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 pub mod types;
+
+mod iter;
 
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 pub mod within_unsorted_iter;

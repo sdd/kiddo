@@ -9,9 +9,12 @@ use fixed::traits::Fixed;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 
-#[cfg(feature = "serialize")]
-use crate::custom_serde::*;
-use crate::types::{Content, Index};
+use crate::iter::TreeIter;
+use crate::{
+    iter::IterableTreeData,
+    types::{Content, Index},
+};
+
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
 
@@ -124,7 +127,10 @@ pub(crate) struct LeafNode<
     const B: usize,
     IDX,
 > {
-    #[cfg_attr(feature = "serialize", serde(with = "array_of_arrays"))]
+    #[cfg_attr(
+        feature = "serialize",
+        serde(with = "crate::custom_serde::array_of_arrays")
+    )]
     #[cfg_attr(
         feature = "serialize",
         serde(bound(
@@ -135,7 +141,7 @@ pub(crate) struct LeafNode<
     // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
     pub(crate) content_points: [[A; K]; B],
 
-    #[cfg_attr(feature = "serialize", serde(with = "array"))]
+    #[cfg_attr(feature = "serialize", serde(with = "crate::custom_serde::array"))]
     #[cfg_attr(
         feature = "serialize",
         serde(bound(
@@ -252,10 +258,51 @@ where
     pub fn size(&self) -> T {
         self.size
     }
+
+    /// Iterate over all `(index, point)` tuples in arbitrary order.
+    ///
+
+    /// ```
+    /// use fixed::FixedU16;
+    /// use fixed::types::extra::U0;
+    /// use kiddo::fixed::kdtree::KdTree;
+    ///
+    /// type Fxd = FixedU16<U0>;
+    ///
+    /// let point = [Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(3)];
+    /// let mut tree: KdTree<Fxd, u32, 3, 32, u32> = KdTree::new();
+    ///
+    /// tree.add(&point, 10);
+    ///
+    /// let mut pairs: Vec<_> = tree.iter().collect();
+    /// assert_eq!(pairs.pop().unwrap(), (10, point));
+    /// ```
+    pub fn iter(&self) -> impl Iterator<Item = (T, [A; K])> + '_ {
+        TreeIter::new(self, B)
+    }
+}
+
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    IterableTreeData<A, T, K> for KdTree<A, T, K, B, IDX>
+{
+    fn get_leaf_data(&self, idx: usize, out: &mut Vec<(T, [A; K])>) -> Option<usize> {
+        let leaf = self.leaves.get(idx)?;
+        let max = leaf.size.cast();
+        out.extend(
+            leaf.content_items
+                .iter()
+                .cloned()
+                .zip(leaf.content_points.iter().cloned())
+                .take(max),
+        );
+        Some(max)
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use fixed::types::extra::U14;
     use fixed::FixedU16;
 
@@ -446,5 +493,25 @@ mod tests {
 
         let deserialized: KdTree<Fxd, u32, 4, 32, u32> = serde_json::from_str(&serialized).unwrap();
         assert_eq!(tree, deserialized);
+    }
+
+    #[test]
+    fn can_iterate() {
+        let mut tree: KdTree<Fxd, u32, 2, 2, u32> = KdTree::new();
+
+        let content_to_add: Vec<(u32, [Fxd; 2])> = vec![
+            (9, [Fxd::from_num(0.9), Fxd::from_num(0)]),
+            (4, [Fxd::from_num(0.4), Fxd::from_num(0.5)]),
+            (12, [Fxd::from_num(0.12), Fxd::from_num(0.3)]),
+        ];
+
+        let mut expected: HashMap<u32, _> = HashMap::default();
+        for (item, point) in content_to_add {
+            tree.add(&point, item);
+            expected.insert(item, point);
+        }
+
+        let actual: HashMap<u32, _> = tree.iter().collect();
+        assert_eq!(actual, expected);
     }
 }

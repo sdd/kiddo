@@ -94,11 +94,12 @@ default-features = false
 features = ["alloc", "copy_unsafe", "size_64"]
 
 [features]
-serialize = ["serde", "serde_derive", "serde_with", "fixed/serde"]
+global_allocate = []
+immutable = []
+serialize = ["serde", "serde/derive", "serde_derive", "serde_with", "fixed/serde"]
 serialize_rkyv = ["rkyv"]
 simd = []
 tracing = ["dep:tracing", "tracing-subscriber"]
-immutable = []
 default = ["tracing"]
 test_utils = ["rand", "rand_chacha", "rayon"]
 
