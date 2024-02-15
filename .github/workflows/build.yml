@@ -68,7 +68,7 @@ jobs:
       - uses: LoliGothick/clippy-check@master
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          options: --features=serialize,serialize_rkyv --no-deps
+          options: --features=serialize,serialize_rkyv,test_utils --no-deps
           name: Clippy (stable)
 
       - name: Check Rustdoc Links
@@ -209,7 +209,7 @@ jobs:
         run: |
           cargo run --example build-float-doctest-tree --features="serialize_rkyv"
           cargo run --example build-immutable-doctest-tree --features="serialize_rkyv"
-          cargo test --workspace --features=serialize,serialize_rkyv
+          cargo test --workspace --features=serialize,serialize_rkyv,test_utils
 
   test-all-features:
     name: Run Tests (Nightly, all features enabled)
