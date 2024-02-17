@@ -1,5 +1,242 @@
 # Kiddo Changelog
 
+## [5.0.0] - 2024-02-17
+
+### Chore
+
+- Rename from sok (son of kiddo) to kiddo, with the aim of this being kiddo v2. Add some docs
+- Update some docs and add beta suffix to version
+- Bump version to 2.0.0-beta.5
+- Update .gitignore
+- Bump version to 2.0.0-beta.8
+- Bump version to 2.0.0-beta.9
+- Update actions/checkout action to v3
+- Bump version to 2.0.2
+- Add .DS_Store to .gitignore
+- Add some missing docs and hide some private internals
+- Update rust crate criterion to 0.5
+- Fix clippy lints
+- Update versions in lib.rs
+- Release
+- Fix clippy lints
+- Add .codecov.yml
+- Bump version to 2.1.2
+- Update actions/checkout action to v4
+- Update ad-m/github-push-action action to v0.8.0
+- Remove commented-out code in float's within_into_iter
+- Enable some optimizations on the bench profile
+- Release 3.0.0-beta.1
+- Add DS_Store and vscode to .gitignore
+- Update trace calls
+- Minor immutable tweaks
+- Minor example and docs update for immutable
+- Merged in changes from 3.0 branch
+- Release 3.0.0-beta.3
+- Remove commented code and test comments
+- Version 3.0.0-beta.4
+- Reorg simd conditional compilation annotations
+- Fix clippy lints
+- Remove unused deps
+- Update ordered-float dep from 3.7 -> 4
+- Version 3.0.0-rc.1
+- Update actions/checkout action to v4
+- Downgrade serde_with to fix failing dependency resolution
+- Clean up some clippy lints from tests
+- V3.0.0 :tada:
+- Consistency
+- Update rust crate proc-macro2 to 1.0.70
+- Remove an example file as it is causing problems with release-plz 🙄
+- Release, Signed-off-by:Scott Donnelly <scott@donnel.ly>
+- Remove unused import
+- Update actions/cache action to v4
+- Update codecov/codecov-action action to v4
+- Update baptiste0928/cargo-install action to v3
+- Release
+
+### Ci
+
+- Add build workflow
+- Add CI for format/clippy/test/coverage/release/publish
+- Fix git-cliff.toml changelog config
+- Update pre-release.yml to use a single job
+- Update pre-release.yml to remove Clippy check
+- Update release.yml to only release on merged PRs labelled `release`
+- Add job to update version strings in docs on pre-release PR branch
+- Temp disable testing of SIMD code path
+- Ensure doctests get ran in CI
+- Add codspeed
+- Ensure codspeed runs on master rather than main. Don't show progress on CI checkout
+- Fix issue with CI lint steps
+
+### Deps
+
+- Relax strictness of some deps to reduce renovate noise
+
+### Revert
+
+- Changes since 'next' branch diverged
+- Re-apply changes reverted in 42f9455
+
+### ♻️ Refactor
+
+- Move Content and Index to src/types.rs and use for both float and fixed. Refactor some repeated test code into test_utils
+- Reduce boilerplate in nearest_one and nearest_n benches
+- Tighten unsafe boundaries. Rename best_n_within_into_iter to best_n_within
+- Dont store bounds on nodes
+- Remove unstable features to allow use on stable rust
+- Update `Axis` trait to include some methods so that the
+- Float and fixed both use a common macro for nearest_n
+- Float and fixed both use a common macro for within
+- Float and fixed both use a common macro for within_unsorted
+- Float and fixed both use a common macro for best_n_within
+- Use idx 1 as root. return usize from size()
+- Use usize where poss to index stem nodes in add and split
+- Rewrite add and split to improve performance
+- Pass leaf node count to stem optimizer
+- Extract extend_shifts function
+- Clippy lint fixes
+- Remove unused code from simd leaf node
+- Slight tweak to SortedVec NearestNeighbour max_dist
+- Remove need for gated import
+
+### ⚡️ Performance
+
+- Refactor `within` to simply sort the result of `within_unsorted`
+- Quit as early as possible if chink fits in bucket
+
+### ✨ Features
+
+- Initial commit
+- Add rkyv zero-copy deserialization
+- Added SIMD f32 4D specific tree. Lots of perf improvements
+- Refactor simd to tuned. add benches for tuned f32d4 and u16d4. refactor leafnodeentry into separate content points and items for better autovectorization
+- Add generic fixed point tree
+- Remove saturating mul / add from fxp squared_euclidean to try to make it vectorizible. split leaf processing in best_n_into_iter into separate funcs to track runtime of each part better
+- Refactor into float and fixed. Fixed mirror_select_nth_unstable_by bug. Add nearest_n
+- Add remove() method
+- Add Sync bound to Axis, Content and Index to allow use with Rayon
+- Bump version to 2.0.0-beta.2
+- Update deps, add serde and rkyv examples, clean up custom serde, remove main
+- Add changelog and example links to readme. Update version strings
+- Add default tree export
+- Return Neighbour<> instead of a tuple in queries., BREAKING:nearest_n now returns a Vec<Neighbour<_, _>> instead of an iterator.
+  The MinMaxHeap was removed in favour of a BinaryHeap, which pretty much doubled
+  query performance on nearest_n but it means that returning a Vec<> here instead
+  of an Iterator makes more sense as we need to call to_sorted_vec() on the
+  BinaryHeap anyway, so we may as well just return the resulting Vec rather than
+  converting that to an Iterator since the most common use case would be to then
+  collect that Iterator into a Vec anyway
+- Rename `radius` param to `dist` and update documentation
+- V2.0.0 release
+- Implement all queries on float::ArchivedKdTree. Update rkyv example.
+- Queries return structs instead of tuples
+- Use a trait instead of a function pointer for distance metrics
+- Add within_unsorted_into_iter query
+- Semi-static-stem
+- Add nearest_one implementation
+- Balanced construction
+- Balanced construction part 2
+- Balanced construction pt 3
+- Add immutable kdtree
+- Use shifts array during construction, and other fixes and optimizations
+- It's finally working! Tested on 1m random trees of each size from 16 to 100, no errors. Tests include an 8m item tree
+- Immutable WIP
+- Immutable WIP 2 (all queries done)
+- Gate unstable rust features behind a crate feature
+- Rename ImmutableTree::optimize_from to new_from_slice. Update docs and version to 3.0.0-beta.2
+- ImmutableTree uses Best/NearestNeighbour for query results, and uses DistanceMetric
+- Refactor immutable to macros to allow DRY query method generation for ArchivedImmutableKdTree
+- Implement query methods on ArchivedImmutableKdTree using macros
+- Simd leaf
+- SIMD leaf nearest one
+- SIMD leaves, AVX2 f64
+- SIMD leaf nearest one: f32 and avx2
+- SIMD leaf nearest n within
+- Export float ImmutableKdTree and Manhattan from root. Clean up examples.
+- Add immutable best_n_within
+- `ImmutableKdTree` now works on stable, BREAKING CHANGE:the `immutable` crate feature now no longer exists.
+- Make tracing an optional dependency gated by tracing feature flag
+- Iterate over trees
+- Make rand and rayon optional
+
+### 🐛 Bug Fixes
+
+- Allow creation with capacity zero, Issue:https://github.com/sdd/kiddo/issues/11
+- Bug in remove when query point value has same value as a split plane, Issue:https://github.com/sdd/kiddo/issues/12
+- Update rust crate fixed to 1.23
+- Update rust crate rayon to 1.7
+- Properly split buckets, Fixes:https://github.com/sdd/kiddo/issues/28
+- Update rust crate serde_with to v3
+- Incompatibility with fixed crate num-traits feature
+- Update rust crate rayon to 1.8
+- Prevent occasional overflow in `Fixed` tree queries by using a saturating_add
+- Only return from root of stem optimizer if there is no room in existing leaves
+- Only terminate stem optimizer early if the upper child fits in one bucket as well as the lower
+- Stem optimizer passes capacity of subtree rather than leaf node count. Fails on 1 tree in 16m for sizes 16-32
+- Optimize_Stems handles right subtree shift requests properly
+- Tracking down last immutable bugs
+- Immutable pivot calc improved. Tracing. bupe checking test
+- One more immutable bug
+- Update conditional compilation directives and gate unstable lang features
+- Disable AVX512 until I can test it on a machine with actual AVX512
+- Don't use AVX512 intrinsic in AVX2 code path
+- Update rust crate serde_with to 3.4
+- Simd in immutable::nearest_one
+- AVX512 missing param
+- Update rust crate itertools to 0.12
+- Re-enable support for wasm targets
+- Stdsimd removed from unstable, fix:fixup simd removal
+- Add missing global_allocate feature definition and sort feature defs alphabetically
+- Update benches to require test_utils feature. update clippy and test steps to include new test_utils feature
+- Claytonwramsey bug, Fixes:[#138](https://github.com/sdd/kiddo/pull/138)
+- Prevent overflow in capacity_with_bucket_size on non-64 bit architectures
+
+### 💄 Styling
+
+- Fmt
+- Fmt
+- Spelling fix and comment removal
+- Fmt
+
+### 📝 Documentation
+
+- Use only 5 keywords in Cargo.toml
+- Cargo.toml keywords can't contain spaces
+- Remove reference to kiddo being based on kdtree now that this is a rewrite
+- Add documentation and doc examples
+- Add documentation for add/remove methods
+- Add cities example
+- Fix some broken links and add missing docs for last generic param in cities example
+- Update changelog and docs for release 2.1.0
+- Fix serde example
+- Minor documentation enhancements
+- Update rkyv-large example
+- Update version in README.md
+- Add workings for right subchild example
+- Fix bad links
+- Minor documentation tweaks
+- Clean up some examples
+- Rewrite doctests to use convenient top-level exports. Ensure doctest .rkyv artifact is reproducible
+- Fix ImmutableKdTree links in the top level documentation
+- Update example for ImmutableKdTree::size
+- Update feature docs in lib.rs
+
+### 🧪 Testing
+
+- Add float construction many items unit test
+- Update benches
+- Refactor add and nearest_one benchmarks to be more DRY
+- Refactor all benches to be more DRY. Format and fix some clippy lints
+- Fix nearest_n bench code
+- Re-enable serde test
+- Add tests to cover all split conditions
+- Add bench for nearest_one
+- Optimize stems stress test only goes to size 32 but seed 1m
+- Fix doctests
+- Sort result of within() call in tests to prevent spurious test failures
+- Fix iter doctests and remove unused var
+- Add hacky workaround to enable tests to run without having to specify --features=test_utils
+
 ## [4.1.0] - 2024-02-17
 
 ### Chore
