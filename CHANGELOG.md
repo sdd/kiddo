@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [4.1.1] - 2024-02-17
+
+### 🐛 Bug Fixes
+
+- Prevent overflow in capacity_with_bucket_size on non-64 bit architectures
+
 ## [4.1.0] - 2024-02-17
 
 ### Chore
