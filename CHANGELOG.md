@@ -1,5 +1,44 @@
 # Kiddo Changelog
 
+## [4.1.0] - 2024-02-17
+
+### Chore
+
+- Remove unused import
+- Update actions/cache action to v4
+- Update codecov/codecov-action action to v4
+- Update baptiste0928/cargo-install action to v3
+
+### Ci
+
+- Fix issue with CI lint steps
+
+### Deps
+
+- Relax strictness of some deps to reduce renovate noise
+
+### ♻️ Refactor
+
+- Remove need for gated import
+
+### ✨ Features
+
+- Make tracing an optional dependency gated by tracing feature flag
+- Iterate over trees
+- Make rand and rayon optional
+
+### 🐛 Bug Fixes
+
+- Stdsimd removed from unstable, fix:fixup simd removal
+- Add missing global_allocate feature definition and sort feature defs alphabetically
+- Update benches to require test_utils feature. update clippy and test steps to include new test_utils feature
+- Claytonwramsey bug, Fixes:[#138](https://github.com/sdd/kiddo/pull/138)
+
+### 🧪 Testing
+
+- Fix iter doctests and remove unused var
+- Add hacky workaround to enable tests to run without having to specify --features=test_utils
+
 ## [4.0.0] - 2023-12-04
 
 Despite the major version bump, this is unlikely to be a breaking change for any users. The `within_unsorted_iter` method of `ImmutableKdTree` is now only present on x86_64 and aaarch64 targets.
