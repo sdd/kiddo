@@ -77,7 +77,7 @@ impl Index for u32 {
         DivCeil::div_ceil(self, b)
     }
     fn capacity_with_bucket_size(bucket_size: usize) -> usize {
-        (u32::MAX - u32::MAX.overflowing_shr(1).0) as usize * bucket_size
+        ((u32::MAX - u32::MAX.overflowing_shr(1).0) as usize).saturating_mul(bucket_size)
     }
 }
 
@@ -99,7 +99,7 @@ impl Index for u16 {
         DivCeil::div_ceil(self, b)
     }
     fn capacity_with_bucket_size(bucket_size: usize) -> usize {
-        (u16::MAX - u16::MAX.overflowing_shr(1).0) as usize * bucket_size
+        ((u16::MAX - u16::MAX.overflowing_shr(1).0) as usize).saturating_mul(bucket_size)
     }
 }
 
@@ -127,6 +127,19 @@ mod tests {
         assert_eq!(<u32 as Index>::min(), 0u32);
         assert_eq!(<u32 as Index>::leaf_offset(), 2_147_483_647);
         assert_eq!(256u32.ilog2(), 8u32);
+
+        #[cfg(target_pointer_width = "64")]
         assert_eq!(u32::capacity_with_bucket_size(32), 68_719_476_736);
+
+        #[cfg(target_pointer_width = "32")]
+        assert_eq!(u32::capacity_with_bucket_size(32), u32::MAX);
+    }
+    #[test]
+    fn test_u32_simulate_32bit_target_pointer() {
+        // TODO: replace this with wasm-bindgen-tests at some point
+        let bucket_size: u32 = 32;
+        let capacity_with_bucket_size =
+            ((u32::MAX - u32::MAX.overflowing_shr(1).0) as u32).saturating_mul(bucket_size);
+        assert_eq!(capacity_with_bucket_size, u32::MAX);
     }
 }
