@@ -269,7 +269,9 @@ where
             return 0;
         }
 
-        assert!(chunk_length <= capacity);
+        if chunk_length > capacity {
+            return chunk_length - capacity;
+        }
 
         let next_dim = (dim + 1).rem(K);
 
