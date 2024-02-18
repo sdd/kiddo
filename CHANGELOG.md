@@ -1,5 +1,15 @@
 # Kiddo Changelog
 
+## [4.2.0] - 2024-02-18
+
+### ✨ Features
+
+- Add f16 support, example and docs to show usage with half crate
+
+### 🐛 Bug Fixes
+
+- Prevent assertion failure when stem optimisation needs a large shift
+
 ## [4.1.1] - 2024-02-17
 
 ### 🐛 Bug Fixes
