@@ -39,7 +39,7 @@ sorted-vec = "0.8"
 
 [dev-dependencies]
 bincode = "1.3"
-criterion = "0.5"
+criterion = "0.5.1"
 csv="1"
 flate2 = { version = "1", features = ["zlib-ng-compat"], default-features = false }
 log = "0.4"
