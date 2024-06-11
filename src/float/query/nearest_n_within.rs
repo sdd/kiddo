@@ -30,9 +30,9 @@ use kiddo::SquaredEuclidean;
             $doctest_build_tree,
             "
 
-let within = tree.nearest_n_within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64, 2, true);
+let within = tree.nearest_n_within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64, 1, true);
 
-assert_eq!(within.len(), 2);
+assert_eq!(within.len(), 1);
 ```"
         ));
     };
@@ -145,8 +145,82 @@ mod tests {
                 .take(max_qty)
                 .collect::<Vec<_>>();
 
-            let mut result: Vec<_> = tree
+            let result: Vec<_> = tree
                 .nearest_n_within::<SquaredEuclidean>(&query_point, radius, max_qty, true)
+                .into_iter()
+                .map(|n| (n.distance, n.item))
+                .collect();
+
+            assert_eq!(result, expected);
+        }
+    }
+
+    #[test]
+    fn can_query_nearest_n_items_within_radius_unsorted() {
+        let mut tree: KdTree<AX, u32, 4, 4, u32> = KdTree::new();
+
+        let content_to_add: [([AX; 4], u32); 16] = [
+            ([0.9f32, 0.0f32, 0.9f32, 0.0f32], 9),
+            ([0.4f32, 0.5f32, 0.4f32, 0.5f32], 4),
+            ([0.12f32, 0.3f32, 0.12f32, 0.3f32], 12),
+            ([0.7f32, 0.2f32, 0.7f32, 0.2f32], 7),
+            ([0.13f32, 0.4f32, 0.13f32, 0.4f32], 13),
+            ([0.6f32, 0.3f32, 0.6f32, 0.3f32], 6),
+            ([0.2f32, 0.7f32, 0.2f32, 0.7f32], 2),
+            ([0.14f32, 0.5f32, 0.14f32, 0.5f32], 14),
+            ([0.3f32, 0.6f32, 0.3f32, 0.6f32], 3),
+            ([0.10f32, 0.1f32, 0.10f32, 0.1f32], 10),
+            ([0.16f32, 0.7f32, 0.16f32, 0.7f32], 16),
+            ([0.1f32, 0.8f32, 0.1f32, 0.8f32], 1),
+            ([0.15f32, 0.6f32, 0.15f32, 0.6f32], 15),
+            ([0.5f32, 0.4f32, 0.5f32, 0.4f32], 5),
+            ([0.8f32, 0.1f32, 0.8f32, 0.1f32], 8),
+            ([0.11f32, 0.2f32, 0.11f32, 0.2f32], 11),
+        ];
+
+        for (point, item) in content_to_add {
+            tree.add(&point, item);
+        }
+
+        assert_eq!(tree.size(), 16);
+
+        let query_point = [0.78f32, 0.55f32, 0.78f32, 0.55f32];
+
+        let radius = 0.2;
+        let max_qty = 3;
+
+        let expected = linear_search(&content_to_add, &query_point, radius)
+            .into_iter()
+            .take(max_qty)
+            .collect::<Vec<_>>();
+
+        let mut result: Vec<_> = tree
+            .nearest_n_within::<SquaredEuclidean>(&query_point, radius, max_qty, false)
+            .into_iter()
+            .map(|n| (n.distance, n.item))
+            .collect();
+
+        stabilize_sort(&mut result);
+        assert_eq!(result, expected);
+
+        let mut rng = rand::thread_rng();
+        for _i in 0..1000 {
+            let query_point = [
+                rng.gen_range(0f32..1f32),
+                rng.gen_range(0f32..1f32),
+                rng.gen_range(0f32..1f32),
+                rng.gen_range(0f32..1f32),
+            ];
+            let radius = 0.2;
+            let max_qty = 3;
+
+            let expected = linear_search(&content_to_add, &query_point, radius)
+                .into_iter()
+                .take(max_qty)
+                .collect::<Vec<_>>();
+
+            let mut result: Vec<_> = tree
+                .nearest_n_within::<SquaredEuclidean>(&query_point, radius, max_qty, false)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
