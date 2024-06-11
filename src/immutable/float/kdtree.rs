@@ -103,6 +103,10 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> IterableTreeData<A, T,
     }
 }
 
+// prevent clippy complaining that the feature unreliable_select_nth_unstable
+// is not defined (I don't want to explicity define it as if I do then
+// passing --all-features in CI will enable it, which I don't want to do
+#[allow(unexpected_cfgs)]
 impl<A, T, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
 where
     A: Axis + BestFromDists<T, B>,
