@@ -432,9 +432,9 @@ where
     #[inline]
     fn update_pivot(
         source: &[[A; K]],
-        mut sort_index: &mut [usize],
+        sort_index: &mut [usize],
         dim: usize,
-        pivot: usize,
+        mut pivot: usize,
     ) -> usize {
         // ensure the item whose index = pivot is in its correctly sorted position
         let (smaller, _, _) =
