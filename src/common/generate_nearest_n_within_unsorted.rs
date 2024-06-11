@@ -10,7 +10,7 @@ macro_rules! generate_nearest_n_within_unsorted {
             where
                 D: DistanceMetric<A, K>,
             {
-                if sorted && max_items < usize::MAX {
+                if sorted || max_items < usize::MAX {
                     if max_items <= MAX_VEC_RESULT_SIZE {
                         self.nearest_n_within_stub::<D, SortedVec<NearestNeighbour<A, T>>>(query, dist, max_items, sorted)
                     } else {
