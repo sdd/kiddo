@@ -86,7 +86,7 @@ pub mod best_neighbour;
 #[doc(hidden)]
 pub(crate) mod common;
 #[cfg(feature = "serialize")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "serialize")))]
+#[doc(hidden)]
 mod custom_serde;
 pub mod distance_metric;
 pub mod fixed;
