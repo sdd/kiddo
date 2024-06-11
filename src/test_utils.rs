@@ -130,7 +130,7 @@ where
     kdtree
 }
 
-pub fn build_populated_tree_immutable_float<A: Axis, T: Content, const K: usize, const B: usize>(
+pub fn build_populated_tree_immutable_float<A, T: Content, const K: usize, const B: usize>(
     size: usize,
 ) -> ImmutableKdTree<A, T, K, B>
 where
@@ -138,7 +138,7 @@ where
     Standard: Distribution<T>,
     Standard: Distribution<([A; K], T)>,
     Standard: Distribution<[A; K]>,
-    A: BestFromDists<T, B>,
+    A: Axis + BestFromDists<T, B>,
 {
     let mut points = vec![];
     points.resize_with(size, rand::random::<[A; K]>);
@@ -311,7 +311,7 @@ where
 }
 
 pub fn build_populated_tree_and_query_points_immutable_float<
-    A: Axis,
+    A,
     T: Content,
     const K: usize,
     const B: usize,
@@ -320,7 +320,7 @@ pub fn build_populated_tree_and_query_points_immutable_float<
     query_point_qty: usize,
 ) -> (ImmutableKdTree<A, T, K, B>, Vec<[A; K]>)
 where
-    A: BestFromDists<T, B>,
+    A: Axis + BestFromDists<T, B>,
     usize: Cast<T>,
     Standard: Distribution<T>,
     Standard: Distribution<[A; K]>,
