@@ -35,16 +35,16 @@ macro_rules! generate_within_unsorted_iter {
             }
 
             #[allow(clippy::too_many_arguments)]
-            unsafe fn within_unsorted_iter_recurse<D>(
+            unsafe fn within_unsorted_iter_recurse<'scope, D>(
                 &'a self,
                 query: &[A; K],
                 radius: A,
                 curr_node_idx: IDX,
                 split_dim: usize,
-                mut gen_scope: Scope<'a, (), NearestNeighbour<A, T>>,
+                mut gen_scope: Scope<'scope, 'a, (), NearestNeighbour<A, T>>,
                 off: &mut [A; K],
                 rd: A,
-            ) -> Scope<(), NearestNeighbour<A, T>>
+            ) -> Scope<'scope, 'a, (), NearestNeighbour<A, T>>
             where
                 D: DistanceMetric<A, K>,
             {
@@ -102,7 +102,7 @@ macro_rules! generate_within_unsorted_iter {
                             let distance = D::dist(query, entry);
 
                             if distance < radius {
-                                gen_scope.yield_(NearestNeighbour {
+                                gen_scope.yield_with(NearestNeighbour {
                                     distance,
                                     item: *leaf_node.content_items.get_unchecked(idx.az::<usize>()),
                                 });
