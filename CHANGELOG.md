@@ -8,6 +8,7 @@
 - Silence new lint error
 - Silence error regarding doc_cfg no longer working
 - Update codspeedhq/action action to v3
+- Update rust crate generator to 0.8.1
 
 ### 🐛 Bug Fixes
 
