@@ -1,5 +1,20 @@
 # Kiddo Changelog
 
+## [4.2.1] - 2024-08-17
+
+### Chore
+
+- Refactor trait bounds to silence new clippy lints
+- Silence new lint error
+- Silence error regarding doc_cfg no longer working
+- Update codspeedhq/action action to v3
+- Update rust crate generator to 0.8.1
+
+### 🐛 Bug Fixes
+
+- Nearest_n_within does not limit num of items when not sorted, Issue:https://github.com/sdd/kiddo/issues/168
+- Update rust crate itertools to 0.13
+
 ## [4.2.0] - 2024-02-18
 
 ### ✨ Features
