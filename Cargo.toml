@@ -97,7 +97,7 @@ optional = true
 features = ["num-traits"]
 
 [dependencies.rkyv]
-version = "0.7"
+version = "0.8"
 optional = true
 default-features = false
 features = ["alloc", "copy_unsafe", "size_64"]
