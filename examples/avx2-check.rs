@@ -21,6 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     #[cfg(all(
+        feature = "simd",
         target_feature = "avx2",
         any(target_arch = "x86", target_arch = "x86_64")
     ))]
