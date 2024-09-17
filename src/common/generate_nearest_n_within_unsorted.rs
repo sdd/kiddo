@@ -6,15 +6,15 @@ macro_rules! generate_nearest_n_within_unsorted {
             concat!$comments,
 
             #[inline]
-            pub fn nearest_n_within<D>(&self, query: &[A; K], dist: A, max_items: usize, sorted: bool) -> Vec<NearestNeighbour<A, T>>
+            pub fn nearest_n_within<D>(&self, query: &[A; K], dist: A, max_items: std::num::NonZero<usize>, sorted: bool) -> Vec<NearestNeighbour<A, T>>
             where
                 D: DistanceMetric<A, K>,
             {
-                if sorted || max_items < usize::MAX {
-                    if max_items <= MAX_VEC_RESULT_SIZE {
-                        self.nearest_n_within_stub::<D, SortedVec<NearestNeighbour<A, T>>>(query, dist, max_items, sorted)
+                if sorted || max_items < std::num::NonZero::new(usize::MAX).unwrap() {
+                    if max_items <= std::num::NonZero::new(MAX_VEC_RESULT_SIZE).unwrap() {
+                        self.nearest_n_within_stub::<D, SortedVec<NearestNeighbour<A, T>>>(query, dist, max_items.get(), sorted)
                     } else {
-                        self.nearest_n_within_stub::<D, BinaryHeap<NearestNeighbour<A, T>>>(query, dist, max_items, sorted)
+                        self.nearest_n_within_stub::<D, BinaryHeap<NearestNeighbour<A, T>>>(query, dist, max_items.get(), sorted)
                     }
                 } else {
                     self.nearest_n_within_stub::<D, Vec<NearestNeighbour<A,T>>>(query, dist, 0, sorted)

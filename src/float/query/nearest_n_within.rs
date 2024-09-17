@@ -24,13 +24,14 @@ Results are returned in as a ResultCollection, which can return a sorted or unso
 # Examples
 
 ```rust
+use std::num::NonZero;
 use kiddo::KdTree;
 use kiddo::SquaredEuclidean;
 ",
             $doctest_build_tree,
             "
-
-let within = tree.nearest_n_within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64, 1, true);
+let max_qty = NonZero::new(1).unwrap();
+let within = tree.nearest_n_within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64, max_qty, true);
 
 assert_eq!(within.len(), 1);
 ```"
@@ -80,6 +81,7 @@ mod tests {
     use crate::float::kdtree::{Axis, KdTree};
     use rand::Rng;
     use std::cmp::Ordering;
+    use std::num::NonZero;
 
     type AX = f32;
 
@@ -115,11 +117,11 @@ mod tests {
         let query_point = [0.78f32, 0.55f32, 0.78f32, 0.55f32];
 
         let radius = 0.2;
-        let max_qty = 3;
+        let max_qty = NonZero::new(3).unwrap();
 
         let expected = linear_search(&content_to_add, &query_point, radius)
             .into_iter()
-            .take(max_qty)
+            .take(max_qty.get())
             .collect::<Vec<_>>();
 
         let result: Vec<_> = tree
@@ -138,11 +140,11 @@ mod tests {
                 rng.gen_range(0f32..1f32),
             ];
             let radius = 0.2;
-            let max_qty = 3;
+            let max_qty = NonZero::new(3).unwrap();
 
             let expected = linear_search(&content_to_add, &query_point, radius)
                 .into_iter()
-                .take(max_qty)
+                .take(max_qty.get())
                 .collect::<Vec<_>>();
 
             let result: Vec<_> = tree
@@ -187,11 +189,11 @@ mod tests {
         let query_point = [0.78f32, 0.55f32, 0.78f32, 0.55f32];
 
         let radius = 0.2;
-        let max_qty = 3;
+        let max_qty = NonZero::new(3).unwrap();
 
         let expected = linear_search(&content_to_add, &query_point, radius)
             .into_iter()
-            .take(max_qty)
+            .take(max_qty.get())
             .collect::<Vec<_>>();
 
         let mut result: Vec<_> = tree
@@ -212,11 +214,11 @@ mod tests {
                 rng.gen_range(0f32..1f32),
             ];
             let radius = 0.2;
-            let max_qty = 3;
+            let max_qty = NonZero::new(3).unwrap();
 
             let expected = linear_search(&content_to_add, &query_point, radius)
                 .into_iter()
-                .take(max_qty)
+                .take(max_qty.get())
                 .collect::<Vec<_>>();
 
             let mut result: Vec<_> = tree
@@ -260,7 +262,7 @@ mod tests {
         let query_point = [0.78f32, 0.55f32, 0.78f32, 0.55f32];
 
         let radius = 100.0;
-        let max_qty = 1;
+        let max_qty = NonZero::new(1).unwrap();
 
         let result_unsorted: Vec<_> = tree
             .nearest_n_within::<SquaredEuclidean>(&query_point, radius, max_qty, false)
@@ -274,25 +276,8 @@ mod tests {
             .map(|n| (n.distance, n.item))
             .collect();
 
-        assert_eq!(result_unsorted.len(), max_qty);
-        assert_eq!(result_sorted.len(), max_qty);
-
-        let max_qty = 0;
-
-        let result_unsorted: Vec<_> = tree
-            .nearest_n_within::<SquaredEuclidean>(&query_point, radius, max_qty, false)
-            .into_iter()
-            .map(|n| (n.distance, n.item))
-            .collect();
-
-        let result_sorted: Vec<_> = tree
-            .nearest_n_within::<SquaredEuclidean>(&query_point, radius, max_qty, true)
-            .into_iter()
-            .map(|n| (n.distance, n.item))
-            .collect();
-
-        assert_eq!(result_unsorted.len(), max_qty);
-        assert_eq!(result_sorted.len(), max_qty);
+        assert_eq!(result_unsorted.len(), max_qty.get());
+        assert_eq!(result_sorted.len(), max_qty.get());
     }
 
     #[test]
@@ -301,7 +286,7 @@ mod tests {
         const NUM_QUERIES: usize = 100;
         const RADIUS: f32 = 0.2;
 
-        const MAX_QTY: usize = 3;
+        let max_qty = NonZero::new(3).unwrap();
 
         let content_to_add: Vec<([f32; 4], u32)> = (0..TREE_SIZE)
             .map(|_| rand::random::<([f32; 4], u32)>())
@@ -320,11 +305,11 @@ mod tests {
         for query_point in query_points {
             let expected = linear_search(&content_to_add, &query_point, RADIUS)
                 .into_iter()
-                .take(MAX_QTY)
+                .take(max_qty.get())
                 .collect::<Vec<_>>();
 
             let mut result: Vec<_> = tree
-                .nearest_n_within::<SquaredEuclidean>(&query_point, RADIUS, MAX_QTY, true)
+                .nearest_n_within::<SquaredEuclidean>(&query_point, RADIUS, max_qty, true)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
