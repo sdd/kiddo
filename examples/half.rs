@@ -1,4 +1,4 @@
-#[cfg(feature = "half")]
+#[cfg(feature = "f16")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use half::f16;
     use kiddo::{KdTree, SquaredEuclidean};
@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[cfg(not(feature = "half"))]
+#[cfg(not(feature = "f16"))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Activate the 'half' feature to run this example properly");
     println!("Try this: cargo run --example half --features=half");

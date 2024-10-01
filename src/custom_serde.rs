@@ -1,4 +1,4 @@
-#[cfg(feature = "serialize")]
+#[cfg(feature = "serde")]
 pub(crate) mod array {
     use core::option::Option::None;
     use serde::{
@@ -62,7 +62,7 @@ pub(crate) mod array {
     }
 }
 
-/*#[cfg(feature = "serialize")]
+/*#[cfg(feature = "serde")]
 pub(crate) mod array_of_2ples {
     use core::option::Option::None;
     use serde::{
@@ -135,7 +135,7 @@ pub(crate) mod array_of_2ples {
     }
 }*/
 
-#[cfg(feature = "serialize")]
+#[cfg(feature = "serde")]
 pub(crate) mod array_of_arrays {
     use core::option::Option::None;
     use serde::{

@@ -104,14 +104,14 @@ features = ["alloc", "copy_unsafe", "size_64"]
 
 [features]
 default = ["tracing"]
-f16 = ["half"]
+f16 = ["dep:half"]
 global_allocate = []
 immutable = []
-serialize = ["serde", "serde/derive", "serde_derive", "serde_with", "fixed/serde"]
-serialize_rkyv = ["rkyv"]
+serde = ["dep:serde", "serde/derive", "dep:serde_derive", "dep:serde_with", "fixed/serde"]
+rkyv = ["dep:rkyv"]
 simd = []
-test_utils = ["rand", "rand_chacha", "rayon"]
-tracing = ["dep:tracing", "tracing-subscriber"]
+test_utils = ["dep:rand", "dep:rand_chacha", "dep:rayon"]
+tracing = ["dep:tracing", "dep:tracing-subscriber"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -158,22 +158,22 @@ path = "examples/cities.rs"
 [[example]]
 name = "serde"
 path = "examples/serde.rs"
-required-features = ["serialize"]
+required-features = ["serde"]
 
 [[example]]
 name = "rkyv"
 path = "examples/rkyv.rs"
-required-features = ["serialize_rkyv"]
+required-features = ["rkyv"]
 
 [[example]]
 name = "rkyv-large-serialize"
 path = "examples/rkyv-large-serialize.rs"
-required-features = ["serialize_rkyv"]
+required-features = ["rkyv"]
 
 [[example]]
 name = "rkyv-large-deserialize"
 path = "examples/rkyv-large-deserialize.rs"
-required-features = ["serialize_rkyv"]
+required-features = ["rkyv"]
 
 [[example]]
 name = "immutable-large"
@@ -183,12 +183,12 @@ required-features = ["test_utils"]
 [[example]]
 name = "immutable-rkyv-serialize"
 path = "examples/immutable-rkyv-serialize.rs"
-required-features = ["serialize_rkyv"]
+required-features = ["rkyv"]
 
 [[example]]
 name = "immutable-rkyv-deserialize"
 path = "examples/immutable-rkyv-deserialize.rs"
-required-features = ["serialize_rkyv"]
+required-features = ["rkyv"]
 
 [[example]]
 name = "check-select-nth-unstable"
@@ -206,12 +206,12 @@ path = "examples/avx2-check.rs"
 [[example]]
 name = "build-immutable-doctest-tree"
 path = "examples/build-immutable-doctest-tree.rs"
-required-features = ["serialize_rkyv"]
+required-features = ["rkyv"]
 
 [[example]]
 name = "build-float-doctest-tree"
 path = "examples/build-float-doctest-tree.rs"
-required-features = ["serialize_rkyv"]
+required-features = ["rkyv"]
 
 [[example]]
 name = "half"

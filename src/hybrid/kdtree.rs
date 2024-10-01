@@ -10,10 +10,10 @@ use std::cmp::PartialEq;
 use std::fmt::Debug;
 use std::ops::Rem;
 
-#[cfg(feature = "serialize")]
+#[cfg(feature = "serde")]
 use crate::custom_serde::*;
 use crate::types::{Content, Index};
-#[cfg(feature = "serialize")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 pub trait FloatLSB {
@@ -87,9 +87,9 @@ impl<T: Float + Default + Debug + Copy + Sync + FloatLSB> Axis for T {}
 ///
 /// For use when the co-ordinates of the points being stored in the tree
 /// are floats. f64 or f32 are supported currently
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
-    feature = "serialize_rkyv",
+    feature = "rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[derive(Clone, Debug, PartialEq)]
@@ -104,9 +104,9 @@ pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B:
 }
 
 #[doc(hidden)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
-    feature = "serialize_rkyv",
+    feature = "rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[derive(Clone, Debug, PartialEq)]
@@ -118,24 +118,24 @@ pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
 }
 
 #[doc(hidden)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
-    feature = "serialize_rkyv",
+    feature = "rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
-    #[cfg_attr(feature = "serialize", serde(with = "array_of_arrays"))]
+    #[cfg_attr(feature = "serde", serde(with = "array_of_arrays"))]
     #[cfg_attr(
-        feature = "serialize",
+        feature = "serde",
         serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
     )]
     // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
     pub(crate) content_points: [[A; K]; B],
 
-    #[cfg_attr(feature = "serialize", serde(with = "array"))]
+    #[cfg_attr(feature = "serde", serde(with = "array"))]
     #[cfg_attr(
-        feature = "serialize",
+        feature = "serde",
         serde(bound(
             serialize = "A: Serialize, T: Serialize",
             deserialize = "A: Deserialize<'de>, T: Deserialize<'de> + Copy + Default"
@@ -621,7 +621,7 @@ mod tests {
 
         assert_eq!(tree.size(), 0);
     }
-    /*    #[cfg(feature = "serialize")]
+    /*    #[cfg(feature = "serde")]
     #[test]
     fn can_serde() {
         let mut tree: KdTree<u16, u32, 4, 32, u32> = KdTree::new();
