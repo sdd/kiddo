@@ -67,8 +67,8 @@ See the [examples documentation](https://github.com/sdd/kiddo/tree/master/exampl
 ## Optional Features
 
 The Kiddo crate exposes the following features. Any labelled as **(NIGHTLY)** are not available on `stable` Rust as they require some unstable features. You'll need to build with `nightly` in order to user them.
-* `serialize` - serialization / deserialization via [`Serde`](https://docs.rs/serde/latest/serde/)
-* `serialize_rkyv` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/)
+* `serde` - serialization / deserialization via [`Serde`](https://docs.rs/serde/latest/serde/)
+* `rkyv` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/)
 * `global_allocate` **(NIGHTLY)** -  When enabled Kiddo will use the unstable allocator_api feature within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) to get a slight performance improvement when allocating space for leaves.
 * `simd` **(NIGHTLY)** - enables some hand-written SIMD intrinsic code within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) that may improve performance (currently only on the nearest_one method when using `f64`)
 * `f16` - enables usage of `f16` from the `half` crate for float trees.

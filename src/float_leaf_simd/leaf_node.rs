@@ -1,5 +1,5 @@
 use az::Cast;
-#[cfg(feature = "serialize")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 #[cfg(all(
@@ -23,26 +23,26 @@ use crate::distance_metric::DistanceMetric;
 use crate::{float::kdtree::Axis, types::Content};
 
 #[doc(hidden)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
-    feature = "serialize_rkyv",
+    feature = "rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize> {
     #[cfg_attr(
-        feature = "serialize",
+        feature = "serde",
         serde(with = "crate::custom_serde::array_of_arrays")
     )]
     #[cfg_attr(
-        feature = "serialize",
+        feature = "serde",
         serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
     )]
     pub content_points: [[A; B]; K],
 
-    #[cfg_attr(feature = "serialize", serde(with = "crate::custom_serde::array"))]
+    #[cfg_attr(feature = "serde", serde(with = "crate::custom_serde::array"))]
     #[cfg_attr(
-        feature = "serialize",
+        feature = "serde",
         serde(bound(
             serialize = "A: Serialize, T: Serialize",
             deserialize = "A: Deserialize<'de>, T: Deserialize<'de> + Copy + Default"

@@ -28,7 +28,7 @@ you can see the tremendous speed improvement that can be had by switching to
 Rkyv for serialization / deserialization
 
 ```
-> cargo run --release --example rkyv --features="serialize_rkyv"
+> cargo run --release --example rkyv --features="rkyv"
    Compiling kiddo v3.0.0 (~/kiddo)
     Finished release [optimized + debuginfo] target(s) in 9.71s
      Running `target/release/examples/rkyv`
@@ -58,7 +58,7 @@ This example uses the larger GeoNames database, created by geonames and download
 The output below was run on a Ryzen 5900X with 32Gb DDR4-3600.
 
 ```
-> cargo run --release --example serde --features="serialize"
+> cargo run --release --example serde --features="serde"
    Compiling kiddo v2.0.2 (~/kiddo)
     Finished release [optimized + debuginfo] target(s) in 5.18s
      Running `target/release/examples/serde`

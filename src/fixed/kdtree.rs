@@ -15,7 +15,7 @@ use crate::{
     types::{Content, Index},
 };
 
-#[cfg(feature = "serialize")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 /// Axis trait represents the traits that must be implemented
@@ -34,9 +34,9 @@ impl<T: Fixed + Default + Debug + Copy + Sync + Send> Axis for T {
 }
 
 /// Rkyv-serializable equivalent of `kiddo::fixed::kdtree::Axis`
-#[cfg(feature = "serialize_rkyv")]
+#[cfg(feature = "rkyv")]
 pub trait AxisRK: num_traits::Zero + Default + Debug + rkyv::Archive {}
-#[cfg(feature = "serialize_rkyv")]
+#[cfg(feature = "rkyv")]
 impl<T: num_traits::Zero + Default + Debug + rkyv::Archive> AxisRK for T {}
 
 /// Rkyv-serializable fixed point k-d tree
@@ -47,10 +47,10 @@ impl<T: num_traits::Zero + Default + Debug + rkyv::Archive> AxisRK for T {}
 /// an equivalent [`crate::fixed::kdtree::KdTreeRK`] before serializing via Rkyv,
 /// and vice-versa when deserializing.
 #[cfg_attr(
-    feature = "serialize_rkyv",
+    feature = "rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
-#[cfg(feature = "serialize_rkyv")]
+#[cfg(feature = "rkyv")]
 pub struct KdTreeRK<
     A: num_traits::PrimInt,
     T: Content,
@@ -70,7 +70,7 @@ pub struct KdTreeRK<
 /// are fixed point or integers. [`u8`], [`u16`], [`u32`], and [`u64`] based fixed-point / integers are supported
 /// via the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate, eg [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html) for a 16-bit fixed point number with 14 bits after the
 /// decimal point.
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
     pub(crate) leaves: Vec<LeafNode<A, T, K, B, IDX>>,
@@ -81,17 +81,17 @@ pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B:
 
 #[doc(hidden)]
 #[cfg_attr(
-    feature = "serialize_rkyv",
+    feature = "rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
-#[cfg(feature = "serialize_rkyv")]
+#[cfg(feature = "rkyv")]
 pub struct StemNodeRK<A: num_traits::PrimInt, const K: usize, IDX: Index<T = IDX>> {
     pub(crate) left: IDX,
     pub(crate) right: IDX,
     pub(crate) split_val: A,
 }
 
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct StemNode<A: Copy + Default, const K: usize, IDX> {
     pub(crate) left: IDX,
@@ -101,10 +101,10 @@ pub(crate) struct StemNode<A: Copy + Default, const K: usize, IDX> {
 
 #[doc(hidden)]
 #[cfg_attr(
-    feature = "serialize_rkyv",
+    feature = "rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
-#[cfg(feature = "serialize_rkyv")]
+#[cfg(feature = "rkyv")]
 pub struct LeafNodeRK<
     A: num_traits::PrimInt,
     T: Content,
@@ -118,7 +118,7 @@ pub struct LeafNodeRK<
     pub(crate) size: IDX,
 }
 
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct LeafNode<
     A: Copy + Default,
@@ -128,11 +128,11 @@ pub(crate) struct LeafNode<
     IDX,
 > {
     #[cfg_attr(
-        feature = "serialize",
+        feature = "serde",
         serde(with = "crate::custom_serde::array_of_arrays")
     )]
     #[cfg_attr(
-        feature = "serialize",
+        feature = "serde",
         serde(bound(
             serialize = "A: Serialize",
             deserialize = "A: Deserialize<'de> + Copy + Default"
@@ -141,9 +141,9 @@ pub(crate) struct LeafNode<
     // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
     pub(crate) content_points: [[A; K]; B],
 
-    #[cfg_attr(feature = "serialize", serde(with = "crate::custom_serde::array"))]
+    #[cfg_attr(feature = "serde", serde(with = "crate::custom_serde::array"))]
     #[cfg_attr(
-        feature = "serialize",
+        feature = "serde",
         serde(bound(
             serialize = "A: Serialize, T: Serialize",
             deserialize = "A: Deserialize<'de>, T: Deserialize<'de> + Copy + Default"
@@ -331,7 +331,7 @@ mod tests {
         assert_eq!(tree.size(), 0);
     }
 
-    #[cfg(feature = "serialize")]
+    #[cfg(feature = "serde")]
     #[test]
     fn can_serde() {
         let mut tree: KdTree<Fxd, u32, 4, 32, u32> = KdTree::new();

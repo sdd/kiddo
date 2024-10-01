@@ -18,7 +18,7 @@ use crate::float_leaf_simd::leaf_node::{BestFromDists, LeafNode};
 use crate::iter::{IterableTreeData, TreeIter};
 use crate::types::Content;
 
-#[cfg(feature = "serialize")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 /// Immutable floating point k-d tree
@@ -31,9 +31,9 @@ use serde::{Deserialize, Serialize};
 /// values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
 ///
 /// A convenient type alias exists for ImmutableKdTree with some sensible defaults set: [`kiddo::ImmutableKdTree`](`crate::ImmutableKdTree`).
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
-    feature = "serialize_rkyv",
+    feature = "rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 #[derive(Clone, Debug, PartialEq)]
@@ -104,7 +104,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> IterableTreeData<A, T,
 }
 
 // prevent clippy complaining that the feature unreliable_select_nth_unstable
-// is not defined (I don't want to explicity define it as if I do then
+// is not defined (I don't want to explicitly define it as if I do then
 // passing --all-features in CI will enable it, which I don't want to do
 #[allow(unexpected_cfgs)]
 impl<A, T, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
