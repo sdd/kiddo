@@ -10,6 +10,7 @@ use ordered_float::OrderedFloat;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 use std::ops::Rem;
+// use num_traits::PrimInt;
 #[cfg(feature = "tracing")]
 use tracing::{event, span, Level};
 
@@ -40,6 +41,7 @@ use serde::{Deserialize, Serialize};
 pub struct ImmutableKdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize> {
     pub(crate) leaves: Vec<LeafNode<A, T, K, B>>,
     pub(crate) stems: Vec<A>,
+    pub(crate) split_dims: Vec<u8>,
     pub(crate) size: usize,
 }
 
@@ -145,25 +147,43 @@ where
         let mut stem_node_count = leaf_node_count.next_power_of_two();
 
         let mut stems = vec![A::infinity(); stem_node_count];
+        let mut split_dims = vec![0u8; stem_node_count];
+
+        let mut dim = K as u8 - 1;
+        for n in 1..stem_node_count {
+            if n.count_ones() == 1 {
+                dim += 1;
+            }
+            split_dims[n] = dim.rem(K as u8);
+        }
+
         let mut shifts = vec![0usize; stem_node_count];
         let mut sort_index = Vec::from_iter(0..item_count);
 
-        //let mut top_level_shift_change_count = 0;
+        // let mut top_level_shift_change_count = 0;
         loop {
-            let requested_shift = Self::optimize_stems(
+            let Some(requested_shift) = Self::optimize_stems(
                 &mut stems,
+                &mut split_dims,
                 &mut shifts,
                 source,
                 &mut sort_index,
                 1,
-                0,
                 leaf_node_count * B,
-            );
+            ) else {
+                split_dims[1] = (split_dims[1] as usize + 1).rem(K) as u8;
+                if split_dims[1] == 0u8 {
+                    // we've tried every dimension. Fail
+                    panic!("Unable to construct tree from this data. Cannot find a solution.")
+                }
+
+                continue;
+            };
 
             if requested_shift == 0 {
                 break;
             }
-            //top_level_shift_change_count += 1;
+            // top_level_shift_change_count += 1;
 
             // if root has requested a shift, then there was not enough capacity in
             // the tree to overflow into. Add just enough extra leaf nodes to accommodate
@@ -185,11 +205,12 @@ where
                 event!(Level::TRACE, stem_node_count, "extending stems");
 
                 stems = vec![A::infinity(); stem_node_count];
+                split_dims = vec![0u8; stem_node_count];
                 shifts = Self::extend_shifts(stem_node_count, &shifts, requested_shift);
             }
         }
 
-        // // generate construction stats
+        // generate construction stats
         // let max_shift = shifts.iter().max().unwrap();
         // let tot_shift: usize = shifts.iter().sum();
         //
@@ -209,6 +230,7 @@ where
         let mut tree = Self {
             size: 0,
             stems,
+            split_dims,
             leaves: Self::allocate_leaves(leaf_node_count),
         };
 
@@ -257,34 +279,53 @@ where
     /// the caller of how many items overflowed.
     fn optimize_stems(
         stems: &mut Vec<A>,
+        split_dims: &mut Vec<u8>,
         shifts: &mut Vec<usize>,
         source: &[[A; K]],
         sort_index: &mut [usize],
         stem_index: usize,
-        dim: usize,
         capacity: usize,
-    ) -> usize {
+    ) -> Option<usize> {
         #[cfg(feature = "tracing")]
         let span = span!(Level::TRACE, "opt", idx = stem_index);
         #[cfg(feature = "tracing")]
         let _enter = span.enter();
         let chunk_length = sort_index.len();
         if chunk_length <= B {
-            return 0;
+            return Some(0);
         }
 
         if chunk_length > capacity {
-            return chunk_length - capacity;
+            return None;
+            return Some(chunk_length - capacity);
         }
 
-        let next_dim = (dim + 1).rem(K);
+        let dim = split_dims[stem_index] as usize;
 
         let stem_levels_below = stems.len().ilog2() - stem_index.ilog2() - 1;
         let left_capacity = (2usize.pow(stem_levels_below) * B).min(capacity);
         let right_capacity = capacity.saturating_sub(left_capacity);
 
-        let mut pivot =
-            Self::calc_pivot(chunk_length, shifts[stem_index], stem_index, right_capacity);
+        let Some(pivot) =
+            Self::calc_pivot(chunk_length, shifts[stem_index], stem_index, right_capacity)
+        else {
+            event!(
+                Level::WARN,
+                chunk_length,
+                shifted = shifts[stem_index],
+                stem_index,
+                dim,
+                right_capacity,
+                left_capacity,
+                stem_levels_below,
+                capacity,
+                //?sort_index,
+                "Required shift is beyond the left end of the bucket. Switching dimension"
+            );
+
+            return None;
+        };
+        let mut pivot = pivot;
 
         // only bother with this if we are putting at least one item in the right hand child
         if pivot < chunk_length {
@@ -299,7 +340,7 @@ where
 
         // if both subtrees can fit in a bucket, we're done
         if pivot <= B && chunk_length - pivot <= B {
-            return 0;
+            return Some(0);
         }
 
         // if the right chunk is bigger than it's capacity, return the overflow amount
@@ -310,25 +351,43 @@ where
                 val = chunk_length - pivot - right_capacity,
                 "RHS Overflow A"
             );
-            return chunk_length - pivot - right_capacity;
+            return None;
+            return Some(chunk_length - pivot - right_capacity);
         }
 
         let next_stem_index = stem_index << 1;
         let mut requested_shift_amount;
         let mut lower_sort_index;
         let mut upper_sort_index;
+
+        let orig_next_dim_l = split_dims[next_stem_index];
+        let orig_next_dim_r = split_dims[next_stem_index + 1];
+
         loop {
             (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
 
-            requested_shift_amount = Self::optimize_stems(
+            let Some(res) = Self::optimize_stems(
                 stems,
+                split_dims,
                 shifts,
                 source,
                 lower_sort_index,
                 next_stem_index,
-                next_dim,
                 left_capacity,
-            );
+            ) else {
+                split_dims[next_stem_index] =
+                    (split_dims[next_stem_index] as usize + 1).rem(K) as u8;
+                // TODO: should reset all child shifts to 0 at this point
+                shifts[next_stem_index] = 0;
+                if split_dims[next_stem_index] == orig_next_dim_l {
+                    // we've tried every dimension. Fail up
+                    return None;
+                }
+
+                continue;
+            };
+
+            requested_shift_amount = res;
 
             // exit the loop if the LHS balanced
             if requested_shift_amount == 0 {
@@ -338,6 +397,10 @@ where
             #[cfg(feature = "tracing")]
             event!(Level::TRACE, req = requested_shift_amount, "LHS shift");
 
+            assert!(
+                pivot > requested_shift_amount,
+                "attempting to shift pivot down to 0"
+            );
             pivot -= requested_shift_amount;
             pivot = Self::update_pivot(source, sort_index, dim, pivot);
 
@@ -356,7 +419,8 @@ where
                     val = chunk_length - pivot - right_capacity,
                     "RHS Overflow B"
                 );
-                return chunk_length - pivot - right_capacity;
+                return None;
+                return Some(chunk_length - pivot - right_capacity);
             }
 
             sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
@@ -374,21 +438,40 @@ where
 
         // If a right child requests a shift, don't shift yourself,
         // but do pass that shift back up to your parent
-        let res = Self::optimize_stems(
-            stems,
-            shifts,
-            source,
-            upper_sort_index,
-            next_stem_index + 1,
-            next_dim,
-            right_capacity,
-        );
-        #[cfg(feature = "tracing")]
-        if res != 0 {
-            event!(Level::TRACE, val = res, "RHS shift");
+        let result;
+        loop {
+            let Some(rhs_shift) = Self::optimize_stems(
+                stems,
+                split_dims,
+                shifts,
+                source,
+                upper_sort_index,
+                next_stem_index + 1,
+                right_capacity,
+            ) else {
+                split_dims[next_stem_index + 1] =
+                    (split_dims[next_stem_index + 1] as usize + 1).rem(K) as u8;
+                shifts[next_stem_index + 1] = 0;
+                // TODO: should reset all child shifts to 0 at this point
+                if split_dims[next_stem_index + 1] == orig_next_dim_r {
+                    // we've tried every dimension. Fail up
+                    return None;
+                }
+
+                continue;
+            };
+
+            result = rhs_shift;
+            break;
         }
 
-        res
+        #[cfg(feature = "tracing")]
+        if result != 0 {
+            event!(Level::TRACE, val = result, "RHS shift");
+            return None;
+        }
+
+        Some(result)
     }
 
     #[cfg(not(feature = "unreliable_select_nth_unstable"))]
@@ -409,6 +492,18 @@ where
         // items that are equal to it are adjacent, according to our assumptions about the
         // behaviour of `select_nth_unstable_by` (See examples/check_select_nth_unstable.rs)
         sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
+
+        if pivot == 0 {
+            event!(
+                Level::WARN,
+                pivot,
+                chunk_len = sort_index.len(),
+                pivot0_val = ?source[sort_index[pivot]][dim],
+                pivot1_val = ?source[sort_index[pivot + 1]][dim],
+                "Pivot already at 0. Update-pivot can't move it left."
+            );
+            return pivot;
+        }
 
         // if the pivot straddles two values that are equal, keep nudging it left until they aren't
         while source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim] && pivot > 1 {
@@ -535,7 +630,7 @@ where
         shifted: usize,
         stem_index: usize,
         right_capacity: usize,
-    ) -> usize {
+    ) -> Option<usize> {
         let mut pivot = (chunk_length + shifted) >> 1;
         if stem_index == 1 {
             // If at the top level, check if there's been a shift
@@ -554,11 +649,26 @@ where
         } else {
             pivot = pivot.next_power_of_two();
         }
+
+        if shifted > pivot {
+            event!(
+                Level::WARN,
+                chunk_length,
+                shifted,
+                stem_index,
+                right_capacity,
+                pivot,
+                "Tried to shift pivot < 0"
+            );
+            return None;
+        }
+
         pivot -= shifted;
+
         pivot = pivot.max(chunk_length.saturating_sub(right_capacity));
         //#[cfg(feature = "tracing")]
         //event!(Level::TRACE, pivot, "pivot");
-        pivot
+        Some(pivot)
         // pivot - shifted
     }
 

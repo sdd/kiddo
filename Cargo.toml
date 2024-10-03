@@ -36,6 +36,8 @@ itertools = "0.13"
 ubyte = "0.10"
 init_with = "1"
 sorted-vec = "0.8"
+las = { version = "0.9.1", features = ["laz-parallel"] }
+csv = "1"
 
 [dev-dependencies]
 bincode = "1.3"
@@ -216,3 +218,13 @@ required-features = ["rkyv"]
 [[example]]
 name = "half"
 path = "examples/half.rs"
+
+[[example]]
+name = "pointcloud-las"
+path = "examples/pointcloud-las.rs"
+required-features = ["rkyv"]
+
+[[example]]
+name = "pointcloud-csv"
+path = "examples/pointcloud-csv.rs"
+required-features = ["rkyv"]
