@@ -10,12 +10,11 @@ use std::io::Write;
 use std::time::Instant;
 
 use csv::Reader;
-use kiddo::ImmutableKdTree;
-use kiddo::SquaredEuclidean;
 use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
 use rkyv::ser::Serializer;
 use rkyv::{AlignedVec, Infallible};
 
+use kiddo::SquaredEuclidean;
 use serde::Deserialize;
 use tracing::Level;
 use tracing_subscriber::fmt;
@@ -30,7 +29,7 @@ struct Point {
     z: f64,
 }
 
-type Tree = ImmutableKdTree<f64, 3>;
+type Tree = kiddo::immutable_dynamic::float::kdtree::ImmutableKdTree<f64, u64, 3, 64>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "tracing")]
@@ -53,7 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Points loaded from CSV file. Count: {}", points.len());
 
-    let kdtree: Tree = (&*points).into();
+    let kdtree: Tree = Tree::new_from_slice(&points);
 
     println!(
         "Populated kd-tree with {} items. Took {}",
@@ -61,17 +60,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         ElapsedDuration::new(start.elapsed())
     );
 
-    println!("Tree Stats: {:?}", kdtree.generate_stats());
-
     // Test query on the newly created tree
     let query = [0.123f64, 0.456f64, 0.789f64];
-    let nearest_neighbour = kdtree.nearest_one::<SquaredEuclidean>(&query);
-    println!("Nearest item to query: {:?}", nearest_neighbour.item);
+    let start_query = Instant::now();
+    let nearest_neighbour = kdtree.approx_nearest_one::<SquaredEuclidean>(&query);
+    println!(
+        "Nearest item to query: {:?}. Elapsed: {:?}",
+        nearest_neighbour.item,
+        ElapsedDuration::new(start_query.elapsed())
+    );
 
     let start = Instant::now();
 
-    // create a file for us to serialize into
-    let mut file = File::create("./examples/house.rkyv")?;
+    // // create a file for us to serialize into
+    let mut file = File::create("./examples/csv.rkyv")?;
 
     serialize_to_rkyv(&mut file, kdtree);
     println!(

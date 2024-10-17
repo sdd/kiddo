@@ -9,10 +9,9 @@ use std::fs::File;
 use std::io::Write;
 use std::time::Instant;
 
-use kiddo::ImmutableKdTree;
-use kiddo::SquaredEuclidean;
 use las::Reader;
 
+use kiddo::SquaredEuclidean;
 use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
 use rkyv::ser::Serializer;
 use rkyv::{AlignedVec, Infallible};
@@ -22,7 +21,7 @@ use tracing_subscriber::fmt;
 const BUFFER_LEN: usize = 10_000_000_000;
 const SCRATCH_LEN: usize = 1_000_000_000;
 
-type Tree = ImmutableKdTree<f32, 3>;
+type Tree = kiddo::immutable_dynamic::float::kdtree::ImmutableKdTree<f32, u64, 3, 64>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "tracing")]
@@ -53,17 +52,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         ElapsedDuration::new(start.elapsed())
     );
 
-    println!("Tree Stats: {:?}", kdtree.generate_stats());
-
     // Test query on the newly created tree
     let query = [0.123f32, 0.456f32, 0.789f32];
-    let nearest_neighbour = kdtree.nearest_one::<SquaredEuclidean>(&query);
-    println!("Nearest item to query: {:?}", nearest_neighbour.item);
+    let start_query = Instant::now();
+    let nearest_neighbour = kdtree.approx_nearest_one::<SquaredEuclidean>(&query);
+    println!(
+        "Nearest item to query: {:?}. Elapsed: {:?}",
+        nearest_neighbour.item,
+        ElapsedDuration::new(start_query.elapsed())
+    );
 
     let start = Instant::now();
 
     // create a file for us to serialize into
-    let mut file = File::create("./examples/house.rkyv")?;
+    let mut file = File::create("./examples/las.rkyv")?;
 
     serialize_to_rkyv(&mut file, kdtree);
     println!(

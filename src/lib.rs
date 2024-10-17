@@ -1,3 +1,7 @@
+#![cfg_attr(
+    all(feature = "simd", target_arch = "aarch64"),
+    feature(stdarch_aarch64_prefetch)
+)]
 #![cfg_attr(feature = "simd", feature(slice_as_chunks))]
 #![cfg_attr(feature = "global_allocate", feature(allocator_api))]
 #![warn(rustdoc::missing_crate_level_docs)]
@@ -92,6 +96,7 @@ pub mod distance_metric;
 pub mod fixed;
 pub mod float;
 pub mod immutable;
+pub mod immutable_dynamic;
 mod mirror_select_nth_unstable_by;
 pub mod nearest_neighbour;
 #[doc(hidden)]
@@ -106,6 +111,7 @@ pub mod within_unsorted_iter;
 
 #[doc(hidden)]
 pub mod float_leaf_simd;
+pub mod point_slice_ops_float;
 
 /// A floating-point k-d tree with default parameters.
 ///

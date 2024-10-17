@@ -11,7 +11,7 @@ impl<'a, A, T> WithinUnsortedIter<'a, A, T> {
     }
 }
 
-impl<'a, A, T> Iterator for WithinUnsortedIter<'a, A, T> {
+impl<A, T> Iterator for WithinUnsortedIter<'_, A, T> {
     type Item = NearestNeighbour<A, T>;
 
     fn next(&mut self) -> Option<Self::Item> {

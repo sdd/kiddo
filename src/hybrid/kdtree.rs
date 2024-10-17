@@ -262,7 +262,7 @@ where
     /// Creates a new float KdTree, balanced and optimized.
     ///
     /// Trees constructed using this method will not be modifiable
-    /// after construction, ant will be optimally balanced and tuned.
+    /// after construction, and will be optimally balanced and tuned.
     ///
     /// # Examples
     ///
