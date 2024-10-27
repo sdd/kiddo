@@ -1,3 +1,4 @@
+#![feature(int_roundings)]
 #![cfg_attr(feature = "simd", feature(slice_as_chunks))]
 #![cfg_attr(feature = "global_allocate", feature(allocator_api))]
 #![warn(rustdoc::missing_crate_level_docs)]
@@ -106,6 +107,7 @@ pub mod within_unsorted_iter;
 
 #[doc(hidden)]
 pub mod float_leaf_simd;
+mod modified_van_emde_boas;
 
 /// A floating-point k-d tree with default parameters.
 ///
