@@ -38,6 +38,9 @@ init_with = "1"
 sorted-vec = "0.8"
 las = { version = "0.9.1", features = ["laz-parallel"] }
 csv = "1"
+cmov = "0.3.1"
+rstest = "0.23.0"
+array-init = "2.1.0"
 
 [dev-dependencies]
 bincode = "1.3"
