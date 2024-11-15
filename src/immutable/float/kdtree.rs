@@ -150,6 +150,7 @@ where
         let mut split_dims = vec![0u8; stem_node_count];
 
         let mut dim = K as u8 - 1;
+        #[allow(clippy::needless_range_loop)]
         for n in 1..stem_node_count {
             if n.count_ones() == 1 {
                 dim += 1;
@@ -297,7 +298,7 @@ where
 
         if chunk_length > capacity {
             return None;
-            return Some(chunk_length - capacity);
+            // return Some(chunk_length - capacity);
         }
 
         let dim = split_dims[stem_index] as usize;
@@ -352,7 +353,7 @@ where
                 "RHS Overflow A"
             );
             return None;
-            return Some(chunk_length - pivot - right_capacity);
+            // return Some(chunk_length - pivot - right_capacity);
         }
 
         let next_stem_index = stem_index << 1;
@@ -420,7 +421,7 @@ where
                     "RHS Overflow B"
                 );
                 return None;
-                return Some(chunk_length - pivot - right_capacity);
+                // return Some(chunk_length - pivot - right_capacity);
             }
 
             sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
@@ -696,7 +697,6 @@ where
 
     /// Iterate over all `(index, point)` tuples in arbitrary order.
     ///
-
     /// ```
     /// use kiddo::immutable::float::kdtree::ImmutableKdTree;
     ///
