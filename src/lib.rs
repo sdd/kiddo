@@ -1,4 +1,7 @@
 #![feature(int_roundings)]
+#![feature(stdarch_aarch64_prefetch)]
+#![feature(new_range_api)]
+#![feature(exact_size_is_empty)]
 #![cfg_attr(feature = "simd", feature(slice_as_chunks))]
 #![cfg_attr(feature = "global_allocate", feature(allocator_api))]
 #![warn(rustdoc::missing_crate_level_docs)]
@@ -82,6 +85,7 @@
 
 #[macro_use]
 extern crate doc_comment;
+extern crate core;
 
 pub mod best_neighbour;
 #[doc(hidden)]
@@ -93,6 +97,7 @@ pub mod distance_metric;
 pub mod fixed;
 pub mod float;
 pub mod immutable;
+pub mod immutable_dynamic;
 mod mirror_select_nth_unstable_by;
 pub mod nearest_neighbour;
 #[doc(hidden)]
@@ -107,6 +112,8 @@ pub mod within_unsorted_iter;
 
 #[doc(hidden)]
 pub mod float_leaf_simd;
+#[doc(hidden)]
+pub mod float_leaf_slice;
 mod modified_van_emde_boas;
 
 /// A floating-point k-d tree with default parameters.
@@ -127,6 +134,16 @@ pub type KdTree<A, const K: usize> = float::kdtree::KdTree<A, u64, K, 32, u32>;
 /// To store positions using integer or fixed-point types, use [`fixed::kdtree::KdTree`].
 pub type ImmutableKdTree<A, const K: usize> =
     immutable::float::kdtree::ImmutableKdTree<A, u64, K, 32>;
+
+/// An immutable floating-point k-d tree with default parameters.
+///
+/// `A` is the floating point type (`f32` or `f64`, or `f16` if the `f16` feature is enabled).
+/// `K` is the number of dimensions. See [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) for details of how to use.
+///
+/// To manually specify more advanced parameters, use [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) directly.
+/// To store positions using integer or fixed-point types, use [`fixed::kdtree::KdTree`].
+pub type ImmutableKdDynamicTree<A, const K: usize> =
+    immutable_dynamic::float::kdtree::ImmutableDynamicKdTree<A, u64, K, 32>;
 
 pub use best_neighbour::BestNeighbour;
 pub use float::distance::Manhattan;
