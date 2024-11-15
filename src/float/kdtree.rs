@@ -197,7 +197,6 @@ where
 
     /// Iterate over all `(index, point)` tuples in arbitrary order.
     ///
-
     /// ```
     /// use kiddo::KdTree;
     ///

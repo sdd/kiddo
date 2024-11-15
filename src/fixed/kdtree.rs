@@ -261,7 +261,6 @@ where
 
     /// Iterate over all `(index, point)` tuples in arbitrary order.
     ///
-
     /// ```
     /// use fixed::FixedU16;
     /// use fixed::types::extra::U0;

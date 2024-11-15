@@ -29,8 +29,8 @@ impl<'a, A: Copy + Default, T: Content, const K: usize, X: IterableTreeData<A, T
     }
 }
 
-impl<'a, A: Copy + Default, T: Content, const K: usize, X: IterableTreeData<A, T, K>> Iterator
-    for TreeIter<'a, A, T, K, X>
+impl<A: Copy + Default, T: Content, const K: usize, X: IterableTreeData<A, T, K>> Iterator
+    for TreeIter<'_, A, T, K, X>
 {
     type Item = (T, [A; K]);
 
