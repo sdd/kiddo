@@ -7,6 +7,7 @@ const ITEMS_PER_CACHE_LINE_MASK: usize = ITEMS_PER_CACHE_LINE - 1;
 const LOG2_ITEMS_PER_CACHE_LINE: usize = ITEMS_PER_CACHE_LINE.ilog2() as usize; // f64 = 3 levels; f32 = 4 levels
 
 #[allow(dead_code)]
+#[inline]
 pub(crate) fn modified_van_emde_boas_get_child_idx_v2(
     curr_idx: usize,
     is_right_child: bool,
@@ -30,10 +31,12 @@ pub(crate) fn modified_van_emde_boas_get_child_idx_v2(
 }
 
 #[allow(dead_code)]
+#[inline]
 pub(crate) fn modified_van_emde_boas_get_child_idx_v2_branchless(
     curr_idx: usize,
     is_right_child: bool,
     level: usize,
+    // minor_level: u64,
 ) -> usize {
     let minor_level = (level % LOG2_ITEMS_PER_CACHE_LINE) as u64;
     let maj_idx = (curr_idx >> LOG2_ITEMS_PER_CACHE_LINE) as u64;

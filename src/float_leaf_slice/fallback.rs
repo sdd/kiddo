@@ -2,6 +2,7 @@ use az::Cast;
 
 use crate::{float::kdtree::Axis, types::Content};
 
+#[inline]
 pub(crate) fn get_best_from_dists_autovec<A: Axis, T: Content>(
     acc: &[A],
     items: &[T],
