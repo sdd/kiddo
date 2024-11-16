@@ -5,7 +5,7 @@
 //! As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
 //! values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
 
-use aligned_vec::{avec,AVec};
+use aligned_vec::{avec, AVec};
 use array_init::array_init;
 use az::{Az, Cast};
 use ordered_float::OrderedFloat;
@@ -16,9 +16,9 @@ use std::fmt::Debug;
 use tracing::{event, span, Level};
 
 pub use crate::float::kdtree::Axis;
-use crate::float_leaf_simd::leaf_node::BestFromDists;
 use crate::types::Content;
 
+use crate::float_leaf_slice::leaf_slice::{LeafSlice, LeafSliceFloat};
 use crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -54,14 +54,14 @@ pub struct ImmutableDynamicKdTree<
     pub(crate) stems: AVec<A>,
     pub(crate) leaf_points: [Vec<A>; K],
     pub(crate) leaf_items: Vec<T>,
-    pub(crate) leaf_extents: Vec<(u32,u32)>,
+    pub(crate) leaf_extents: Vec<(u32, u32)>,
     pub(crate) max_stem_level: usize,
 }
 
 impl<A: Axis, T: Content, const K: usize, const B: usize> From<&[[A; K]]>
     for ImmutableDynamicKdTree<A, T, K, B>
 where
-    A: Axis + BestFromDists<T, B>,
+    A: Axis + LeafSliceFloat<T, K>,
     T: Content,
     usize: Cast<T>,
 {
@@ -92,7 +92,7 @@ where
 #[allow(unexpected_cfgs)]
 impl<A, T, const K: usize, const B: usize> ImmutableDynamicKdTree<A, T, K, B>
 where
-    A: Axis + BestFromDists<T, B>,
+    A: Axis + LeafSliceFloat<T, K>,
     T: Content,
     usize: Cast<T>,
 {
@@ -131,7 +131,7 @@ where
         let mut stems = avec![A::infinity(); stem_node_count];
         let mut leaf_points: [Vec<A>; K] = array_init(|_| Vec::with_capacity(item_count));
         let mut leaf_items: Vec<T> = Vec::with_capacity(item_count);
-        let mut leaf_extents: Vec<(u32,u32)> = Vec::with_capacity(item_count.div_ceil(B));
+        let mut leaf_extents: Vec<(u32, u32)> = Vec::with_capacity(item_count.div_ceil(B));
 
         let mut sort_index = Vec::from_iter(0..item_count);
 
@@ -170,7 +170,7 @@ where
         capacity: usize,
         leaf_points: &mut [Vec<A>; K],
         leaf_items: &mut Vec<T>,
-        leaf_extents: &mut Vec<(u32,u32)>,
+        leaf_extents: &mut Vec<(u32, u32)>,
     ) {
         #[cfg(feature = "tracing")]
         let span = span!(Level::TRACE, "opt", idx = stem_index);
@@ -182,7 +182,10 @@ where
             // Write leaf and terminate recursion
             // println!("Writing leaf #{:?}", leaf_extents.len());
 
-            leaf_extents.push((leaf_items.len() as u32, (leaf_items.len() + chunk_length) as u32));
+            leaf_extents.push((
+                leaf_items.len() as u32,
+                (leaf_items.len() + chunk_length) as u32,
+            ));
 
             (0..chunk_length).for_each(|i| {
                 (0..K).for_each(|dim| leaf_points[dim].push(source[sort_index[i]][dim]));
@@ -324,6 +327,21 @@ where
 
     fn calc_pivot(chunk_length: usize, _stem_index: usize, _right_capacity: usize) -> usize {
         chunk_length >> 1
+    }
+
+    /// Returns a LeafSlice for a given leaf index
+    #[inline]
+    pub(crate) fn get_leaf_slice(&self, leaf_idx: usize) -> LeafSlice<A, T, K> {
+        let (start, end) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
+
+        // Artificially extend size to be at least chunk length for faster processing
+        // TODO: why does this slow things down?
+        // let end = end.max(start + 32).min(self.leaf_items.len() as u32);
+
+        LeafSlice::new(
+            array_init::array_init(|i| &self.leaf_points[i][start as usize..end as usize]),
+            &self.leaf_items[start as usize..end as usize],
+        )
     }
 }
 

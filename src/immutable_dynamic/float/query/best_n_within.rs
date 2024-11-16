@@ -5,7 +5,7 @@ use std::ops::Rem;
 use crate::best_neighbour::BestNeighbour;
 use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
-use crate::float_leaf_simd::leaf_node::BestFromDists;
+use crate::float_leaf_slice::leaf_slice::LeafSliceFloat;
 use crate::immutable_dynamic::float::kdtree::ImmutableDynamicKdTree;
 use crate::types::Content;
 
@@ -41,7 +41,12 @@ performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt
     };
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableDynamicKdTree<A, T, K, B> {
+impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableDynamicKdTree<A, T, K, B>
+where
+    A: Axis + LeafSliceFloat<T, K>,
+    T: Content,
+    usize: Cast<T>,
+{
     generate_immutable_dynamic_float_best_n_within!(
         "let content: Vec<[f64; 3]> = vec!(
             [1.0, 2.0, 5.0],
@@ -102,7 +107,8 @@ mod tests {
             [11f64, -200f64],
         ];
 
-        let tree: ImmutableDynamicKdTree<AX, i32, 2, 4> = ImmutableDynamicKdTree::new_from_slice(&content_to_add);
+        let tree: ImmutableDynamicKdTree<AX, i32, 2, 4> =
+            ImmutableDynamicKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), 16);
 
@@ -149,7 +155,7 @@ mod tests {
     }
 
     #[test]
-    fn can_query_items_within_radius_large_scale() {
+    fn can_query_best_items_within_radius_large_scale() {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
         let max_qty = 2;

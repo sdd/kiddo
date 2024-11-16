@@ -7,7 +7,7 @@ macro_rules! generate_immutable_dynamic_nearest_n {
             #[inline]
             pub fn nearest_n<D>(&self, query: &[A; K], qty: usize) -> Vec<NearestNeighbour<A, T>>
             where
-                A: BestFromDists<T, B>,
+                A: LeafSliceFloat<T, K>,
                 D: DistanceMetric<A, K>,
                 usize: Cast<T>,
             {

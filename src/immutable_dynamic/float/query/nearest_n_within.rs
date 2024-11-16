@@ -6,7 +6,7 @@ use std::ops::Rem;
 use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
 use crate::float::result_collection::ResultCollection;
-use crate::float_leaf_simd::leaf_node::BestFromDists;
+use crate::float_leaf_slice::leaf_slice::LeafSliceFloat;
 use crate::immutable_dynamic::float::kdtree::ImmutableDynamicKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::Content;
@@ -40,7 +40,7 @@ distance metric function.
 
 impl<A, T, const K: usize, const B: usize> ImmutableDynamicKdTree<A, T, K, B>
 where
-    A: Axis + BestFromDists<T, B>,
+    A: Axis + LeafSliceFloat<T, K>,
     T: Content,
     usize: Cast<T>,
 {
@@ -64,7 +64,7 @@ impl<
         const B: usize,
     > ArchivedImmutableDynamicKdTree<A, T, K, B>
 where
-    A: Axis + BestFromDists<T, B>,
+    A: Axis + LeafSliceFloat<T, K>,
     T: Content,
     usize: Cast<T>,
 {
@@ -109,7 +109,8 @@ mod tests {
             [0.11f32, 0.2f32, 0.11f32, 0.2f32],
         ];
 
-        let tree: ImmutableDynamicKdTree<AX, u32, 4, 4> = ImmutableDynamicKdTree::new_from_slice(&content_to_add);
+        let tree: ImmutableDynamicKdTree<AX, u32, 4, 4> =
+            ImmutableDynamicKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), 16);
 

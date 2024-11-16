@@ -1,6 +1,6 @@
 use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
-use crate::float_leaf_simd::leaf_node::BestFromDists;
+use crate::float_leaf_slice::leaf_slice::LeafSliceFloat;
 use crate::immutable_dynamic::float::kdtree::ImmutableDynamicKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::Content;
@@ -33,7 +33,12 @@ distance metric function.
     };
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableDynamicKdTree<A, T, K, B> {
+impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableDynamicKdTree<A, T, K, B>
+where
+    A: Axis + LeafSliceFloat<T, K>,
+    T: Content,
+    usize: Cast<T>,
+{
     generate_immutable_dynamic_float_nearest_n!(
         "let content: Vec<[f64; 3]> = vec!(
             [1.0, 2.0, 5.0],

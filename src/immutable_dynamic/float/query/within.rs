@@ -1,12 +1,11 @@
 use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
-use crate::float_leaf_simd::leaf_node::BestFromDists;
+use crate::float_leaf_slice::leaf_slice::LeafSliceFloat;
+use crate::generate_immutable_dynamic_within;
 use crate::immutable_dynamic::float::kdtree::ImmutableDynamicKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::Content;
 use az::Cast;
-
-use crate::generate_immutable_dynamic_within;
 
 macro_rules! generate_immutable_dynamic_float_within {
     ($doctest_build_tree:tt) => {
@@ -33,7 +32,12 @@ Results are returned sorted nearest-first
     };
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableDynamicKdTree<A, T, K, B> {
+impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableDynamicKdTree<A, T, K, B>
+where
+    A: Axis + LeafSliceFloat<T, K>,
+    T: Content,
+    usize: Cast<T>,
+{
     generate_immutable_dynamic_float_within!(
         "let content: Vec<[f64; 3]> = vec!(
             [1.0, 2.0, 5.0],
@@ -95,7 +99,8 @@ mod tests {
             [0.11f32, 0.2f32, 0.11f32, 0.2f32],
         ];
 
-        let tree: ImmutableDynamicKdTree<AX, u32, 4, 4> = ImmutableDynamicKdTree::new_from_slice(&content_to_add);
+        let tree: ImmutableDynamicKdTree<AX, u32, 4, 4> =
+            ImmutableDynamicKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), 16);
 
