@@ -4,7 +4,7 @@ use crate::types::Content;
 use sorted_vec::SortedVec;
 use std::collections::BinaryHeap;
 
-pub(crate) trait ResultCollection<A: Axis, T: Content> {
+pub trait ResultCollection<A: Axis, T: Content> {
     fn new_with_capacity(capacity: usize) -> Self;
     fn add(&mut self, entry: NearestNeighbour<A, T>);
     fn max_dist(&self) -> A;
