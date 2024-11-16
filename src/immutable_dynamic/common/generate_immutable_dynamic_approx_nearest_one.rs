@@ -20,7 +20,7 @@ macro_rules! generate_immutable_dynamic_approx_nearest_one {
                 let mut level: usize = 0;
                 let mut leaf_idx: usize = 0;
 
-                while level <= self.max_stem_level {
+                while level <= self.max_stem_level as usize {
                     let val = *unsafe { self.stems.get_unchecked(curr_idx) };
                     let is_right_child = *unsafe { query.get_unchecked(dim) } >= val;
 
@@ -32,13 +32,13 @@ macro_rules! generate_immutable_dynamic_approx_nearest_one {
                     dim = (dim + 1) % K;
                 }
 
-                let leaf_extent: core::range::Range<usize> = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
+                let (start, end) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
 
                 let leaf_slice = $crate::float_leaf_slice::leaf_slice::LeafSlice::new(
                     array_init::array_init(|i|
-                        &self.leaf_points[i][leaf_extent]
+                        &self.leaf_points[i][start as usize..end as usize]
                     ),
-                    &self.leaf_items[leaf_extent],
+                    &self.leaf_items[start as usize..end as usize],
                 );
 
                 leaf_slice.nearest_one::<D>(

@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::Write;
 use std::time::Instant;
 
-use kiddo::ImmutableKdTree;
+use kiddo::ImmutableKdDynamicTree;
 use kiddo::SquaredEuclidean;
 use las::Reader;
 
@@ -22,7 +22,7 @@ use tracing_subscriber::fmt;
 const BUFFER_LEN: usize = 10_000_000_000;
 const SCRATCH_LEN: usize = 1_000_000_000;
 
-type Tree = ImmutableKdTree<f32, 3>;
+type Tree = ImmutableKdDynamicTree<f32, 3>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "tracing")]
@@ -52,8 +52,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         kdtree.size(),
         ElapsedDuration::new(start.elapsed())
     );
-
-    println!("Tree Stats: {:?}", kdtree.generate_stats());
 
     // Test query on the newly created tree
     let query = [0.123f32, 0.456f32, 0.789f32];

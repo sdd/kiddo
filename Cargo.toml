@@ -41,6 +41,7 @@ csv = "1"
 cmov = "0.3.1"
 rstest = "0.23.0"
 array-init = "2.1.0"
+aligned-vec = "0.6.1"
 
 [dev-dependencies]
 bincode = "1.3"

@@ -1,6 +1,8 @@
 use az::Cast;
 use std::slice::ChunksExact;
 
+const CHUNK_SIZE: usize = 32;
+
 #[cfg(all(
     feature = "simd",
     target_feature = "avx2",
@@ -34,6 +36,7 @@ where
     T: Content,
     usize: Cast<T>,
 {
+    #[inline]
     pub fn nearest_one<D>(&self, query: &[A; K], best_dist: &mut A, best_item: &mut T)
     where
         D: DistanceMetric<A, K>,
@@ -77,6 +80,7 @@ impl<'a, A: Axis, T: Content, const K: usize, const C: usize> Iterator
 {
     type Item = ([&'a [A; C]; K], &'a [T; C]);
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.items_iterator.is_empty() {
             None
@@ -93,6 +97,7 @@ impl<'a, A: Axis, T: Content, const K: usize, const C: usize> Iterator
 impl<'a, A: Axis, T: Content, const K: usize, const C: usize>
     LeafFixedSliceIterator<'a, A, T, K, C>
 {
+    #[inline]
     fn remainder(&self) -> ([&'a [A]; K], &'a [T]) {
         (
             array_init::array_init(|i| self.points_iterators[i].remainder()),
@@ -122,6 +127,7 @@ where
     T: Content,
     usize: Cast<T>,
 {
+    #[inline]
     pub fn new<'a>(content_points: [&'a [A]; K], content_items: &'a [T]) -> LeafSlice<'a, A, T, K> {
         let size = content_items.len();
         for arr in content_points {
@@ -134,6 +140,7 @@ where
         }
     }
 
+    #[inline]
     fn as_full_chunks<const C: usize>(&self) -> LeafFixedSliceIterator<A, T, K, C> {
         let points_iterators = self.content_points.map(|i| i.chunks_exact(C));
         let items_iterator = self.content_items.chunks_exact(C);
@@ -144,14 +151,15 @@ where
         }
     }
 
+    #[inline]
     pub fn nearest_one<D>(&self, query: &[A; K], best_dist: &mut A, best_item: &mut T)
     where
         D: DistanceMetric<A, K>,
     {
-        let chunk_iter = self.as_full_chunks::<64>();
+        let chunk_iter = self.as_full_chunks::<CHUNK_SIZE>();
         let (remainder_points, remainder_items) = chunk_iter.remainder();
         for chunk in chunk_iter {
-            let dists = A::dists_for_chunk::<D, 64>(chunk.0, query);
+            let dists = A::dists_for_chunk::<D, CHUNK_SIZE>(chunk.0, query);
             A::update_best_dist(dists, chunk.1, best_dist, best_item);
         }
 
@@ -180,6 +188,7 @@ where
     T: Content,
     usize: Cast<T>,
 {
+    #[inline]
     fn update_best_dist<const C: usize>(
         acc: [f64; C],
         items: &[T; C],
@@ -213,6 +222,7 @@ where
         }
     }
 
+    #[inline]
     fn dists_for_chunk<D, const C: usize>(chunk: [&[Self; C]; K], query: &[Self; K]) -> [Self; C]
     where
         D: DistanceMetric<Self, K>,
@@ -237,6 +247,7 @@ where
     T: Content,
     usize: Cast<T>,
 {
+    #[inline]
     fn update_best_dist<const C: usize>(
         acc: [f32; C],
         items: &[T; C],
@@ -268,6 +279,7 @@ where
         }
     }
 
+    #[inline]
     fn dists_for_chunk<D, const C: usize>(chunk: [&[Self; C]; K], query: &[Self; K]) -> [Self; C]
     where
         D: DistanceMetric<Self, K>,
