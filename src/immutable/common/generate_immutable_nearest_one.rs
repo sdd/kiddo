@@ -10,17 +10,24 @@ macro_rules! generate_immutable_nearest_one {
                     D: DistanceMetric<A, K>,
             {
                 let mut off = [A::zero(); K];
+                let mut result = NearestNeighbour {
+                    distance: A::max_value(),
+                    item: T::zero(),
+                };
+
                 self.nearest_one_recurse::<D>(
                     query,
-                    1,
                     0,
-                    NearestNeighbour {
-                        distance: A::max_value(),
-                        item: T::zero(),
-                    },
+                    0,
+                    &mut result,
                     &mut off,
                     A::zero(),
-                )
+                    0,
+                    // 0,
+                    0,
+                );
+
+                result
             }
 
             #[allow(clippy::too_many_arguments)]
@@ -29,72 +36,76 @@ macro_rules! generate_immutable_nearest_one {
                 query: &[A; K],
                 stem_idx: usize,
                 split_dim: usize,
-                mut nearest: NearestNeighbour<A, T>,
+                nearest: &mut NearestNeighbour<A, T>,
                 off: &mut [A; K],
                 rd: A,
-            ) -> NearestNeighbour<A, T>
+                mut level: usize,
+                // mut minor_level: u64,
+                mut leaf_idx: usize,
+            )
                 where
                     D: DistanceMetric<A, K>,
             {
-                if stem_idx >= self.stems.len() {
-                    self.search_leaf_for_nearest::<D>(query, &mut nearest, stem_idx - self.stems.len());
+                // use cmov::Cmov;
+                use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 
-                    return nearest;
+                if level > self.max_stem_level as usize {
+                    self.search_leaf_for_nearest_one::<D>(query, nearest, leaf_idx as usize);
+                    return;
                 }
 
-                let left_child_idx = stem_idx << 1;
+                let val = *unsafe { self.stems.get_unchecked(stem_idx as usize) };
+                let is_right_child = usize::from(*unsafe { query.get_unchecked(split_dim as usize) } >= val);
 
-                #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
-                self.prefetch_stems(left_child_idx);
+                leaf_idx <<= 1;
+                let closer_leaf_idx = leaf_idx + is_right_child;
+                let farther_leaf_idx = leaf_idx + (1 - is_right_child);
 
-                // let val = *unsafe { self.stems.get_unchecked(stem_idx) };
-                let val = self.stems[stem_idx];
+                let closer_node_idx = modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 1, /*minor_*/level);
+                let further_node_idx =  modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 0, /*minor_*/level);
 
                 let mut rd = rd;
                 let old_off = off[split_dim];
-                // let new_off = (query[split_dim] * query[split_dim]) - (val * val);
                 let new_off = query[split_dim].saturating_dist(val);
-                // let new_off = query[split_dim] - val;
 
-                let is_left_child = usize::from(*unsafe { query.get_unchecked(split_dim) } < val);
-                // let is_left_child = usize::from(query[split_dim] < val);
-
-                let closer_node_idx = left_child_idx + (1 - is_left_child);
-                let further_node_idx = left_child_idx + is_left_child;
-
+                level += 1;
                 let next_split_dim = (split_dim + 1).rem(K);
+                // minor_level += 1;
+                // minor_level.cmovnz(&0, u8::from(minor_level == 3));
 
-                let nearest_neighbour =
-                    self.nearest_one_recurse::<D>(query, closer_node_idx, next_split_dim, nearest, off, rd);
-
-                if nearest_neighbour < nearest {
-                    nearest = nearest_neighbour;
-                }
+                self.nearest_one_recurse::<D>(
+                    query,
+                    closer_node_idx,
+                    next_split_dim,
+                    nearest,
+                    off,
+                    rd,
+                    level,
+                    // minor_level,
+                    closer_leaf_idx,
+                );
 
                 rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
 
                 if rd <= nearest.distance {
                     off[split_dim] = new_off;
-                    let result = self.nearest_one_recurse::<D>(
+                    self.nearest_one_recurse::<D>(
                         query,
                         further_node_idx,
                         next_split_dim,
                         nearest,
                         off,
                         rd,
+                        level,
+                        // minor_level,
+                        farther_leaf_idx,
                     );
                     off[split_dim] = old_off;
-
-                    if result < nearest {
-                        nearest = result;
-                    }
                 }
-
-                nearest
             }
 
             #[inline]
-             fn search_leaf_for_nearest<D>(
+            fn search_leaf_for_nearest_one<D>(
                 &self,
                 query: &[A; K],
                 nearest: &mut NearestNeighbour<A, T>,
@@ -102,34 +113,13 @@ macro_rules! generate_immutable_nearest_one {
             ) where
                 D: DistanceMetric<A, K>,
             {
-                let leaf_node = unsafe { self.leaves.get_unchecked(leaf_idx) };
-                // let leaf_node = &self.leaves[leaf_idx];
+                let leaf_slice = self.get_leaf_slice(leaf_idx);
 
-                let mut best_item = nearest.item;
-                let mut best_dist = nearest.distance;
-
-                leaf_node.nearest_one::<D>(
+                leaf_slice.nearest_one::<D>(
                     query,
-                    &mut best_dist,
-                    &mut best_item
+                    &mut nearest.distance,
+                    &mut nearest.item
                 );
-
-                nearest.distance = best_dist;
-                nearest.item = best_item;
-
-                // leaf_node
-                //     .content_points
-                //     .iter()
-                //     .enumerate()
-                //     .take(leaf_node.size as usize)
-                //     .for_each(|(idx, entry)| {
-                //         let dist = D::dist(query, entry);
-                //         if dist < nearest.distance {
-                //             nearest.distance = dist;
-                //             nearest.item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
-                //             // nearest.item = leaf_node.content_items[idx]
-                //         }
-                //     });
             }
         }
     };

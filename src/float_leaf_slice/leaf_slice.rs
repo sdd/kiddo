@@ -332,31 +332,7 @@ where
     ) where
         R: ResultCollection<f64, T>,
     {
-        #[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
-        {
-            /*if is_x86_feature_detected!("avx512f") {
-                #[cfg(target_feature = "avx512f")]
-                unsafe {
-                    update_best_dists_within_f64_avx512(&acc, items, radius, results)
-                }
-            } else */
-            if is_x86_feature_detected!("avx2") {
-                #[cfg(target_feature = "avx2")]
-                unsafe {
-                    update_best_dists_within_f64_avx2(&acc, items, radius, results)
-                }
-            } else {
-                update_best_dists_within_autovec(&acc, items, radius, results)
-            }
-        }
-
-        #[cfg(any(
-            not(feature = "simd"),
-            not(any(target_arch = "x86", target_arch = "x86_64"))
-        ))]
-        {
-            update_nearest_dists_within_autovec(&acc, items, radius, results)
-        }
+        update_nearest_dists_within_autovec(&acc, items, radius, results)
     }
 
     #[inline]
@@ -367,31 +343,7 @@ where
         max_qty: usize,
         results: &mut BinaryHeap<BestNeighbour<f64, T>>,
     ) {
-        #[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
-        {
-            /*if is_x86_feature_detected!("avx512f") {
-                #[cfg(target_feature = "avx512f")]
-                unsafe {
-                    update_best_dists_within_f64_avx512(&acc, items, radius, results)
-                }
-            } else */
-            if is_x86_feature_detected!("avx2") {
-                #[cfg(target_feature = "avx2")]
-                unsafe {
-                    update_best_dists_within_f64_avx2(&acc, items, radius, results)
-                }
-            } else {
-                update_best_dists_within_autovec(&acc, items, radius, results)
-            }
-        }
-
-        #[cfg(any(
-            not(feature = "simd"),
-            not(any(target_arch = "x86", target_arch = "x86_64"))
-        ))]
-        {
-            update_best_dists_within_autovec(&acc, items, radius, max_qty, results)
-        }
+        update_best_dists_within_autovec(&acc, items, radius, max_qty, results)
     }
 
     #[inline]
@@ -460,31 +412,7 @@ where
     ) where
         R: ResultCollection<f32, T>,
     {
-        #[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
-        {
-            /*if is_x86_feature_detected!("avx512f") {
-                #[cfg(target_feature = "avx512f")]
-                unsafe {
-                    update_best_dists_within_f32_avx512(&acc, items, radius, results)
-                }
-            } else */
-            if is_x86_feature_detected!("avx2") {
-                #[cfg(target_feature = "avx2")]
-                unsafe {
-                    update_best_dists_within_f32_avx2(&acc, items, radius, results)
-                }
-            } else {
-                update_best_dists_within_autovec(&acc, items, radius, results)
-            }
-        }
-
-        #[cfg(any(
-            not(feature = "simd"),
-            not(any(target_arch = "x86", target_arch = "x86_64"))
-        ))]
-        {
-            update_nearest_dists_within_autovec(&acc, items, radius, results)
-        }
+        update_nearest_dists_within_autovec(&acc, items, radius, results)
     }
 
     #[inline]
@@ -495,31 +423,7 @@ where
         max_qty: usize,
         results: &mut BinaryHeap<BestNeighbour<f32, T>>,
     ) {
-        #[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
-        {
-            /*if is_x86_feature_detected!("avx512f") {
-                #[cfg(target_feature = "avx512f")]
-                unsafe {
-                    update_best_dists_within_f32_avx512(&acc, items, radius, results)
-                }
-            } else */
-            if is_x86_feature_detected!("avx2") {
-                #[cfg(target_feature = "avx2")]
-                unsafe {
-                    update_best_dists_within_f32_avx2(&acc, items, radius, results)
-                }
-            } else {
-                update_best_dists_within_autovec(&acc, items, radius, results)
-            }
-        }
-
-        #[cfg(any(
-            not(feature = "simd"),
-            not(any(target_arch = "x86", target_arch = "x86_64"))
-        ))]
-        {
-            update_best_dists_within_autovec(&acc, items, radius, max_qty, results)
-        }
+        update_best_dists_within_autovec(&acc, items, radius, max_qty, results)
     }
 
     #[inline]

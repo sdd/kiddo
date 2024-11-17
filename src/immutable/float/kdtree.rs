@@ -5,29 +5,34 @@
 //! As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
 //! values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
 
+use array_init::array_init;
 use az::{Az, Cast};
 use ordered_float::OrderedFloat;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
-use std::ops::Rem;
-// use num_traits::PrimInt;
-#[cfg(feature = "tracing")]
-use tracing::{event, span, Level};
 
 pub use crate::float::kdtree::Axis;
-use crate::float_leaf_simd::leaf_node::{BestFromDists, LeafNode};
-use crate::iter::{IterableTreeData, TreeIter};
 use crate::types::Content;
 
+use crate::float_leaf_slice::leaf_slice::{LeafSlice, LeafSliceFloat};
+use crate::modified_van_emde_boas::{
+    modified_van_emde_boas_get_child_idx_v2, modified_van_emde_boas_get_child_idx_v2_branchless,
+};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 /// Immutable floating point k-d tree
 ///
-/// Offers less memory utilisation, smaller size
+/// Offers less memory utilisation, smaller size vs non-immutable tree
 /// when serialized, and faster more consistent query performance. This comes at the
 /// expense of not being able to modify the contents of the tree after its initial
 /// construction, and longer construction times.
+///
+/// Compared to non-dynamic ImmutableKdTree, this can handle data like point clouds
+/// that may have many occurrences of multiple points have the exact same value on a given axis.
+/// This comes at the expense of slower performance. Memory usage should still be very efficient,
+/// more so than the standard and non-dynamic immutable tree types.
+///
 /// As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
 /// values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
 ///
@@ -37,33 +42,28 @@ use serde::{Deserialize, Serialize};
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
+#[repr(align(16))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct ImmutableKdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize> {
-    pub(crate) leaves: Vec<LeafNode<A, T, K, B>>,
     pub(crate) stems: Vec<A>,
-    pub(crate) split_dims: Vec<u8>,
-    pub(crate) size: usize,
-}
-
-/// Encapsulates stats on a particular `ImmutableTree`'s contents and
-/// memory usage at the time of calling `generate_stats()`
-#[allow(dead_code)]
-#[derive(Debug)]
-pub struct TreeStats {
-    size: usize,
-    capacity: usize,
-    stem_count: usize,
-    leaf_count: usize,
-    leaf_fill_counts: Vec<usize>,
-    leaf_fill_ratio: f32,
-    stem_fill_ratio: f32,
-    unused_stem_count: usize,
+    #[cfg_attr(feature = "serde", serde(with = "crate::custom_serde::array_of_vecs"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(bound(
+            serialize = "A: Serialize, T: Serialize",
+            deserialize = "A: Deserialize<'de>, T: Deserialize<'de> + Copy + Default"
+        ))
+    )]
+    pub(crate) leaf_points: [Vec<A>; K],
+    pub(crate) leaf_items: Vec<T>,
+    pub(crate) leaf_extents: Vec<(u32, u32)>,
+    pub(crate) max_stem_level: usize,
 }
 
 impl<A: Axis, T: Content, const K: usize, const B: usize> From<&[[A; K]]>
     for ImmutableKdTree<A, T, K, B>
 where
-    A: Axis + BestFromDists<T, B>,
+    A: Axis + LeafSliceFloat<T, K>,
     T: Content,
     usize: Cast<T>,
 {
@@ -88,30 +88,13 @@ where
     }
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize> IterableTreeData<A, T, K>
-    for ImmutableKdTree<A, T, K, B>
-{
-    fn get_leaf_data(&self, idx: usize, out: &mut Vec<(T, [A; K])>) -> Option<usize> {
-        let leaf = self.leaves.get(idx)?;
-        let max = leaf.size;
-        for (pt_idx, content) in leaf.content_items[..max].iter().cloned().enumerate() {
-            let mut arr = [A::default(); K];
-            for (elem_idx, elem) in arr.iter_mut().enumerate() {
-                *elem = leaf.content_points[elem_idx][pt_idx];
-            }
-            out.push((content, arr));
-        }
-        Some(max)
-    }
-}
-
 // prevent clippy complaining that the feature unreliable_select_nth_unstable
 // is not defined (I don't want to explicitly define it as if I do then
 // passing --all-features in CI will enable it, which I don't want to do
 #[allow(unexpected_cfgs)]
 impl<A, T, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
 where
-    A: Axis + BestFromDists<T, B>,
+    A: Axis + LeafSliceFloat<T, K>,
     T: Content,
     usize: Cast<T>,
 {
@@ -137,196 +120,96 @@ where
         usize: Cast<T>,
     {
         let item_count = source.len();
+        let leaf_node_count = item_count.div_ceil(B);
+        let max_stem_level: usize = (leaf_node_count.next_power_of_two().ilog2() - 1) as usize;
+        let stem_node_count = leaf_node_count.next_power_of_two() - 1;
 
-        // TODO: is it possible to start with an excessive leaf count, but always ensure we are
-        //       packed to the left as we go? This could reduce the number of times that we need
-        //       to rebalance all the way to the outer loop, and any unused leaves could be
-        //       freed up afterwards?
-
-        let mut leaf_node_count = item_count.div_ceil(B);
-        let mut stem_node_count = leaf_node_count.next_power_of_two();
+        // TODO: It would be nice to be able to determine the exact required length up-front.
+        //  Instead, we just trim the stems afterwards by traversing right-child non-inf nodes
+        //  till we hit max level to get the max used stem
+        let stem_node_count = stem_node_count * 5;
 
         let mut stems = vec![A::infinity(); stem_node_count];
-        let mut split_dims = vec![0u8; stem_node_count];
+        let mut leaf_points: [Vec<A>; K] = array_init(|_| Vec::with_capacity(item_count));
+        let mut leaf_items: Vec<T> = Vec::with_capacity(item_count);
+        let mut leaf_extents: Vec<(u32, u32)> = Vec::with_capacity(item_count.div_ceil(B));
 
-        let mut dim = K as u8 - 1;
-        #[allow(clippy::needless_range_loop)]
-        for n in 1..stem_node_count {
-            if n.count_ones() == 1 {
-                dim += 1;
-            }
-            split_dims[n] = dim.rem(K as u8);
-        }
-
-        let mut shifts = vec![0usize; stem_node_count];
         let mut sort_index = Vec::from_iter(0..item_count);
 
-        // let mut top_level_shift_change_count = 0;
+        Self::populate_recursive(
+            &mut stems,
+            0,
+            source,
+            &mut sort_index,
+            0,
+            0,
+            max_stem_level,
+            leaf_node_count * B,
+            &mut leaf_points,
+            &mut leaf_items,
+            &mut leaf_extents,
+        );
+
+        // trim unneeded stems
+        let mut level = 0;
+        let mut stem_idx = 0;
         loop {
-            let Some(requested_shift) = Self::optimize_stems(
-                &mut stems,
-                &mut split_dims,
-                &mut shifts,
-                source,
-                &mut sort_index,
-                1,
-                leaf_node_count * B,
-            ) else {
-                split_dims[1] = (split_dims[1] as usize + 1).rem(K) as u8;
-                if split_dims[1] == 0u8 {
-                    // we've tried every dimension. Fail
-                    panic!("Unable to construct tree from this data. Cannot find a solution.")
-                }
-
-                continue;
-            };
-
-            if requested_shift == 0 {
+            let val = stems[stem_idx];
+            let is_right_child = val.is_finite();
+            stem_idx =
+                modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child, level);
+            level += 1;
+            if level == max_stem_level {
                 break;
             }
-            // top_level_shift_change_count += 1;
-
-            // if root has requested a shift, then there was not enough capacity in
-            // the tree to overflow into. Add just enough extra leaf nodes to accommodate
-            // the shift.
-            leaf_node_count += requested_shift.div_ceil(B);
-            #[cfg(feature = "tracing")]
-            event!(
-                Level::TRACE,
-                requested_shift,
-                leaf_node_count,
-                "top-level shift"
-            );
-
-            // if the new leaf count can't be accommodated by the existing stem count,
-            // bump up the stem count to the next power of two.
-            if leaf_node_count > stem_node_count {
-                stem_node_count = (stem_node_count + 1).next_power_of_two();
-                #[cfg(feature = "tracing")]
-                event!(Level::TRACE, stem_node_count, "extending stems");
-
-                stems = vec![A::infinity(); stem_node_count];
-                split_dims = vec![0u8; stem_node_count];
-                shifts = Self::extend_shifts(stem_node_count, &shifts, requested_shift);
-            }
         }
+        stems.truncate(stem_idx + 1);
 
-        // generate construction stats
-        // let max_shift = shifts.iter().max().unwrap();
-        // let tot_shift: usize = shifts.iter().sum();
-        //
-        // println!(
-        //     "top_level_shift_change_count: {:?}",
-        //     top_level_shift_change_count
-        // );
-        // println!("max_shift: {:?}", max_shift);
-        // println!("tot_shift: {:?}", tot_shift);
-        //
-        // for (idx, &shift) in shifts.iter().enumerate() {
-        //     if shift != 0 {
-        //         println!("Index {}: shift {}", &idx, shift);
-        //     }
-        // }
-
-        let mut tree = Self {
-            size: 0,
+        Self {
             stems,
-            split_dims,
-            leaves: Self::allocate_leaves(leaf_node_count),
-        };
-
-        for (idx, point) in source.iter().enumerate() {
-            tree.safe_add_to_optimized(point, idx.az::<T>());
+            leaf_points,
+            leaf_items,
+            leaf_extents,
+            max_stem_level,
         }
-
-        tree
     }
 
-    fn extend_shifts(
-        stem_node_count: usize,
-        shifts: &[usize],
-        requested_shift: usize,
-    ) -> Vec<usize> {
-        let root_shift = shifts[1];
-        let mut new_shifts = vec![0usize; stem_node_count];
-
-        // copy from old to new. Old forms the left subtree of new's root, eg:
-        //
-        //                          0
-        //         1            1       0
-        //       2   3   ->   2   3   0   0
-        //      4 5 6 7      4 5 6 7 0 0 0 0
-
-        new_shifts[1] = requested_shift;
-        new_shifts[2] = root_shift;
-        let mut step = 1;
-        for i in 2..shifts.len() {
-            // check to see if i is a power of 2
-            if i.count_ones() == 1 {
-                step *= 2;
-            }
-
-            if shifts[i] > 0 {
-                new_shifts[i + step] = shifts[i];
-            }
-        }
-
-        new_shifts
-    }
-
-    /// Returns a value representing the number of items that would not fit (ie zero if balancing
-    /// was successful). If a child splitpoint has landed in between two (or more) items with
-    /// the same value on the split axis, the value returned is a hint to
-    /// the caller of how many items overflowed.
-    fn optimize_stems(
+    #[allow(clippy::too_many_arguments)]
+    fn populate_recursive(
         stems: &mut Vec<A>,
-        split_dims: &mut Vec<u8>,
-        shifts: &mut Vec<usize>,
+        dim: usize,
         source: &[[A; K]],
         sort_index: &mut [usize],
         stem_index: usize,
+        mut level: usize,
+        max_stem_level: usize,
         capacity: usize,
-    ) -> Option<usize> {
-        #[cfg(feature = "tracing")]
-        let span = span!(Level::TRACE, "opt", idx = stem_index);
-        #[cfg(feature = "tracing")]
-        let _enter = span.enter();
+        leaf_points: &mut [Vec<A>; K],
+        leaf_items: &mut Vec<T>,
+        leaf_extents: &mut Vec<(u32, u32)>,
+    ) {
         let chunk_length = sort_index.len();
-        if chunk_length <= B {
-            return Some(0);
+
+        if level > max_stem_level {
+            // Write leaf and terminate recursion
+            leaf_extents.push((
+                leaf_items.len() as u32,
+                (leaf_items.len() + chunk_length) as u32,
+            ));
+
+            (0..chunk_length).for_each(|i| {
+                (0..K).for_each(|dim| leaf_points[dim].push(source[sort_index[i]][dim]));
+                leaf_items.push(sort_index[i].az::<T>())
+            });
+
+            return;
         }
 
-        if chunk_length > capacity {
-            return None;
-            // return Some(chunk_length - capacity);
-        }
-
-        let dim = split_dims[stem_index] as usize;
-
-        let stem_levels_below = stems.len().ilog2() - stem_index.ilog2() - 1;
-        let left_capacity = (2usize.pow(stem_levels_below) * B).min(capacity);
+        let levels_below = max_stem_level - level;
+        let left_capacity = (2usize.pow(levels_below as u32) * B).min(capacity);
         let right_capacity = capacity.saturating_sub(left_capacity);
 
-        let Some(pivot) =
-            Self::calc_pivot(chunk_length, shifts[stem_index], stem_index, right_capacity)
-        else {
-            event!(
-                Level::WARN,
-                chunk_length,
-                shifted = shifts[stem_index],
-                stem_index,
-                dim,
-                right_capacity,
-                left_capacity,
-                stem_levels_below,
-                capacity,
-                //?sort_index,
-                "Required shift is beyond the left end of the bucket. Switching dimension"
-            );
-
-            return None;
-        };
-        let mut pivot = pivot;
+        let mut pivot = Self::calc_pivot(chunk_length, stem_index, right_capacity);
 
         // only bother with this if we are putting at least one item in the right hand child
         if pivot < chunk_length {
@@ -335,144 +218,50 @@ where
             // if we end up with a pivot of 0, something has gone wrong,
             // unless we only had a slice of len 1 anyway
             debug_assert!(pivot > 0 || chunk_length == 1);
+            debug_assert!(
+                stems[stem_index].is_infinite(),
+                "Wrote to stem #{:?} for a second time",
+                stem_index
+            );
 
             stems[stem_index] = source[sort_index[pivot]][dim];
         }
 
-        // if both subtrees can fit in a bucket, we're done
-        if pivot <= B && chunk_length - pivot <= B {
-            return Some(0);
-        }
+        let left_child_idx = modified_van_emde_boas_get_child_idx_v2(stem_index, false, level);
+        let right_child_idx = modified_van_emde_boas_get_child_idx_v2(stem_index, true, level);
 
-        // if the right chunk is bigger than it's capacity, return the overflow amount
-        if chunk_length - pivot > right_capacity {
-            #[cfg(feature = "tracing")]
-            event!(
-                Level::TRACE,
-                val = chunk_length - pivot - right_capacity,
-                "RHS Overflow A"
-            );
-            return None;
-            // return Some(chunk_length - pivot - right_capacity);
-        }
+        let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
 
-        let next_stem_index = stem_index << 1;
-        let mut requested_shift_amount;
-        let mut lower_sort_index;
-        let mut upper_sort_index;
+        level += 1;
+        let next_dim = (dim + 1) % K;
 
-        let orig_next_dim_l = split_dims[next_stem_index];
-        let orig_next_dim_r = split_dims[next_stem_index + 1];
+        Self::populate_recursive(
+            stems,
+            next_dim,
+            source,
+            lower_sort_index,
+            left_child_idx,
+            level,
+            max_stem_level,
+            left_capacity,
+            leaf_points,
+            leaf_items,
+            leaf_extents,
+        );
 
-        loop {
-            (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
-
-            let Some(res) = Self::optimize_stems(
-                stems,
-                split_dims,
-                shifts,
-                source,
-                lower_sort_index,
-                next_stem_index,
-                left_capacity,
-            ) else {
-                split_dims[next_stem_index] =
-                    (split_dims[next_stem_index] as usize + 1).rem(K) as u8;
-                // TODO: should reset all child shifts to 0 at this point
-                shifts[next_stem_index] = 0;
-                if split_dims[next_stem_index] == orig_next_dim_l {
-                    // we've tried every dimension. Fail up
-                    return None;
-                }
-
-                continue;
-            };
-
-            requested_shift_amount = res;
-
-            // exit the loop if the LHS balanced
-            if requested_shift_amount == 0 {
-                break;
-            }
-
-            #[cfg(feature = "tracing")]
-            event!(Level::TRACE, req = requested_shift_amount, "LHS shift");
-
-            assert!(
-                pivot > requested_shift_amount,
-                "attempting to shift pivot down to 0"
-            );
-            pivot -= requested_shift_amount;
-            pivot = Self::update_pivot(source, sort_index, dim, pivot);
-
-            // Test for RHS now having more items than can fit
-            // in the buckets present in its subtree. If it does,
-            // return with a value so that the parent reduces our
-            // total allocation
-            if chunk_length - pivot > right_capacity {
-                #[cfg(feature = "tracing")]
-                event!(Level::TRACE, val = requested_shift_amount, "shift A");
-                shifts[stem_index] += requested_shift_amount;
-
-                #[cfg(feature = "tracing")]
-                event!(
-                    Level::TRACE,
-                    val = chunk_length - pivot - right_capacity,
-                    "RHS Overflow B"
-                );
-                return None;
-                // return Some(chunk_length - pivot - right_capacity);
-            }
-
-            sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
-            stems[stem_index] = source[sort_index[pivot]][dim];
-
-            #[cfg(feature = "tracing")]
-            event!(
-                Level::TRACE,
-                idx = stem_index,
-                d = requested_shift_amount,
-                "shift B"
-            );
-            shifts[stem_index] += requested_shift_amount;
-        }
-
-        // If a right child requests a shift, don't shift yourself,
-        // but do pass that shift back up to your parent
-        let result;
-        loop {
-            let Some(rhs_shift) = Self::optimize_stems(
-                stems,
-                split_dims,
-                shifts,
-                source,
-                upper_sort_index,
-                next_stem_index + 1,
-                right_capacity,
-            ) else {
-                split_dims[next_stem_index + 1] =
-                    (split_dims[next_stem_index + 1] as usize + 1).rem(K) as u8;
-                shifts[next_stem_index + 1] = 0;
-                // TODO: should reset all child shifts to 0 at this point
-                if split_dims[next_stem_index + 1] == orig_next_dim_r {
-                    // we've tried every dimension. Fail up
-                    return None;
-                }
-
-                continue;
-            };
-
-            result = rhs_shift;
-            break;
-        }
-
-        #[cfg(feature = "tracing")]
-        if result != 0 {
-            event!(Level::TRACE, val = result, "RHS shift");
-            return None;
-        }
-
-        Some(result)
+        Self::populate_recursive(
+            stems,
+            next_dim,
+            source,
+            upper_sort_index,
+            right_child_idx,
+            level,
+            max_stem_level,
+            right_capacity,
+            leaf_points,
+            leaf_items,
+            leaf_extents,
+        );
     }
 
     #[cfg(not(feature = "unreliable_select_nth_unstable"))]
@@ -483,8 +272,6 @@ where
         dim: usize,
         mut pivot: usize,
     ) -> usize {
-        // Using this version of update_pivot makes construction significantly faster (~13%)
-
         // TODO: this block might be faster by using a quickselect with a fat partition?
         //       we could then run that quickselect and subtract (fat partition length - 1)
         //       from the pivot, avoiding the need for the while loop.
@@ -495,86 +282,15 @@ where
         sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
 
         if pivot == 0 {
-            event!(
-                Level::WARN,
-                pivot,
-                chunk_len = sort_index.len(),
-                pivot0_val = ?source[sort_index[pivot]][dim],
-                pivot1_val = ?source[sort_index[pivot + 1]][dim],
-                "Pivot already at 0. Update-pivot can't move it left."
-            );
             return pivot;
         }
 
         // if the pivot straddles two values that are equal, keep nudging it left until they aren't
         while source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim] && pivot > 1 {
             pivot -= 1;
-            #[cfg(feature = "tracing")]
-            event!(
-                Level::INFO,
-                pivot,
-                chunk_len = sort_index.len(),
-                pivotN1_val = ?source[sort_index[pivot - 1]][dim],
-                pivot0_val = ?source[sort_index[pivot]][dim],
-                pivot1_val = ?source[sort_index[pivot + 1]][dim],
-                "pivot shifted"
-            );
         }
 
         pivot
-    }
-
-    #[cfg(feature = "unreliable_select_nth_unstable")]
-    #[inline]
-    fn update_pivot(
-        source: &[[A; K]],
-        sort_index: &mut [usize],
-        dim: usize,
-        mut pivot: usize,
-    ) -> usize {
-        // ensure the item whose index = pivot is in its correctly sorted position
-        let (smaller, _, _) =
-            sort_index.select_nth_unstable_by_key(pivot, |&i| OrderedFloat(source[i][dim]));
-
-        // ensure the item whose index = (pivot - 1) is in its correctly sorted position
-        smaller.select_nth_unstable_by_key(pivot - 1, |&i| OrderedFloat(source[i][dim]));
-
-        // if the pivot straddles two values that are equal, keep nudging it left until they aren't
-        while source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim] && pivot > 0 {
-            pivot -= 1;
-
-            // ensure the item whose index = (pivot - 1) is in its correctly sorted position
-            // now that pivot has been decremented
-            sort_index[..pivot]
-                .select_nth_unstable_by_key(pivot - 1, |&i| OrderedFloat(source[i][dim]));
-        }
-
-        pivot
-    }
-
-    #[cfg(feature = "global_allocate")]
-    fn allocate_leaves(count: usize) -> Vec<LeafNode<A, T, K, B>> {
-        use std::alloc::{AllocError, Allocator, Global, Layout};
-
-        let layout = Layout::array::<LeafNode<A, T, K, B>>(count).unwrap();
-        let mut leaves = unsafe {
-            let mem = match Global.allocate(layout) {
-                Ok(mem) => mem.cast::<LeafNode<A, T, K, B>>().as_ptr(),
-                Err(AllocError) => panic!(),
-            };
-
-            Vec::from_raw_parts_in(mem, count, count, Global)
-        };
-        for leaf in &mut leaves {
-            leaf.size = 0;
-        }
-
-        leaves
-    }
-
-    #[cfg(not(feature = "global_allocate"))]
-    fn allocate_leaves(count: usize) -> Vec<LeafNode<A, T, K, B>> {
-        vec![LeafNode::new(); count]
     }
 
     /// Returns the current number of elements stored in the tree
@@ -591,170 +307,71 @@ where
     /// ```
     #[inline]
     pub fn size(&self) -> usize {
-        self.size
+        self.leaf_items.len()
     }
 
     /// Returns the theoretical max capacity of this tree
     #[inline]
     pub fn capacity(&self) -> usize {
-        self.leaves.len() * B
+        self.size()
     }
 
-    /// Generates a `TreeStats` object, describing some
-    /// statistics of a particular instance of an `ImmutableTree`
-    pub fn generate_stats(&self) -> TreeStats {
-        let mut leaf_fill_counts = vec![0usize; B + 1];
-        for leaf in &self.leaves {
-            leaf_fill_counts[leaf.size.az::<usize>()] += 1;
-        }
-
-        let leaf_fill_ratio = (self.size as f32) / (self.capacity() as f32);
-
-        let unused_stem_count = self.stems.iter().filter(|x| x.is_infinite()).count() - 1;
-
-        let stem_fill_ratio = 1.0 - (unused_stem_count as f32 / ((self.stems.len() - 1) as f32));
-
-        TreeStats {
-            size: self.size,
-            capacity: self.leaves.len() * B,
-            stem_count: self.stems.len(),
-            leaf_count: self.leaves.len(),
-            leaf_fill_counts,
-            leaf_fill_ratio,
-            stem_fill_ratio,
-            unused_stem_count,
-        }
+    fn calc_pivot(chunk_length: usize, _stem_index: usize, _right_capacity: usize) -> usize {
+        chunk_length >> 1
     }
 
-    fn calc_pivot(
-        chunk_length: usize,
-        shifted: usize,
-        stem_index: usize,
-        right_capacity: usize,
-    ) -> Option<usize> {
-        let mut pivot = (chunk_length + shifted) >> 1;
-        if stem_index == 1 {
-            // If at the top level, check if there's been a shift
-            pivot = if chunk_length & 1 == 1 {
-                #[cfg(feature = "tracing")]
-                event!(Level::DEBUG, "calc_pivot: unusual route");
-                (pivot + 1).next_power_of_two()
-            } else {
-                //event!(Level::TRACE, "cp C");
-                pivot.next_power_of_two()
-            };
-        } else if chunk_length & 0x01 == 1 && shifted == 0 {
-            //#[cfg(feature = "tracing")]
-            //event!(Level::TRACE, "cp D");
-            pivot = (pivot + 1).next_power_of_two()
-        } else {
-            pivot = pivot.next_power_of_two();
-        }
-
-        if shifted > pivot {
-            event!(
-                Level::WARN,
-                chunk_length,
-                shifted,
-                stem_index,
-                right_capacity,
-                pivot,
-                "Tried to shift pivot < 0"
-            );
-            return None;
-        }
-
-        pivot -= shifted;
-
-        pivot = pivot.max(chunk_length.saturating_sub(right_capacity));
-        //#[cfg(feature = "tracing")]
-        //event!(Level::TRACE, pivot, "pivot");
-        Some(pivot)
-        // pivot - shifted
-    }
-
-    #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
+    /// Returns a LeafSlice for a given leaf index
     #[inline]
-    pub(crate) fn prefetch_stems(&self, idx: usize) {
-        #[cfg(target_arch = "x86_64")]
-        unsafe {
-            let prefetch = self.stems.as_ptr().wrapping_offset(2 * idx as isize);
-            std::arch::x86_64::_mm_prefetch::<{ core::arch::x86_64::_MM_HINT_T0 }>(
-                std::ptr::addr_of!(prefetch) as *const i8,
-            );
-        }
+    pub(crate) fn get_leaf_slice(&self, leaf_idx: usize) -> LeafSlice<A, T, K> {
+        let (start, end) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
 
-        #[cfg(target_arch = "aarch64")]
-        unsafe {
-            let prefetch = self.stems.as_ptr().wrapping_offset(2 * idx as isize);
-            core::arch::aarch64::_prefetch(
-                std::ptr::addr_of!(prefetch) as *const i8,
-                core::arch::aarch64::_PREFETCH_READ,
-                core::arch::aarch64::_PREFETCH_LOCALITY3,
-            );
-        }
-    }
+        // Artificially extend size to be at least chunk length for faster processing
+        // TODO: why does this slow things down?
+        // let end = end.max(start + 32).min(self.leaf_items.len() as u32);
 
-    /// Iterate over all `(index, point)` tuples in arbitrary order.
-    ///
-    /// ```
-    /// use kiddo::immutable::float::kdtree::ImmutableKdTree;
-    ///
-    /// let points: Vec<[f64; 3]> = vec!([1.0f64, 2.0f64, 3.0f64]);
-    /// let tree: ImmutableKdTree<f64, u32, 3, 32> = ImmutableKdTree::new_from_slice(&points);
-    ///
-    /// let mut pairs: Vec<_> = tree.iter().collect();
-    /// assert_eq!(pairs.pop().unwrap(), (0, [1.0, 2.0, 3.0]));
-    /// ```
-    pub fn iter(&self) -> impl Iterator<Item = (T, [A; K])> + '_ {
-        TreeIter::new(self, B)
+        LeafSlice::new(
+            array_init::array_init(|i| &self.leaf_points[i][start as usize..end as usize]),
+            &self.leaf_items[start as usize..end as usize],
+        )
     }
 }
 
 #[cfg(feature = "rkyv")]
-impl<
-        A: Axis + rkyv::Archive<Archived = A>,
-        T: Content + rkyv::Archive<Archived = T>,
-        const K: usize,
-        const B: usize,
-    > ArchivedImmutableKdTree<A, T, K, B>
+impl<A, T, const K: usize, const B: usize> ArchivedImmutableKdTree<A, T, K, B>
+where
+    A: Axis + LeafSliceFloat<T, K> + rkyv::Archive<Archived = A>,
+    T: Content + rkyv::Archive<Archived = T>,
+    usize: Cast<T>,
 {
     /// Returns the current number of elements stored in the tree
     #[inline]
     pub fn size(&self) -> usize {
-        self.size as usize
+        self.leaf_items.len()
     }
-    #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
-    #[inline]
-    pub(crate) fn prefetch_stems(&self, idx: usize) {
-        #[cfg(target_arch = "x86_64")]
-        unsafe {
-            let prefetch = self.stems.as_ptr().wrapping_offset(2 * idx as isize);
-            std::arch::x86_64::_mm_prefetch::<{ core::arch::x86_64::_MM_HINT_T0 }>(
-                std::ptr::addr_of!(prefetch) as *const i8,
-            );
-        }
 
-        #[cfg(target_arch = "aarch64")]
-        unsafe {
-            let prefetch = self.stems.as_ptr().wrapping_offset(2 * idx as isize);
-            core::arch::aarch64::_prefetch(
-                std::ptr::addr_of!(prefetch) as *const i8,
-                core::arch::aarch64::_PREFETCH_READ,
-                core::arch::aarch64::_PREFETCH_LOCALITY3,
-            );
-        }
+    /// Returns a LeafSlice for a given leaf index
+    #[inline]
+    pub(crate) fn get_leaf_slice(&self, leaf_idx: usize) -> LeafSlice<A, T, K> {
+        let (start, end) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
+
+        // Artificially extend size to be at least chunk length for faster processing
+        // TODO: why does this slow things down?
+        // let end = end.max(start + 32).min(self.leaf_items.len() as u32);
+
+        LeafSlice::new(
+            array_init::array_init(|i| &self.leaf_points[i][start as usize..end as usize]),
+            &self.leaf_items[start as usize..end as usize],
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, panic};
-
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use ordered_float::OrderedFloat;
     use rand::{Rng, SeedableRng};
     use rayon::prelude::IntoParallelRefIterator;
+    use std::panic;
 
     #[test]
     fn can_construct_optimized_tree_with_straddled_split() {
@@ -777,16 +394,13 @@ mod tests {
             [15.0, 115.0],
         ];
 
-        let tree: ImmutableKdTree<f32, usize, 2, 4> =
+        let _tree: ImmutableKdTree<f32, usize, 2, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
-        println!("Tree Stats: {:?}", tree.generate_stats());
-
-        assert_eq!(tree.leaves[0].size, 3);
-        assert_eq!(tree.leaves[1].size, 4);
-        assert_eq!(tree.leaves[2].size, 4);
-        assert_eq!(tree.leaves[3].size, 1);
-        assert_eq!(tree.leaves[4].size, 4);
+        // assert_eq!(tree.leaf_extents[0].iter().count(), 3);
+        // assert_eq!(tree.leaf_extents[1].iter().count(), 5);
+        // assert_eq!(tree.leaf_extents[2].iter().count(), 4);
+        // assert_eq!(tree.leaf_extents[3].iter().count(), 4);
     }
 
     #[test]
@@ -813,16 +427,8 @@ mod tests {
             [18.0, 118.0],
         ];
 
-        let tree: ImmutableKdTree<f32, usize, 2, 4> =
+        let _tree: ImmutableKdTree<f32, usize, 2, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
-
-        println!("Tree Stats: {:?}", tree.generate_stats());
-
-        assert_eq!(tree.leaves[0].size, 3);
-        assert_eq!(tree.leaves[1].size, 4);
-        assert_eq!(tree.leaves[2].size, 4);
-        assert_eq!(tree.leaves[3].size, 4);
-        assert_eq!(tree.leaves[4].size, 4);
     }
 
     #[test]
@@ -854,16 +460,14 @@ mod tests {
         ];
         content_to_add.shuffle(&mut rng);
 
-        let tree: ImmutableKdTree<f32, usize, 2, 4> =
+        let _tree: ImmutableKdTree<f32, usize, 2, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
-        println!("Tree Stats: {:?}", tree.generate_stats());
-
-        assert_eq!(tree.leaves[0].size, 3);
-        assert_eq!(tree.leaves[1].size, 4);
-        assert_eq!(tree.leaves[2].size, 4);
-        assert_eq!(tree.leaves[3].size, 4);
-        assert_eq!(tree.leaves[4].size, 4);
+        // assert_eq!(tree.leaves[0].size, 3);
+        // assert_eq!(tree.leaves[1].size, 4);
+        // assert_eq!(tree.leaves[2].size, 4);
+        // assert_eq!(tree.leaves[3].size, 4);
+        // assert_eq!(tree.leaves[4].size, 4);
     }
 
     #[test]
@@ -912,7 +516,7 @@ mod tests {
         let tree: ImmutableKdTree<f32, usize, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
-        println!("Tree Stats: {:?}", tree.generate_stats())
+        println!("tree: {:?}", tree);
     }
 
     #[test]
@@ -971,10 +575,8 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
-        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
-
-        println!("Tree Stats: {:?}", tree.generate_stats())
     }
 
     #[test]
@@ -985,10 +587,8 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
-        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
-
-        println!("Tree Stats: {:?}", tree.generate_stats())
     }
 
     #[test]
@@ -999,10 +599,8 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
-        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
-
-        println!("Tree Stats: {:?}", tree.generate_stats())
     }
 
     #[test]
@@ -1013,10 +611,8 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
-        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
-
-        println!("Tree Stats: {:?}", tree.generate_stats())
     }
 
     #[test]
@@ -1027,10 +623,8 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
-        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
-
-        println!("Tree Stats: {:?}", tree.generate_stats())
     }
 
     #[test]
@@ -1041,10 +635,8 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
-        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
-
-        println!("Tree Stats: {:?}", tree.generate_stats())
     }
 
     #[test]
@@ -1055,10 +647,8 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
         let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
 
-        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
-
-        println!("Tree Stats: {:?}", tree.generate_stats())
     }
 
     #[test]
@@ -1076,9 +666,7 @@ mod tests {
             }
         }
 
-        let tree: ImmutableKdTree<f32, usize, 4, 8> = ImmutableKdTree::new_from_slice(&duped);
-
-        println!("Tree Stats: {:?}", tree.generate_stats());
+        let _tree: ImmutableKdTree<f32, usize, 4, 8> = ImmutableKdTree::new_from_slice(&duped);
     }
 
     #[ignore]
@@ -1138,10 +726,8 @@ mod tests {
 
         println!("dupes: {:?}", TREE_SIZE * 4 - num_uniq);
 
-        let tree: ImmutableKdTree<f32, usize, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
-
-        println!("Tree Stats: {:?}", tree.generate_stats())
     }
 
     #[ignore]
@@ -1152,10 +738,8 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(493);
         let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE).map(|_| rng.gen::<[f32; 4]>()).collect();
 
-        let tree: ImmutableKdTree<f32, usize, 4, 32> =
+        let _tree: ImmutableKdTree<f32, usize, 4, 32> =
             ImmutableKdTree::new_from_slice(&content_to_add);
-
-        println!("Tree Stats: {:?}", tree.generate_stats())
     }
 
     #[test]
@@ -2702,15 +2286,5 @@ mod tests {
         let kdt: ImmutableKdTree<f64, usize, 3, 32> = ImmutableKdTree::new_from_slice(&points);
 
         assert_eq!(kdt.size(), points.len());
-    }
-
-    #[test]
-    fn can_iterate() {
-        let pts = vec![[1.0, 2.0, 3.0], [10.0, 2.0, 3.0], [1.0, 20.0, 3.0]];
-        let t: ImmutableKdTree<f64, usize, 3, 2> = ImmutableKdTree::new_from_slice(pts.as_slice());
-
-        let expected = pts.iter().cloned().enumerate().collect();
-        let actual: HashMap<_, _> = t.iter().collect();
-        assert_eq!(actual, expected);
     }
 }

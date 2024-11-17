@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         ElapsedDuration::new(start.elapsed())
     );
 
-    println!("Tree Stats: {:?}", tree.generate_stats());
+    // println!("Tree Stats: {:?}", tree.generate_stats());
 
     let query_points = build_query_points_float(QUERY_POINT_QTY);
     println!("Performing {:?} random NN queries...", QUERY_POINT_QTY);

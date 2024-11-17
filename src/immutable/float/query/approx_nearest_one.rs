@@ -1,6 +1,5 @@
 use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
-use crate::float_leaf_simd::leaf_node::BestFromDists;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::Content;
@@ -61,7 +60,7 @@ impl<
         "use std::fs::File;
     use memmap::MmapOptions;
 
-    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-dynamic-doctest-tree.rkyv\").unwrap()).unwrap() };
     let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, 3>>(&mmap) };"
     );
 }
@@ -98,6 +97,7 @@ mod tests {
         let tree: ImmutableKdTree<AX, u32, 4, 4> = ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), 16);
+        println!("Tree: {:?}", &tree);
 
         let query_point = [0.78f32, 0.55f32, 0.78f32, 0.55f32];
 

@@ -12,7 +12,7 @@ macro_rules! generate_immutable_best_n_within {
                 max_qty: usize,
             ) -> impl Iterator<Item = BestNeighbour<A, T>>
             where
-                A: BestFromDists<T, B>,
+                A: LeafSliceFloat<T, K>,
                 usize: Cast<T>,
                 D: DistanceMetric<A, K>,
             {
@@ -23,11 +23,13 @@ macro_rules! generate_immutable_best_n_within {
                     query,
                     dist,
                     max_qty,
-                    1,
+                    0,
                     0,
                     &mut best_items,
                     &mut off,
                     A::zero(),
+                    0,
+                    0,
                 );
 
                 best_items.into_iter()
@@ -44,63 +46,38 @@ macro_rules! generate_immutable_best_n_within {
                 best_items: &mut BinaryHeap<BestNeighbour<A, T>>,
                 off: &mut [A; K],
                 rd: A,
+                mut level: usize,
+                mut leaf_idx: usize,
             ) where
-                A: BestFromDists<T, B>,
+                A: LeafSliceFloat<T, K>,
                 usize: Cast<T>,
                 D: DistanceMetric<A, K>,
             {
-                if stem_idx >= self.stems.len() {
-                    let leaf_node = &self.leaves[stem_idx - self.stems.len()];
+                use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 
-                    let mut acc = [A::zero(); B];
-                    (0..K).step_by(1).for_each(|dim| {
-                        let qd = [query[dim]; B];
-
-                        (0..leaf_node.size as usize).step_by(1).for_each(|idx| {
-                            acc[idx] += D::dist1(leaf_node.content_points[dim][idx], qd[idx]);
-                        });
-                    });
-
-                    acc
-                        .iter()
-                        .enumerate()
-                        .take(leaf_node.size as usize)
-                        .filter(|(_, &distance)| distance <= radius)
-                        .for_each(|(idx, &distance)| {
-                            let item = *unsafe { leaf_node.content_items.get_unchecked(idx) };
-                            if best_items.len() < max_qty {
-                                best_items.push(BestNeighbour { distance, item });
-                            } else {
-                                let mut top = best_items.peek_mut().unwrap();
-                                if item < top.item {
-                                    top.item = item;
-                                    top.distance = distance;
-                                }
-                            }
-                        });
-
+                if level > self.max_stem_level as usize {
+                    self.search_leaf_for_best_n_within::<D>(query, radius, max_qty, best_items, leaf_idx as usize);
                     return;
                 }
 
-                let left_child_idx = stem_idx << 1;
+                let val = *unsafe { self.stems.get_unchecked(stem_idx as usize) };
+                let is_right_child = usize::from(*unsafe { query.get_unchecked(split_dim as usize) } >= val);
 
-                #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
-                self.prefetch_stems(left_child_idx);
+                leaf_idx <<= 1;
+                let closer_leaf_idx = leaf_idx + is_right_child;
+                let further_leaf_idx = leaf_idx + (1 - is_right_child);
 
-                let val = *unsafe { self.stems.get_unchecked(stem_idx) };
-                // let val = self.stems[stem_idx];
+                let closer_node_idx = modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 1, /*minor_*/level);
+                let further_node_idx =  modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 0, /*minor_*/level);
 
                 let mut rd = rd;
                 let old_off = off[split_dim];
                 let new_off = query[split_dim].saturating_dist(val);
 
-                let is_left_child = usize::from(*unsafe { query.get_unchecked(split_dim) } < val);
-                // let is_left_child = usize::from(query[split_dim] < val);
-
-                let closer_node_idx = left_child_idx + (1 - is_left_child);
-                let further_node_idx = left_child_idx + is_left_child;
-
+                level += 1;
                 let next_split_dim = (split_dim + 1).rem(K);
+                // minor_level += 1;
+                // minor_level.cmovnz(&0, u8::from(minor_level == 3));
 
                 self.best_n_within_recurse::<D>(
                     query,
@@ -111,6 +88,8 @@ macro_rules! generate_immutable_best_n_within {
                     best_items,
                     off,
                     rd,
+                    level,
+                    closer_leaf_idx,
                 );
 
                 rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
@@ -126,9 +105,32 @@ macro_rules! generate_immutable_best_n_within {
                         best_items,
                         off,
                         rd,
+                        level,
+                        further_leaf_idx,
                     );
                     off[split_dim] = old_off;
                 }
+            }
+
+            #[inline]
+            fn search_leaf_for_best_n_within<D>(
+                &self,
+                query: &[A; K],
+                radius: A,
+                max_qty: usize,
+                results: &mut BinaryHeap<BestNeighbour<A, T>>,
+                leaf_idx: usize,
+            ) where
+                D: DistanceMetric<A, K>,
+            {
+                let leaf_slice = self.get_leaf_slice(leaf_idx);
+
+                leaf_slice.best_n_within::<D>(
+                    query,
+                    radius,
+                    max_qty,
+                    results,
+                );
             }
         }
     };

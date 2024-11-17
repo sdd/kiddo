@@ -10,7 +10,7 @@ use std::io::Write;
 use std::time::Instant;
 
 use csv::Reader;
-use kiddo::ImmutableKdDynamicTree;
+use kiddo::ImmutableKdTree;
 use kiddo::SquaredEuclidean;
 use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
 use rkyv::ser::Serializer;
@@ -30,7 +30,7 @@ struct Point {
     z: f64,
 }
 
-type Tree = ImmutableKdDynamicTree<f64, 3>;
+type Tree = ImmutableKdTree<f64, 3>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "tracing")]

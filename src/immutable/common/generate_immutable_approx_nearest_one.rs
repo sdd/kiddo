@@ -7,54 +7,45 @@ macro_rules! generate_immutable_approx_nearest_one {
             #[inline]
             pub fn approx_nearest_one<D>(&self, query: &[A; K]) -> NearestNeighbour<A, T>
             where
-                A: BestFromDists<T, B>,
+                A: $crate::float_leaf_slice::leaf_slice::LeafSliceFloat<T, K>,
                 D: DistanceMetric<A, K>,
                 usize: Cast<T>,
             {
-                let mut split_dim = 0;
-                let mut stem_idx = 1;
+                use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2;
+
+                let mut curr_idx: usize = 0;
+                let mut dim: usize = 0;
                 let mut best_item = T::zero();
                 let mut best_dist = A::max_value();
+                let mut level: usize = 0;
+                let mut leaf_idx: usize = 0;
 
-                let stem_len = self.stems.len();
+                while level <= self.max_stem_level as usize {
+                    let val = *unsafe { self.stems.get_unchecked(curr_idx) };
+                    let is_right_child = *unsafe { query.get_unchecked(dim) } >= val;
 
-                while stem_idx < stem_len {
-                    let left_child_idx = stem_idx << 1;
+                    curr_idx = modified_van_emde_boas_get_child_idx_v2(curr_idx, is_right_child, level);
+                    let is_right_child = usize::from(is_right_child);
+                    leaf_idx = (leaf_idx << 1) + is_right_child;
 
-                    #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
-                    self.prefetch_stems(left_child_idx);
-
-                    let val = *unsafe { self.stems.get_unchecked(stem_idx) };
-                    let is_right_child = usize::from(*unsafe { query.get_unchecked(split_dim) } >= val);
-
-                    stem_idx = left_child_idx + is_right_child;
-
-                    split_dim += 1;
-                    split_dim %= K;
+                    level += 1;
+                    dim = (dim + 1) % K;
                 }
 
-                let leaf_node = unsafe { self.leaves.get_unchecked(stem_idx - stem_len) };
-                // let leaf_node = &self.leaves[leaf_idx];
+                let (start, end) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
 
-                leaf_node.nearest_one::<D>(
+                let leaf_slice = $crate::float_leaf_slice::leaf_slice::LeafSlice::new(
+                    array_init::array_init(|i|
+                        &self.leaf_points[i][start as usize..end as usize]
+                    ),
+                    &self.leaf_items[start as usize..end as usize],
+                );
+
+                leaf_slice.nearest_one::<D>(
                     query,
                     &mut best_dist,
                     &mut best_item
                 );
-
-                // leaf_node
-                //     .content_points
-                //     .iter()
-                //     .enumerate()
-                //     .take(leaf_node.size as usize)
-                //     .for_each(|(idx, entry)| {
-                //         let dist = D::dist(query, entry);
-                //         if dist < best_dist {
-                //             best_dist = dist;
-                //             best_item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
-                //             // *best_item = leaf_node.content_items[idx]
-                //         }
-                //     });
 
                 NearestNeighbour {
                     distance: best_dist,

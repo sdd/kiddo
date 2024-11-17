@@ -203,3 +203,65 @@ pub(crate) mod array_of_arrays {
         deserializer.deserialize_tuple(N * K, ArrayArrayVisitor::<T, N, K>(PhantomData))
     }
 }
+
+#[cfg(feature = "serde")]
+pub(crate) mod array_of_vecs {
+    use core::option::Option::None;
+    use serde::{
+        de::{SeqAccess, Visitor},
+        ser::SerializeTuple,
+        Deserialize, Deserializer, Serialize, Serializer,
+    };
+    use std::marker::PhantomData;
+
+    pub fn serialize<S: Serializer, T: Serialize, const N: usize>(
+        data: &[Vec<T>; N],
+        ser: S,
+    ) -> Result<S::Ok, S::Error> {
+        let mut s = ser.serialize_tuple(N)?;
+        for item in data {
+            s.serialize_element(item)?;
+        }
+        s.end()
+    }
+
+    struct ArrayVecVisitor<T, const N: usize>(PhantomData<T>);
+
+    impl<'de, T, const N: usize> Visitor<'de> for ArrayVecVisitor<T, N>
+    where
+        T: Copy + Default + Deserialize<'de>,
+    {
+        type Value = [Vec<T>; N];
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str(&format!("an array of vecs, dimension of {}", N))
+        }
+
+        #[inline]
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            // can be optimized using MaybeUninit
+            let mut data = array_init::array_init(|_| Vec::new());
+
+            for item in data.iter_mut().take(N) {
+                match (seq.next_element::<Vec<T>>())? {
+                    Some(val) => {
+                        *item = val;
+                    }
+                    None => return Err(serde::de::Error::invalid_length(N, &self)),
+                }
+            }
+
+            Ok(data)
+        }
+    }
+    pub fn deserialize<'de, D, T, const N: usize>(deserializer: D) -> Result<[Vec<T>; N], D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Copy + Default + Deserialize<'de>,
+    {
+        deserializer.deserialize_tuple(N, ArrayVecVisitor::<T, N>(PhantomData))
+    }
+}

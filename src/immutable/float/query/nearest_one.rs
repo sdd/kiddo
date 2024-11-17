@@ -3,7 +3,7 @@ use std::ops::Rem;
 
 use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
-use crate::float_leaf_simd::leaf_node::BestFromDists;
+use crate::float_leaf_slice::leaf_slice::LeafSliceFloat;
 use crate::generate_immutable_nearest_one;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
@@ -38,7 +38,7 @@ to not needing to allocate memory or maintain sorted results.
 
 impl<A, T, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
 where
-    A: Axis + BestFromDists<T, B>,
+    A: Axis + LeafSliceFloat<T, K>,
     T: Content,
     usize: Cast<T>,
 {
@@ -57,7 +57,7 @@ use crate::immutable::float::kdtree::ArchivedImmutableKdTree;
 #[cfg(feature = "rkyv")]
 impl<A, T, const K: usize, const B: usize> ArchivedImmutableKdTree<A, T, K, B>
 where
-    A: Axis + BestFromDists<T, B> + rkyv::Archive<Archived = A>,
+    A: Axis + LeafSliceFloat<T, K> + rkyv::Archive<Archived = A>,
     T: Content + rkyv::Archive<Archived = T>,
     usize: Cast<T>,
 {
@@ -65,7 +65,7 @@ where
         "use std::fs::File;
     use memmap::MmapOptions;
 
-    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-dynamic-doctest-tree.rkyv\").unwrap()).unwrap() };
     let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, 3>>(&mmap) };"
     );
 }
@@ -125,7 +125,9 @@ mod tests {
             ];
             let expected = linear_search(&content_to_add, &query_point);
 
+            // println!("query #{:?}: {:?}", _i, &query_point);
             let result = tree.nearest_one::<SquaredEuclidean>(&query_point);
+            // println!("result: {:?}, expected: {:?}", &result, &expected);
 
             assert_eq!(result.distance, expected.distance);
         }
@@ -177,6 +179,7 @@ mod tests {
             ];
             let expected = linear_search(&content_to_add, &query_point);
 
+            // println!("query #{:?}: {:?}", _i, &query_point);
             let result = tree.nearest_one::<SquaredEuclidean>(&query_point);
 
             assert_eq!(result.distance, expected.distance);
@@ -188,26 +191,27 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(3);
 
         const TREE_SIZE: usize = 100_000;
-        const NUM_QUERIES: usize = 100;
+        const NUM_QUERIES: usize = 1000;
 
         let content_to_add: Vec<[f64; 4]> = (0..TREE_SIZE).map(|_| rng.gen::<[f64; 4]>()).collect();
 
-        let tree: ImmutableKdTree<f64, u32, 4, 32> =
+        let tree: ImmutableKdTree<f64, u32, 4, 256> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), TREE_SIZE);
 
-        let query_points: Vec<[f64; 4]> = (0..NUM_QUERIES)
-            .map(|_| rand::random::<[f64; 4]>())
-            .collect();
+        let query_points: Vec<[f64; 4]> = (0..NUM_QUERIES).map(|_| rng.gen::<[f64; 4]>()).collect();
 
         for (_i, query_point) in query_points.iter().enumerate() {
             let expected = linear_search(&content_to_add, query_point);
 
+            // println!("query #{:?}", _i);
             let result = tree.nearest_one::<SquaredEuclidean>(query_point);
+            // println!("result: {:?} ({:?})", &result, content_to_add[result.item as usize]);
+            // println!("expected: {:?} ({:?})", &expected, content_to_add[expected.item as usize]);
 
-            assert_eq!(result.distance, expected.distance);
             assert_eq!(result.item as usize, expected.item);
+            assert_eq!(result.distance, expected.distance);
         }
     }
 
@@ -216,11 +220,11 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(3);
 
         const TREE_SIZE: usize = 100_000;
-        const NUM_QUERIES: usize = 100;
+        const NUM_QUERIES: usize = 1000;
 
         let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE).map(|_| rng.gen::<[f32; 4]>()).collect();
 
-        let tree: ImmutableKdTree<f32, u32, 4, 32> =
+        let tree: ImmutableKdTree<f32, u32, 4, 256> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), TREE_SIZE);

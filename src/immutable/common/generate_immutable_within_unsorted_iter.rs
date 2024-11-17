@@ -16,17 +16,17 @@ macro_rules! generate_immutable_within_unsorted_iter {
                 let mut off = [A::zero(); K];
 
                 let gen = Gn::new_scoped(move |gen_scope| {
-                    unsafe {
-                        self.within_unsorted_iter_recurse::<D>(
-                            query,
-                            dist,
-                            1,
-                            0,
-                            gen_scope,
-                            &mut off,
-                            A::zero(),
-                        );
-                    }
+                    self.within_unsorted_iter_recurse::<D>(
+                        query,
+                        dist,
+                        0,
+                        0,
+                        gen_scope,
+                        &mut off,
+                        A::zero(),
+                        0,
+                        0,
+                    );
 
                     done!();
                 });
@@ -35,39 +35,42 @@ macro_rules! generate_immutable_within_unsorted_iter {
             }
 
             #[allow(clippy::too_many_arguments)]
-            fn within_unsorted_iter_recurse<D>(
+            fn within_unsorted_iter_recurse<'scope, D>(
                 &'a self,
                 query: &[A; K],
                 radius: A,
                 stem_idx: usize,
                 split_dim: usize,
-                mut gen_scope: Scope<'a, (), NearestNeighbour<A, T>>,
+                mut gen_scope: Scope<'scope, 'a, (), NearestNeighbour<A, T>>,
                 off: &mut [A; K],
                 rd: A,
-            ) -> Scope<(), NearestNeighbour<A, T>>
+                mut level: usize,
+                mut leaf_idx: usize,
+            ) -> Scope<'scope, 'a, (), NearestNeighbour<A, T>>
             where
                 D: DistanceMetric<A, K>,
             {
-                if stem_idx < self.stems.len() {
-                    let left_child_idx = stem_idx << 1;
+                use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 
-                    #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
-                    self.prefetch_stems(left_child_idx);
+                if level <= self.max_stem_level as usize {
+                    let val = *unsafe { self.stems.get_unchecked(stem_idx as usize) };
+                    let is_right_child = usize::from(*unsafe { query.get_unchecked(split_dim as usize) } >= val);
 
-                    let val = *unsafe { self.stems.get_unchecked(stem_idx) };
-                    // let val = self.stems[stem_idx];
+                    leaf_idx <<= 1;
+                    let closer_leaf_idx = leaf_idx + is_right_child;
+                    let further_leaf_idx = leaf_idx + (1 - is_right_child);
+
+                    let closer_node_idx = modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 1, /*minor_*/level);
+                    let further_node_idx =  modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 0, /*minor_*/level);
 
                     let mut rd = rd;
                     let old_off = off[split_dim];
                     let new_off = query[split_dim].saturating_dist(val);
 
-                    let is_left_child = usize::from(*unsafe { query.get_unchecked(split_dim) } < val);
-                    // let is_left_child = usize::from(query[split_dim] < val);
-
-                    let closer_node_idx = left_child_idx + (1 - is_left_child);
-                    let further_node_idx = left_child_idx + is_left_child;
-
+                    level += 1;
                     let next_split_dim = (split_dim + 1).rem(K);
+                    // minor_level += 1;
+                    // minor_level.cmovnz(&0, u8::from(minor_level == 3));
 
                     gen_scope = self.within_unsorted_iter_recurse::<D>(
                         query,
@@ -77,6 +80,8 @@ macro_rules! generate_immutable_within_unsorted_iter {
                         gen_scope,
                         off,
                         rd,
+                        level,
+                        closer_leaf_idx,
                     );
 
                     rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
@@ -91,26 +96,28 @@ macro_rules! generate_immutable_within_unsorted_iter {
                             gen_scope,
                             off,
                             rd,
+                            level,
+                            further_leaf_idx,
                         );
                         off[split_dim] = old_off;
                     }
                 } else {
-                    let leaf_node = self
-                        .leaves
-                        .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
+                    let leaf_slice = self.get_leaf_slice(leaf_idx);
 
-                    leaf_node
-                        .content_points
+                    leaf_slice
+                        .content_items
                         .iter()
                         .enumerate()
-                        .take(leaf_node.size.az::<usize>())
-                        .for_each(|(idx, entry)| {
-                            let distance = D::dist(query, entry);
+                        .for_each(|(idx, &item)| {
+                            let point = array_init::array_init(
+                                |i| leaf_slice.content_points[i][idx]
+                            );
+                            let distance = D::dist(query, &point);
 
                             if distance < radius {
                                 gen_scope.yield_(NearestNeighbour {
                                     distance,
-                                    item: *leaf_node.content_items.get_unchecked(idx.az::<usize>()),
+                                    item,
                                 });
                             }
                         });

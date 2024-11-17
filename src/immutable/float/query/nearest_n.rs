@@ -1,6 +1,6 @@
 use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
-use crate::float_leaf_simd::leaf_node::BestFromDists;
+use crate::float_leaf_slice::leaf_slice::LeafSliceFloat;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::Content;
@@ -33,7 +33,12 @@ distance metric function.
     };
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
+impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
+where
+    A: Axis + LeafSliceFloat<T, K>,
+    T: Content,
+    usize: Cast<T>,
+{
     generate_immutable_float_nearest_n!(
         "let content: Vec<[f64; 3]> = vec!(
             [1.0, 2.0, 5.0],
@@ -58,7 +63,7 @@ impl<
         "use std::fs::File;
     use memmap::MmapOptions;
 
-    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-dynamic-doctest-tree.rkyv\").unwrap()).unwrap() };
     let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, 3>>(&mmap) };"
     );
 }
