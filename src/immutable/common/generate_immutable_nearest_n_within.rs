@@ -29,11 +29,13 @@ macro_rules! generate_immutable_nearest_n_within {
                 self.nearest_n_within_recurse::<D, H>(
                     query,
                     dist,
-                    1,
+                    0,
                     0,
                     &mut matching_items,
                     &mut off,
                     A::zero(),
+                    0,
+                    0,
                 );
 
                 if sorted {
@@ -44,7 +46,7 @@ macro_rules! generate_immutable_nearest_n_within {
             }
 
             #[allow(clippy::too_many_arguments)]
-            fn nearest_n_within_recurse<D, R: ResultCollection<A, T>>(
+            fn nearest_n_within_recurse<D, R>(
                 &self,
                 query: &[A; K],
                 radius: A,
@@ -53,57 +55,37 @@ macro_rules! generate_immutable_nearest_n_within {
                 matching_items: &mut R,
                 off: &mut [A; K],
                 rd: A,
+                mut level: usize,
+                mut leaf_idx: usize,
             ) where
                 D: DistanceMetric<A, K>,
+                R: ResultCollection<A, T>,
             {
-                if stem_idx >= self.stems.len() {
-                    let leaf_node = &self.leaves[stem_idx - self.stems.len()];
+                use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 
-                    let mut acc = [A::zero(); B];
-                    (0..K).step_by(1).for_each(|dim| {
-                        let qd = [query[dim]; B];
-
-                        (0..leaf_node.size as usize).step_by(1).for_each(|idx| {
-                            acc[idx] += D::dist1(leaf_node.content_points[dim][idx], qd[idx]);
-                        });
-                    });
-
-                    acc
-                        .iter()
-                        .enumerate()
-                        .take(leaf_node.size as usize)
-                        .for_each(|(idx, &distance)| {
-
-                            if distance < radius {
-                                matching_items.add(NearestNeighbour {
-                                    distance,
-                                    item: *unsafe { leaf_node.content_items.get_unchecked(idx) },
-                                });
-                            }
-                        });
-
+                if level > self.max_stem_level as usize {
+                    self.search_leaf_for_nearest_n_within::<D, R>(query, radius, matching_items, leaf_idx as usize);
                     return;
                 }
 
-                let left_child_idx = stem_idx << 1;
+                let val = *unsafe { self.stems.get_unchecked(stem_idx as usize) };
+                let is_right_child = usize::from(*unsafe { query.get_unchecked(split_dim as usize) } >= val);
 
-                #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
-                self.prefetch_stems(left_child_idx);
+                leaf_idx <<= 1;
+                let closer_leaf_idx = leaf_idx + is_right_child;
+                let further_leaf_idx = leaf_idx + (1 - is_right_child);
 
-                let val = *unsafe { self.stems.get_unchecked(stem_idx) };
-                // let val = self.stems[stem_idx];
+                let closer_node_idx = modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 1, /*minor_*/level);
+                let further_node_idx =  modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 0, /*minor_*/level);
 
                 let mut rd = rd;
                 let old_off = off[split_dim];
                 let new_off = query[split_dim].saturating_dist(val);
 
-                let is_left_child = usize::from(*unsafe { query.get_unchecked(split_dim) } < val);
-                // let is_left_child = usize::from(query[split_dim] < val);
-
-                let closer_node_idx = left_child_idx + (1 - is_left_child);
-                let further_node_idx = left_child_idx + is_left_child;
-
+                level += 1;
                 let next_split_dim = (split_dim + 1).rem(K);
+                // minor_level += 1;
+                // minor_level.cmovnz(&0, u8::from(minor_level == 3));
 
                 self.nearest_n_within_recurse::<D, R>(
                     query,
@@ -113,6 +95,8 @@ macro_rules! generate_immutable_nearest_n_within {
                     matching_items,
                     off,
                     rd,
+                    level,
+                    closer_leaf_idx,
                 );
 
                 rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
@@ -127,9 +111,31 @@ macro_rules! generate_immutable_nearest_n_within {
                         matching_items,
                         off,
                         rd,
+                        level,
+                        further_leaf_idx,
                     );
                     off[split_dim] = old_off;
                 }
+            }
+
+            #[inline]
+            fn search_leaf_for_nearest_n_within<D, R>(
+                &self,
+                query: &[A; K],
+                radius: A,
+                results: &mut R,
+                leaf_idx: usize,
+            ) where
+                D: DistanceMetric<A, K>,
+                R: ResultCollection<A, T>,
+            {
+                let leaf_slice = self.get_leaf_slice(leaf_idx);
+
+                leaf_slice.nearest_n_within::<D, R>(
+                    query,
+                    radius,
+                    results,
+                );
             }
         }
     };

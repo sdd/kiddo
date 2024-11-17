@@ -12,7 +12,7 @@
 //!    to modify its contents after it has been constructed.
 //!    The co-ordinates of the points to be stored must
 //!    have all been generated in advance.
-//! 2) Construction time can be a bit slower. Typically
+//! 2) Construction time can be a bit slower. Typically,
 //!    this can be twice as long as the default [`float::kdtree::KdTree`](`crate::float::kdtree::KdTree`).
 //! 3) The more common that duplicate values are amongst your source points,
 //!    the slower it will take to construct the tree. If you're using [`f64`]
@@ -26,7 +26,6 @@
 //! or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled).
 
 #[doc(hidden)]
-pub mod construction;
 pub mod kdtree;
 
 #[doc(hidden)]

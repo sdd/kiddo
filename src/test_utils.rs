@@ -10,7 +10,7 @@ use std::hint::black_box;
 
 use crate::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
 use crate::float::kdtree::{Axis, KdTree};
-use crate::float_leaf_simd::leaf_node::BestFromDists;
+use crate::float_leaf_slice::leaf_slice::LeafSliceFloat;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::types::{Content, Index};
 
@@ -138,7 +138,7 @@ where
     Standard: Distribution<T>,
     Standard: Distribution<([A; K], T)>,
     Standard: Distribution<[A; K]>,
-    A: Axis + BestFromDists<T, B>,
+    A: Axis + LeafSliceFloat<T, K>,
 {
     let mut points = vec![];
     points.resize_with(size, rand::random::<[A; K]>);
@@ -320,7 +320,7 @@ pub fn build_populated_tree_and_query_points_immutable_float<
     query_point_qty: usize,
 ) -> (ImmutableKdTree<A, T, K, B>, Vec<[A; K]>)
 where
-    A: Axis + BestFromDists<T, B>,
+    A: Axis + LeafSliceFloat<T, K>,
     usize: Cast<T>,
     Standard: Distribution<T>,
     Standard: Distribution<[A; K]>,

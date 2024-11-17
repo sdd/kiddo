@@ -5,7 +5,7 @@ use std::ops::Rem;
 use crate::best_neighbour::BestNeighbour;
 use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
-use crate::float_leaf_simd::leaf_node::BestFromDists;
+use crate::float_leaf_slice::leaf_slice::LeafSliceFloat;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::types::Content;
 
@@ -41,7 +41,12 @@ performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt
     };
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B> {
+impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
+where
+    A: Axis + LeafSliceFloat<T, K>,
+    T: Content,
+    usize: Cast<T>,
+{
     generate_immutable_float_best_n_within!(
         "let content: Vec<[f64; 3]> = vec!(
             [1.0, 2.0, 5.0],
@@ -55,18 +60,17 @@ impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, 
 #[cfg(feature = "rkyv")]
 use crate::immutable::float::kdtree::ArchivedImmutableKdTree;
 #[cfg(feature = "rkyv")]
-impl<
-        A: Axis + rkyv::Archive<Archived = A>,
-        T: Content + rkyv::Archive<Archived = T>,
-        const K: usize,
-        const B: usize,
-    > ArchivedImmutableKdTree<A, T, K, B>
+impl<A, T, const K: usize, const B: usize> ArchivedImmutableKdTree<A, T, K, B>
+where
+    A: Axis + LeafSliceFloat<T, K> + rkyv::Archive<Archived = A>,
+    T: Content + rkyv::Archive<Archived = T>,
+    usize: Cast<T>,
 {
     generate_immutable_float_best_n_within!(
         "use std::fs::File;
     use memmap::MmapOptions;
 
-    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-dynamic-doctest-tree.rkyv\").unwrap()).unwrap() };
     let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, 3>>(&mmap) };"
     );
 }
@@ -149,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    fn can_query_items_within_radius_large_scale() {
+    fn can_query_best_items_within_radius_large_scale() {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
         let max_qty = 2;

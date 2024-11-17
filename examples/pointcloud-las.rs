@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::Write;
 use std::time::Instant;
 
-use kiddo::ImmutableKdDynamicTree;
+use kiddo::ImmutableKdTree;
 use kiddo::SquaredEuclidean;
 use las::Reader;
 
@@ -22,7 +22,7 @@ use tracing_subscriber::fmt;
 const BUFFER_LEN: usize = 10_000_000_000;
 const SCRATCH_LEN: usize = 1_000_000_000;
 
-type Tree = ImmutableKdDynamicTree<f32, 3>;
+type Tree = ImmutableKdTree<f32, 3>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "tracing")]
