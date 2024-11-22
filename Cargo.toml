@@ -1,6 +1,6 @@
 [package]
 name = "kiddo"
-version = "4.2.1"
+version = "5.0.0"
 edition = "2021"
 authors = ["Scott Donnelly <scott@donnel.ly>"]
 description = "A high-performance, flexible, ergonomic k-d tree library. Ideal for geo- and astro- nearest-neighbour and k-nearest-neighbor queries"
@@ -24,39 +24,37 @@ codegen-units = 1
 opt-level = 3
 
 [dependencies]
-log = "0.4"
-num-traits = "0.2"
-fixed = { version = "1", features = ["num-traits"] }
+array-init = "2.1.0"
 az = "1"
+cmov = "0.3"
+divrem = "1"
 doc-comment = "0.3"
 elapsed = "0.1"
-divrem = "1"
-ordered-float = "4"
-itertools = "0.13"
-ubyte = "0.10"
+fixed = { version = "1", features = ["num-traits"] }
 init_with = "1"
+itertools = "0.13"
+log = "0.4"
+num-traits = "0.2"
+ordered-float = "4"
 sorted-vec = "0.8"
-las = { version = "0.9.1", features = ["laz-parallel"] }
-csv = "1"
-cmov = "0.3.1"
-rstest = "0.23.0"
-array-init = "2.1.0"
+ubyte = "0.10"
 
 [dev-dependencies]
 bincode = "1.3"
+codspeed-criterion-compat = "2"
 criterion = "0.5"
-csv="1"
 flate2 = { version = "1", features = ["zlib-ng-compat"], default-features = false }
+las = { version = "0.9", features = ["laz-parallel"] }
 log = "0.4"
 memmap = "0.7"
 proc-macro2 = { version = "1", features=["default", "proc-macro"] }
 radians = "0.3"
-rayon = "1"
 rand = "0.8"
 rand_distr = "0.4"
+rayon = "1"
+rstest = "0.23"
 serde = { version = "1", features = ["derive", "rc"] }
-serde_json = "1.0"
-codspeed-criterion-compat = "2"
+serde_json = "1"
 # required to be able to run tests without specifying --features=test_utils
 # see https://github.com/rust-lang/cargo/issues/2911#issuecomment-749580481
 kiddo = { path = ".", features = ["test_utils"] }
@@ -64,9 +62,19 @@ kiddo = { path = ".", features = ["test_utils"] }
 [target.'cfg(any(target_arch = "x86_64", target_arch = "aarch64"))'.dependencies]
 generator = "0.8.1"
 
-[dependencies.rayon]
+[dependencies.csv]
 version = "1"
 optional = true
+
+[dependencies.half]
+version = "2"
+optional = true
+features = ["num-traits"]
+
+[dependencies.las]
+version = "0.9"
+optional = true
+features = ["laz-parallel"]
 
 [dependencies.rand]
 version = "0.8"
@@ -76,13 +84,15 @@ optional = true
 version = "0.3"
 optional = true
 
-[dependencies.tracing]
-version = "0.1"
+[dependencies.rayon]
+version = "1"
 optional = true
 
-[dependencies.tracing-subscriber]
-version = "0.3"
+[dependencies.rkyv]
+version = "0.7"
 optional = true
+default-features = false
+features = ["alloc", "copy_unsafe", "size_64"]
 
 [dependencies.serde]
 version = "1"
@@ -96,30 +106,32 @@ optional = true
 version = "3"
 optional = true
 
-[dependencies.half]
-version = "2.3"
+[dependencies.tracing]
+version = "0.1"
 optional = true
-features = ["num-traits"]
 
-[dependencies.rkyv]
-version = "0.7"
+[dependencies.tracing-subscriber]
+version = "0.3"
 optional = true
-default-features = false
-features = ["alloc", "copy_unsafe", "size_64"]
+
+
 
 [features]
+csv = ["dep:csv"]
 default = ["tracing"]
 f16 = ["dep:half"]
 global_allocate = []
-immutable = []
+las = ["dep:las"]
 serde = ["dep:serde", "serde/derive", "dep:serde_derive", "dep:serde_with", "fixed/serde"]
-rkyv = ["dep:rkyv"]
 simd = []
+rkyv = ["dep:rkyv"]
 test_utils = ["dep:rand", "dep:rand_chacha", "dep:rayon"]
 tracing = ["dep:tracing", "dep:tracing-subscriber"]
 
 [package.metadata.docs.rs]
 all-features = true
+
+
 
 [[bench]]
 name = "add_points"
@@ -156,29 +168,35 @@ name = "best_n"
 harness = false
 required-features = ["test_utils"]
 
+
+
+[[example]]
+name = "avx2-check"
+path = "examples/avx2-check.rs"
+
+[[example]]
+name = "build-float-doctest-tree"
+path = "examples/build-float-doctest-tree.rs"
+required-features = ["rkyv"]
+
+[[example]]
+name = "build-immutable-doctest-tree"
+path = "examples/build-immutable-doctest-tree.rs"
+required-features = ["rkyv"]
+
+[[example]]
+name = "check-select-nth-unstable"
+path = "examples/check-select-nth-unstable.rs"
+
 [[example]]
 name = "cities"
 path = "examples/cities.rs"
+required-features = ["csv"]
 
 [[example]]
-name = "serde"
-path = "examples/serde.rs"
-required-features = ["serde"]
-
-[[example]]
-name = "rkyv"
-path = "examples/rkyv.rs"
-required-features = ["rkyv"]
-
-[[example]]
-name = "rkyv-large-serialize"
-path = "examples/rkyv-large-serialize.rs"
-required-features = ["rkyv"]
-
-[[example]]
-name = "rkyv-large-deserialize"
-path = "examples/rkyv-large-deserialize.rs"
-required-features = ["rkyv"]
+name = "half"
+path = "examples/half.rs"
+required-features = ["half"]
 
 [[example]]
 name = "immutable-large"
@@ -196,38 +214,36 @@ path = "examples/immutable-rkyv-deserialize.rs"
 required-features = ["rkyv"]
 
 [[example]]
-name = "check-select-nth-unstable"
-path = "examples/check-select-nth-unstable.rs"
+name = "pointcloud-las"
+path = "examples/pointcloud-las.rs"
+required-features = ["las", "rkyv"]
+
+[[example]]
+name = "pointcloud-csv"
+path = "examples/pointcloud-csv.rs"
+required-features = ["csv", "rkyv"]
+
+[[example]]
+name = "rkyv"
+path = "examples/rkyv.rs"
+required-features = ["csv", "rkyv"]
+
+[[example]]
+name = "rkyv-large-serialize"
+path = "examples/rkyv-large-serialize.rs"
+required-features = ["rkyv"]
+
+[[example]]
+name = "rkyv-large-deserialize"
+path = "examples/rkyv-large-deserialize.rs"
+required-features = ["rkyv"]
+
+[[example]]
+name = "serde"
+path = "examples/serde.rs"
+required-features = ["csv", "serde"]
 
 [[example]]
 name = "simd_leaf"
 path = "examples/simd_leaf.rs"
 required-features = ["test_utils"]
-
-[[example]]
-name = "avx2-check"
-path = "examples/avx2-check.rs"
-
-[[example]]
-name = "build-immutable-doctest-tree"
-path = "examples/build-immutable-doctest-tree.rs"
-required-features = ["rkyv"]
-
-[[example]]
-name = "build-float-doctest-tree"
-path = "examples/build-float-doctest-tree.rs"
-required-features = ["rkyv"]
-
-[[example]]
-name = "half"
-path = "examples/half.rs"
-
-[[example]]
-name = "pointcloud-las"
-path = "examples/pointcloud-las.rs"
-required-features = ["rkyv"]
-
-[[example]]
-name = "pointcloud-csv"
-path = "examples/pointcloud-csv.rs"
-required-features = ["rkyv"]

@@ -10,7 +10,7 @@ macro_rules! generate_immutable_within {
                 A: LeafSliceFloat<T, K>,
                 D: DistanceMetric<A, K>,
                 usize: Cast<T>,            {
-                self.nearest_n_within::<D>(query, dist, usize::MAX, true)
+                self.nearest_n_within::<D>(query, dist, std::num::NonZero::new(usize::MAX).unwrap(), true)
             }
         }
     };

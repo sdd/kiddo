@@ -5,10 +5,12 @@ macro_rules! generate_immutable_nearest_n_within {
         doc_comment! {
             concat!$comments,
             #[inline]
-            pub fn nearest_n_within<D>(&self, query: &[A; K], dist: A, max_items: usize, sorted: bool) -> Vec<NearestNeighbour<A, T>>
+            pub fn nearest_n_within<D>(&self, query: &[A; K], dist: A, max_items: NonZero<usize>, sorted: bool) -> Vec<NearestNeighbour<A, T>>
             where
                 D: DistanceMetric<A, K>,
             {
+                let max_items = max_items.into();
+
                 if sorted && max_items < usize::MAX {
                     if max_items <= MAX_VEC_RESULT_SIZE {
                         self.nearest_n_within_stub::<D, SortedVec<NearestNeighbour<A, T>>>(query, dist, max_items, sorted)
@@ -63,7 +65,7 @@ macro_rules! generate_immutable_nearest_n_within {
             {
                 use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 
-                if level > self.max_stem_level as usize {
+                if level > self.max_stem_level as usize || self.stems.is_empty() {
                     self.search_leaf_for_nearest_n_within::<D, R>(query, radius, matching_items, leaf_idx as usize);
                     return;
                 }

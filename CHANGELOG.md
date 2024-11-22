@@ -72,11 +72,11 @@
 
 ## [4.0.0] - 2023-12-04
 
-Despite the major version bump, this is unlikely to be a breaking change for any users. The `within_unsorted_iter` method of `ImmutableKdTree` is now only present on x86_64 and aaarch64 targets.
+Despite the major version bump, this is unlikely to be a breaking change for any users. The `within_unsorted_iter` method of `ImmutableKdTree` is now only present on x86_64 and Aarch64 targets.
 Considering that v3.0.0 would not even compile on these targets when the `immutable` crate feature was activated, 
 it seems vanishingly unlikely that this breaks anyone.
-Additionally the `immutable` feature has been removed and the `global_allocate` feature added. If you were using `ImmutableKdTree` and your build
-breaks because the `immutable` feature does not exist - don't worry, you don't need it any more.
+Additionally, the `immutable` feature has been removed and the `global_allocate` feature added. If you were using `ImmutableKdTree` and your build
+breaks because the `immutable` feature does not exist - don't worry, you don't need it anymore.
 Simply remove any reference to it ant the `ImmutableKdTree` should be available without it.
 
 ### ✨ Features
@@ -131,7 +131,7 @@ let result = kdtree.nearest_one::<SquaredEuclidean>(&[0f64, 0f64]);
 * the `ImmutableKdTree` is now only usable by enabling the `immutable` crate feature. This ensures that the crate as a whole retains compatible with stable rust, as `ImmutableKdTree` depends on some unstable features at present.
 
 ### Refactors
-* Leaf nodes for Immutable now store their points in columnar format. Searches across them have been re-written to autovectorise better. This has been tested on Compiler Explorer to demonstrate that AVX512 instructions are generated, ensuring vectorization is as wide as is possible. Handwritten SIMD intrinsics have been used (activated by enabling the `simd` crate feature) to manually vectorise code that the compiler could not autovectorize. **NOTE** `simd` is currently quite unstable and not as well tested as the rest of the library, so use it with caution until it stabilizes in the full `v3.0.0` release!
+* Leaf nodes for Immutable now store their points in columnar format. Searches across them have been re-written to autovectorise better. This has been tested on Compiler Explorer to demonstrate that AVX512 instructions are generated, ensuring vectorization is as wide as is possible. Handwritten SIMD intrinsics have been used (activated by enabling the `simd` crate feature) to manually vectorise code that the compiler could not autovectorise. **NOTE** `simd` is currently quite unstable and not as well tested as the rest of the library, so use it with caution until it stabilizes in the full `v3.0.0` release!
 
 
 ### Style / Tests
@@ -188,7 +188,7 @@ These capabilities come with a few trade-offs:
   its `into_sorted_vec` method to, well, return a sorted `Vec`.
   Whilst a `BinaryHeap` is great if you are frequently adding and removing
   items, if your use case is to gradually add all your items, and then sort
-  them all at once, its quicker to just put things in a `Vec` and then
+  them all at once, it's quicker to just put things in a `Vec` and then
   sort the `Vec` at the end.
   Benchmarking shows that this change improves performance by anything from
   5 to 60% in practice.
@@ -210,13 +210,13 @@ These capabilities come with a few trade-offs:
 - Add CI for format/clippy/test/coverage/release/publish
 
 ## [2.1.0]
-* feat: implement the main query methods plus `size` on `kiddo::float::kdtree::ArchivedKdTree` and improve the rkyv example.
+* feat: implement the main query methods plus `size` on `kiddo::float::kdtree::ArchivedKdTree` and improve the Rkyv example.
 
-The previous Rkyv example was not really using Rkyv in the most efficient way (Thanks to @cavemanloverboy for spotting my mistakes!). In order to properly use rkyv'z zero-copy deserialization, you need to use `rkyv::archived_root` to transmute a buffer into an `ArchivedKdTree`. For `ArchivedKdTree` to be useful, it actually needs some methods though!
+The previous Rkyv example was not really using Rkyv in the most efficient way (Thanks to @cavemanloverboy for spotting my mistakes!). In order to properly use rkyv's zero-copy deserialization, you need to use `rkyv::archived_root` to transmute a buffer into an `ArchivedKdTree`. For `ArchivedKdTree` to be useful, it actually needs some methods though!
 
 v2.1.0 refactors the query code so that the method bodies of the queries are templated by macros, allowing them to be implemented on `KdTree` and `ArchivedKdTree` without completely duplicating the code.
 
-The updated rkyv example shows the difference that zero-copy usage of rkyv makes vs deserializing, as well as also showing the gains that can be made using mmap compared to standard file access. Combining both together results in absolutely mindblowing performance when measuring  time-from-binary-start-to-first-query-result.
+The updated rkyv example shows the difference that zero-copy usage of rkyv makes vs deserializing, as well as also showing the gains that can be made using mmap compared to standard file access. Combining both together results in absolutely mind-blowing performance when measuring  time-from-binary-start-to-first-query-result.
 
 See for yourself by downloading the sample datasets mentioned in the examples readme and running:
 
@@ -237,7 +237,7 @@ I'll follow up this release with equivalent methods for `Fixed`, and some more e
 
 ## [2.0.0]
 
-Version 2 is a complete rewrite and rearchitecting of Kiddo. The same methods have been provided (except periodic boundary conditions, for now), but large performance improvements have been made across the board, and some improvements have been made to the ergonomics of the library also.
+Version 2 is a complete rewrite and re-architecting of Kiddo. The same methods have been provided (except periodic boundary conditions, for now), but large performance improvements have been made across the board, and some improvements have been made to the ergonomics of the library also.
 Needless to say, this is a breaking change, but I hope you find the upgrade not too difficult as the improvements are significant.
 
 ### Major Changes

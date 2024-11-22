@@ -5,6 +5,7 @@ use codspeed_criterion_compat::{
 };
 use kiddo::batch_benches;
 use kiddo::float::distance::SquaredEuclidean;
+use kiddo::float_leaf_slice::leaf_slice::LeafSliceFloat;
 use kiddo::immutable::float::kdtree::{Axis, ImmutableKdTree};
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_immutable_float, process_queries_immutable_float,
@@ -12,7 +13,6 @@ use kiddo::test_utils::{
 use kiddo::types::Content;
 use rand::distributions::Standard;
 use rand_distr::Distribution;
-use kiddo::float_leaf_slice::leaf_slice::LeafSliceFloat;
 
 const BUCKET_SIZE: usize = 32;
 const QUERY_POINTS_PER_LOOP: usize = 1000;

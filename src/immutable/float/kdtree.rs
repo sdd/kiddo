@@ -57,7 +57,7 @@ pub struct ImmutableKdTree<A: Copy + Default, T: Copy + Default, const K: usize,
     pub(crate) leaf_points: [Vec<A>; K],
     pub(crate) leaf_items: Vec<T>,
     pub(crate) leaf_extents: Vec<(u32, u32)>,
-    pub(crate) max_stem_level: usize,
+    pub(crate) max_stem_level: isize,
 }
 
 impl<A: Axis, T: Content, const K: usize, const B: usize> From<&[[A; K]]>
@@ -121,8 +121,12 @@ where
     {
         let item_count = source.len();
         let leaf_node_count = item_count.div_ceil(B);
-        let max_stem_level: usize = (leaf_node_count.next_power_of_two().ilog2() - 1) as usize;
-        let stem_node_count = leaf_node_count.next_power_of_two() - 1;
+        let stem_node_count = if leaf_node_count < 2 {
+            0
+        } else {
+            leaf_node_count.next_power_of_two() - 1
+        };
+        let max_stem_level: isize = leaf_node_count.next_power_of_two().ilog2() as isize - 1;
 
         // TODO: It would be nice to be able to determine the exact required length up-front.
         //  Instead, we just trim the stems afterwards by traversing right-child non-inf nodes
@@ -136,34 +140,49 @@ where
 
         let mut sort_index = Vec::from_iter(0..item_count);
 
-        Self::populate_recursive(
-            &mut stems,
-            0,
-            source,
-            &mut sort_index,
-            0,
-            0,
-            max_stem_level,
-            leaf_node_count * B,
-            &mut leaf_points,
-            &mut leaf_items,
-            &mut leaf_extents,
-        );
+        if stem_node_count == 0 {
+            // Write leaf and terminate recursion
+            leaf_extents.push((0u32, sort_index.len() as u32));
 
-        // trim unneeded stems
-        let mut level = 0;
-        let mut stem_idx = 0;
-        loop {
-            let val = stems[stem_idx];
-            let is_right_child = val.is_finite();
-            stem_idx =
-                modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child, level);
-            level += 1;
-            if level == max_stem_level {
-                break;
+            (0..sort_index.len()).for_each(|i| {
+                (0..K).for_each(|dim| leaf_points[dim].push(source[sort_index[i]][dim]));
+                leaf_items.push(sort_index[i].az::<T>())
+            });
+        } else {
+            Self::populate_recursive(
+                &mut stems,
+                0,
+                source,
+                &mut sort_index,
+                0,
+                0,
+                max_stem_level,
+                leaf_node_count * B,
+                &mut leaf_points,
+                &mut leaf_items,
+                &mut leaf_extents,
+            );
+
+            // trim unneeded stems
+            if !stems.is_empty() {
+                let mut level = 0;
+                let mut stem_idx = 0;
+                loop {
+                    let val = stems[stem_idx];
+                    let is_right_child = val.is_finite();
+                    stem_idx = modified_van_emde_boas_get_child_idx_v2_branchless(
+                        stem_idx,
+                        is_right_child,
+                        level,
+                    );
+                    level += 1;
+                    if level == max_stem_level as usize {
+                        break;
+                    }
+                }
+                stems.truncate(stem_idx + 1);
             }
         }
-        stems.truncate(stem_idx + 1);
 
         Self {
             stems,
@@ -182,7 +201,7 @@ where
         sort_index: &mut [usize],
         stem_index: usize,
         mut level: usize,
-        max_stem_level: usize,
+        max_stem_level: isize,
         capacity: usize,
         leaf_points: &mut [Vec<A>; K],
         leaf_items: &mut Vec<T>,
@@ -190,7 +209,7 @@ where
     ) {
         let chunk_length = sort_index.len();
 
-        if level > max_stem_level {
+        if level as isize > max_stem_level {
             // Write leaf and terminate recursion
             leaf_extents.push((
                 leaf_items.len() as u32,
@@ -205,7 +224,7 @@ where
             return;
         }
 
-        let levels_below = max_stem_level - level;
+        let levels_below = max_stem_level - level as isize;
         let left_capacity = (2usize.pow(levels_below as u32) * B).min(capacity);
         let right_capacity = capacity.saturating_sub(left_capacity);
 
@@ -368,10 +387,17 @@ where
 #[cfg(test)]
 mod tests {
     use crate::immutable::float::kdtree::ImmutableKdTree;
+    use crate::SquaredEuclidean;
     use ordered_float::OrderedFloat;
     use rand::{Rng, SeedableRng};
     use rayon::prelude::IntoParallelRefIterator;
     use std::panic;
+
+    #[test]
+    fn can_construct_an_empty_tree() {
+        let tree = ImmutableKdTree::<f64, u32, 3, 32>::new_from_slice(&[]);
+        let _result = tree.nearest_one::<SquaredEuclidean>(&[0.; 3]);
+    }
 
     #[test]
     fn can_construct_optimized_tree_with_straddled_split() {

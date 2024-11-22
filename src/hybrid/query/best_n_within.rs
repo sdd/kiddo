@@ -38,7 +38,7 @@ where
         &self,
         query: &[A; K],
         dist: A,
-        max_qty: usize,
+        max_qty: NonZero<usize>,
         distance_fn: &F,
     ) -> impl Iterator<Item = T>
     where
@@ -69,7 +69,7 @@ where
         &self,
         query: &[A; K],
         radius: A,
-        max_qty: usize,
+        max_qty: NonZero<usize>,
         distance_fn: &F,
         curr_node_idx: IDX,
         split_dim: usize,
@@ -137,7 +137,7 @@ where
     unsafe fn process_leaf_node<F>(
         query: &[A; K],
         radius: A,
-        max_qty: usize,
+        max_qty: NonZero<usize>,
         distance_fn: &F,
         best_items: &mut BinaryHeap<T>,
         leaf_node: &LeafNode<A, T, K, B, IDX>,
@@ -157,7 +157,7 @@ where
     }
 
     unsafe fn get_item_and_add_if_good(
-        max_qty: usize,
+        max_qty: NonZero<usize>,
         best_items: &mut BinaryHeap<T>,
         leaf_node: &LeafNode<A, T, K, B, IDX>,
         idx: usize,
@@ -274,7 +274,7 @@ mod tests {
         content: &[([f64; 2], i32)],
         query: &[f64; 2],
         radius: f64,
-        max_qty: usize,
+        max_qty: NonZero<usize>,
     ) -> Vec<i32> {
         let mut best_items = Vec::with_capacity(max_qty);
 

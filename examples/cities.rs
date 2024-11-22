@@ -1,3 +1,6 @@
+use csv::Reader;
+use kiddo::float::{distance::SquaredEuclidean, kdtree::KdTree};
+use serde::Deserialize;
 /// Kiddo example 1: Cities
 ///
 /// This example walks through the basics of using Kiddo to
@@ -6,10 +9,6 @@
 use std::error::Error;
 use std::fmt::Formatter;
 use std::fs::File;
-
-use csv::Reader;
-use kiddo::float::{distance::SquaredEuclidean, kdtree::KdTree};
-use serde::Deserialize;
 
 #[allow(dead_code)]
 pub const EARTH_RADIUS_IN_KM: f32 = 6371.0;

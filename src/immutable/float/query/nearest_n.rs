@@ -5,6 +5,7 @@ use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::Content;
 use az::Cast;
+use std::num::NonZero;
 
 use crate::generate_immutable_nearest_n;
 
@@ -16,6 +17,7 @@ distance metric function.
 # Examples
 
 ```rust
+    use std::num::NonZero;
     use kiddo::ImmutableKdTree;
     use kiddo::SquaredEuclidean;
 
@@ -23,7 +25,7 @@ distance metric function.
             $doctest_build_tree,
             "
 
-    let nearest: Vec<_> = tree.nearest_n::<SquaredEuclidean>(&[1.0, 2.0, 5.1], 1);
+    let nearest: Vec<_> = tree.nearest_n::<SquaredEuclidean>(&[1.0, 2.0, 5.1], NonZero::new(1).unwrap());
 
     assert_eq!(nearest.len(), 1);
     assert!((nearest[0].distance - 0.01f64).abs() < f64::EPSILON);
@@ -76,6 +78,7 @@ mod tests {
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use az::{Az, Cast};
     use rand::Rng;
+    use std::num::NonZero;
 
     #[test]
     fn can_query_nearest_n_item_f32() {
@@ -104,18 +107,19 @@ mod tests {
         assert_eq!(tree.size(), 16);
 
         let query_point = [0.78f32, 0.55f32, 0.78f32, 0.55f32];
+        let max_qty = NonZero::new(10).unwrap();
 
-        let expected = linear_search(&content_to_add, 10, &query_point);
+        let expected = linear_search(&content_to_add, max_qty.into(), &query_point);
         // let expected = vec![(0.17569996, 5), (0.19139998, 13), (0.24420004, 3)];
 
         let result: Vec<_> = tree
-            .nearest_n::<SquaredEuclidean>(&query_point, 10)
+            .nearest_n::<SquaredEuclidean>(&query_point, max_qty)
             .into_iter()
             .map(|n| (n.distance, n.item))
             .collect();
         assert_eq!(result, expected);
 
-        let qty = 10;
+        let max_qty = NonZero::new(10).unwrap();
         let mut rng = rand::thread_rng();
         for _i in 0..1000 {
             let query_point = [
@@ -124,10 +128,10 @@ mod tests {
                 rng.gen_range(0f32..1f32),
                 rng.gen_range(0f32..1f32),
             ];
-            let expected = linear_search(&content_to_add, qty, &query_point);
+            let expected = linear_search(&content_to_add, max_qty.into(), &query_point);
 
             let result: Vec<_> = tree
-                .nearest_n::<SquaredEuclidean>(&query_point, qty)
+                .nearest_n::<SquaredEuclidean>(&query_point, max_qty)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -141,7 +145,8 @@ mod tests {
     fn can_query_nearest_10_items_large_scale_f32() {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
-        const N: usize = 10;
+
+        let max_qty = NonZero::new(10).unwrap();
 
         let content_to_add: Vec<[f32; 4]> =
             (0..TREE_SIZE).map(|_| rand::random::<[f32; 4]>()).collect();
@@ -156,10 +161,10 @@ mod tests {
             .collect();
 
         for query_point in query_points {
-            let expected = linear_search(&content_to_add, N, &query_point);
+            let expected = linear_search(&content_to_add, max_qty.into(), &query_point);
 
             let result: Vec<_> = tree
-                .nearest_n::<SquaredEuclidean>(&query_point, N)
+                .nearest_n::<SquaredEuclidean>(&query_point, max_qty)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -202,14 +207,16 @@ mod tests {
             (0.2442000000000001, 3),
         ];
 
+        let max_qty = NonZero::new(3).unwrap();
+
         let result: Vec<_> = tree
-            .nearest_n::<SquaredEuclidean>(&query_point, 3)
+            .nearest_n::<SquaredEuclidean>(&query_point, max_qty)
             .into_iter()
             .map(|n| (n.distance, n.item))
             .collect();
         assert_eq!(result, expected);
 
-        let qty = 10;
+        let max_qty = NonZero::new(10).unwrap();
         let mut rng = rand::thread_rng();
         for _i in 0..1000 {
             let query_point = [
@@ -218,10 +225,10 @@ mod tests {
                 rng.gen_range(0f64..1f64),
                 rng.gen_range(0f64..1f64),
             ];
-            let expected = linear_search(&content_to_add, qty, &query_point);
+            let expected = linear_search(&content_to_add, max_qty.into(), &query_point);
 
             let result: Vec<_> = tree
-                .nearest_n::<SquaredEuclidean>(&query_point, qty)
+                .nearest_n::<SquaredEuclidean>(&query_point, max_qty)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -234,7 +241,8 @@ mod tests {
     fn can_query_nearest_10_items_large_scale_f64() {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
-        const N: usize = 10;
+
+        let max_qty = NonZero::new(10).unwrap();
 
         let content_to_add: Vec<[f64; 4]> =
             (0..TREE_SIZE).map(|_| rand::random::<[f64; 4]>()).collect();
@@ -249,10 +257,10 @@ mod tests {
             .collect();
 
         for query_point in query_points {
-            let expected = linear_search(&content_to_add, N, &query_point);
+            let expected = linear_search(&content_to_add, max_qty.into(), &query_point);
 
             let result: Vec<_> = tree
-                .nearest_n::<SquaredEuclidean>(&query_point, N)
+                .nearest_n::<SquaredEuclidean>(&query_point, max_qty)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();

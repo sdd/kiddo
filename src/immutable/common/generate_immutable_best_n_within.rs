@@ -9,7 +9,7 @@ macro_rules! generate_immutable_best_n_within {
                 &self,
                 query: &[A; K],
                 dist: A,
-                max_qty: usize,
+                max_qty: NonZero<usize>,
             ) -> impl Iterator<Item = BestNeighbour<A, T>>
             where
                 A: LeafSliceFloat<T, K>,
@@ -22,7 +22,7 @@ macro_rules! generate_immutable_best_n_within {
                 self.best_n_within_recurse::<D>(
                     query,
                     dist,
-                    max_qty,
+                    max_qty.into(),
                     0,
                     0,
                     &mut best_items,
@@ -55,7 +55,7 @@ macro_rules! generate_immutable_best_n_within {
             {
                 use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 
-                if level > self.max_stem_level as usize {
+                if level as isize > self.max_stem_level as isize {
                     self.search_leaf_for_best_n_within::<D>(query, radius, max_qty, best_items, leaf_idx as usize);
                     return;
                 }

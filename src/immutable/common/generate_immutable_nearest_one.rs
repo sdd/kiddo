@@ -49,7 +49,7 @@ macro_rules! generate_immutable_nearest_one {
                 // use cmov::Cmov;
                 use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 
-                if level > self.max_stem_level as usize {
+                if level > self.max_stem_level as usize || self.stems.is_empty() {
                     self.search_leaf_for_nearest_one::<D>(query, nearest, leaf_idx as usize);
                     return;
                 }
