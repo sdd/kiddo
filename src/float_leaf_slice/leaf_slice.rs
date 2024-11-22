@@ -89,7 +89,7 @@ impl<'a, A: Axis, T: Content, const K: usize, const C: usize> Iterator
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.items_iterator.is_empty() {
+        if self.items_iterator.len() == 0 {
             None
         } else {
             let points_chunk: [&[A; C]; K] = array_init::array_init(|i| {

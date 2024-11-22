@@ -74,7 +74,7 @@ where
         "use std::fs::File;
 use memmap::MmapOptions;
 
-let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-dynamic-doctest-tree.rkyv\").unwrap()).unwrap() };
+let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
 let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, 3>>(&mmap) };"
     );
 }
@@ -163,7 +163,8 @@ mod tests {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
         const RADIUS: f32 = 0.2;
-        const MAX_QTY: NonZero<usize> = NonZero::new(3).unwrap();
+
+        let max_qty: NonZero<usize> = NonZero::new(3).unwrap();
 
         let content_to_add: Vec<[f32; 4]> =
             (0..TREE_SIZE).map(|_| rand::random::<[f32; 4]>()).collect();
@@ -179,11 +180,11 @@ mod tests {
         for query_point in query_points {
             let expected = linear_search(&content_to_add, &query_point, RADIUS)
                 .into_iter()
-                .take(MAX_QTY.into())
+                .take(max_qty.into())
                 .collect::<Vec<_>>();
 
             let mut result: Vec<_> = tree
-                .nearest_n_within::<SquaredEuclidean>(&query_point, RADIUS, MAX_QTY, true)
+                .nearest_n_within::<SquaredEuclidean>(&query_point, RADIUS, max_qty, true)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
