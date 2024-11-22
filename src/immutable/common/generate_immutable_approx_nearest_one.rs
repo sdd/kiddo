@@ -20,7 +20,7 @@ macro_rules! generate_immutable_approx_nearest_one {
                 let mut level: usize = 0;
                 let mut leaf_idx: usize = 0;
 
-                while level <= self.max_stem_level as usize {
+                while level as isize <= self.max_stem_level as isize {
                     let val = *unsafe { self.stems.get_unchecked(curr_idx) };
                     let is_right_child = *unsafe { query.get_unchecked(dim) } >= val;
 

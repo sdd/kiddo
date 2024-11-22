@@ -1,6 +1,7 @@
 use az::Cast;
 use sorted_vec::SortedVec;
 use std::collections::BinaryHeap;
+use std::num::NonZero;
 use std::ops::Rem;
 
 use crate::distance_metric::DistanceMetric;
@@ -24,13 +25,14 @@ distance metric function.
 # Examples
 
 ```rust
+    use std::num::NonZero;
     use kiddo::ImmutableKdTree;
     use kiddo::SquaredEuclidean;
     ",
             $doctest_build_tree,
             "
 
-    let within = tree.nearest_n_within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64, 2, true);
+    let within = tree.nearest_n_within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64, NonZero::new(2).unwrap(), true);
 
     assert_eq!(within.len(), 2);
 ```"
@@ -85,6 +87,7 @@ mod tests {
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use rand::Rng;
     use std::cmp::Ordering;
+    use std::num::NonZero;
 
     type AX = f32;
 
@@ -116,7 +119,7 @@ mod tests {
         let query_point = [0.78f32, 0.55f32, 0.78f32, 0.55f32];
 
         let radius = 0.2;
-        let max_qty = 3;
+        let max_qty = NonZero::new(3).unwrap();
 
         let expected = linear_search(&content_to_add, &query_point, radius);
 
@@ -137,11 +140,11 @@ mod tests {
                 rng.gen_range(0f32..1f32),
             ];
             let radius: f32 = 2.0;
-            let max_qty = 3;
+            let max_qty = NonZero::new(3).unwrap();
 
             let expected = linear_search(&content_to_add, &query_point, radius)
                 .into_iter()
-                .take(max_qty)
+                .take(max_qty.into())
                 .collect::<Vec<_>>();
 
             let mut result: Vec<_> = tree
@@ -160,7 +163,7 @@ mod tests {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
         const RADIUS: f32 = 0.2;
-        const MAX_QTY: usize = 3;
+        const MAX_QTY: NonZero<usize> = NonZero::new(3).unwrap();
 
         let content_to_add: Vec<[f32; 4]> =
             (0..TREE_SIZE).map(|_| rand::random::<[f32; 4]>()).collect();
@@ -176,7 +179,7 @@ mod tests {
         for query_point in query_points {
             let expected = linear_search(&content_to_add, &query_point, RADIUS)
                 .into_iter()
-                .take(MAX_QTY)
+                .take(MAX_QTY.into())
                 .collect::<Vec<_>>();
 
             let mut result: Vec<_> = tree

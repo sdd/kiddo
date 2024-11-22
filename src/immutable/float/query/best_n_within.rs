@@ -1,5 +1,6 @@
 use az::Cast;
 use std::collections::BinaryHeap;
+use std::num::NonZero;
 use std::ops::Rem;
 
 use crate::best_neighbour::BestNeighbour;
@@ -23,6 +24,7 @@ performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt
 # Examples
 
 ```rust
+    use std::num::NonZero;
     use kiddo::ImmutableKdTree;
     use kiddo::best_neighbour::BestNeighbour;
     use kiddo::SquaredEuclidean;
@@ -31,7 +33,7 @@ performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt
                 $doctest_build_tree,
                 "
 
-    let mut best_n_within = tree.best_n_within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64, 1);
+    let mut best_n_within = tree.best_n_within::<SquaredEuclidean>(&[1.0, 2.0, 5.0], 10f64, NonZero::new(1).unwrap());
     let first = best_n_within.next().unwrap();
 
     assert_eq!(first, BestNeighbour { distance: 0.0, item: 0 });
@@ -82,8 +84,30 @@ mod tests {
     use crate::float::distance::SquaredEuclidean;
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use rand::Rng;
+    use std::num::NonZero;
 
     type AX = f64;
+
+    #[test]
+    fn can_query_single_bucket_tree() {
+        let content: Vec<[AX; 3]> = vec![[1.0, 2.0, 5.0], [2.0, 3.0, 6.0]];
+        let tree: ImmutableKdTree<AX, i32, 3, 32> = ImmutableKdTree::new_from_slice(&content);
+
+        let mut best_n_within = tree.best_n_within::<SquaredEuclidean>(
+            &[1.0, 2.0, 5.0],
+            10f64,
+            NonZero::new(1).unwrap(),
+        );
+        let first = best_n_within.next().unwrap();
+
+        assert_eq!(
+            first,
+            BestNeighbour {
+                distance: 0.0,
+                item: 0
+            }
+        );
+    }
 
     #[test]
     fn can_query_best_n_items_within_radius() {
@@ -112,7 +136,7 @@ mod tests {
 
         let query = [9f64, 0f64];
         let radius = 20000f64;
-        let max_qty = 3;
+        let max_qty = NonZero::new(3).unwrap();
         let expected = vec![
             BestNeighbour {
                 distance: 10001.0,
@@ -133,7 +157,7 @@ mod tests {
             .collect();
         assert_eq!(result, expected);
 
-        let max_qty = 2;
+        let max_qty = NonZero::new(2).unwrap();
 
         let mut rng = rand::thread_rng();
         for _i in 0..1000 {
@@ -142,7 +166,7 @@ mod tests {
                 rng.gen_range(-1000f64..1000f64),
             ];
             let radius = 100000f64;
-            let expected = linear_search(&content_to_add, &query, radius, max_qty);
+            let expected = linear_search(&content_to_add, &query, radius, max_qty.into());
             //println!("{}, {}", query[0].to_string(), query[1].to_string());
 
             let result: Vec<_> = tree
@@ -156,7 +180,7 @@ mod tests {
     fn can_query_best_items_within_radius_large_scale() {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
-        let max_qty = 2;
+        let max_qty = NonZero::new(2).unwrap();
 
         let content_to_add: Vec<[AX; 2]> =
             (0..TREE_SIZE).map(|_| rand::random::<[AX; 2]>()).collect();
@@ -171,7 +195,7 @@ mod tests {
 
         for query_point in query_points {
             let radius = 100000f64;
-            let expected = linear_search(&content_to_add, &query_point, radius, max_qty);
+            let expected = linear_search(&content_to_add, &query_point, radius, max_qty.into());
 
             let result: Vec<_> = tree
                 .best_n_within::<SquaredEuclidean>(&query_point, radius, max_qty)
