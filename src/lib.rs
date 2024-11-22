@@ -1,7 +1,3 @@
-#![feature(int_roundings)]
-#![feature(stdarch_aarch64_prefetch)]
-#![feature(new_range_api)]
-#![feature(exact_size_is_empty)]
 #![cfg_attr(feature = "simd", feature(slice_as_chunks))]
 #![cfg_attr(feature = "global_allocate", feature(allocator_api))]
 #![warn(rustdoc::missing_crate_level_docs)]
