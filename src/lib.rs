@@ -106,8 +106,6 @@ mod iter;
 pub mod within_unsorted_iter;
 
 #[doc(hidden)]
-pub mod float_leaf_simd;
-#[doc(hidden)]
 pub mod float_leaf_slice;
 mod modified_van_emde_boas;
 
