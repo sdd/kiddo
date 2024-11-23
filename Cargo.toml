@@ -242,8 +242,3 @@ required-features = ["rkyv"]
 name = "serde"
 path = "examples/serde.rs"
 required-features = ["csv", "serde"]
-
-[[example]]
-name = "simd_leaf"
-path = "examples/simd_leaf.rs"
-required-features = ["test_utils"]
