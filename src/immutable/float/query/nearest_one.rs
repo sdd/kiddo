@@ -105,6 +105,8 @@ mod tests {
 
         assert_eq!(tree.size(), 16);
 
+        println!("Tree: {:?}", &tree);
+
         let query_point = [0.78f64, 0.55f64, 0.78f64, 0.55f64];
 
         let expected = NearestNeighbour {

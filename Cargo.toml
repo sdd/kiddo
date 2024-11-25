@@ -120,6 +120,7 @@ optional = true
 [features]
 csv = ["dep:csv"]
 default = ["tracing"]
+eytzinger = []
 f16 = ["dep:half"]
 global_allocate = []
 las = ["dep:las"]

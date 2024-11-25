@@ -15,15 +15,19 @@ macro_rules! generate_immutable_nearest_one {
                     item: T::zero(),
                 };
 
+                #[cfg(feature = "eytzinger")]
+                let initial_stem_idx = 1;
+                #[cfg(not(feature = "eytzinger"))]
+                let initial_stem_idx = 0;
+
                 self.nearest_one_recurse::<D>(
                     query,
-                    0,
+                    initial_stem_idx,
                     0,
                     &mut result,
                     &mut off,
                     A::zero(),
                     0,
-                    // 0,
                     0,
                 );
 
@@ -40,13 +44,12 @@ macro_rules! generate_immutable_nearest_one {
                 off: &mut [A; K],
                 rd: A,
                 mut level: usize,
-                // mut minor_level: u64,
                 mut leaf_idx: usize,
             )
                 where
                     D: DistanceMetric<A, K>,
             {
-                // use cmov::Cmov;
+                #[cfg(not(feature = "eytzinger"))]
                 use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 
                 if level > self.max_stem_level as usize || self.stems.is_empty() {
@@ -61,8 +64,15 @@ macro_rules! generate_immutable_nearest_one {
                 let closer_leaf_idx = leaf_idx + is_right_child;
                 let farther_leaf_idx = leaf_idx + (1 - is_right_child);
 
+                #[cfg(not(feature = "eytzinger"))]
                 let closer_node_idx = modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 1, /*minor_*/level);
+                #[cfg(not(feature = "eytzinger"))]
                 let further_node_idx =  modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 0, /*minor_*/level);
+
+                #[cfg(feature = "eytzinger")]
+                let closer_node_idx = (stem_idx << 1) + is_right_child;
+                #[cfg(feature = "eytzinger")]
+                let further_node_idx = (stem_idx << 1) + 1 - is_right_child;
 
                 let mut rd = rd;
                 let old_off = off[split_dim];
@@ -70,8 +80,6 @@ macro_rules! generate_immutable_nearest_one {
 
                 level += 1;
                 let next_split_dim = (split_dim + 1).rem(K);
-                // minor_level += 1;
-                // minor_level.cmovnz(&0, u8::from(minor_level == 3));
 
                 self.nearest_one_recurse::<D>(
                     query,
@@ -81,7 +89,6 @@ macro_rules! generate_immutable_nearest_one {
                     off,
                     rd,
                     level,
-                    // minor_level,
                     closer_leaf_idx,
                 );
 
@@ -97,7 +104,6 @@ macro_rules! generate_immutable_nearest_one {
                         off,
                         rd,
                         level,
-                        // minor_level,
                         farther_leaf_idx,
                     );
                     off[split_dim] = old_off;
