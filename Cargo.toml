@@ -24,6 +24,7 @@ codegen-units = 1
 opt-level = 3
 
 [dependencies]
+aligned-vec = "0.6.1"
 array-init = "2.1.0"
 az = "1"
 cmov = "0.3"

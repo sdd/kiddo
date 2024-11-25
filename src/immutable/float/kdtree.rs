@@ -10,7 +10,7 @@ use az::{Az, Cast};
 use ordered_float::OrderedFloat;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
-
+use aligned_vec::{avec, AVec, ConstAlign};
 pub use crate::float::kdtree::Axis;
 use crate::types::Content;
 
@@ -45,7 +45,7 @@ use serde::{Deserialize, Serialize};
 #[repr(align(16))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct ImmutableKdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize> {
-    pub(crate) stems: Vec<A>,
+    pub(crate) stems: AVec<A>,
     #[cfg_attr(feature = "serde", serde(with = "crate::custom_serde::array_of_vecs"))]
     #[cfg_attr(
         feature = "serde",
@@ -133,7 +133,7 @@ where
         //  till we hit max level to get the max used stem
         let stem_node_count = stem_node_count * 5;
 
-        let mut stems = vec![A::infinity(); stem_node_count];
+        let mut stems = avec![A::infinity(); stem_node_count];
         let mut leaf_points: [Vec<A>; K] = array_init(|_| Vec::with_capacity(item_count));
         let mut leaf_items: Vec<T> = Vec::with_capacity(item_count);
         let mut leaf_extents: Vec<(u32, u32)> = Vec::with_capacity(item_count.div_ceil(B));
@@ -195,7 +195,7 @@ where
 
     #[allow(clippy::too_many_arguments)]
     fn populate_recursive(
-        stems: &mut Vec<A>,
+        stems: &mut AVec<A, ConstAlign<128>>,
         dim: usize,
         source: &[[A; K]],
         sort_index: &mut [usize],
