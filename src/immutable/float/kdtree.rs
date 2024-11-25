@@ -5,14 +5,14 @@
 //! As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
 //! values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
 
+pub use crate::float::kdtree::Axis;
+use crate::types::Content;
+use aligned_vec::{avec, AVec, ConstAlign};
 use array_init::array_init;
 use az::{Az, Cast};
 use ordered_float::OrderedFloat;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
-use aligned_vec::{avec, AVec, ConstAlign};
-pub use crate::float::kdtree::Axis;
-use crate::types::Content;
 
 use crate::float_leaf_slice::leaf_slice::{LeafSlice, LeafSliceFloat};
 use crate::modified_van_emde_boas::{
@@ -121,6 +121,11 @@ where
     {
         let item_count = source.len();
         let leaf_node_count = item_count.div_ceil(B);
+
+        #[cfg(feature = "eytzinger")]
+        let mut stem_node_count = leaf_node_count.next_power_of_two();
+
+        #[cfg(not(feature = "eytzinger"))]
         let stem_node_count = if leaf_node_count < 2 {
             0
         } else {
@@ -131,6 +136,7 @@ where
         // TODO: It would be nice to be able to determine the exact required length up-front.
         //  Instead, we just trim the stems afterwards by traversing right-child non-inf nodes
         //  till we hit max level to get the max used stem
+        #[cfg(not(feature = "eytzinger"))]
         let stem_node_count = stem_node_count * 5;
 
         let mut stems = avec![A::infinity(); stem_node_count];
@@ -149,12 +155,17 @@ where
                 leaf_items.push(sort_index[i].az::<T>())
             });
         } else {
+            #[cfg(feature = "eytzinger")]
+            let initial_stem_idx = 1;
+            #[cfg(not(feature = "eytzinger"))]
+            let initial_stem_idx = 0;
+
             Self::populate_recursive(
                 &mut stems,
                 0,
                 source,
                 &mut sort_index,
-                0,
+                initial_stem_idx,
                 0,
                 max_stem_level,
                 leaf_node_count * B,
@@ -164,6 +175,7 @@ where
             );
 
             // trim unneeded stems
+            #[cfg(not(feature = "eytzinger"))]
             if !stems.is_empty() {
                 let mut level = 0;
                 let mut stem_idx = 0;
@@ -246,8 +258,15 @@ where
             stems[stem_index] = source[sort_index[pivot]][dim];
         }
 
+        #[cfg(not(feature = "eytzinger"))]
         let left_child_idx = modified_van_emde_boas_get_child_idx_v2(stem_index, false, level);
+        #[cfg(not(feature = "eytzinger"))]
         let right_child_idx = modified_van_emde_boas_get_child_idx_v2(stem_index, true, level);
+
+        #[cfg(feature = "eytzinger")]
+        let left_child_idx = stem_index << 1;
+        #[cfg(feature = "eytzinger")]
+        let right_child_idx = (stem_index << 1) + 1;
 
         let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
 
