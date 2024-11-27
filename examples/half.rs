@@ -30,8 +30,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(not(feature = "f16"))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Activate the 'half' feature to run this example properly");
-    println!("Try this: cargo run --example half --features=half");
+    println!("Activate the 'f16' feature to run this example properly");
+    println!("Try this: cargo run --example half --features=f16");
 
     Ok(())
 }

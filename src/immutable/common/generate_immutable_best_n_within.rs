@@ -19,11 +19,16 @@ macro_rules! generate_immutable_best_n_within {
                 let mut off = [A::zero(); K];
                 let mut best_items: BinaryHeap<BestNeighbour<A, T>> = BinaryHeap::new();
 
+                #[cfg(not(feature = "modified_van_emde_boas"))]
+                let initial_stem_idx = 1;
+                #[cfg(feature = "modified_van_emde_boas")]
+                let initial_stem_idx = 0;
+
                 self.best_n_within_recurse::<D>(
                     query,
                     dist,
                     max_qty.into(),
-                    0,
+                    initial_stem_idx,
                     0,
                     &mut best_items,
                     &mut off,
@@ -53,6 +58,7 @@ macro_rules! generate_immutable_best_n_within {
                 usize: Cast<T>,
                 D: DistanceMetric<A, K>,
             {
+                #[cfg(feature = "modified_van_emde_boas")]
                 use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 
                 if level as isize > self.max_stem_level as isize {
@@ -67,8 +73,15 @@ macro_rules! generate_immutable_best_n_within {
                 let closer_leaf_idx = leaf_idx + is_right_child;
                 let further_leaf_idx = leaf_idx + (1 - is_right_child);
 
+                #[cfg(feature = "modified_van_emde_boas")]
                 let closer_node_idx = modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 1, /*minor_*/level);
+                #[cfg(feature = "modified_van_emde_boas")]
                 let further_node_idx =  modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 0, /*minor_*/level);
+
+                #[cfg(not(feature = "modified_van_emde_boas"))]
+                let closer_node_idx = (stem_idx << 1) + is_right_child;
+                #[cfg(not(feature = "modified_van_emde_boas"))]
+                let further_node_idx = (stem_idx << 1) + 1 - is_right_child;
 
                 let mut rd = rd;
                 let old_off = off[split_dim];
