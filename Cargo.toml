@@ -120,7 +120,7 @@ optional = true
 [features]
 csv = ["dep:csv"]
 default = ["tracing"]
-eytzinger = []
+modified_van_emde_boas = []
 f16 = ["dep:half"]
 global_allocate = []
 las = ["dep:las"]
@@ -198,7 +198,7 @@ required-features = ["csv"]
 [[example]]
 name = "half"
 path = "examples/half.rs"
-required-features = ["half"]
+required-features = ["f16"]
 
 [[example]]
 name = "immutable-large"

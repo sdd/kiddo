@@ -1,5 +1,41 @@
 # Kiddo Changelog
 
+## [5.0.0] - 2024-11-18
+
+Version 5 bundles a complete re-write of [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) alongside some rationalization of feature names and a change of type of the `max_qty` parameter present in some query methods from `usize` to `NonZero<usize>`.
+
+### `ImmutableKdTree` rewrite
+
+**BREAKING CHANGE**: For anyone that has been serializing `ImmutableKdTree` (using either `serde` or `rkyv`), version 5 constitutes a breaking change as serialized trees from prior versions will not be deserializable with v5 and vice-versa.
+
+Many people (https://github.com/sdd/kiddo/issues/172, https://github.com/sdd/kiddo/issues/158, https://github.com/sdd/kiddo/issues/78) had previously unsuccessfully tried to use `ImmutableKdTree` with data containing many points that have the same value on one or more of their axes, for example point cloud data containing many points on a flat axis-aligned plane.
+The v5 rewrite of `ImmutableKdTree` experiences none of these kinds of problems and can be safely used no matter what your data looks like.
+Query performance is in many cases faster than the prior version, but sometimes slightly slower - your mileage may vary but differences in query performance is pretty small.
+Construction performance is considerably improved, with up to a 2x speedup, with the improvement becoming more pronounced as the tree size increases.
+Memory efficiency is slightly better also.
+
+Behind-the-scenes, the structure of the `ImmutableKdTree` has changed from using a Vec of fixed-size array-based buckets to using a single array-of-vecs to store all of the points, with per-bucket offsets being stored for each leaf. To avoid dynamic allocation at query time, a fixed slice that chunks the bucket is used, permitting autovectorization to work well and giving the opportunity for manual SIMD to be used on the fixed-length slice. Trailing values beyond the last full slice are processed individually.
+
+### Modified van Emde Boas Stem Ordering
+
+The experimental `modified_van_emde_boas` feature allows an alternative stem node ordering mode to be enabled.
+When enabled, the ordering of stem nodes changes from using Eytzinger ordering to a modified van Emde Boas (can I call this a Donnelly ordering? :-p) order.
+This is a novel implementation unique to Kiddo v5 that ensures that a cache line only needs to be retrieved at most once every three levels (on most CPUs when using f64), or every four levels (on most CPUs when using f32). This increases by an extra one level on CPU architectures with a 128-byte cache line width (this is quite rara at the moment but can be found on some Apple M3 and newer CPUs).
+Previous literature has indicated that a standard van Emde Boas layout provided no advantage, but thanks to an efficient branchless implementation of the stem ordering logic, and a refinement to leave the last slot on each cache line empty, rather than straddling levels across cache lines, cache efficiency is improved to the point where gains can sometimes be seen over the previously-best Eytzinger layout.
+Typically performance varies from between 1% faster an 5% slower than Eytzinger, from what I've seen during testing, with the differences often being statistically insignificant.
+
+### Feature name changes
+
+**BREAKING CHANGE**: It was pointed out in https://github.com/sdd/kiddo/issues/159 that it was necessary to enable both `rkyv` and `serialize_rkyv` features to use Rkyv serialization. I took the opportunity of the major version bump to rationalize the feature names to make them easier to use.
+`serialize_rkyv` has been removed and now only `rkyv` feature is needed to enable Rkyv serialization.
+`serialize` has been renamed to `serde` in line with ecosystem conventions.
+`half` has been renamed to `f16` for clarity.
+
+### `max_qty` Changed to `NonZero<usize>`
+
+**BREAKING CHANGE**: It was noted by [@ezrasingh](https://github.com/sdd/kiddo/issues/168#issuecomment-2335183999) that specifying `max_qty` as `0` in version 4.2.1 alongside `sorted = false` resulted in a panic. Since requesting a `max_qty` of zero makes no sense, and to avoid adding a run-time check for users who have no possibility of specifying a `max_qty` of `0`, the type of `max_qty` has been changed to `NonZero<usize>` to make this a compile-time check instead.
+
+
 ## [4.2.1] - 2024-08-17
 
 ### Chore

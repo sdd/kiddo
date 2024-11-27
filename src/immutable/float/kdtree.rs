@@ -15,9 +15,8 @@ use std::cmp::PartialEq;
 use std::fmt::Debug;
 
 use crate::float_leaf_slice::leaf_slice::{LeafSlice, LeafSliceFloat};
-use crate::modified_van_emde_boas::{
-    modified_van_emde_boas_get_child_idx_v2, modified_van_emde_boas_get_child_idx_v2_branchless,
-};
+#[cfg(feature = "modified_van_emde_boas")]
+use crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -122,21 +121,26 @@ where
         let item_count = source.len();
         let leaf_node_count = item_count.div_ceil(B);
 
-        #[cfg(feature = "eytzinger")]
-        let mut stem_node_count = leaf_node_count.next_power_of_two();
+        #[cfg(not(feature = "modified_van_emde_boas"))]
+        let stem_node_count = if leaf_node_count < 2 {
+            0
+        } else {
+            leaf_node_count.next_power_of_two()
+        };
 
-        #[cfg(not(feature = "eytzinger"))]
+        #[cfg(feature = "modified_van_emde_boas")]
         let stem_node_count = if leaf_node_count < 2 {
             0
         } else {
             leaf_node_count.next_power_of_two() - 1
         };
+
         let max_stem_level: isize = leaf_node_count.next_power_of_two().ilog2() as isize - 1;
 
         // TODO: It would be nice to be able to determine the exact required length up-front.
         //  Instead, we just trim the stems afterwards by traversing right-child non-inf nodes
         //  till we hit max level to get the max used stem
-        #[cfg(not(feature = "eytzinger"))]
+        #[cfg(feature = "modified_van_emde_boas")]
         let stem_node_count = stem_node_count * 5;
 
         let mut stems = avec![A::infinity(); stem_node_count];
@@ -155,9 +159,9 @@ where
                 leaf_items.push(sort_index[i].az::<T>())
             });
         } else {
-            #[cfg(feature = "eytzinger")]
+            #[cfg(not(feature = "modified_van_emde_boas"))]
             let initial_stem_idx = 1;
-            #[cfg(not(feature = "eytzinger"))]
+            #[cfg(feature = "modified_van_emde_boas")]
             let initial_stem_idx = 0;
 
             Self::populate_recursive(
@@ -175,7 +179,7 @@ where
             );
 
             // trim unneeded stems
-            #[cfg(not(feature = "eytzinger"))]
+            #[cfg(feature = "modified_van_emde_boas")]
             if !stems.is_empty() {
                 let mut level = 0;
                 let mut stem_idx = 0;
@@ -258,14 +262,16 @@ where
             stems[stem_index] = source[sort_index[pivot]][dim];
         }
 
-        #[cfg(not(feature = "eytzinger"))]
-        let left_child_idx = modified_van_emde_boas_get_child_idx_v2(stem_index, false, level);
-        #[cfg(not(feature = "eytzinger"))]
-        let right_child_idx = modified_van_emde_boas_get_child_idx_v2(stem_index, true, level);
+        #[cfg(feature = "modified_van_emde_boas")]
+        let left_child_idx =
+            modified_van_emde_boas_get_child_idx_v2_branchless(stem_index, false, level);
+        #[cfg(feature = "modified_van_emde_boas")]
+        let right_child_idx =
+            modified_van_emde_boas_get_child_idx_v2_branchless(stem_index, true, level);
 
-        #[cfg(feature = "eytzinger")]
+        #[cfg(not(feature = "modified_van_emde_boas"))]
         let left_child_idx = stem_index << 1;
-        #[cfg(feature = "eytzinger")]
+        #[cfg(not(feature = "modified_van_emde_boas"))]
         let right_child_idx = (stem_index << 1) + 1;
 
         let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);

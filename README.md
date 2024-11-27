@@ -19,9 +19,9 @@ Kiddo provides:
  - Its standard floating point k-d tree, exposed as [`kiddo::KdTree`](`crate::KdTree`)
  - An [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) with space and performance advantages over the standard
    k-d tree, for situations where the tree does not need to be modified after creation
- - **integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) library;
+ - **Integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) library;
  - **`f16` support** via the [`half`](https://docs.rs/half/latest/half/) library; 
- - **instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
+ - **Instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
 
 ## Usage
 Add `kiddo` to `Cargo.toml`
@@ -72,6 +72,42 @@ The Kiddo crate exposes the following features. Any labelled as **(NIGHTLY)** ar
 * `global_allocate` **(NIGHTLY)** -  When enabled Kiddo will use the unstable allocator_api feature within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) to get a slight performance improvement when allocating space for leaves.
 * `simd` **(NIGHTLY)** - enables some hand-written SIMD intrinsic code within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) that may improve performance (currently only on the nearest_one method when using `f64`)
 * `f16` - enables usage of `f16` from the `half` crate for float trees.
+* `csv` and `las` features are only required for building some of the examples.
+* `tracing` feature is enabled by default and adds some tracing output.
+* `modified_van_emde_boas`: disabled by default. Enabling will switch the stem node ordering from Eytzinger to a modified Van Emde Boas ordering that may in some circumstances be slightly faster.
+
+
+## v5.x
+
+Version 5 bundles a complete re-write of [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) alongside some rationalization of feature names and a change of type of the `max_qty` parameter present in some query methods from `usize` to `NonZero<usize>`.
+
+### `ImmutableKdTree` rewrite
+
+Many people had previously unsuccessfully tried to use `ImmutableKdTree` with data containing many points that have the same value on one or more of their axes, for example point cloud data containing many points on a flat axis-aligned plane.
+The v5 rewrite of `ImmutableKdTree` experiences none of these kinds of problems and can be safely used no matter what your data looks like.
+Query performance is in many cases faster than the prior version, but sometimes slightly slower - your mileage may vary but differences in query performance is pretty small.
+Construction performance is considerably improved, with up to a 2x speedup, with the improvement becoming more pronounced as the tree size increases.
+Memory efficiency is slightly better also.
+
+### Modified van Emde Boas Stem Ordering
+
+The experimental `modified_van_emde_boas` feature allows an alternative stem node ordering mode to be enabled. This mode is more cache-friendly. Under the standard Eytzinger ordering, a new cache line will be fetched for almost every level traversed within the stem nodes beyond the third level. The Modified van Emde Boas ordering is more cache efficient - meaning that on CPU architectures with a 64-byte cache line (ie almost all of them in servers, desktops and laptops), a cache line needs fetching only once every 3 stem levels for f64, and every 4 levels for f32.
+On architectures with a 128-byte cache lines (some Apple M3 and newer at the moment), this is every 4 levels for f64 and every 5 levels for f32.
+The downside is that logic to calculate the next stem index is significantly more complex than with the Eytzinger layout, requiring around 10 integer ops (one being a divide) vs just one integer op (a shift) for Eytzinger.
+Right now the performance when using `modified_van_emde_boas` is between 1% faster and 5% slower than standard, at least on the machines that I've tested it on.
+I'd love to hear how it fares on a machine with a 128-byte cache line width, if anyone cares to try it. I'm continuing to work on the performance of this and perhaps one day it may end up faster than Eytzinger if I can optimise the logic well enough - the initial implementation required 24 operations, so progress has been made.
+
+### Feature name changes
+
+It was pointed out in https://github.com/sdd/kiddo/issues/159 that it was necessary to anable both `rkyv` and `serialize_rkyv` features to use Rkyv serialization. I took the opportunity of the major version bump to rationalize the feature names to make them easier to use.
+`serialize_rkyv` has been removed and now only `rkyv` feature is needed to enable Rkyv serialization.
+`serialize` has been renamed to `serde` in line with ecosystem conventions.
+`half` has been renamed to `f16` for clarity.
+
+### `max_qty` Changed to `NonZero<usize>`
+
+It was noted by [@ezrasingh](https://github.com/sdd/kiddo/issues/168#issuecomment-2335183999) that specifying `max_qty` as zero in version 4.2.1 alongside `sorted = false` resulted in a panic. Since requesting a `max_qty` of zero makes no sense, and to avoid adding a run-time check, the type of `max_qty` has been changed to `NonZero<usize>` to make this a compile-time check instead.
+
 
 ## v3.x
 
