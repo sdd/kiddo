@@ -17,14 +17,14 @@ use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializ
 use rkyv::ser::Serializer;
 use rkyv::{AlignedVec, Infallible};
 
-use kiddo::ImmutableKdTree;
+use kiddo::immutable::float::kdtree::{ImmutableKdTree, ImmutableKdTreeRK};
 
 const BUFFER_LEN: usize = 300_000_000;
 const SCRATCH_LEN: usize = 300_000_000;
 
 const NUM_ITEMS: usize = 50_000_000;
 
-type Tree = ImmutableKdTree<f64, 3>;
+type Tree = ImmutableKdTree<f64, u32, 3, 256>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "tracing")]
@@ -51,6 +51,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Nearest item to query: {:?}", nearest_neighbour.item);
 
     let start = Instant::now();
+
+    let tree_rk: ImmutableKdTreeRK<f64, u32, 3, 256> = tree.into();
+
     let mut serialize_buffer = AlignedVec::with_capacity(BUFFER_LEN);
     let mut serialize_scratch = AlignedVec::with_capacity(SCRATCH_LEN);
     unsafe {
@@ -63,7 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Infallible,
     );
     serializer
-        .serialize_value(&tree)
+        .serialize_value(&tree_rk)
         .expect("Could not serialize with rkyv");
 
     let buf = serializer.into_serializer().into_inner();

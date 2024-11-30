@@ -8,9 +8,10 @@ use tracing::Level;
 #[cfg(feature = "tracing")]
 use tracing_subscriber::fmt;
 
-use kiddo::{ImmutableKdTree, SquaredEuclidean};
+use kiddo::immutable::float::kdtree::AlignedArchivedImmutableKdTree;
+use kiddo::SquaredEuclidean;
 
-type Tree = ImmutableKdTree<f64, 3>;
+type Tree<'a> = AlignedArchivedImmutableKdTree<'a, f64, u32, 3, 256>;
 
 fn main() -> Result<(), Box<dyn Error>>
 where
@@ -28,12 +29,7 @@ where
     let buf =
         unsafe { MmapOptions::new().map(&File::open("./examples/immutable-test-tree.rkyv")?)? };
 
-    // zero-copy deserialize
-    let tree = unsafe { rkyv::archived_root::<Tree>(&buf) };
-    println!(
-        "Memmap ZC Deserialized rkyv file back into a kd-tree ({})",
-        ElapsedDuration::new(start.elapsed())
-    );
+    let tree: Tree = AlignedArchivedImmutableKdTree::from_bytes(&buf);
 
     // perform a query
     let nearest_neighbour = tree.nearest_one::<SquaredEuclidean>(&query);

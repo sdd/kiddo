@@ -4,11 +4,10 @@ use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 
+use kiddo::immutable::float::kdtree::{ImmutableKdTree, ImmutableKdTreeRK};
 use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
 use rkyv::ser::Serializer;
 use rkyv::{AlignedVec, Infallible};
-
-use kiddo::ImmutableKdTree;
 
 const BUFFER_LEN: usize = 300_000;
 const SCRATCH_LEN: usize = 300_000;
@@ -16,7 +15,9 @@ const SCRATCH_LEN: usize = 300_000;
 fn main() -> Result<(), Box<dyn Error>> {
     // build and serialize small tree for ArchivedImmutableKdTree doctests
     let content: Vec<[f64; 3]> = vec![[1.0, 2.0, 5.0], [2.0, 3.0, 6.0]];
-    let tree: ImmutableKdTree<f64, 3> = ImmutableKdTree::new_from_slice(&content);
+    let tree: ImmutableKdTree<f64, u32, 3, 256> = ImmutableKdTree::new_from_slice(&content);
+
+    let rk_tree: ImmutableKdTreeRK<f64, u32, 3, 256> = tree.into();
 
     let mut serialize_buffer = AlignedVec::with_capacity(BUFFER_LEN);
     let mut serialize_scratch = AlignedVec::with_capacity(SCRATCH_LEN);
@@ -30,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Infallible,
     );
     serializer
-        .serialize_value(&tree)
+        .serialize_value(&rk_tree)
         .expect("Could not serialize with rkyv");
 
     let buf = serializer.into_serializer().into_inner();
