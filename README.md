@@ -10,7 +10,7 @@
 * [Change Log](https://github.com/sdd/kiddo/blob/master/CHANGELOG.md)
 * [License](#license)
 
-Kiddo is ideal for super-fast spatial / geospatial lookups and nearest-neighbour / KNN queries for low-ish numbers of dimensions, where you want to ask questions such as:
+Kiddo is ideal for superfast spatial / geospatial lookups and nearest-neighbour / KNN queries for low-ish numbers of dimensions, where you want to ask questions such as:
  - Find the [nearest_n](https://docs.rs/kiddo/latest/kiddo/float/kdtree/struct.KdTree.html#method.nearest_n) item(s) to a query point, ordered by distance;
  - Find all items [within](https://docs.rs/kiddo/latest/kiddo/float/kdtree/struct.KdTree.html#method.within) a specified radius of a query point;
  - Find the ["best" n item(s) within](https://docs.rs/kiddo/latest/kiddo/float/kdtree/struct.KdTree.html#method.best_n_within) a specified distance of a query point, for some definition of "best".
@@ -30,7 +30,7 @@ Add `kiddo` to `Cargo.toml`
 kiddo = "4.2.0"
 ```
 
-Add points to kdtree and query nearest n points with distance function
+Add points to kd-tree and query nearest n points with distance function
 ```rust
 use kiddo::{KdTree, SquaredEuclidean};
 
@@ -55,7 +55,7 @@ assert_eq!(nearest.item, 0);
 
 
 // find the nearest 3 items to [0f64, 0f64]
-// // returns an Vec of kiddo::NearestNeighbour
+// returns a Vec of kiddo::NearestNeighbour
 let nearest_n: Vec<_> = tree.nearest_n::<SquaredEuclidean>(&[0f64, 0f64], 3);
 assert_eq!(
     nearest_n.iter().map(|x|(x.distance, x.item)).collect::<Vec<_>>(),
@@ -108,6 +108,16 @@ It was pointed out in https://github.com/sdd/kiddo/issues/159 that it was necess
 
 It was noted by [@ezrasingh](https://github.com/sdd/kiddo/issues/168#issuecomment-2335183999) that specifying `max_qty` as zero in version 4.2.1 alongside `sorted = false` resulted in a panic. Since requesting a `max_qty` of zero makes no sense, and to avoid adding a run-time check, the type of `max_qty` has been changed to `NonZero<usize>` to make this a compile-time check instead.
 
+### `ImmutableKdTree` + `rkyv`
+
+The v5 `ImmutableKdTree` uses an Aligned Vec internally for storing stem nodes. It is not possible to zero-copy deserialize
+into an Aligned Vec with `rkyv` as there is no guarantee that the stem vec in the underlying buffer respects the alignment.
+As such, unfortunately this means that `ImmutableKdTree` itself can't be fully zero-copy serialized / deserialized, but there
+are some related types that are provided that allow zero-copy deserialization to be performed for all other parts of the tree
+except for the stems, which themselves get copied into an aligned array from the buffer.
+In practice this is still very fast as the stems are only a very small part of the overall tree.
+
+See `immutable-rkyv-serialize` and `immutable-rkyv-deserialize` in the examples for how to do this.
 
 ## v3.x
 

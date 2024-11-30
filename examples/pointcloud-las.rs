@@ -9,10 +9,10 @@ use std::fs::File;
 use std::io::Write;
 use std::time::Instant;
 
-use kiddo::ImmutableKdTree;
 use kiddo::SquaredEuclidean;
 use las::Reader;
 
+use kiddo::immutable::float::kdtree::{ImmutableKdTree, ImmutableKdTreeRK};
 use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
 use rkyv::ser::Serializer;
 use rkyv::{AlignedVec, Infallible};
@@ -22,7 +22,7 @@ use tracing_subscriber::fmt;
 const BUFFER_LEN: usize = 10_000_000_000;
 const SCRATCH_LEN: usize = 1_000_000_000;
 
-type Tree = ImmutableKdTree<f32, 3>;
+type Tree = ImmutableKdTree<f32, u32, 3, 64>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "tracing")]
@@ -78,6 +78,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn serialize_to_rkyv(file: &mut File, tree: Tree) {
+    let tree_rk: ImmutableKdTreeRK<f32, u32, 3, 64> = tree.into();
+
     let mut serialize_buffer = AlignedVec::with_capacity(BUFFER_LEN);
     let mut serialize_scratch = AlignedVec::with_capacity(SCRATCH_LEN);
 
@@ -91,7 +93,7 @@ fn serialize_to_rkyv(file: &mut File, tree: Tree) {
     );
 
     serializer
-        .serialize_value(&tree)
+        .serialize_value(&tree_rk)
         .expect("Could not serialize with rkyv");
 
     let buf = serializer.into_serializer().into_inner();

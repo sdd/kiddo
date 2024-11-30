@@ -10,7 +10,7 @@ use std::io::Write;
 use std::time::Instant;
 
 use csv::Reader;
-use kiddo::ImmutableKdTree;
+use kiddo::immutable::float::kdtree::{ImmutableKdTree, ImmutableKdTreeRK};
 use kiddo::SquaredEuclidean;
 use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
 use rkyv::ser::Serializer;
@@ -30,7 +30,7 @@ struct Point {
     z: f64,
 }
 
-type Tree = ImmutableKdTree<f64, 3>;
+type Tree = ImmutableKdTree<f64, u32, 3, 64>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "tracing")]
@@ -86,6 +86,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn serialize_to_rkyv(file: &mut File, tree: Tree) {
+    let tree_rk: ImmutableKdTreeRK<f64, u32, 3, 64> = tree.into();
+
     let mut serialize_buffer = AlignedVec::with_capacity(BUFFER_LEN);
     let mut serialize_scratch = AlignedVec::with_capacity(SCRATCH_LEN);
 
@@ -99,7 +101,7 @@ fn serialize_to_rkyv(file: &mut File, tree: Tree) {
     );
 
     serializer
-        .serialize_value(&tree)
+        .serialize_value(&tree_rk)
         .expect("Could not serialize with rkyv");
 
     let buf = serializer.into_serializer().into_inner();

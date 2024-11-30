@@ -49,21 +49,23 @@ where
 }
 
 #[cfg(feature = "rkyv")]
-use crate::immutable::float::kdtree::ArchivedImmutableKdTree;
+use crate::immutable::float::kdtree::AlignedArchivedImmutableKdTree;
 #[cfg(feature = "rkyv")]
 impl<
         A: Axis + rkyv::Archive<Archived = A>,
         T: Content + rkyv::Archive<Archived = T>,
         const K: usize,
         const B: usize,
-    > ArchivedImmutableKdTree<A, T, K, B>
+    > AlignedArchivedImmutableKdTree<'_, A, T, K, B>
 {
     generate_immutable_float_within!(
         "use std::fs::File;
-use memmap::MmapOptions;
+    use memmap::MmapOptions;
 
-let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
-let tree = unsafe { rkyv::archived_root::<ImmutableKdTree<f64, 3>>(&mmap) };"
+    use kiddo::immutable::float::kdtree::AlignedArchivedImmutableKdTree;
+
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
+    let tree: AlignedArchivedImmutableKdTree<f64, u32, 3, 256> = AlignedArchivedImmutableKdTree::from_bytes(&mmap);"
     );
 }
 
