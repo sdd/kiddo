@@ -21,7 +21,7 @@ use super::f64_avx2::get_best_from_dists_f64_avx2;
 // use super::f64_avx512::get_best_from_dists_f64_avx512;
 
 use super::fallback::{
-    get_best_from_dists_autovec, update_best_dists_within_autovec,
+    update_best_dists_within_autovec, update_nearest_dist_autovec,
     update_nearest_dists_within_autovec,
 };
 
@@ -310,7 +310,7 @@ where
                     get_best_from_dists_f64_avx2(&acc, items, best_dist, best_item)
                 }
             } else {
-                get_best_from_dists_autovec(&acc, items, best_dist, best_item)
+                update_nearest_dist_autovec(&acc, items, best_dist, best_item)
             }
         }
 
@@ -319,7 +319,7 @@ where
             not(any(target_arch = "x86", target_arch = "x86_64"))
         ))]
         {
-            get_best_from_dists_autovec(&acc, items, best_dist, best_item)
+            update_nearest_dist_autovec(&acc, items, best_dist, best_item)
         }
     }
 
@@ -390,7 +390,7 @@ where
                     get_best_from_dists_f32_avx2(&acc, items, best_dist, best_item)
                 }
             } else {*/
-            get_best_from_dists_autovec(&acc, items, best_dist, best_item)
+            update_nearest_dist_autovec(&acc, items, best_dist, best_item)
             //}
         }
 
@@ -399,7 +399,7 @@ where
             not(any(target_arch = "x86", target_arch = "x86_64"))
         ))]
         {
-            get_best_from_dists_autovec(&acc, items, best_dist, best_item)
+            update_nearest_dist_autovec(&acc, items, best_dist, best_item)
         }
     }
 

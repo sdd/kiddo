@@ -5,8 +5,8 @@ use crate::float::result_collection::ResultCollection;
 use crate::{float::kdtree::Axis, types::Content, BestNeighbour, NearestNeighbour};
 
 #[inline]
-pub(crate) fn get_best_from_dists_autovec<A: Axis, T: Content>(
-    acc: &[A],
+pub(crate) fn update_nearest_dist_autovec<A: Axis, T: Content>(
+    dists: &[A],
     items: &[T],
     best_dist: &mut A,
     best_item: &mut T,
@@ -15,7 +15,7 @@ pub(crate) fn get_best_from_dists_autovec<A: Axis, T: Content>(
 {
     // Autovectorizes with 256bit vectors on x86_64 where available
     // 341 loops (1 item per loop, unrolled x 3) of 4-8 instructions per item
-    let (leaf_best_item, leaf_best_dist) = acc
+    let (leaf_best_item, leaf_best_dist) = dists
         .iter()
         .enumerate()
         .min_by(|(_, &a), (_, b)| a.partial_cmp(b).unwrap())
@@ -41,13 +41,10 @@ pub(crate) fn update_nearest_dists_within_autovec<A: Axis, T: Content, R>(
     // TODO: Optimise with Godbolt
     dists
         .iter()
-        .enumerate()
-        .filter(|(_, &distance)| distance < radius)
-        .for_each(|(idx, &distance)| {
-            results.add(NearestNeighbour {
-                distance,
-                item: *unsafe { items.get_unchecked(idx) },
-            });
+        .zip(items.iter())
+        .filter(|(&distance, _)| distance <= radius)
+        .for_each(|(&distance, &item)| {
+            results.add(NearestNeighbour { distance, item });
         });
 }
 
@@ -64,10 +61,9 @@ pub(crate) fn update_best_dists_within_autovec<A: Axis, T: Content>(
     // TODO: Optimise with Godbolt
     dists
         .iter()
-        .enumerate()
-        .filter(|(_, &distance)| distance <= radius)
-        .for_each(|(idx, &distance)| {
-            let item = *unsafe { items.get_unchecked(idx) };
+        .zip(items.iter())
+        .filter(|(&distance, _)| distance <= radius)
+        .for_each(|(&distance, &item)| {
             if results.len() < max_qty {
                 results.push(BestNeighbour { distance, item });
             } else {
@@ -78,4 +74,105 @@ pub(crate) fn update_best_dists_within_autovec<A: Axis, T: Content>(
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::float_leaf_slice::fallback::{
+        update_best_dists_within_autovec, update_nearest_dist_autovec,
+        update_nearest_dists_within_autovec,
+    };
+    use crate::{BestNeighbour, NearestNeighbour};
+    use std::collections::BinaryHeap;
+
+    #[test]
+    fn test_get_best_from_dists_autovec_leaves_best_unchanged_when_not_better() {
+        let dists = vec![10000f64, 20000f64, 20f64];
+        let items = vec![1u32, 3u32, 5u32];
+
+        let mut best_dist = 10f64;
+        let mut best_item = 12345u32;
+
+        update_nearest_dist_autovec(&dists[..], &items[..], &mut best_dist, &mut best_item);
+
+        assert_eq!(best_dist, 10f64);
+        assert_eq!(best_item, 12345u32);
+    }
+
+    #[test]
+    fn test_get_best_from_dists_autovec_updates_best_when_closer_dist_present() {
+        let dists = vec![10000f64, 20000f64, 2f64];
+        let items = vec![1u32, 3u32, 5u32];
+
+        let mut best_dist = 10f64;
+        let mut best_item = 12345u32;
+
+        update_nearest_dist_autovec(&dists[..], &items[..], &mut best_dist, &mut best_item);
+
+        assert_eq!(best_dist, 2f64);
+        assert_eq!(best_item, 5u32);
+    }
+
+    #[test]
+    fn test_update_nearest_dists_within_autovec_leaves_nearest() {
+        let dists = vec![10000f64, 20000f64, 20f64];
+        let items = vec![1u32, 3u32, 5u32];
+
+        let radius = 200f64;
+
+        let mut results = vec![NearestNeighbour {
+            distance: 10f64,
+            item: 100u32,
+        }];
+
+        update_nearest_dists_within_autovec(&dists[..], &items[..], radius, &mut results);
+
+        assert_eq!(
+            results,
+            vec![
+                NearestNeighbour {
+                    distance: 10f64,
+                    item: 100u32
+                },
+                NearestNeighbour {
+                    distance: 20f64,
+                    item: 5u32
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn test_update_best_dists_within_autovec_leaves_nearest() {
+        let dists = vec![10000f64, 20000f64, 20f64, 15f64];
+        let items = vec![1u32, 3u32, 5u32, 7u32];
+
+        let radius = 200f64;
+
+        let max_qty = 2usize;
+
+        let mut results = BinaryHeap::new();
+        results.push(BestNeighbour {
+            distance: 10f64,
+            item: 100u32,
+        });
+
+        update_best_dists_within_autovec(&dists[..], &items[..], radius, max_qty, &mut results);
+
+        let results = results.into_vec();
+
+        assert_eq!(
+            results,
+            vec![
+                BestNeighbour {
+                    distance: 15f64,
+                    item: 7u32
+                },
+                BestNeighbour {
+                    distance: 20f64,
+                    item: 5u32
+                },
+            ]
+        );
+    }
 }
