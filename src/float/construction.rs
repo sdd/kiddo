@@ -1,6 +1,6 @@
 use crate::float::kdtree::{Axis, KdTree, LeafNode, StemNode};
 use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
-use crate::types::{is_stem_index, Content, Index};
+use crate::traits::{is_stem_index, Content, Index};
 use az::{Az, Cast};
 use std::ops::Rem;
 

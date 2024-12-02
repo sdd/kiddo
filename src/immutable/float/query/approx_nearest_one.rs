@@ -1,8 +1,8 @@
-use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::types::Content;
+use crate::traits::Content;
+use crate::traits::DistanceMetric;
 use az::Cast;
 
 use crate::generate_immutable_approx_nearest_one;

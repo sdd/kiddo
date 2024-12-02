@@ -5,8 +5,8 @@
 // #[cfg(any(target_arch = "x86_64"))]
 // use std::arch::x86_64::*;
 
-use crate::distance_metric::DistanceMetric;
 use crate::fixed::kdtree::Axis;
+use crate::traits::DistanceMetric;
 
 /// Returns the squared euclidean distance between two points. When you only
 /// need to compare distances, rather than having the exact distance between
@@ -18,7 +18,7 @@ use crate::fixed::kdtree::Axis;
 /// ```rust
 /// use fixed::types::extra::U0;
 /// use fixed::FixedU16;
-/// use kiddo::distance_metric::DistanceMetric;
+/// use kiddo::traits::DistanceMetric;
 /// use kiddo::fixed::distance::Manhattan;
 /// type Fxd = FixedU16<U0>;
 ///
@@ -67,7 +67,7 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
 /// ```rust
 /// use fixed::types::extra::U0;
 /// use fixed::FixedU16;
-/// use kiddo::distance_metric::DistanceMetric;
+/// use kiddo::traits::DistanceMetric;
 /// use kiddo::fixed::distance::SquaredEuclidean;
 /// type Fxd = FixedU16<U0>;
 ///

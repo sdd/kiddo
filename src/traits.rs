@@ -110,7 +110,7 @@ pub(crate) fn is_stem_index<IDX: Index<T = IDX>>(x: IDX) -> bool {
 #[cfg(test)]
 mod tests {
 
-    use crate::types::Index;
+    use crate::traits::Index;
 
     #[test]
     fn test_u16() {
@@ -142,4 +142,20 @@ mod tests {
             ((u32::MAX - u32::MAX.overflowing_shr(1).0) as u32).saturating_mul(bucket_size);
         assert_eq!(capacity_with_bucket_size, u32::MAX);
     }
+}
+
+/// Trait that needs to be implemented by any potential distance
+/// metric to be used within queries
+pub trait DistanceMetric<A, const K: usize> {
+    /// returns the distance between two K-d points, as measured
+    /// by a particular distance metric
+    fn dist(a: &[A; K], b: &[A; K]) -> A;
+
+    /// returns the distance between two points along a single axis,
+    /// as measured by a particular distance metric.
+    ///
+    /// (needs to be implemented as it is used by the NN query implementations
+    /// to extend the min acceptable distance for a node when recursing
+    /// back up the tree)
+    fn dist1(a: A, b: A) -> A;
 }

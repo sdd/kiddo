@@ -1,9 +1,9 @@
-use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
 use crate::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::types::Content;
+use crate::traits::Content;
+use crate::traits::DistanceMetric;
 use az::Cast;
 use std::num::NonZero;
 
@@ -74,10 +74,10 @@ impl<
 
 #[cfg(test)]
 mod tests {
-    use crate::distance_metric::DistanceMetric;
     use crate::float::distance::SquaredEuclidean;
     use crate::float::kdtree::Axis;
     use crate::immutable::float::kdtree::ImmutableKdTree;
+    use crate::traits::DistanceMetric;
     use az::{Az, Cast};
     use rand::Rng;
     use std::num::NonZero;

@@ -1,5 +1,5 @@
 //! A result item returned by a query
-use crate::types::Content;
+use crate::traits::Content;
 use std::cmp::Ordering;
 
 /// Represents an entry in the results of a "best" query, with `distance` being the distance of this

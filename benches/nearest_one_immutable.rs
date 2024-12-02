@@ -10,7 +10,7 @@ use kiddo::immutable::float::kdtree::{Axis, ImmutableKdTree};
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_immutable_float, process_queries_immutable_float,
 };
-use kiddo::types::Content;
+use kiddo::traits::Content;
 use rand::distributions::Standard;
 use rand_distr::Distribution;
 

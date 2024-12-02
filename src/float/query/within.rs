@@ -1,9 +1,9 @@
 use az::Cast;
 
-use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::{Axis, KdTree};
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::types::{Content, Index};
+use crate::traits::DistanceMetric;
+use crate::traits::{Content, Index};
 
 use crate::generate_within;
 
@@ -69,10 +69,10 @@ let tree = unsafe { rkyv::archived_root::<KdTree<f64, 3>>(&mmap) };"
 
 #[cfg(test)]
 mod tests {
-    use crate::distance_metric::DistanceMetric;
     use crate::float::distance::Manhattan;
     use crate::float::kdtree::{Axis, KdTree};
     use crate::nearest_neighbour::NearestNeighbour;
+    use crate::traits::DistanceMetric;
     use rand::Rng;
     use std::cmp::Ordering;
 

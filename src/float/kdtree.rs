@@ -10,7 +10,7 @@ use std::fmt::Debug;
 
 use crate::{
     iter::{IterableTreeData, TreeIter},
-    types::{Content, Index},
+    traits::{Content, Index},
 };
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

@@ -2,10 +2,10 @@ use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
-use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::{Axis, KdTree};
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::types::{is_stem_index, Content, Index};
+use crate::traits::DistanceMetric;
+use crate::traits::{is_stem_index, Content, Index};
 
 use crate::generate_nearest_n;
 
@@ -70,9 +70,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::distance_metric::DistanceMetric;
     use crate::float::distance::SquaredEuclidean;
     use crate::float::kdtree::{Axis, KdTree};
+    use crate::traits::DistanceMetric;
     use rand::Rng;
 
     type AX = f32;

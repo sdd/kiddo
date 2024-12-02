@@ -9,7 +9,7 @@ pub use crate::float::kdtree::Axis;
 use crate::float_leaf_slice::leaf_slice::{LeafSlice, LeafSliceFloat, LeafSliceFloatChunk};
 #[cfg(feature = "modified_van_emde_boas")]
 use crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
-use crate::types::Content;
+use crate::traits::Content;
 #[cfg(feature = "rkyv")]
 use aligned_vec::CACHELINE_ALIGN;
 use aligned_vec::{avec, AVec, ConstAlign};

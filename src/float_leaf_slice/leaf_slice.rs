@@ -25,8 +25,8 @@ use super::fallback::{
     update_nearest_dists_within_autovec,
 };
 
-use crate::distance_metric::DistanceMetric;
-use crate::{float::kdtree::Axis, types::Content, BestNeighbour, NearestNeighbour};
+use crate::traits::DistanceMetric;
+use crate::{float::kdtree::Axis, traits::Content, BestNeighbour, NearestNeighbour};
 
 #[doc(hidden)]
 #[allow(dead_code)]

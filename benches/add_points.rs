@@ -12,7 +12,7 @@ use kiddo::batch_benches;
 use kiddo::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
 use kiddo::float::kdtree::{Axis, KdTree};
 use kiddo::test_utils::rand_data_fixed_u16_entry;
-use kiddo::types::{Content, Index};
+use kiddo::traits::{Content, Index};
 
 const BUCKET_SIZE: usize = 32;
 const QTY_TO_ADD_TO_POPULATED: u64 = 100;

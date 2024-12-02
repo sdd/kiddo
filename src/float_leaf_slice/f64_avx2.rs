@@ -4,7 +4,7 @@ use core::arch::x86_64::{
     _mm_add_epi32, _mm_blendv_ps, _mm_maskstore_epi32, _mm_set1_epi32, _mm_set_epi32, _CMP_LT_OQ,
 };
 
-pub(crate) unsafe fn get_best_from_dists_f64_avx2<T: crate::types::Content, const B: usize>(
+pub(crate) unsafe fn get_best_from_dists_f64_avx2<T: crate::traits::Content, const B: usize>(
     acc: &[f64; B],
     items: &[T; B],
     best_dist: &mut f64,

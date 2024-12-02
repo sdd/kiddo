@@ -90,16 +90,16 @@ pub(crate) mod common;
 #[cfg(feature = "serde")]
 #[doc(hidden)]
 mod custom_serde;
-pub mod distance_metric;
 pub mod fixed;
 pub mod float;
 pub mod immutable;
 mod mirror_select_nth_unstable_by;
+#[doc(hidden)]
 pub mod nearest_neighbour;
 #[doc(hidden)]
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
-pub mod types;
+pub mod traits;
 
 mod iter;
 

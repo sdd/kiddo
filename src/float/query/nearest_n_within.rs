@@ -3,11 +3,11 @@ use sorted_vec::SortedVec;
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
-use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::{Axis, KdTree};
 use crate::float::result_collection::ResultCollection;
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::types::{is_stem_index, Content, Index};
+use crate::traits::DistanceMetric;
+use crate::traits::{is_stem_index, Content, Index};
 
 use crate::generate_nearest_n_within_unsorted;
 
@@ -76,9 +76,9 @@ let tree = unsafe { rkyv::archived_root::<KdTree<f64, 3>>(&mmap) };"
 
 #[cfg(test)]
 mod tests {
-    use crate::distance_metric::DistanceMetric;
     use crate::float::distance::SquaredEuclidean;
     use crate::float::kdtree::{Axis, KdTree};
+    use crate::traits::DistanceMetric;
     use rand::Rng;
     use std::cmp::Ordering;
     use std::num::NonZero;
