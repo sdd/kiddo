@@ -50,7 +50,7 @@ const BUCKET_SIZE: usize = 1024;
 type Tree = KdTree<f32, usize, 3, BUCKET_SIZE, u32>;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // Load in the cities data from the CSV and use it to populate a kd-tree, as per
+    // Load in the cities data from the CSV and use it to populate a k-d tree, as per
     // the cities.rs example
     let start = Instant::now();
     let cities: Vec<CityCsvRecord> = parse_csv_file("./examples/geonames.csv")?;
@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         kdtree.add(&city.as_xyz(), idx);
     });
     println!(
-        "Populated kd-tree with {} items ({})",
+        "Populated k-d tree with {} items ({})",
         kdtree.size(),
         ElapsedDuration::new(start.elapsed())
     );
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let encoder = GzEncoder::new(file, Compression::default());
     bincode::serialize_into(encoder, &kdtree)?;
     println!(
-        "Serialized kd-tree to gzipped bincode file ({})",
+        "Serialized k-d tree to gzipped bincode file ({})",
         ElapsedDuration::new(start.elapsed())
     );
 
@@ -91,7 +91,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let decompressor = GzDecoder::new(file);
     let deserialized_tree: Tree = bincode::deserialize_from(decompressor)?;
     println!(
-        "Deserialized gzipped bincode file back into a kd-tree ({})",
+        "Deserialized gzipped bincode file back into a k-d tree ({})",
         ElapsedDuration::new(start.elapsed())
     );
 
@@ -116,7 +116,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let encoder = GzEncoder::new(file, Compression::default());
     bincode::serialize_into(encoder, &kdtree)?;
     println!(
-        "Serialized kd-tree to gzipped bincode file ({})",
+        "Serialized k-d tree to gzipped bincode file ({})",
         ElapsedDuration::new(start.elapsed())
     );
 
@@ -126,7 +126,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let deserialized_tree: ImmutableKdTree<f32, u32, 3, 32> =
         bincode::deserialize_from(decompressor)?;
     println!(
-        "Deserialized gzipped bincode file back into a kd-tree ({})",
+        "Deserialized gzipped bincode file back into a k-d tree ({})",
         ElapsedDuration::new(start.elapsed())
     );
 

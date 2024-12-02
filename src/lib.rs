@@ -1,5 +1,4 @@
 #![cfg_attr(feature = "simd", feature(slice_as_chunks))]
-#![cfg_attr(feature = "global_allocate", feature(allocator_api))]
 #![warn(rustdoc::missing_crate_level_docs)]
 #![deny(rustdoc::invalid_codeblock_attributes)]
 #![warn(missing_docs)]
@@ -15,12 +14,14 @@
 //! Possibly the fastest k-d tree library in the world? [See for yourself](https://sdd.github.io/kd-tree-comparison-webapp/).
 //!
 //! Kiddo provides:
-//! - Its standard floating-point k-d tree, exposed as [`kiddo::KdTree`](`crate::KdTree`)
-//! - **integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) library;
-//! - **`f16` support** via the [`half`](https://docs.rs/half/latest/half/) library;
-//! - **instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
-//! - An [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) with space and performance advantages over the standard
+//! - A standard floating-point k-d tree, exposed as [`kiddo::KdTree`](`crate::KdTree`), for when you may need to add or remove
+//!     points to the tree after the initial construction / deserialization
+//! - An [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) with performance space and advantages over the standard
 //!   k-d tree, for situations where the tree does not need to be modified after creation
+//! - **integer / fixed point support** via the [`fixed`](https://docs.rs/fixed/latest/fixed/) crate;
+//! - **`f16` support** via the [`half`](https://docs.rs/half/latest/half/) crate;
+//! - **instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
+
 //!
 //! Kiddo is ideal for super-fast spatial / geospatial lookups and nearest-neighbour / KNN
 //! queries for low-ish numbers of dimensions, where you want to ask questions such as:
@@ -33,7 +34,7 @@
 //! Add `kiddo` to `Cargo.toml`
 //! ```toml
 //! [dependencies]
-//! kiddo = "4.2.0"
+//! kiddo = "5.0.0"
 //! ```
 //!
 //! ## Usage
@@ -75,7 +76,6 @@
 //! The Kiddo crate exposes the following features. Any labelled as **(NIGHTLY)** are not available on `stable` Rust as they require some unstable features. You'll need to build with `nightly` in order to user them.
 //! * **serde** - serialization / deserialization via [`Serde`](https://docs.rs/serde/latest/serde/)
 //! * **rkyv** - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/)
-//! * `global_allocate` **(NIGHTLY)** -  When enabled Kiddo will use the unstable allocator_api feature within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) to get a slight performance improvement when allocating space for leaves.
 //! * `simd` **(NIGHTLY)** - enables some hand written SIMD and pre-fetch intrinsics code within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) that may improve performance (currently only on nearest_one with `f64`)
 //! * `f16` - enables usage of `f16` from the `half` crate for float trees.
 
@@ -83,6 +83,7 @@
 extern crate doc_comment;
 extern crate core;
 
+#[doc(hidden)]
 pub mod best_neighbour;
 #[doc(hidden)]
 pub(crate) mod common;
@@ -102,6 +103,7 @@ pub mod types;
 
 mod iter;
 
+#[doc(hidden)]
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 pub mod within_unsorted_iter;
 
@@ -132,3 +134,4 @@ pub use best_neighbour::BestNeighbour;
 pub use float::distance::Manhattan;
 pub use float::distance::SquaredEuclidean;
 pub use nearest_neighbour::NearestNeighbour;
+pub use within_unsorted_iter::WithinUnsortedIter;

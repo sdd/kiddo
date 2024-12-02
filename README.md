@@ -30,7 +30,7 @@ Add `kiddo` to `Cargo.toml`
 kiddo = "4.2.0"
 ```
 
-Add points to kd-tree and query nearest n points with distance function
+Add points to k-d tree and query nearest n points with distance function
 ```rust
 use kiddo::{KdTree, SquaredEuclidean};
 
@@ -178,7 +178,7 @@ Each action is benchmarked against trees that contain 100, 1,000, 10,000, 100,00
 
 The benchmarks are repeated against 2d, 3d and 4d trees, as well as with points that are both of type `f32` and of type `f64`, as well as a 16-bit fixed point use case for Kiddo v2.
 
-The trees are populated with random source data whose points are all on a unit sphere. This use case is representative of common kd-tree usages in geospatial and astronomical contexts.
+The trees are populated with random source data whose points are all on a unit sphere. This use case is representative of common k-d tree usages in geospatial and astronomical contexts.
 
 
 ## License

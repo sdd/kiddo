@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // zero-copy deserialize
     let tree = unsafe { rkyv::archived_root::<Tree>(&buf) };
     println!(
-        "Memmap ZC Deserialized rkyv file back into a kd-tree ({})",
+        "Memmap ZC Deserialized rkyv file back into a k-d tree ({})",
         ElapsedDuration::new(start.elapsed())
     );
 
