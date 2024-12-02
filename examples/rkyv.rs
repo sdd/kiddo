@@ -54,7 +54,7 @@ impl CityCsvRecord {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // Load in the cities data from the CSV and use it to populate a kd-tree, as per
+    // Load in the cities data from the CSV and use it to populate a k-d tree, as per
     // the cities.rs example
     let start = Instant::now();
     let cities: Vec<CityCsvRecord> = parse_csv_file("./examples/geonames.csv")?;
@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         kdtree.add(&city.as_xyz(), idx as u64);
     });
     println!(
-        "Populated kd-tree with {} items ({})",
+        "Populated k-d tree with {} items ({})",
         kdtree.size(),
         ElapsedDuration::new(start.elapsed())
     );
@@ -86,7 +86,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut file: File = File::create("./examples/geonames-tree.rkyv")?;
     serialize_to_rkyv(&mut file, kdtree);
     println!(
-        "Serialized kd-tree to rkyv file ({})\n\n",
+        "Serialized k-d tree to rkyv file ({})\n\n",
         ElapsedDuration::new(start.elapsed())
     );
 
@@ -95,7 +95,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mmap = unsafe { MmapOptions::new().map(&File::open("./examples/geonames-tree.rkyv")?)? };
     let mm_zc_deserialized_tree = unsafe { rkyv::archived_root::<Tree>(&mmap) };
     println!(
-        "Memmap ZC Deserialized rkyv file back into a kd-tree ({})",
+        "Memmap ZC Deserialized rkyv file back into a k-d tree ({})",
         ElapsedDuration::new(start.elapsed())
     );
 
@@ -114,7 +114,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     File::open("./examples/geonames-tree.rkyv")?.read_to_end(&mut buffer)?;
     let zc_deserialized_tree = unsafe { rkyv::archived_root::<Tree>(&buffer) };
     println!(
-        "ZC Deserialized rkyv file back into a kd-tree ({})",
+        "ZC Deserialized rkyv file back into a k-d tree ({})",
         ElapsedDuration::new(start.elapsed())
     );
 
@@ -133,7 +133,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let archived = unsafe { rkyv::archived_root::<Tree>(&mmap) };
     let mm_deserialized_tree: Tree = archived.deserialize(&mut rkyv::Infallible).unwrap();
     println!(
-        "Memmap Deserialized rkyv file back into a kd-tree ({})",
+        "Memmap Deserialized rkyv file back into a k-d tree ({})",
         ElapsedDuration::new(start.elapsed())
     );
 
@@ -154,7 +154,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let archived = unsafe { rkyv::archived_root::<Tree>(&buffer) };
     let deserialized_tree: Tree = archived.deserialize(&mut rkyv::Infallible).unwrap();
     println!(
-        "Deserialized rkyv file back into a kd-tree ({})",
+        "Deserialized rkyv file back into a k-d tree ({})",
         ElapsedDuration::new(start.elapsed())
     );
 

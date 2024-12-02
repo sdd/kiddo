@@ -4,7 +4,7 @@ use serde::Deserialize;
 /// Kiddo example 1: Cities
 ///
 /// This example walks through the basics of using Kiddo to
-/// populate a kd-tree from CSV data and then use it to perform
+/// populate a k-d tree from CSV data and then use it to perform
 /// nearest neighbour (NN) and k-nearest-neighbour (KNN) queries.
 use std::error::Error;
 use std::fmt::Formatter;
@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     //    significant figures, and we are only interested in a single decimal place (and
     //    a max of 4 or 5 significant figures),  `f32` is sufficient for our use case.
     //    `f32` consumes half the space of `f64`, and using it can improve performance
-    //    since more of the internal stem nodes in the kd-tree can fit in the CPU
+    //    since more of the internal stem nodes in the k-d tree can fit in the CPU
     //    cache. If you need more precision than 7 significant figures, Kiddo supports `f64`.
     //    If your data covers a narrow dynamic range (e.g. all of the values are within
     //    a few orders of magnitude of each other) and performance (or memory usage)
@@ -90,7 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     //    to store 2^32 (around 4 billion) different indices. Using a `u16` may
     //    result in your tree using less memory, and again this can help with performance
     //    by allowing more stem nodes to fit in the CPU cache.
-    // 3) `K`: 3 - the number of dimensions that your position data has, i.e. the `k` in kd-tree.
+    // 3) `K`: 3 - the number of dimensions that your position data has, i.e. the `k` in k-d tree.
     //    this of course depends solely on the data that you are storing. Kd tree NN and KNN
     //    queries work best with lower numbers of dimensions.
     // 4) `B`: 32 - the "bucket size". Kiddo stores points on the leaf nodes of its tree,
@@ -107,13 +107,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Now we populate the newly-created empty kd tree with data about our cities.
     // Our `CityCsvRecord`s store their position as latitude and longitude, so we
     // first use the `as_xyz` method we defined in order to convert the lat/lng values
-    // into 3D xyz co-ordinates. Our kd-tree uses `u16` indices so we need to cast
+    // into 3D xyz co-ordinates. Our k-d tree uses `u16` indices so we need to cast
     // our `usize`s from `enumerate` into `u16`s for storage into the tree.
     cities.iter().enumerate().for_each(|(idx, city)| {
         kdtree.add(&city.as_xyz(), idx);
     });
 
-    println!("Loaded {} items into Kiddo kd-tree", kdtree.size());
+    println!("Loaded {} items into Kiddo k-d tree", kdtree.size());
 
     // ### find the nearest city to 52.5N, 1.9W
     // First, let's try a nearest-neighbour query. Let's say we want to
@@ -201,7 +201,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// Converts a squared euclidean unit sphere distance (like what we'd get back from
-/// our kd-tree) into kilometres for user convenience.
+/// our k-d tree) into kilometres for user convenience.
 #[allow(dead_code)]
 pub fn unit_sphere_squared_euclidean_to_kilometres(sq_euc_dist: f32) -> f32 {
     sq_euc_dist.sqrt() * EARTH_RADIUS_IN_KM
@@ -209,7 +209,7 @@ pub fn unit_sphere_squared_euclidean_to_kilometres(sq_euc_dist: f32) -> f32 {
 
 /// Converts a value in km to squared euclidean distance on a unit sphere representing Earth.
 ///
-/// This allows us to query using kilometres as distances in our kd-tree.
+/// This allows us to query using kilometres as distances in our k-d tree.
 pub fn kilometres_to_unit_sphere_squared_euclidean(km_dist: f32) -> f32 {
     (km_dist / EARTH_RADIUS_IN_KM).powi(2)
 }

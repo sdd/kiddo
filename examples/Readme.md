@@ -6,10 +6,10 @@
 
 This example uses the World Cities Database dataset, created by SimpleMaps.com and downloadable from Kaggle. You'll need to download it into this `examples` folder and unzip it in order to use these examples. You can find it here: [https://www.kaggle.com/datasets/juanmah/world-cities?resource=download&select=worldcities.csv](https://www.kaggle.com/datasets/juanmah/world-cities?resource=download&select=worldcities.csv).
 
-These examples demonstrate the creation of a kd-tree, populated by data on world cities. It demonstrates the following:
+These examples demonstrate the creation of a k-d tree, populated by data on world cities. It demonstrates the following:
 
 * Conversion of lat/long co-ordinates into 3D unit sphere co-ordinates
-* Construction and population of a Kiddo kd-tree containing the positions of the cities in the dataset
+* Construction and population of a Kiddo k-d tree containing the positions of the cities in the dataset
 * Serde-based deserialization from CSV
 * Querying the nearest single city to a specific point on Earth using `nearest_one`
 * Finding the nearest five cities to a specific pint on Earth, ordered by distance, using `nearest_n`
@@ -34,13 +34,13 @@ Rkyv for serialization / deserialization
      Running `target/release/examples/rkyv`
 Cities successfully parsed from CSV: 11061987
 Parsed 11061987 rows from the CSV: (3.97 s)
-Populated kd-tree with 11061987 items (1.19 s)
+Populated k-d tree with 11061987 items (1.19 s)
 
 Nearest city to 52.5N, 1.9W: CityCsvRecord { name: "Aston", lat: 52.5, lng: -1.88333 }
-Serialized kd-tree to rkyv file (306.00 ms)
+Serialized k-d tree to rkyv file (306.00 ms)
 
 
-Memmap ZC Deserialized rkyv file back into a kd-tree (23.31 μs)
+Memmap ZC Deserialized rkyv file back into a k-d tree (23.31 μs)
 Nearest city to 52.5N, 1.9W: CityCsvRecord { name: "Aston", lat: 52.5, lng: -1.88333 }
 total elapsed: 50.53 μs
 
@@ -64,11 +64,11 @@ The output below was run on a Ryzen 5900X with 32Gb DDR4-3600.
      Running `target/release/examples/serde`
 Cities successfully parsed from CSV: 11061987
 Parsed 11061987 rows from the CSV: (3.35 s)
-Populated kd-tree with 11061987 items (2.74 s)
+Populated k-d tree with 11061987 items (2.74 s)
 
 Nearest city to 52.5N, 1.9W: CityCsvRecord { name: "Aston", lat: 52.5, lng: -1.88333 }
-Serialized kd-tree to gzipped bincode file (5.72 s)
-Deserialized gzipped bincode file back into a kd-tree (2.71 s)
+Serialized k-d tree to gzipped bincode file (5.72 s)
+Deserialized gzipped bincode file back into a k-d tree (2.71 s)
 
 Nearest city to 52.5N, 1.9W: CityCsvRecord { name: "Aston", lat: 52.5, lng: -1.88333 }
 ```

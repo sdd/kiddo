@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     let kdtree: Tree = build_populated_tree_float(NUM_ITEMS, 0);
     println!(
-        "Populated kd-tree with {} items. Took {}",
+        "Populated k-d tree with {} items. Took {}",
         kdtree.size(),
         ElapsedDuration::new(start.elapsed())
     );
@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     serialize_to_rkyv(&mut file, kdtree);
     println!(
-        "Serialized kd-tree to rkyv file ({})\n\n",
+        "Serialized k-d tree to rkyv file ({})\n\n",
         ElapsedDuration::new(start.elapsed())
     );
 

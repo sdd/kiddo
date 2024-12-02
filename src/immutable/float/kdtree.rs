@@ -123,7 +123,7 @@ where
     }
 }
 
-/// Re-aligned Immutable kd-tree
+/// Re-aligned Immutable k-d tree
 ///
 /// Convert an ImmutableKdTreeRK into this in order to perform queries.
 /// Required because the AlignedVec used for storing stem node values cannot

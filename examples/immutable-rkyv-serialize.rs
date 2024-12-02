@@ -76,7 +76,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let file_size = file.metadata().unwrap().len().bytes();
     println!(
-        "Serialized kd-tree to rkyv file 'immutable-test-tree.rkyv' ({}). File size: {:.2}",
+        "Serialized k-d tree to rkyv file 'immutable-test-tree.rkyv' ({}). File size: {:.2}",
         ElapsedDuration::new(start.elapsed()),
         file_size
     );
