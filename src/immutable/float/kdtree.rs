@@ -1,6 +1,12 @@
-//! Immutable Floating point k-d tree. Offers less memory utilisation, smaller size
-//! when serialized, and faster more consistent query performance. This comes at the
-//! expense of not being able to modify the contents of the tree after its initial
+//! Immutable Floating point k-d tree.
+//!
+//! (Most of the structs listed in these docs are only relevant when using `rkyv` for zero-copy
+//! deserialization.
+//! The main Struct in here, [`ImmutableKdTree`], is usually what you're looking for.)
+//!
+//! [`ImmutableKdTree`] offers improved memory utilisation, smaller size
+//! when serialized, and faster more consistent query performance, when compared to [`crate::float::kdtree::KdTree`].
+//! This comes at the expense of not being able to modify the contents of the tree after its initial
 //! construction, and longer construction times - perhaps prohibitively so.
 //! As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
 //! values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
@@ -58,9 +64,9 @@ pub struct ImmutableKdTree<A: Copy + Default, T: Copy + Default, const K: usize,
     pub(crate) max_stem_level: isize,
 }
 
-/// rkyv-Archivable / Serializable version of an `ImmutableKdTree`.
+/// rkyv-Archivable / Serializable version of an [`ImmutableKdTree`].
 ///
-/// Convert an ImmutableKdTree into this in order to serialize the tree via `rkyv`.
+/// Convert an ImmutableKdTree into this in order to serialize the tree via [`rkyv`].
 /// Required because the AlignedVec used for storing stem node values cannot
 /// be zero-copy deserialized.
 #[cfg(feature = "rkyv")]
@@ -81,15 +87,15 @@ where
     T: Content,
     usize: Cast<T>,
 {
-    /// Creates an `ImmutableKdTreeRK`, from an `ImmutableKdTree`
+    /// Creates an [`ImmutableKdTreeRK`]  from an [`ImmutableKdTree`]
     ///
     ///
     /// `ImmutableKdTreeRK` implements `rkyv::Archive`, permitting it to be serialized to
-    /// as close to a zero-copy form as possible. Zero-copy-deserialized `ImmutableKdTreeRK`
-    /// instances can be converted to instances of `AlignedArchivedImmutableKdTree`, which involves
+    /// as close to a zero-copy form as possible. Zero-copy-deserialized [`ImmutableKdTreeRK`]
+    /// instances can be converted to instances of [`AlignedArchivedImmutableKdTree`], which involves
     /// a copy of the stems to ensure correct alignment, but re-use of the rest of the structure.
-    /// `AlignedArchivedImmutableKdTree` instances can then be queried in the same way as the original
-    /// `ImmutableKdTree`.
+    /// [`AlignedArchivedImmutableKdTree`] instances can then be queried in the same way as the original
+    /// [`ImmutableKdTree`].
     ///
     /// # Examples
     ///
@@ -123,12 +129,12 @@ where
     }
 }
 
-/// Re-aligned Immutable k-d tree
+/// rkyv zero-copy deserializable version of an `ImmutableKdTree`.
 ///
-/// Convert an ImmutableKdTreeRK into this in order to perform queries.
+/// Convert an `ImmutableKdTreeRK` into this in order to perform queries.
 /// Required because the AlignedVec used for storing stem node values cannot
 /// be zero-copy deserialized. You need to first zero-copy-deserialize into an
-/// ImmutableKdTreeRK and then convert that into one of these, re-aligning the stems.
+/// `ImmutableKdTreeRK` and then convert that into one of these, re-aligning the stems.
 #[cfg(feature = "rkyv")]
 #[derive(Debug, PartialEq)]
 pub struct AlignedArchivedImmutableKdTree<

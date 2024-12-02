@@ -1,7 +1,10 @@
 //! Floating point k-d tree, for use when the co-ordinates of the points being stored in the tree
 //! are floats. f64 or f32 are supported currently, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html)
-//! if the `f16` feature is enabled
-
+//! if the `f16` feature is enabled.
+//!
+//! (Most of the structs listed in these docs are only relevant when using `rkyv` for zero-copy
+//! deserialization. The main Struct in here, [`KdTree`], is usually what you're looking for.)
+//!
 use az::{Az, Cast};
 use divrem::DivCeil;
 use num_traits::float::FloatCore;
