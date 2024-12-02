@@ -1,4 +1,4 @@
-//! Definitions for some types that are common between the [`float`](crate::float), [`immutable`](crate::immutable) and [`fixed`](crate::fixed)  modules
+//! Definitions and implementations for some traits that are common between the [`float`](crate::float), [`immutable`](crate::immutable) and [`fixed`](crate::fixed)  modules
 use az::Cast;
 use divrem::DivCeil;
 use num_traits::{One, PrimInt, Unsigned, Zero};
