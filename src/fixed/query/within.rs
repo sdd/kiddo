@@ -1,9 +1,9 @@
 use az::Cast;
 
-use crate::distance_metric::DistanceMetric;
 use crate::fixed::kdtree::{Axis, KdTree};
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::types::{Content, Index};
+use crate::traits::DistanceMetric;
+use crate::traits::{Content, Index};
 
 use crate::generate_within;
 
@@ -43,10 +43,10 @@ Results are returned sorted nearest-first
 
 #[cfg(test)]
 mod tests {
-    use crate::distance_metric::DistanceMetric;
     use crate::fixed::distance::Manhattan;
     use crate::fixed::kdtree::{Axis, KdTree};
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
+    use crate::traits::DistanceMetric;
     use fixed::types::extra::U14;
     use fixed::FixedU16;
     use rand::Rng;

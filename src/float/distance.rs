@@ -4,8 +4,8 @@
 // #[cfg(any(target_arch = "x86_64"))]
 // use std::arch::x86_64::*;
 
-use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
+use crate::traits::DistanceMetric;
 
 /// Returns the Manhattan / "taxi cab" distance between two points.
 ///
@@ -16,7 +16,7 @@ use crate::float::kdtree::Axis;
 /// # Examples
 ///
 /// ```rust
-/// use kiddo::distance_metric::DistanceMetric;
+/// use kiddo::traits::DistanceMetric;
 /// use kiddo::Manhattan;
 ///
 /// assert_eq!(0f32, Manhattan::dist(&[0f32, 0f32], &[0f32, 0f32]));
@@ -50,7 +50,7 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
 /// # Examples
 ///
 /// ```rust
-/// use kiddo::distance_metric::DistanceMetric;
+/// use kiddo::traits::DistanceMetric;
 /// use kiddo::SquaredEuclidean;
 ///
 /// assert_eq!(0f32, SquaredEuclidean::dist(&[0f32, 0f32], &[0f32, 0f32]));

@@ -1,4 +1,4 @@
-use crate::types::Content;
+use crate::traits::Content;
 
 pub(crate) trait IterableTreeData<A: Copy + Default, T: Content, const K: usize> {
     fn get_leaf_data(&self, idx: usize, out: &mut Vec<(T, [A; K])>) -> Option<usize>;

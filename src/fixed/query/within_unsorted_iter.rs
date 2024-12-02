@@ -2,10 +2,10 @@ use az::{Az, Cast};
 use generator::{done, Gn, Scope};
 use std::ops::Rem;
 
-use crate::distance_metric::DistanceMetric;
 use crate::fixed::kdtree::{Axis, KdTree};
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::types::{is_stem_index, Content, Index};
+use crate::traits::DistanceMetric;
+use crate::traits::{is_stem_index, Content, Index};
 use crate::within_unsorted_iter::WithinUnsortedIter;
 
 use crate::generate_within_unsorted_iter;
@@ -49,10 +49,10 @@ Returns an Iterator. Results are returned in arbitrary order. Faster than `withi
 
 #[cfg(test)]
 mod tests {
-    use crate::distance_metric::DistanceMetric;
     use crate::fixed::distance::Manhattan;
     use crate::fixed::kdtree::{Axis, KdTree};
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
+    use crate::traits::DistanceMetric;
     use fixed::types::extra::U14;
     use fixed::FixedU16;
     use rand::Rng;

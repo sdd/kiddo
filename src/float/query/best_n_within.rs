@@ -3,9 +3,9 @@ use std::collections::BinaryHeap;
 use std::ops::Rem;
 
 use crate::best_neighbour::BestNeighbour;
-use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::{Axis, KdTree, LeafNode};
-use crate::types::{is_stem_index, Content, Index};
+use crate::traits::DistanceMetric;
+use crate::traits::{is_stem_index, Content, Index};
 
 use crate::generate_best_n_within;
 
@@ -80,9 +80,9 @@ where
 #[cfg(test)]
 mod tests {
     use crate::best_neighbour::BestNeighbour;
-    use crate::distance_metric::DistanceMetric;
     use crate::float::distance::SquaredEuclidean;
     use crate::float::kdtree::KdTree;
+    use crate::traits::DistanceMetric;
     use rand::Rng;
 
     type AX = f64;

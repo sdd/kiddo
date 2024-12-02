@@ -1,10 +1,10 @@
 use az::{Az, Cast};
 use std::ops::Rem;
 
-use crate::distance_metric::DistanceMetric;
 use crate::fixed::kdtree::{Axis, KdTree, LeafNode};
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::types::{is_stem_index, Content, Index};
+use crate::traits::DistanceMetric;
+use crate::traits::{is_stem_index, Content, Index};
 
 use crate::generate_nearest_one;
 
@@ -46,11 +46,11 @@ to not needing to allocate memory or maintain sorted results.
 
 #[cfg(test)]
 mod tests {
-    use crate::distance_metric::DistanceMetric;
     use crate::fixed::distance::Manhattan;
     use crate::fixed::kdtree::{Axis, KdTree};
     use crate::nearest_neighbour::NearestNeighbour;
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
+    use crate::traits::DistanceMetric;
     use fixed::types::extra::U14;
     use fixed::FixedU16;
     use rand::Rng;

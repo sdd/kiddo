@@ -12,7 +12,7 @@ use std::fmt::Debug;
 use crate::iter::TreeIter;
 use crate::{
     iter::IterableTreeData,
-    types::{Content, Index},
+    traits::{Content, Index},
 };
 
 #[cfg(feature = "serde")]

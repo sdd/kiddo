@@ -3,9 +3,9 @@ use std::collections::BinaryHeap;
 use std::ops::Rem;
 
 use crate::best_neighbour::BestNeighbour;
-use crate::distance_metric::DistanceMetric;
 use crate::fixed::kdtree::{Axis, KdTree, LeafNode};
-use crate::types::{is_stem_index, Content, Index};
+use crate::traits::DistanceMetric;
+use crate::traits::{is_stem_index, Content, Index};
 
 use crate::generate_best_n_within;
 
@@ -51,10 +51,10 @@ performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt
 #[cfg(test)]
 mod tests {
     use crate::best_neighbour::BestNeighbour;
-    use crate::distance_metric::DistanceMetric;
     use crate::fixed::distance::Manhattan;
     use crate::fixed::kdtree::{Axis, KdTree};
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
+    use crate::traits::DistanceMetric;
     use fixed::types::extra::U14;
     use fixed::FixedU16;
     use rand::Rng;

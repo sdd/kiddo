@@ -14,7 +14,7 @@ use kiddo::test_utils::{
     build_populated_tree_and_query_points_fixed, build_populated_tree_and_query_points_float,
     process_queries_fixed, process_queries_float,
 };
-use kiddo::types::{Content, Index};
+use kiddo::traits::{Content, Index};
 use rand::distributions::Standard;
 use rand_distr::Distribution;
 

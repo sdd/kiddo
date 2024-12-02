@@ -4,11 +4,11 @@ use std::num::NonZero;
 use std::ops::Rem;
 
 use crate::best_neighbour::BestNeighbour;
-use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
 use crate::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::immutable::float::kdtree::ImmutableKdTree;
-use crate::types::Content;
+use crate::traits::Content;
+use crate::traits::DistanceMetric;
 
 use crate::generate_immutable_best_n_within;
 
@@ -82,9 +82,9 @@ where
 #[cfg(test)]
 mod tests {
     use crate::best_neighbour::BestNeighbour;
-    use crate::distance_metric::DistanceMetric;
     use crate::float::distance::SquaredEuclidean;
     use crate::immutable::float::kdtree::ImmutableKdTree;
+    use crate::traits::DistanceMetric;
     use rand::Rng;
     use std::num::NonZero;
 

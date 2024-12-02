@@ -1,6 +1,6 @@
 use crate::float::kdtree::Axis;
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::types::Content;
+use crate::traits::Content;
 use sorted_vec::SortedVec;
 use std::collections::BinaryHeap;
 
