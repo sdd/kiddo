@@ -1,6 +1,6 @@
 use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
-use crate::float_leaf_slice::leaf_slice::LeafSliceFloat;
+use crate::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::generate_immutable_within;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
@@ -34,7 +34,7 @@ Results are returned sorted nearest-first
 
 impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
 where
-    A: Axis + LeafSliceFloat<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     T: Content,
     usize: Cast<T>,
 {

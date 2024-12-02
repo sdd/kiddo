@@ -38,7 +38,7 @@ pub(crate) struct LeafFixedSlice<'a, A: Axis, T: Content, const K: usize, const 
 
 impl<A, T, const K: usize, const C: usize> LeafFixedSlice<'_, A, T, K, C>
 where
-    A: Axis + LeafSliceFloat<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     T: Content,
     usize: Cast<T>,
 {
@@ -113,7 +113,17 @@ impl<'a, A: Axis, T: Content, const K: usize, const C: usize>
     }
 }
 
-pub trait LeafSliceFloat<T, const K: usize>
+pub trait LeafSliceFloatChunk<T, const K: usize>
+where
+    T: Content,
+{
+    fn dists_for_chunk<D, const C: usize>(chunk: [&[Self; C]; K], query: &[Self; K]) -> [Self; C]
+    where
+        D: DistanceMetric<Self, K>,
+        Self: Sized;
+}
+
+pub trait LeafSliceFloat<T>
 where
     T: Content,
 {
@@ -125,11 +135,6 @@ where
     ) where
         Self: Sized;
 
-    fn dists_for_chunk<D, const C: usize>(chunk: [&[Self; C]; K], query: &[Self; K]) -> [Self; C]
-    where
-        D: DistanceMetric<Self, K>,
-        Self: Sized;
-
     fn update_nearest_dists_within<R, const C: usize>(
         acc: [Self; C],
         items: &[T; C],
@@ -137,6 +142,7 @@ where
         results: &mut R,
     ) where
         R: ResultCollection<Self, T>,
+        usize: Cast<T>,
         Self: Axis + Sized;
 
     fn update_best_dists_within<const C: usize>(
@@ -151,7 +157,7 @@ where
 
 impl<A, T, const K: usize> LeafSlice<'_, A, T, K>
 where
-    A: Axis + LeafSliceFloat<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     T: Content,
     usize: Cast<T>,
 {
@@ -284,7 +290,7 @@ where
     }
 }
 
-impl<T: Content, const K: usize> LeafSliceFloat<T, K> for f64
+impl<T: Content> LeafSliceFloat<T> for f64
 where
     T: Content,
     usize: Cast<T>,
@@ -345,7 +351,13 @@ where
     ) {
         update_best_dists_within_autovec(&acc, items, radius, max_qty, results)
     }
+}
 
+impl<T: Content, const K: usize> LeafSliceFloatChunk<T, K> for f64
+where
+    T: Content,
+    usize: Cast<T>,
+{
     #[inline]
     fn dists_for_chunk<D, const C: usize>(chunk: [&[Self; C]; K], query: &[Self; K]) -> [Self; C]
     where
@@ -366,7 +378,7 @@ where
     }
 }
 
-impl<T: Content, const K: usize> LeafSliceFloat<T, K> for f32
+impl<T: Content> LeafSliceFloat<T> for f32
 where
     T: Content,
     usize: Cast<T>,
@@ -425,7 +437,13 @@ where
     ) {
         update_best_dists_within_autovec(&acc, items, radius, max_qty, results)
     }
+}
 
+impl<T: Content, const K: usize> LeafSliceFloatChunk<T, K> for f32
+where
+    T: Content,
+    usize: Cast<T>,
+{
     #[inline]
     fn dists_for_chunk<D, const C: usize>(chunk: [&[Self; C]; K], query: &[Self; K]) -> [Self; C]
     where
@@ -443,5 +461,164 @@ where
         });
 
         acc
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::float_leaf_slice::leaf_slice::{LeafFixedSlice, LeafSliceFloat};
+    use crate::{BestNeighbour, NearestNeighbour, SquaredEuclidean};
+    use std::collections::BinaryHeap;
+
+    #[test]
+    fn leaf_fixed_slice_nearest_one_works() {
+        let content_points = [[0.0f64, 3.0f64, 5.0f64], [0.0f64, 4.0f64, 12.0f64]];
+
+        let content_items = [1u32, 2u32, 3u32];
+
+        let slice = LeafFixedSlice {
+            content_points: [&content_points[0], &content_points[1]],
+            content_items: &content_items,
+        };
+
+        let mut best_dist = f64::INFINITY;
+        let mut best_item = u32::MAX;
+
+        slice.nearest_one::<SquaredEuclidean>(&[0.0f64, 0.0f64], &mut best_dist, &mut best_item);
+
+        assert_eq!(best_dist, 0f64);
+        assert_eq!(best_item, 1u32);
+    }
+
+    #[test]
+    fn test_f64_leafslicefloat_update_nearest_dists_within() {
+        let dists = [10000f64, 20000f64, 20f64];
+        let items = [1u32, 3u32, 5u32];
+
+        let radius = 200f64;
+
+        let mut results: BinaryHeap<NearestNeighbour<f64, u32>> = BinaryHeap::new();
+        results.push(NearestNeighbour {
+            distance: 10f64,
+            item: 100u32,
+        });
+
+        f64::update_nearest_dists_within(dists, &items, radius, &mut results);
+
+        let results = results.into_vec();
+
+        assert_eq!(
+            results,
+            vec![
+                NearestNeighbour {
+                    distance: 20f64,
+                    item: 5u32
+                },
+                NearestNeighbour {
+                    distance: 10f64,
+                    item: 100u32
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_f64_update_best_dists_within_autovec_leaves_nearest() {
+        let dists = [10000f64, 20000f64, 20f64, 15f64];
+        let items = [1u32, 3u32, 5u32, 7u32];
+
+        let radius = 200f64;
+
+        let max_qty = 2usize;
+
+        let mut results = BinaryHeap::new();
+        results.push(BestNeighbour {
+            distance: 10f64,
+            item: 100u32,
+        });
+
+        f64::update_best_dists_within(dists, &items, radius, max_qty, &mut results);
+
+        let results = results.into_vec();
+
+        assert_eq!(
+            results,
+            vec![
+                BestNeighbour {
+                    distance: 15f64,
+                    item: 7u32
+                },
+                BestNeighbour {
+                    distance: 20f64,
+                    item: 5u32
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_f32_leafslicefloat_update_nearest_dists_within() {
+        let dists = [10000f32, 20000f32, 20f32];
+        let items = [1u32, 3u32, 5u32];
+
+        let radius = 200f32;
+
+        let mut results: BinaryHeap<NearestNeighbour<f32, u32>> = BinaryHeap::new();
+        results.push(NearestNeighbour {
+            distance: 10f32,
+            item: 100u32,
+        });
+
+        f32::update_nearest_dists_within(dists, &items, radius, &mut results);
+
+        let results = results.into_vec();
+
+        assert_eq!(
+            results,
+            vec![
+                NearestNeighbour {
+                    distance: 20f32,
+                    item: 5u32
+                },
+                NearestNeighbour {
+                    distance: 10f32,
+                    item: 100u32
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_f32_update_best_dists_within_autovec_leaves_nearest() {
+        let dists = [10000f32, 20000f32, 20f32, 15f32];
+        let items = [1u32, 3u32, 5u32, 7u32];
+
+        let radius = 200f32;
+
+        let max_qty = 2usize;
+
+        let mut results = BinaryHeap::new();
+        results.push(BestNeighbour {
+            distance: 10f32,
+            item: 100u32,
+        });
+
+        f32::update_best_dists_within(dists, &items, radius, max_qty, &mut results);
+
+        let results = results.into_vec();
+
+        assert_eq!(
+            results,
+            vec![
+                BestNeighbour {
+                    distance: 15f32,
+                    item: 7u32
+                },
+                BestNeighbour {
+                    distance: 20f32,
+                    item: 5u32
+                },
+            ]
+        );
     }
 }

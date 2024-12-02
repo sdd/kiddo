@@ -7,7 +7,7 @@ use std::ops::Rem;
 use crate::distance_metric::DistanceMetric;
 use crate::float::kdtree::Axis;
 use crate::float::result_collection::ResultCollection;
-use crate::float_leaf_slice::leaf_slice::LeafSliceFloat;
+use crate::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::Content;
@@ -42,7 +42,7 @@ distance metric function.
 
 impl<A, T, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
 where
-    A: Axis + LeafSliceFloat<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     T: Content,
     usize: Cast<T>,
 {
@@ -66,7 +66,7 @@ impl<
         const B: usize,
     > AlignedArchivedImmutableKdTree<'_, A, T, K, B>
 where
-    A: Axis + LeafSliceFloat<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     T: Content,
     usize: Cast<T>,
 {

@@ -7,7 +7,7 @@ macro_rules! generate_immutable_approx_nearest_one {
             #[inline]
             pub fn approx_nearest_one<D>(&self, query: &[A; K]) -> NearestNeighbour<A, T>
             where
-                A: $crate::float_leaf_slice::leaf_slice::LeafSliceFloat<T, K>,
+                A: $crate::float_leaf_slice::leaf_slice::LeafSliceFloat<T> + $crate::float_leaf_slice::leaf_slice::LeafSliceFloatChunk<T, K>,
                 D: DistanceMetric<A, K>,
                 usize: Cast<T>,
             {

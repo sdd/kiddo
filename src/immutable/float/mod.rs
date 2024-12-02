@@ -25,8 +25,6 @@
 //! in the tree must be floats ([`f64`] or [`f32`] are supported currently,
 //! or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled).
 
-#[doc(hidden)]
 pub mod kdtree;
-
 #[doc(hidden)]
 pub mod query;

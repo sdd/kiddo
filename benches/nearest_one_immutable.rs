@@ -5,7 +5,7 @@ use codspeed_criterion_compat::{
 };
 use kiddo::batch_benches;
 use kiddo::float::distance::SquaredEuclidean;
-use kiddo::float_leaf_slice::leaf_slice::LeafSliceFloat;
+use kiddo::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
 use kiddo::immutable::float::kdtree::{Axis, ImmutableKdTree};
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_immutable_float, process_queries_immutable_float,
@@ -54,7 +54,7 @@ fn perform_query_immutable_float<A: Axis, T: Content + 'static, const K: usize, 
     kdtree: &ImmutableKdTree<A, T, K, BUCKET_SIZE>,
     point: &[A; K],
 ) where
-    A: LeafSliceFloat<T, K>,
+    A: LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     usize: Cast<T>,
 {
     kdtree.nearest_one::<SquaredEuclidean>(point);
@@ -70,7 +70,7 @@ fn bench_query_nearest_one_immutable_float<
     query_point_qty: usize,
     subtype: &str,
 ) where
-    A: LeafSliceFloat<T, K>,
+    A: LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     usize: Cast<T>,
     Standard: Distribution<T>,
     Standard: Distribution<[A; K]>,

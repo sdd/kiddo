@@ -6,7 +6,7 @@
 //! values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
 
 pub use crate::float::kdtree::Axis;
-use crate::float_leaf_slice::leaf_slice::{LeafSlice, LeafSliceFloat};
+use crate::float_leaf_slice::leaf_slice::{LeafSlice, LeafSliceFloat, LeafSliceFloatChunk};
 #[cfg(feature = "modified_van_emde_boas")]
 use crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 use crate::types::Content;
@@ -58,6 +58,11 @@ pub struct ImmutableKdTree<A: Copy + Default, T: Copy + Default, const K: usize,
     pub(crate) max_stem_level: isize,
 }
 
+/// rkyv-Archivable / Serializable version of an `ImmutableKdTree`.
+///
+/// Convert an ImmutableKdTree into this in order to serialize the tree via `rkyv`.
+/// Required because the AlignedVec used for storing stem node values cannot
+/// be zero-copy deserialized.
 #[cfg(feature = "rkyv")]
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct ImmutableKdTreeRK<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize> {
@@ -72,7 +77,7 @@ pub struct ImmutableKdTreeRK<A: Copy + Default, T: Copy + Default, const K: usiz
 impl<A: Axis, T: Content, const K: usize, const B: usize> From<ImmutableKdTree<A, T, K, B>>
     for ImmutableKdTreeRK<A, T, K, B>
 where
-    A: Axis + LeafSliceFloat<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     T: Content,
     usize: Cast<T>,
 {
@@ -118,6 +123,12 @@ where
     }
 }
 
+/// Re-aligned Immutable kd-tree
+///
+/// Convert an ImmutableKdTreeRK into this in order to perform queries.
+/// Required because the AlignedVec used for storing stem node values cannot
+/// be zero-copy deserialized. You need to first zero-copy-deserialize into an
+/// ImmutableKdTreeRK and then convert that into one of these, re-aligning the stems.
 #[cfg(feature = "rkyv")]
 #[derive(Debug, PartialEq)]
 pub struct AlignedArchivedImmutableKdTree<
@@ -131,7 +142,7 @@ pub struct AlignedArchivedImmutableKdTree<
     pub(crate) leaf_points: &'a [ArchivedVec<A>; K],
     pub(crate) leaf_items: &'a ArchivedVec<T>,
     pub(crate) leaf_extents: &'a ArchivedVec<(u32, u32)>,
-    pub max_stem_level: isize,
+    pub(crate) max_stem_level: isize,
 }
 
 #[cfg(feature = "rkyv")]
@@ -143,7 +154,7 @@ impl<
         const B: usize,
     > AlignedArchivedImmutableKdTree<'a, A, T, K, B>
 {
-    pub fn new_from(
+    pub(crate) fn new_from(
         value: &'a ArchivedImmutableKdTreeRK<A, T, K, B>,
     ) -> AlignedArchivedImmutableKdTree<'a, A, T, K, B> {
         AlignedArchivedImmutableKdTree {
@@ -155,22 +166,22 @@ impl<
         }
     }
 
+    /// create an `AlignedArchivedImmutableKdTree` from `Bytes`
+    ///
+    /// Intended to be used on raw / mem-mapped bytes from a `File` containing data serialized from an
+    /// `ArchivedImmutableKdTreeRK`
     #[cfg(feature = "rkyv")]
     pub fn from_bytes(bytes: &'a [u8]) -> AlignedArchivedImmutableKdTree<'a, A, T, K, B> {
         let tree_rk = unsafe { rkyv::archived_root::<ImmutableKdTreeRK<A, T, K, B>>(bytes) };
 
         AlignedArchivedImmutableKdTree::new_from(tree_rk)
     }
-
-    pub fn stem_count(&self) -> usize {
-        self.stems.len()
-    }
 }
 
 #[cfg(feature = "rkyv")]
 impl<A, T, const K: usize, const B: usize> AlignedArchivedImmutableKdTree<'_, A, T, K, B>
 where
-    A: Axis + LeafSliceFloat<T, K> + rkyv::Archive<Archived = A>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + rkyv::Archive<Archived = A>,
     T: Content + rkyv::Archive<Archived = T>,
     usize: Cast<T>,
 {
@@ -199,7 +210,7 @@ where
 impl<A: Axis, T: Content, const K: usize, const B: usize> From<&[[A; K]]>
     for ImmutableKdTree<A, T, K, B>
 where
-    A: Axis + LeafSliceFloat<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     T: Content,
     usize: Cast<T>,
 {
@@ -230,7 +241,7 @@ where
 #[allow(unexpected_cfgs)]
 impl<A, T, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
 where
-    A: Axis + LeafSliceFloat<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     T: Content,
     usize: Cast<T>,
 {
