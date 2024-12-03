@@ -87,8 +87,8 @@ mod tests {
 
     #[test]
     fn test_get_best_from_dists_autovec_leaves_best_unchanged_when_not_better() {
-        let dists = vec![10000f64, 20000f64, 20f64];
-        let items = vec![1u32, 3u32, 5u32];
+        let dists = [10000f64, 20000f64, 20f64];
+        let items = [1u32, 3u32, 5u32];
 
         let mut best_dist = 10f64;
         let mut best_item = 12345u32;
@@ -101,8 +101,8 @@ mod tests {
 
     #[test]
     fn test_get_best_from_dists_autovec_updates_best_when_closer_dist_present() {
-        let dists = vec![10000f64, 20000f64, 2f64];
-        let items = vec![1u32, 3u32, 5u32];
+        let dists = [10000f64, 20000f64, 2f64];
+        let items = [1u32, 3u32, 5u32];
 
         let mut best_dist = 10f64;
         let mut best_item = 12345u32;
@@ -115,8 +115,8 @@ mod tests {
 
     #[test]
     fn test_update_nearest_dists_within_autovec_leaves_nearest() {
-        let dists = vec![10000f64, 20000f64, 20f64];
-        let items = vec![1u32, 3u32, 5u32];
+        let dists = [10000f64, 20000f64, 20f64];
+        let items = [1u32, 3u32, 5u32];
 
         let radius = 200f64;
 
@@ -144,8 +144,8 @@ mod tests {
 
     #[test]
     fn test_update_best_dists_within_autovec_leaves_nearest() {
-        let dists = vec![10000f64, 20000f64, 20f64, 15f64];
-        let items = vec![1u32, 3u32, 5u32, 7u32];
+        let dists = [10000f64, 20000f64, 20f64, 15f64];
+        let items = [1u32, 3u32, 5u32, 7u32];
 
         let radius = 200f64;
 

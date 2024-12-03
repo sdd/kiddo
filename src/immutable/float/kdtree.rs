@@ -21,6 +21,7 @@ use aligned_vec::CACHELINE_ALIGN;
 use aligned_vec::{avec, AVec, ConstAlign};
 use array_init::array_init;
 use az::{Az, Cast};
+use cmov::Cmov;
 use ordered_float::OrderedFloat;
 #[cfg(feature = "rkyv")]
 use rkyv::vec::ArchivedVec;
@@ -61,7 +62,7 @@ pub struct ImmutableKdTree<A: Copy + Default, T: Copy + Default, const K: usize,
     pub(crate) leaf_points: [Vec<A>; K],
     pub(crate) leaf_items: Vec<T>,
     pub(crate) leaf_extents: Vec<(u32, u32)>,
-    pub(crate) max_stem_level: isize,
+    pub(crate) max_stem_level: i32,
 }
 
 /// rkyv-Archivable / Serializable version of an [`ImmutableKdTree`].
@@ -76,7 +77,7 @@ pub struct ImmutableKdTreeRK<A: Copy + Default, T: Copy + Default, const K: usiz
     pub(crate) leaf_points: [Vec<A>; K],
     pub(crate) leaf_items: Vec<T>,
     pub(crate) leaf_extents: Vec<(u32, u32)>,
-    pub(crate) max_stem_level: isize,
+    pub(crate) max_stem_level: i32,
 }
 
 #[cfg(feature = "rkyv")]
@@ -148,7 +149,7 @@ pub struct AlignedArchivedImmutableKdTree<
     pub(crate) leaf_points: &'a [ArchivedVec<A>; K],
     pub(crate) leaf_items: &'a ArchivedVec<T>,
     pub(crate) leaf_extents: &'a ArchivedVec<(u32, u32)>,
-    pub(crate) max_stem_level: isize,
+    pub(crate) max_stem_level: i32,
 }
 
 #[cfg(feature = "rkyv")]
@@ -168,7 +169,7 @@ impl<
             leaf_points: &value.leaf_points,
             leaf_extents: &value.leaf_extents,
             leaf_items: &value.leaf_items,
-            max_stem_level: value.max_stem_level as isize,
+            max_stem_level: value.max_stem_level,
         }
     }
 
@@ -289,7 +290,7 @@ where
             leaf_node_count.next_power_of_two() - 1
         };
 
-        let max_stem_level: isize = leaf_node_count.next_power_of_two().ilog2() as isize - 1;
+        let max_stem_level: i32 = leaf_node_count.next_power_of_two().ilog2() as i32 - 1;
 
         // TODO: It would be nice to be able to determine the exact required length up-front.
         //  Instead, we just trim the stems afterwards by traversing right-child non-inf nodes
@@ -325,6 +326,7 @@ where
                 &mut sort_index,
                 initial_stem_idx,
                 0,
+                0,
                 max_stem_level,
                 leaf_node_count * B,
                 &mut leaf_points,
@@ -335,17 +337,20 @@ where
             // trim unneeded stems
             #[cfg(feature = "modified_van_emde_boas")]
             if !stems.is_empty() {
-                let mut level = 0;
+                let mut level: usize = 0;
+                let mut minor_level: u64 = 0;
                 let mut stem_idx = 0;
                 loop {
                     let val = stems[stem_idx];
                     let is_right_child = val.is_finite();
                     stem_idx = modified_van_emde_boas_get_child_idx_v2_branchless(
-                        stem_idx,
+                        stem_idx as u32,
                         is_right_child,
-                        level,
-                    );
+                        minor_level as u32,
+                    ) as usize;
                     level += 1;
+                    minor_level += 1;
+                    minor_level.cmovnz(&0, u8::from(minor_level == 3));
                     if level == max_stem_level as usize {
                         break;
                     }
@@ -370,8 +375,9 @@ where
         source: &[[A; K]],
         sort_index: &mut [usize],
         stem_index: usize,
-        mut level: usize,
-        max_stem_level: isize,
+        mut level: i32,
+        mut minor_level: u64,
+        max_stem_level: i32,
         capacity: usize,
         leaf_points: &mut [Vec<A>; K],
         leaf_items: &mut Vec<T>,
@@ -379,7 +385,7 @@ where
     ) {
         let chunk_length = sort_index.len();
 
-        if level as isize > max_stem_level {
+        if level > max_stem_level {
             // Write leaf and terminate recursion
             leaf_extents.push((
                 leaf_items.len() as u32,
@@ -394,7 +400,7 @@ where
             return;
         }
 
-        let levels_below = max_stem_level - level as isize;
+        let levels_below = max_stem_level - level;
         let left_capacity = (2usize.pow(levels_below as u32) * B).min(capacity);
         let right_capacity = capacity.saturating_sub(left_capacity);
 
@@ -417,11 +423,17 @@ where
         }
 
         #[cfg(feature = "modified_van_emde_boas")]
-        let left_child_idx =
-            modified_van_emde_boas_get_child_idx_v2_branchless(stem_index, false, level);
+        let left_child_idx = modified_van_emde_boas_get_child_idx_v2_branchless(
+            stem_index as u32,
+            false,
+            minor_level as u32,
+        ) as usize;
         #[cfg(feature = "modified_van_emde_boas")]
-        let right_child_idx =
-            modified_van_emde_boas_get_child_idx_v2_branchless(stem_index, true, level);
+        let right_child_idx = modified_van_emde_boas_get_child_idx_v2_branchless(
+            stem_index as u32,
+            true,
+            minor_level as u32,
+        ) as usize;
 
         #[cfg(not(feature = "modified_van_emde_boas"))]
         let left_child_idx = stem_index << 1;
@@ -431,6 +443,9 @@ where
         let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
 
         level += 1;
+        minor_level += 1;
+        minor_level.cmovnz(&0, u8::from(minor_level == 3));
+
         let next_dim = (dim + 1) % K;
 
         Self::populate_recursive(
@@ -440,6 +455,7 @@ where
             lower_sort_index,
             left_child_idx,
             level,
+            minor_level,
             max_stem_level,
             left_capacity,
             leaf_points,
@@ -454,6 +470,7 @@ where
             upper_sort_index,
             right_child_idx,
             level,
+            minor_level,
             max_stem_level,
             right_capacity,
             leaf_points,

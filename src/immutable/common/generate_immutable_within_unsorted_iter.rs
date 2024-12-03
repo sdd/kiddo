@@ -60,8 +60,8 @@ macro_rules! generate_immutable_within_unsorted_iter {
                     let closer_leaf_idx = leaf_idx + is_right_child;
                     let further_leaf_idx = leaf_idx + (1 - is_right_child);
 
-                    let closer_node_idx = modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 1, /*minor_*/level);
-                    let further_node_idx =  modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 0, /*minor_*/level);
+                    let closer_node_idx = modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx as u32, is_right_child == 1, /*minor_*/level as u32) as usize;
+                    let further_node_idx =  modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx as u32, is_right_child == 0, /*minor_*/level as u32) as usize;
 
                     let mut rd = rd;
                     let old_off = off[split_dim];

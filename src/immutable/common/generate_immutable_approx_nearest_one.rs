@@ -30,7 +30,7 @@ macro_rules! generate_immutable_approx_nearest_one {
                     let is_right_child = *unsafe { query.get_unchecked(dim) } >= val;
 
                     #[cfg(feature = "modified_van_emde_boas")]
-                    let next_idx = modified_van_emde_boas_get_child_idx_v2(curr_idx, is_right_child, level);
+                    let next_idx = modified_van_emde_boas_get_child_idx_v2(curr_idx as u32, is_right_child, level as u32) as usize;
                     #[cfg(not(feature = "modified_van_emde_boas"))]
                     let next_idx = (curr_idx << 1) + usize::from(is_right_child);
 

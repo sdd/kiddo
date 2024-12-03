@@ -472,9 +472,12 @@ mod test {
 
     #[test]
     fn leaf_fixed_slice_nearest_one_works() {
-        let content_points = [[0.0f64, 3.0f64, 5.0f64], [0.0f64, 4.0f64, 12.0f64]];
+        let content_points = [
+            [0.0f64, 3.0f64, 5.0f64, 0.0f64],
+            [0.0f64, 4.0f64, 12.0f64, 0.0f64],
+        ];
 
-        let content_items = [1u32, 2u32, 3u32];
+        let content_items = [1u32, 2u32, 3u32, 4u32];
 
         let slice = LeafFixedSlice {
             content_points: [&content_points[0], &content_points[1]],

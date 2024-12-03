@@ -50,27 +50,23 @@ pub fn nearest_one_immutable_float(c: &mut Criterion) {
     group.finish();
 }
 
-fn perform_query_immutable_float<A: Axis, T: Content + 'static, const K: usize, const B: usize>(
+fn perform_query_immutable_float<A, T: Content + 'static, const K: usize, const B: usize>(
     kdtree: &ImmutableKdTree<A, T, K, BUCKET_SIZE>,
     point: &[A; K],
 ) where
-    A: LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     usize: Cast<T>,
 {
     kdtree.nearest_one::<SquaredEuclidean>(point);
 }
 
-fn bench_query_nearest_one_immutable_float<
-    A: Axis + 'static,
-    T: Content + 'static,
-    const K: usize,
->(
+fn bench_query_nearest_one_immutable_float<A, T: Content + 'static, const K: usize>(
     group: &mut BenchmarkGroup<WallTime>,
     initial_size: usize,
     query_point_qty: usize,
     subtype: &str,
 ) where
-    A: LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + 'static,
     usize: Cast<T>,
     Standard: Distribution<T>,
     Standard: Distribution<[A; K]>,

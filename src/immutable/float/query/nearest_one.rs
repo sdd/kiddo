@@ -206,7 +206,7 @@ mod tests {
 
         let query_points: Vec<[f64; 4]> = (0..NUM_QUERIES).map(|_| rng.gen::<[f64; 4]>()).collect();
 
-        for (_i, query_point) in query_points.iter().enumerate() {
+        for query_point in query_points.iter() {
             let expected = linear_search(&content_to_add, query_point);
 
             // println!("query #{:?}", _i);
@@ -237,7 +237,7 @@ mod tests {
             .map(|_| rand::random::<[f32; 4]>())
             .collect();
 
-        for (_i, query_point) in query_points.iter().enumerate() {
+        for query_point in query_points.iter() {
             let expected = linear_search(&content_to_add, query_point);
 
             let result = tree.nearest_one::<SquaredEuclidean>(query_point);
