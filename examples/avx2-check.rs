@@ -6,9 +6,10 @@ use std::error::Error;
     any(target_arch = "x86", target_arch = "x86_64")
 ))]
 use std::arch::x86_64::{
-    __m256i, _mm256_castpd256_pd128, _mm256_cmp_pd, _mm256_loadu_pd, _mm256_min_pd,
-    _mm256_permutevar8x32_epi32, _mm256_set_epi32, _mm256_storeu_pd, _mm256_testz_si256,
-    _mm_add_epi32, _mm_blendv_ps, _mm_maskstore_epi32, _mm_set1_epi32, _mm_set_epi32, _CMP_LT_OQ,
+    __m128, __m128d, __m128i, __m256d, __m256i, _mm256_castpd256_pd128, _mm256_cmp_pd,
+    _mm256_loadu_pd, _mm256_min_pd, _mm256_permutevar8x32_epi32, _mm256_set_epi32,
+    _mm256_storeu_pd, _mm256_testz_si256, _mm_add_epi32, _mm_blendv_ps, _mm_maskstore_epi32,
+    _mm_set1_epi32, _mm_set_epi32, _CMP_LT_OQ,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -77,12 +78,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             let chunk_v = _mm256_loadu_pd(std::ptr::addr_of!(chunk[0]));
             println!("chunk_v = {:?}", &chunk_v);
 
-            let is_better = _mm256_cmp_pd(chunk_v, min_dists_v, _CMP_LT_OQ);
+            let is_better = _mm256_cmp_pd::<_CMP_LT_OQ>(chunk_v, min_dists_v);
             println!("is_better = {:?}", &is_better);
 
             let these_better = _mm256_testz_si256(
-                std::mem::transmute(is_better),
-                std::mem::transmute(is_better),
+                std::mem::transmute::<__m256d, __m256i>(is_better),
+                std::mem::transmute::<__m256d, __m256i>(is_better),
             );
             println!("these_better = {:?}", &these_better);
 
@@ -93,18 +94,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("min_dists_v = {:?}", &min_dists_v);
 
             let is_better_shuffled = _mm256_permutevar8x32_epi32(
-                std::mem::transmute(is_better),
+                std::mem::transmute::<__m256d, __m256i>(is_better),
                 is_better_shuffle_pattern,
             );
             println!("min_dists_v = {:?}", &min_dists_v);
 
-            let is_better_mask = _mm256_castpd256_pd128(std::mem::transmute(is_better_shuffled));
+            let is_better_mask =
+                _mm256_castpd256_pd128(std::mem::transmute::<__m256i, __m256d>(is_better_shuffled));
             println!("is_better_shuffled = {:?}", &is_better_shuffled);
 
-            min_dist_indexes_v = std::mem::transmute(_mm_blendv_ps(
-                std::mem::transmute(min_dist_indexes_v),
-                std::mem::transmute(index_v),
-                std::mem::transmute(is_better_mask),
+            min_dist_indexes_v = std::mem::transmute::<__m128, __m128i>(_mm_blendv_ps(
+                std::mem::transmute::<__m128i, __m128>(min_dist_indexes_v),
+                std::mem::transmute::<__m128i, __m128>(index_v),
+                std::mem::transmute::<__m128d, __m128>(is_better_mask),
             ));
             println!("min_dist_indexes_v = {:?}", &min_dist_indexes_v);
 

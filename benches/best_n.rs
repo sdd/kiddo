@@ -94,7 +94,7 @@ fn perform_query_float_10<
 }
 
 fn perform_query_fixed_10<
-    A: Unsigned,
+    A: Unsigned + LeEqU16,
     T: Content + 'static,
     const K: usize,
     const B: usize,
@@ -105,7 +105,6 @@ fn perform_query_fixed_10<
 ) where
     usize: Cast<IDX>,
     FixedU16<A>: AxisFixed,
-    A: LeEqU16,
 {
     kdtree
         .best_n_within::<SquaredEuclideanFixed>(point, FixedU16::<A>::from_num(0.05f64), 10)
@@ -151,7 +150,7 @@ fn bench_query_float_10<
 }
 
 fn bench_query_fixed_10<
-    A: Unsigned,
+    A: Unsigned + LeEqU16,
     T: Content + 'static,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
@@ -163,7 +162,6 @@ fn bench_query_fixed_10<
     usize: Cast<IDX>,
     Standard: Distribution<T>,
     FixedU16<A>: AxisFixed,
-    A: LeEqU16,
 {
     group.bench_with_input(
         BenchmarkId::new(subtype, initial_size),
