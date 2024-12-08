@@ -1,5 +1,16 @@
 # Kiddo Changelog
 
+## [5.0.1] - 2024-12-08
+
+### Performance
+
+- fix a performance regression on the immutable tree.
+
+### Documentation
+
+- ensure that the top-level documentation example shows v5 being imported.
+
+
 ## [5.0.0] - 2024-11-30
 
 Version 5 bundles a complete re-write of [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) alongside some rationalization of feature names and a change of type of the `max_qty` parameter present in some query methods from `usize` to `NonZero<usize>`.
