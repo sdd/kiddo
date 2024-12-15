@@ -5,12 +5,12 @@ use std::slice::ChunksExact;
 
 const CHUNK_SIZE: usize = 32;
 
-#[cfg(all(
+/*#[cfg(all(
     feature = "simd",
     target_feature = "avx2",
     any(target_arch = "x86", target_arch = "x86_64")
 ))]
-use super::f64_avx2::get_best_from_dists_f64_avx2;
+use super::f64_avx2::get_best_from_dists_f64_avx2;*/
 //use super::{f32_avx2::get_best_from_dists_f32_avx2};
 
 // #[cfg(all(
@@ -310,14 +310,14 @@ where
                     get_best_from_dists_f64_avx512(&acc, items, best_dist, best_item)
                 }
             } else */
-            if is_x86_feature_detected!("avx2") {
+            /*if is_x86_feature_detected!("avx2") {
                 #[cfg(target_feature = "avx2")]
                 unsafe {
                     get_best_from_dists_f64_avx2(&acc, items, best_dist, best_item)
                 }
-            } else {
-                update_nearest_dist_autovec(&acc, items, best_dist, best_item)
-            }
+            } else {*/
+            update_nearest_dist_autovec(&acc, items, best_dist, best_item)
+            // }
         }
 
         #[cfg(any(
