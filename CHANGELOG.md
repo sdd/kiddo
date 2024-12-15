@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.0.2] - 2024-12-15
+
+### 🐛 Bug Fixes
+
+- Disable broken get_best_from_dists_f64_avx2 until fixed
+
 ## [5.0.1] - 2024-12-08
 
 ### Performance
