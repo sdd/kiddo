@@ -237,7 +237,13 @@ jobs:
           toolchain: nightly
           components: rustfmt,clippy
 
-      - name: Cargo test
+      - name: Cargo test (dev build)
+        run: |
+          cargo run --example build-float-doctest-tree --features="rkyv"
+          cargo run --example build-immutable-doctest-tree --features="rkyv"
+          cargo test --workspace --all-features
+
+      - name: Cargo test (release build)
         env:
           RUSTFLAGS: '-C target-cpu=native'
         run: |
