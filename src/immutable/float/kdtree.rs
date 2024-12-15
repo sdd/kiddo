@@ -16,9 +16,7 @@ use crate::float_leaf_slice::leaf_slice::{LeafSlice, LeafSliceFloat, LeafSliceFl
 #[cfg(feature = "modified_van_emde_boas")]
 use crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 use crate::traits::Content;
-#[cfg(feature = "rkyv")]
-use aligned_vec::CACHELINE_ALIGN;
-use aligned_vec::{avec, AVec, ConstAlign};
+use aligned_vec::{avec, AVec, ConstAlign, CACHELINE_ALIGN};
 use array_init::array_init;
 use az::{Az, Cast};
 use cmov::Cmov;
@@ -370,7 +368,7 @@ where
 
     #[allow(clippy::too_many_arguments)]
     fn populate_recursive(
-        stems: &mut AVec<A, ConstAlign<128>>,
+        stems: &mut AVec<A, ConstAlign<{ CACHELINE_ALIGN }>>,
         dim: usize,
         source: &[[A; K]],
         sort_index: &mut [usize],
