@@ -134,4 +134,6 @@ pub use best_neighbour::BestNeighbour;
 pub use float::distance::Manhattan;
 pub use float::distance::SquaredEuclidean;
 pub use nearest_neighbour::NearestNeighbour;
+
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 pub use within_unsorted_iter::WithinUnsortedIter;
