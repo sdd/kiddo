@@ -24,21 +24,21 @@ jobs:
         with:
           find: "^kiddo = \".*\"$"
           include: "README.md"
-          replace: ${{ format('kiddo = "{0}"', steps.crate-version.outputs.version }}
+          replace: ${{ format('kiddo = "{0}"', steps.crate-version.outputs.version) }}
 
       - name: Find and Replace 2/3
         uses: jacobtomlinson/gha-find-replace@v3
         with:
           find: "^//! kiddo = \".*\"$"
           include: "src/lib.rs"
-          replace: ${{ format('kiddo = "{0}"', steps.crate-version.outputs.version }}
+          replace: ${{ format('kiddo = "{0}"', steps.crate-version.outputs.version) }}
 
       - name: Find and Replace 3/3
         uses: jacobtomlinson/gha-find-replace@v3
         with:
           find: "\"https://docs.rs/kiddo/.*?\""
           include: "src/lib.rs"
-          replace: ${{ format('"https://docs.rs/kiddo/{0}"', steps.crate-version.outputs.version }}
+          replace: ${{ format('"https://docs.rs/kiddo/{0}"', steps.crate-version.outputs.version) }}
 
       - name: Commit files
         run: |
