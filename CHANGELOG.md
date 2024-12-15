@@ -5,6 +5,8 @@
 ### 🐛 Bug Fixes
 
 - Disable broken get_best_from_dists_f64_avx2 until fixed
+- only export WithinUnsortedIter on archs where the within_unsorted_iter mod is configured (https://github.com/sdd/kiddo/issues/190)
+- fix: consistently use CACHELINE_ALIGN (https://github.com/sdd/kiddo/issues/190)
 
 ## [5.0.1] - 2024-12-08
 
