@@ -31,7 +31,7 @@ jobs:
         with:
           find: "//! kiddo = \".*\""
           include: "src/lib.rs"
-          replace: ${{ format('kiddo = "{0}"', steps.crate-version.outputs.version) }}
+          replace: ${{ format('//! kiddo = "{0}"', steps.crate-version.outputs.version) }}
 
       - name: Find and Replace 3/3
         uses: jacobtomlinson/gha-find-replace@v3
