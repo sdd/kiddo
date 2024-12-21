@@ -3,6 +3,9 @@ name: Pre-release String Updater
 on:
   push:
     branches: [ release-plz-* ]
+  pull_request:
+    types: [ opened, reopened ]
+    branches: [ release-plz-* ]
 
 jobs:
   pre-release-string-updater:
