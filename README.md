@@ -27,7 +27,7 @@ Kiddo provides:
 Add `kiddo` to `Cargo.toml`
 ```toml
 [dependencies]
-kiddo = "5.0.2"
+kiddo = "5.0.3"
 ```
 
 Add points to k-d tree and query nearest n points with distance function
