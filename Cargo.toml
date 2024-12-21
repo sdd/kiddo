@@ -61,7 +61,7 @@ serde_json = "1"
 kiddo = { path = ".", features = ["test_utils"] }
 
 [target.'cfg(any(target_arch = "x86_64", target_arch = "aarch64"))'.dependencies]
-generator = "0.8.1"
+generator = "0.8.4"
 
 [dependencies.csv]
 version = "1"
