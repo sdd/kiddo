@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.0.3] - 2024-12-21
+
+### Deps
+
+- Update generator dependency to 0.8.4, Fixes:https://github.com/sdd/kiddo/issues/182
+
 ## [5.0.2] - 2024-12-15
 
 ### 🐛 Bug Fixes
