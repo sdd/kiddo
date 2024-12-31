@@ -33,7 +33,7 @@ doc-comment = "0.3"
 elapsed = "0.1"
 fixed = { version = "1", features = ["num-traits"] }
 init_with = "1"
-itertools = "0.13"
+itertools = "0.14"
 log = "0.4"
 num-traits = "0.2"
 ordered-float = "4"
