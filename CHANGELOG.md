@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.0.4] - 2025-01-07
+
+### Chore
+
+- Update rust crate rstest to 0.24
+
 ## [5.0.3] - 2024-12-21
 
 ### Deps
