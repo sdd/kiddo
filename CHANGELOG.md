@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.0.4] - 2025-01-07
+
+### 🐛 Bug Fixes
+
+- Update rust crate itertools to 0.14
+
 ## [5.0.3] - 2024-12-21
 
 ### Deps
