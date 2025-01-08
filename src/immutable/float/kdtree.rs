@@ -11,11 +11,8 @@
 //! As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
 //! values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
 
-pub use crate::float::kdtree::Axis;
-use crate::float_leaf_slice::leaf_slice::{LeafSlice, LeafSliceFloat, LeafSliceFloatChunk};
-#[cfg(feature = "modified_van_emde_boas")]
-use crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
-use crate::traits::Content;
+use std::{cmp::PartialEq, fmt::Debug};
+
 use aligned_vec::{avec, AVec, ConstAlign, CACHELINE_ALIGN};
 use array_init::array_init;
 use az::{Az, Cast};
@@ -25,8 +22,14 @@ use ordered_float::OrderedFloat;
 use rkyv::vec::ArchivedVec;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::cmp::PartialEq;
-use std::fmt::Debug;
+
+pub use crate::float::kdtree::Axis;
+use crate::float_leaf_slice::leaf_slice::{LeafSlice, LeafSliceFloat, LeafSliceFloatChunk};
+#[cfg(feature = "rkyv_08")]
+use crate::immutable::float::rkyv_aligned_vec::EncodeAVec;
+#[cfg(feature = "modified_van_emde_boas")]
+use crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
+use crate::traits::Content;
 
 /// Immutable floating point k-d tree
 ///
@@ -45,8 +48,14 @@ use std::fmt::Debug;
 ///
 /// A convenient type alias exists for ImmutableKdTree with some sensible defaults set: [`kiddo::ImmutableKdTree`](`crate::ImmutableKdTree`).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "rkyv_08",
+    derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
+)]
+#[cfg_attr(feature = "rkyv_08", rkyv(crate=rkyv_08))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct ImmutableKdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize> {
+    #[cfg_attr(feature = "rkyv_08", rkyv(with = EncodeAVec<A>))]
     pub(crate) stems: AVec<A>,
 
     #[cfg_attr(feature = "serde", serde(with = "crate::custom_serde::array_of_vecs"))]
@@ -208,6 +217,37 @@ where
         LeafSlice::new(
             array_init::array_init(|i| &self.leaf_points[i][start as usize..end as usize]),
             &self.leaf_items[start as usize..end as usize],
+        )
+    }
+}
+
+#[cfg(feature = "rkyv_08")]
+impl<A, T, const K: usize, const B: usize> ArchivedImmutableKdTree<A, T, K, B>
+where
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + rkyv_08::Archive<Archived = A>,
+    T: Content + rkyv_08::Archive<Archived = T>,
+    usize: Cast<T>,
+{
+    /// Returns the current number of elements stored in the tree
+    #[inline]
+    pub fn size(&self) -> usize {
+        self.leaf_items.len()
+    }
+
+    /// Returns a LeafSlice for a given leaf index
+    #[inline]
+    pub(crate) fn get_leaf_slice(&self, leaf_idx: usize) -> LeafSlice<A, T, K> {
+        let extents = unsafe { self.leaf_extents.get_unchecked(leaf_idx) };
+        let start = Into::<u32>::into(extents.0) as usize;
+        let end = Into::<u32>::into(extents.1) as usize;
+
+        // Artificially extend size to be at least chunk length for faster processing
+        // TODO: why does this slow things down?
+        // let end = end.max(start + 32).min(self.leaf_items.len() as u32);
+
+        LeafSlice::new(
+            array_init::array_init(|i| &self.leaf_points[i][start..end]),
+            &self.leaf_items[start..end],
         )
     }
 }
