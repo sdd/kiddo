@@ -15,7 +15,7 @@
 //!
 //! Kiddo provides:
 //! - A standard floating-point k-d tree, exposed as [`kiddo::KdTree`](`crate::KdTree`), for when you may need to add or remove
-//!     points to the tree after the initial construction / deserialization
+//!   points to the tree after the initial construction / deserialization
 //! - An [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) with performance space and advantages over the standard
 //!   k-d tree, for situations where the tree does not need to be modified after creation
 //! - **integer / fixed point support** via the [`fixed`](https://docs.rs/fixed/latest/fixed/) crate;
