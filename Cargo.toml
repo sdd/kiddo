@@ -36,7 +36,7 @@ init_with = "1"
 itertools = "0.14"
 log = "0.4"
 num-traits = "0.2"
-ordered-float = "4"
+ordered-float = "5"
 sorted-vec = "0.8"
 ubyte = "0.10"
 
