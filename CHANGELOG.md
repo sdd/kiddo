@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.0.4] - 2025-03-17
+
+### 📝 Documentation
+
+- Fix extra spacing causing clippy lint failure
+
 ## [5.0.3] - 2024-12-21
 
 ### Deps
