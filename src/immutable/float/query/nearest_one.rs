@@ -71,6 +71,26 @@ where
     );
 }
 
+#[cfg(feature = "rkyv_08")]
+use crate::immutable::float::kdtree::ArchivedImmutableKdTree;
+#[cfg(feature = "rkyv_08")]
+impl<A, T, const K: usize, const B: usize> ArchivedImmutableKdTree<A, T, K, B>
+where
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + rkyv_08::Archive<Archived = A>,
+    T: Content + rkyv_08::Archive<Archived = T>,
+    usize: Cast<T>,
+{
+    generate_immutable_float_nearest_one!(
+        "use std::fs::File;
+    use memmap::MmapOptions;
+
+    use kiddo::immutable::float::kdtree::AlignedArchivedImmutableKdTree;
+
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
+    let tree = unsafe { access_unchecked::<Archived<ImmutableKdTree<f64, u32, 3, 256>>>(&buf) };"
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use crate::float::distance::SquaredEuclidean;
