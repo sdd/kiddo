@@ -1,7 +1,7 @@
 //! Definitions and implementations for some traits that are common between the [`float`](crate::float), [`immutable`](crate::immutable) and [`fixed`](crate::fixed)  modules
 use az::Cast;
 use divrem::DivCeil;
-use num_traits::{One, PrimInt, Unsigned, Zero};
+use num_traits::{PrimInt, Unsigned, Zero};
 use std::fmt::Debug;
 
 /// Content trait.
@@ -11,22 +11,20 @@ use std::fmt::Debug;
 /// than 65535 points, you could use a `u16`. All these types implement `Content` with no
 /// extra changes. Start off with a `usize` as that's easiest
 /// since you won't need to cast to / from usize when using query results to index into
-/// a Vec, and try switching tqo a smaller type and benchmarking to see if you get better
-/// performance.
+/// a Vec, and try switching to a smaller type and benchmarking to see if you get better
+/// performance.  However, any type that satisfies these trait constraints may be used; in
+/// particular, we use T::default() to initialize the KdTree content.
 pub trait Content:
-    Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync + Send
+    PartialEq + Default + Clone + Copy + Ord + Debug + Sync + Send
 {
 }
 impl<
-        T: Zero
-            + One
-            + PartialEq
+        T: PartialEq
             + Default
             + Clone
             + Copy
             + Ord
             + Debug
-            + std::ops::SubAssign
             + Sync
             + Send,
     > Content for T

@@ -21,6 +21,8 @@ distance metric function.
 Faster than querying for nearest_n(point, 1, ...) due
 to not needing to allocate memory or maintain sorted results.
 
+The nearest_one_point version also returns the coordinates of the nearest point.
+
 # Examples
 
 ```rust
@@ -40,6 +42,12 @@ to not needing to allocate memory or maintain sorted results.
 
     assert_eq!(nearest.distance, Fxd::from_num(0));
     assert_eq!(nearest.item, 100);
+
+    let (nearest, nearest_point) = tree.nearest_one_point::<SquaredEuclidean>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)]);
+
+    assert_eq!(nearest.distance, Fxd::from_num(0));
+    assert_eq!(nearest.item, 100);
+    assert_eq!(nearest_point, [Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)]);
 ```"#)
     );
 }
@@ -128,7 +136,7 @@ mod tests {
         content_to_add
             .iter()
             .for_each(|(point, content)| tree.add(point, *content));
-        assert_eq!(tree.size(), TREE_SIZE as u32);
+        assert_eq!(tree.size(), TREE_SIZE);
 
         let query_points: Vec<[Fxd; 4]> = (0..NUM_QUERIES)
             .map(|_| rand_data_fixed_u16_point::<U14, 4>())

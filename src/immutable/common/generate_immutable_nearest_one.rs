@@ -12,7 +12,7 @@ macro_rules! generate_immutable_nearest_one {
                 let mut off = [A::zero(); K];
                 let mut result = NearestNeighbour {
                     distance: A::max_value(),
-                    item: T::zero(),
+                    item: T::default(),
                 };
 
                 if self.stems.is_empty() {
