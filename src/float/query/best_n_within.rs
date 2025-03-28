@@ -196,7 +196,7 @@ mod tests {
         content_to_add
             .iter()
             .for_each(|(point, content)| tree.add(point, *content));
-        assert_eq!(tree.size(), TREE_SIZE as i32);
+        assert_eq!(tree.size(), TREE_SIZE);
 
         let query_points: Vec<[AX; 2]> = (0..NUM_QUERIES)
             .map(|_| rand::random::<[AX; 2]>())
