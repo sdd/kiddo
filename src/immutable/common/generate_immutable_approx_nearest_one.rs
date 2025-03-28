@@ -20,7 +20,7 @@ macro_rules! generate_immutable_approx_nearest_one {
                 let mut curr_idx: usize = 1;
 
                 let mut dim: usize = 0;
-                let mut best_item = T::zero();
+                let mut best_item = T::default();
                 let mut best_dist = A::max_value();
                 let mut level: i32 = 0;
                 let mut leaf_idx: usize = 0;

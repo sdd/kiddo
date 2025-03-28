@@ -156,7 +156,7 @@ where
     pub(crate) fn new() -> Self {
         Self {
             content_points: [[A::zero(); K]; B],
-            content_items: [T::zero(); B],
+            content_items: [T::default(); B],
             size: IDX::zero(),
         }
     }

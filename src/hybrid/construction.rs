@@ -232,7 +232,7 @@ where
                     leaf_node.content_items[p_index] =
                         leaf_node.content_items[leaf_node.size.az::<usize>() - 1];
 
-                    self.size -= T::one();
+                    self.size -= 1;
                     removed += 1;
                     leaf_node.size = leaf_node.size - IDX::one();
                 } else {

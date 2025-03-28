@@ -49,7 +49,7 @@ where
                 distance_fn,
                 StemIdx::Stem(IDX::one()),
                 0,
-                T::zero(),
+                T::default(),
                 A::max_value(),
                 &mut off,
                 A::zero(),
