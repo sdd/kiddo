@@ -8,28 +8,28 @@ use std::fmt::Debug;
 ///
 /// Must be implemented by any type that you want to use to represent the content
 /// stored in a KdTree. Generally this will be `usize`, `u32`, or for trees with less
-/// than 65535 points, you could use a `u16`. All these types implement `Content` with no
-/// extra changes. Start off with a `usize` as that's easiest
+/// than 65,535 points, you could use a `u16`. All these types implement `Content` with no
+/// extra changes. Start off with a `usize`, as that's easiest
 /// since you won't need to cast to / from usize when using query results to index into
-/// a Vec, and try switching tqo a smaller type and benchmarking to see if you get better
-/// performance.
+/// a Vec. Try switching to a smaller type and benchmarking to see if you get better
+/// performance. Any type that satisfies these trait constraints may be used; in
+/// particular, we use T::default() to initialize the KdTree content.
 pub trait Content:
-    Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync + Send
+    PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync + Send
 {
 }
+
 impl<
-        T: Zero
-            + One
-            + PartialEq
-            + Default
-            + Clone
-            + Copy
-            + Ord
-            + Debug
-            + std::ops::SubAssign
-            + Sync
-            + Send,
-    > Content for T
+    T: PartialEq
+        + Default
+        + Clone
+        + Copy
+        + Ord
+        + Debug
+        + std::ops::SubAssign
+        + Sync
+        + Send
+> Content for T
 {
 }
 

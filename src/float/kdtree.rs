@@ -108,7 +108,7 @@ pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B:
     pub(crate) leaves: Vec<LeafNode<A, T, K, B, IDX>>,
     pub(crate) stems: Vec<StemNode<A, K, IDX>>,
     pub(crate) root_index: IDX,
-    pub(crate) size: T,
+    pub(crate) size: usize,
 }
 
 #[doc(hidden)]
@@ -175,7 +175,7 @@ where
     pub(crate) fn new() -> Self {
         Self {
             content_points: [[A::zero(); K]; B],
-            content_items: [T::zero(); B],
+            content_items: [T::default(); B],
             size: IDX::zero(),
         }
     }
@@ -237,7 +237,7 @@ where
     pub fn with_capacity(capacity: usize) -> Self {
         assert!(capacity <= <IDX as Index>::capacity_with_bucket_size(B));
         let mut tree = Self {
-            size: T::zero(),
+            size: 0,
             stems: Vec::with_capacity(capacity.max(1).ilog2() as usize),
             leaves: Vec::with_capacity(DivCeil::div_ceil(capacity, B.az::<usize>())),
             root_index: <IDX as Index>::leaf_offset(),
@@ -319,8 +319,8 @@ macro_rules! generate_common_methods {
         /// assert_eq!(tree.size(), 2);
         /// ```
         #[inline]
-        pub fn size(&self) -> T {
-            self.size
+        pub fn size(&self) -> usize {
+            self.size as usize
         }
     };
 }
