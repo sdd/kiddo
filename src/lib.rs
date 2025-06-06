@@ -89,6 +89,7 @@ pub(crate) mod common;
 #[cfg(feature = "serde")]
 #[doc(hidden)]
 mod custom_serde;
+#[cfg(feature = "fixed")]
 pub mod fixed;
 pub mod float;
 pub mod immutable;

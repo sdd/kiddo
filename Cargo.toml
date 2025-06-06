@@ -31,7 +31,6 @@ cmov = "0.3"
 divrem = "1"
 doc-comment = "0.3"
 elapsed = "0.1"
-fixed = { version = "1", features = ["num-traits"] }
 init_with = "1"
 itertools = "0.14"
 log = "0.4"
@@ -67,6 +66,10 @@ generator = "0.8.4"
 version = "1"
 optional = true
 
+[dependencies.fixed]
+version = "1"
+features = ["num-traits"]
+optional = true
 
 # half 2.5.0 switched from rkyv 0.7 to rkyv 0.8.
 [dependencies.half]
@@ -133,17 +136,18 @@ optional = true
 
 [features]
 csv = ["dep:csv"]
-default = ["tracing"]
+default = ["tracing", "fixed"]
 modified_van_emde_boas = []
 f16 = ["dep:half"]
 f16_rkyv_08 = ["dep:half_2_5", "rkyv_08"]
+fixed = ["dep:fixed"]
 global_allocate = []
 las = ["dep:las"]
 serde = ["dep:serde", "serde/derive", "dep:serde_derive", "dep:serde_with", "fixed/serde", "aligned-vec/serde"]
 simd = []
 rkyv = ["dep:rkyv"]
 rkyv_08 = ["dep:rkyv_08"]
-test_utils = ["dep:rand", "dep:rand_chacha", "dep:rayon"]
+test_utils = ["dep:rand", "dep:rand_chacha", "dep:rayon", "dep:fixed"]
 tracing = ["dep:tracing", "dep:tracing-subscriber"]
 
 [package.metadata.docs.rs]
