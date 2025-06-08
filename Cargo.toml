@@ -43,7 +43,7 @@ ubyte = "0.10"
 [dev-dependencies]
 bincode = "1.3"
 codspeed-criterion-compat = "2"
-criterion = "0.5"
+criterion = "0.6"
 flate2 = { version = "1", features = ["zlib-ng-compat"], default-features = false }
 las = { version = "0.9", features = ["laz-parallel"] }
 log = "0.4"
