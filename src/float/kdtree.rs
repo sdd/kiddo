@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 /// by the type that is used as the first generic parameter, `A`,
 /// on the float [`KdTree`]. This will be [`f64`] or [`f32`],
 /// or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
+#[cfg(not(feature = "rkyv_08"))]
 pub trait Axis: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign {
     /// returns absolute diff between two values of a type implementing this trait
     fn saturating_dist(self, other: Self) -> Self;
@@ -29,7 +30,39 @@ pub trait Axis: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::Add
     /// used in query methods to update the rd value. Basically a saturating add for Fixed and an add for Float
     fn rd_update(rd: Self, delta: Self) -> Self;
 }
+
+/// Axis trait represents the traits that must be implemented
+/// by the type that is used as the first generic parameter, `A`,
+/// on the float [`KdTree`]. This will be [`f64`] or [`f32`],
+/// or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
+#[cfg(feature = "rkyv_08")]
+pub trait Axis:
+    FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign + rkyv_08::Archive
+{
+    /// returns absolute diff between two values of a type implementing this trait
+    fn saturating_dist(self, other: Self) -> Self;
+
+    /// used in query methods to update the rd value. Basically a saturating add for Fixed and an add for Float
+    fn rd_update(rd: Self, delta: Self) -> Self;
+}
+
+#[cfg(not(feature = "rkyv_08"))]
 impl<T: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign> Axis for T {
+    fn saturating_dist(self, other: Self) -> Self {
+        (self - other).abs()
+    }
+
+    #[inline]
+    fn rd_update(rd: Self, delta: Self) -> Self {
+        rd + delta
+    }
+}
+
+#[cfg(feature = "rkyv_08")]
+impl<
+        T: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign + rkyv_08::Archive,
+    > Axis for T
+{
     fn saturating_dist(self, other: Self) -> Self {
         (self - other).abs()
     }
