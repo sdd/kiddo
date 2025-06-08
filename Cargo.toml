@@ -31,7 +31,7 @@ cmov = "0.3"
 divrem = "1"
 doc-comment = "0.3"
 elapsed = "0.1"
-fixed = { version = "1", features = ["num-traits"] }
+fixed = { version = "1", features = ["num-traits"], optional = true}
 init_with = "1"
 itertools = "0.14"
 log = "0.4"
@@ -119,15 +119,16 @@ optional = true
 
 [features]
 csv = ["dep:csv"]
-default = ["tracing"]
+default = ["tracing", "fixed"]
 modified_van_emde_boas = []
 f16 = ["dep:half"]
+fixed = ["dep:fixed"]
 global_allocate = []
 las = ["dep:las"]
 serde = ["dep:serde", "serde/derive", "dep:serde_derive", "dep:serde_with", "fixed/serde", "aligned-vec/serde"]
 simd = []
 rkyv = ["dep:rkyv"]
-test_utils = ["dep:rand", "dep:rand_chacha", "dep:rayon"]
+test_utils = ["dep:rand", "dep:rand_chacha", "dep:rayon", "dep:fixed"]
 tracing = ["dep:tracing", "dep:tracing-subscriber"]
 
 [package.metadata.docs.rs]
