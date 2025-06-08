@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.1.0] - 2025-06-08
+
+### ✨ Features
+
+- Preallocate binary heap capacity
+
 ## [5.0.3] - 2024-12-21
 
 ### Deps
