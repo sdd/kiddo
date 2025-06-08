@@ -17,7 +17,7 @@ macro_rules! generate_immutable_best_n_within {
                 D: DistanceMetric<A, K>,
             {
                 let mut off = [A::zero(); K];
-                let mut best_items: BinaryHeap<BestNeighbour<A, T>> = BinaryHeap::new();
+                let mut best_items: BinaryHeap<BestNeighbour<A, T>> = BinaryHeap::with_capacity(max_qty.into());
 
                 #[cfg(not(feature = "modified_van_emde_boas"))]
                 let initial_stem_idx = 1;

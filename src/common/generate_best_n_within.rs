@@ -15,7 +15,7 @@ macro_rules! generate_best_n_within {
         D: DistanceMetric<A, K>,
     {
         let mut off = [A::zero(); K];
-        let mut best_items: BinaryHeap<BestNeighbour<A, T>> = BinaryHeap::new();
+        let mut best_items: BinaryHeap<BestNeighbour<A, T>> = BinaryHeap::with_capacity(max_qty);
 
         unsafe {
             self.best_n_within_recurse::<D>(

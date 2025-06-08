@@ -45,7 +45,7 @@ where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
         let mut off = [A::zero(); K];
-        let mut best_items: BinaryHeap<T> = BinaryHeap::new();
+        let mut best_items: BinaryHeap<T> = BinaryHeap::with_capacity(max_qty.into());
 
         unsafe {
             self.best_n_within_recurse(

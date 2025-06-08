@@ -178,7 +178,7 @@ where
     }
 
     #[inline]
-    fn as_full_chunks<const C: usize>(&self) -> LeafFixedSliceIterator<A, T, K, C> {
+    fn as_full_chunks<const C: usize>(&self) -> LeafFixedSliceIterator<'_, A, T, K, C> {
         let points_iterators = self.content_points.map(|i| i.chunks_exact(C));
         let items_iterator = self.content_items.chunks_exact(C);
 

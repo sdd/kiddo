@@ -118,7 +118,7 @@ pub trait DistanceMetric<A, const K: usize> {
     /// as measured by a particular distance metric.
     ///
     /// (needs to be implemented as it is used by the NN query implementations
-    /// to extend the min acceptable distance for a node when recursing
+    /// to extend the minimum acceptable distance for a node when recursing
     /// back up the tree)
     fn dist1(a: A, b: A) -> A;
 }
