@@ -198,7 +198,7 @@ where
 
     /// Returns a LeafSlice for a given leaf index
     #[inline]
-    pub(crate) fn get_leaf_slice(&self, leaf_idx: usize) -> LeafSlice<A, T, K> {
+    pub(crate) fn get_leaf_slice(&self, leaf_idx: usize) -> LeafSlice<'_, A, T, K> {
         let (start, end) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
 
         // Artificially extend size to be at least chunk length for faster processing
@@ -413,8 +413,7 @@ where
             debug_assert!(pivot > 0 || chunk_length == 1);
             debug_assert!(
                 stems[stem_index].is_infinite(),
-                "Wrote to stem #{:?} for a second time",
-                stem_index
+                "Wrote to stem #{stem_index:?} for a second time",
             );
 
             stems[stem_index] = source[sort_index[pivot]][dim];
@@ -535,11 +534,11 @@ where
 
     /// Returns a LeafSlice for a given leaf index
     #[inline]
-    pub(crate) fn get_leaf_slice(&self, leaf_idx: usize) -> LeafSlice<A, T, K> {
+    pub(crate) fn get_leaf_slice(&self, leaf_idx: usize) -> LeafSlice<'_, A, T, K> {
         let (start, end) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
 
         // Artificially extend size to be at least chunk length for faster processing
-        // TODO: why does this slow things down?
+        // TODO: why does this slow things down and break things?
         // let end = end.max(start + 32).min(self.leaf_items.len() as u32);
 
         LeafSlice::new(

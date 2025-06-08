@@ -28,7 +28,7 @@ pub(crate) mod array {
         type Value = [T; N];
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str(&format!("an array of length {}", N))
+            formatter.write_str(&format!("an array of length {N}"))
         }
 
         #[inline]
@@ -167,7 +167,7 @@ pub(crate) mod array_of_arrays {
         type Value = [[T; K]; N];
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str(&format!("an array of arrays, dimensions of {}x{}", K, N))
+            formatter.write_str(&format!("an array of arrays, dimensions of {K}x{N}"))
         }
 
         #[inline]
@@ -234,7 +234,7 @@ pub(crate) mod array_of_vecs {
         type Value = [Vec<T>; N];
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str(&format!("an array of vecs, dimension of {}", N))
+            formatter.write_str(&format!("an array of vecs, dimension of {N}"))
         }
 
         #[inline]
