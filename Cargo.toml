@@ -95,6 +95,11 @@ optional = true
 default-features = false
 features = ["alloc", "copy_unsafe", "size_64"]
 
+[dependencies.rkyv_08]
+package = "rkyv"
+version = "0.8.9"
+optional = true
+
 [dependencies.serde]
 version = "1"
 optional = true
@@ -127,6 +132,7 @@ las = ["dep:las"]
 serde = ["dep:serde", "serde/derive", "dep:serde_derive", "dep:serde_with", "fixed/serde", "aligned-vec/serde"]
 simd = []
 rkyv = ["dep:rkyv"]
+rkyv_08 = ["dep:rkyv_08"]
 test_utils = ["dep:rand", "dep:rand_chacha", "dep:rayon"]
 tracing = ["dep:tracing", "dep:tracing-subscriber"]
 
@@ -214,6 +220,16 @@ required-features = ["rkyv"]
 name = "immutable-rkyv-deserialize"
 path = "examples/immutable-rkyv-deserialize.rs"
 required-features = ["rkyv"]
+
+[[example]]
+name = "immutable-rkyv_08-serialize"
+path = "examples/immutable-rkyv_08-serialize.rs"
+required-features = ["rkyv_08"]
+
+[[example]]
+name = "immutable-rkyv_08-deserialize"
+path = "examples/immutable-rkyv_08-deserialize.rs"
+required-features = ["rkyv_08"]
 
 [[example]]
 name = "pointcloud-las"

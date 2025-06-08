@@ -79,7 +79,7 @@ macro_rules! generate_immutable_nearest_n_within {
                 D: DistanceMetric<A, K>,
                 R: ResultCollection<A, T>,
             {
-                if level > self.max_stem_level as usize || self.stems.is_empty() {
+                if level > i32::from(self.max_stem_level) as usize || self.stems.is_empty() {
                     self.search_leaf_for_nearest_n_within::<D, R>(query, radius, matching_items, leaf_idx as usize);
                     return;
                 }
@@ -153,7 +153,7 @@ macro_rules! generate_immutable_nearest_n_within {
                 use cmov::Cmov;
                 use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 
-                if level > self.max_stem_level || self.stems.is_empty() {
+                if level > i32::from(self.max_stem_level) || self.stems.is_empty() {
                     self.search_leaf_for_nearest_n_within::<D, R>(query, radius, matching_items, leaf_idx as usize);
                     return;
                 }

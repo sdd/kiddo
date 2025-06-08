@@ -79,6 +79,25 @@ where
     );
 }
 
+#[cfg(feature = "rkyv_08")]
+impl<A, T, const K: usize, const B: usize>
+    crate::immutable::float::kdtree::ArchivedImmutableKdTree<A, T, K, B>
+where
+    A: Copy + Default + PartialOrd + Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
+    T: Copy + Default + Content,
+    usize: Cast<T>,
+{
+    generate_immutable_float_best_n_within!(
+        "use std::fs::File;
+    use memmap::MmapOptions;
+
+    use kiddo::immutable::float::kdtree::AlignedArchivedImmutableKdTree;
+
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
+    let tree: AlignedArchivedImmutableKdTree<f64, u32, 3, 256> = AlignedArchivedImmutableKdTree::from_bytes(&mmap);"
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use crate::best_neighbour::BestNeighbour;
