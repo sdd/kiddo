@@ -75,7 +75,7 @@ macro_rules! generate_immutable_best_n_within {
                 usize: Cast<T>,
                 D: DistanceMetric<A, K>,
             {
-                if level as isize > self.max_stem_level as isize {
+                if level as isize > i32::from(self.max_stem_level) as isize {
                     self.search_leaf_for_best_n_within::<D>(query, radius, max_qty, best_items, leaf_idx as usize);
                     return;
                 }
@@ -153,7 +153,7 @@ macro_rules! generate_immutable_best_n_within {
                 use cmov::Cmov;
                 use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 
-                if level > self.max_stem_level {
+                if level > i32::from(self.max_stem_level) {
                     self.search_leaf_for_best_n_within::<D>(query, radius, max_qty, best_items, leaf_idx as usize);
                     return;
                 }
