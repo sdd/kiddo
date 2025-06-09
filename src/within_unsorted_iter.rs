@@ -18,3 +18,19 @@ impl<A, T> Iterator for WithinUnsortedIter<'_, A, T> {
         self.0.next()
     }
 }
+
+pub struct WithinUnsortedIterOwned<'a, A, T>(Generator<'a, (), NearestNeighbour<A, T>>);
+
+impl<'a, A, T> WithinUnsortedIterOwned<'a, A, T> {
+    pub(crate) fn new(gen: Generator<'a, (), NearestNeighbour<A, T>>) -> Self {
+        WithinUnsortedIterOwned(gen)
+    }
+}
+
+impl<A, T> Iterator for WithinUnsortedIterOwned<'_, A, T> {
+    type Item = NearestNeighbour<A, T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}

@@ -7,7 +7,7 @@ use crate::nearest_neighbour::NearestNeighbour;
 use crate::rkyv_utils::transform;
 use crate::traits::DistanceMetric;
 use crate::traits::{is_stem_index, Content, Index};
-use crate::within_unsorted_iter::WithinUnsortedIter;
+use crate::within_unsorted_iter::{WithinUnsortedIter, WithinUnsortedIterOwned};
 
 use crate::generate_within_unsorted_iter;
 
