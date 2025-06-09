@@ -35,6 +35,37 @@ macro_rules! generate_within_unsorted_iter {
                 WithinUnsortedIter::new(gen)
             }
 
+            #[inline]
+            pub fn within_unsorted_iter_owned<D>(
+                &'a self,
+                query: [A; K],
+                dist: A,
+            ) -> WithinUnsortedIterOwned<'a, A, T>
+            where
+                D: DistanceMetric<A, K>,
+            {
+                let mut off = [A::zero(); K];
+
+                let gen = Gn::new_scoped(move |gen_scope| {
+                    let query_ref = &query;
+                    unsafe {
+                        self.within_unsorted_iter_recurse::<D>(
+                            query_ref,
+                            dist,
+                            self.root_index,
+                            0,
+                            gen_scope,
+                            &mut off,
+                            A::zero(),
+                        );
+                    }
+
+                    done!();
+                });
+
+                WithinUnsortedIterOwned::new(gen)
+            }
+
             #[allow(clippy::too_many_arguments)]
             unsafe fn within_unsorted_iter_recurse<'scope, D>(
                 &'a self,
