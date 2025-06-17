@@ -193,6 +193,11 @@ path = "examples/build-immutable-doctest-tree.rs"
 required-features = ["rkyv"]
 
 [[example]]
+name = "build-immutable-doctest-tree-rkyv_08"
+path = "examples/build-immutable-doctest-tree-rkyv_08.rs"
+required-features = ["rkyv_08"]
+
+[[example]]
 name = "check-select-nth-unstable"
 path = "examples/check-select-nth-unstable.rs"
 

@@ -207,8 +207,7 @@ jobs:
 
       - name: Cargo test
         run: |
-          cargo run --example build-float-doctest-tree --features="rkyv_08"
-          cargo run --example build-immutable-doctest-tree --features="rkyv_08"
+          cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
           cargo test --workspace --features=serde,rkyv_08,test_utils
 
   test-all-features:
@@ -239,14 +238,12 @@ jobs:
 
       - name: Cargo test (dev build)
         run: |
-          cargo run --example build-float-doctest-tree --features="rkyv_08"
-          cargo run --example build-immutable-doctest-tree --features="rkyv_08"
+          cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
           cargo test --workspace --all-features
 
       - name: Cargo test (release build)
         env:
           RUSTFLAGS: '-C target-cpu=native'
         run: |
-          cargo run --example build-float-doctest-tree --features="rkyv_08"
-          cargo run --example build-immutable-doctest-tree --features="rkyv_08"
+          cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
           cargo test --workspace --all-features --release
