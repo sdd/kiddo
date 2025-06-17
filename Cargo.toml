@@ -206,10 +206,10 @@ name = "cities"
 path = "examples/cities.rs"
 required-features = ["csv"]
 
-[[example]]
-name = "half"
-path = "examples/half.rs"
-required-features = ["f16"]
+#[[example]]
+#name = "half"
+#path = "examples/half.rs"
+#required-features = ["f16"]
 
 [[example]]
 name = "immutable-large"
