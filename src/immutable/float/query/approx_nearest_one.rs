@@ -1,11 +1,11 @@
 use crate::float::kdtree::Axis;
+use crate::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
+use crate::generate_immutable_approx_nearest_one;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::traits::Content;
 use crate::traits::DistanceMetric;
 use az::Cast;
-
-use crate::generate_immutable_approx_nearest_one;
 
 macro_rules! generate_immutable_approx_float_nearest_one {
     ($doctest_build_tree:tt) => {
@@ -64,6 +64,24 @@ impl<
 
     let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
     let tree: AlignedArchivedImmutableKdTree<f64, u32, 3, 256> = AlignedArchivedImmutableKdTree::from_bytes(&mmap);"
+    );
+}
+
+#[cfg(feature = "rkyv_08")]
+impl<A, T, const K: usize, const B: usize>
+    crate::immutable::float::kdtree::ArchivedImmutableKdTree<A, T, K, B>
+where
+    A: Copy + Default + PartialOrd + Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
+    T: Copy + Default + Content,
+    usize: Cast<T>,
+{
+    generate_immutable_approx_float_nearest_one!(
+        "use std::fs::File;
+    use memmap::MmapOptions;
+    use rkyv::{access_unchecked, Archived};
+
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-test-tree-r08.rkyv\").unwrap()).unwrap() };
+    let tree = unsafe { access_unchecked::<ArchivedImmutableKdTree<Archived<f64>, Archived<u32>, 3, 256>>(&mmap) };"
     );
 }
 

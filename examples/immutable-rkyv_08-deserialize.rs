@@ -37,7 +37,7 @@ where
         let tree = unsafe { from_bytes_unchecked::<Tree, RkyvError>(&buf) }?;
         let loaded = Instant::now();
 
-        // perform a query
+        // perform some queries
         let nearest_neighbour = tree.nearest_one::<SquaredEuclidean>(&query);
 
         println!(
@@ -49,6 +49,68 @@ where
             ElapsedDuration::new(start.elapsed()),
             ElapsedDuration::new(loaded - start)
         );
+
+        let pre_query = Instant::now();
+        let approx_nearest_neighbour = tree.approx_nearest_one::<SquaredEuclidean>(&query);
+
+        println!(
+            "Approx nearest item to query (deserialized): {:?}",
+            approx_nearest_neighbour.item
+        );
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
+
+        let dist = 0.01;
+        let max_qty = NonZero::new(10).unwrap();
+
+        let pre_query = Instant::now();
+        let best_n_within = tree.best_n_within::<SquaredEuclidean>(&query, dist, max_qty);
+        ElapsedDuration::new(pre_query.elapsed());
+
+        let best_n_within = best_n_within.collect::<Vec<_>>();
+
+        println!(
+            "Best n items within radius of query (deserialized): {:?}",
+            best_n_within
+        );
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
+
+        let pre_query = Instant::now();
+        let nearest_n = tree.nearest_n::<SquaredEuclidean>(&query, max_qty);
+        ElapsedDuration::new(pre_query.elapsed());
+
+        println!("Nearest n items of query (deserialized): {:?}", nearest_n);
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
+
+        let pre_query = Instant::now();
+        let nearest_n_within =
+            tree.nearest_n_within::<SquaredEuclidean>(&query, dist, max_qty, true);
+        ElapsedDuration::new(pre_query.elapsed());
+
+        println!(
+            "Nearest n items (sorted) within radius of query (deserialized): {:?}",
+            nearest_n_within
+        );
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
+
+        let pre_query = Instant::now();
+        let within = tree.within::<SquaredEuclidean>(&query, dist);
+        ElapsedDuration::new(pre_query.elapsed());
+
+        println!(
+            "All items within radius of query, sorted (deserialized): ({:?} items)",
+            within.len()
+        );
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
+
+        let pre_query = Instant::now();
+        let within_unsorted = tree.within_unsorted::<SquaredEuclidean>(&query, dist);
+        ElapsedDuration::new(pre_query.elapsed());
+
+        println!(
+            "All items within radius of query, unsorted (deserialized): ({:?} items)",
+            within_unsorted.len()
+        );
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
     }
 
     {
@@ -72,6 +134,68 @@ where
             ElapsedDuration::new(start.elapsed()),
             ElapsedDuration::new(loaded - start)
         );
+
+        let pre_query = Instant::now();
+        let approx_nearest_neighbour = archived_tree.approx_nearest_one::<SquaredEuclidean>(&query);
+
+        println!(
+            "Approx nearest item to query (checked ZC): {:?}",
+            approx_nearest_neighbour.item
+        );
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
+
+        let dist = 0.01;
+        let max_qty = NonZero::new(10).unwrap();
+
+        let pre_query = Instant::now();
+        let best_n_within = archived_tree.best_n_within::<SquaredEuclidean>(&query, dist, max_qty);
+        ElapsedDuration::new(pre_query.elapsed());
+
+        let best_n_within = best_n_within.collect::<Vec<_>>();
+
+        println!(
+            "Best n items within radius of query (checked ZC): {:?}",
+            best_n_within
+        );
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
+
+        let pre_query = Instant::now();
+        let nearest_n = archived_tree.nearest_n::<SquaredEuclidean>(&query, max_qty);
+        ElapsedDuration::new(pre_query.elapsed());
+
+        println!("Nearest n items of query (checked ZC): {:?}", nearest_n);
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
+
+        let pre_query = Instant::now();
+        let nearest_n_within =
+            archived_tree.nearest_n_within::<SquaredEuclidean>(&query, dist, max_qty, true);
+        ElapsedDuration::new(pre_query.elapsed());
+
+        println!(
+            "Nearest n items (sorted) within radius of query (checked ZC): {:?}",
+            nearest_n_within
+        );
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
+
+        let pre_query = Instant::now();
+        let within = archived_tree.within::<SquaredEuclidean>(&query, dist);
+        ElapsedDuration::new(pre_query.elapsed());
+
+        println!(
+            "All items within radius of query, sorted (checked ZC): ({:?} items)",
+            within.len()
+        );
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
+
+        let pre_query = Instant::now();
+        let within_unsorted = archived_tree.within_unsorted::<SquaredEuclidean>(&query, dist);
+        ElapsedDuration::new(pre_query.elapsed());
+
+        println!(
+            "All items within radius of query, unsorted (checked ZC): ({:?} items)",
+            within_unsorted.len()
+        );
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
     }
 
     {
@@ -96,19 +220,67 @@ where
             ElapsedDuration::new(loaded - start)
         );
 
-        let within = archived_tree.within::<SquaredEuclidean>(&query, 0.01);
-        println!(
-            "items within 0.01 of query (unchecked ZC): {:?}",
-            within.len()
-        );
+        let pre_query = Instant::now();
+        let approx_nearest_neighbour = archived_tree.approx_nearest_one::<SquaredEuclidean>(&query);
 
-        let best_n_within = archived_tree
-            .best_n_within::<SquaredEuclidean>(&query, 0.01, NonZero::new(10).unwrap())
-            .collect::<Vec<_>>();
         println!(
-            "best 10 items within 0.01 of query (unchecked ZC): {:?}",
+            "Approx nearest item to query (unchecked ZC): {:?}",
+            approx_nearest_neighbour.item
+        );
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
+
+        let dist = 0.01;
+        let max_qty = NonZero::new(10).unwrap();
+
+        let pre_query = Instant::now();
+        let best_n_within = archived_tree.best_n_within::<SquaredEuclidean>(&query, dist, max_qty);
+        ElapsedDuration::new(pre_query.elapsed());
+
+        let best_n_within = best_n_within.collect::<Vec<_>>();
+
+        println!(
+            "Best n items within radius of query (unchecked ZC): {:?}",
             best_n_within
         );
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
+
+        let pre_query = Instant::now();
+        let nearest_n = archived_tree.nearest_n::<SquaredEuclidean>(&query, max_qty);
+        ElapsedDuration::new(pre_query.elapsed());
+
+        println!("Nearest n items of query (unchecked ZC): {:?}", nearest_n);
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
+
+        let pre_query = Instant::now();
+        let nearest_n_within =
+            archived_tree.nearest_n_within::<SquaredEuclidean>(&query, dist, max_qty, true);
+        ElapsedDuration::new(pre_query.elapsed());
+
+        println!(
+            "Nearest n items (sorted) within radius of query (unchecked ZC): {:?}",
+            nearest_n_within
+        );
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
+
+        let pre_query = Instant::now();
+        let within = archived_tree.within::<SquaredEuclidean>(&query, dist);
+        ElapsedDuration::new(pre_query.elapsed());
+
+        println!(
+            "All items within radius of query, sorted (unchecked ZC): ({:?} items)",
+            within.len()
+        );
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
+
+        let pre_query = Instant::now();
+        let within_unsorted = archived_tree.within_unsorted::<SquaredEuclidean>(&query, dist);
+        ElapsedDuration::new(pre_query.elapsed());
+
+        println!(
+            "All items within radius of query, unsorted (unchecked ZC): ({:?} items)",
+            within_unsorted.len()
+        );
+        println!("took {}.\n", ElapsedDuration::new(pre_query.elapsed()));
     }
 
     Ok(())

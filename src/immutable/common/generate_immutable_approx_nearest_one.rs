@@ -22,10 +22,10 @@ macro_rules! generate_immutable_approx_nearest_one {
                 let mut dim: usize = 0;
                 let mut best_item = T::zero();
                 let mut best_dist = A::max_value();
-                let mut level: usize = 0;
+                let mut level: i32 = 0;
                 let mut leaf_idx: usize = 0;
 
-                while level as isize <= self.max_stem_level as isize {
+                while level <= Into::<i32>::into(self.max_stem_level) {
                     let val = *unsafe { self.stems.get_unchecked(curr_idx) };
                     let is_right_child = *unsafe { query.get_unchecked(dim) } >= val;
 
@@ -43,12 +43,40 @@ macro_rules! generate_immutable_approx_nearest_one {
                     dim = (dim + 1) % K;
                 }
 
+                // Handle the archived tuple differently depending on the feature
+                #[cfg(feature = "rkyv_08")]
+                let leaf_extent = unsafe { self.leaf_extents.get_unchecked(leaf_idx) };
+                #[cfg(feature = "rkyv_08")]
+                let start = leaf_extent.0;
+                #[cfg(feature = "rkyv_08")]
+                let end = leaf_extent.1;
+
+                #[cfg(not(feature = "rkyv_08"))]
                 let (start, end) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
+
+                let start = Into::<u32>::into(start);
+                let end = Into::<u32>::into(end);
 
                 let leaf_slice = $crate::float_leaf_slice::leaf_slice::LeafSlice::new(
                     array_init::array_init(|i|
+                        #[cfg(feature = "rkyv_08")]
+                        {
+                            // Transmute the archived slice to the regular type slice
+                            let archived_slice = &self.leaf_points[i][start as usize..end as usize];
+                            #[allow(clippy::missing_transmute_annotations)]
+                            unsafe { std::mem::transmute(archived_slice) }
+                        },
+                        #[cfg(not(feature = "rkyv_08"))]
                         &self.leaf_points[i][start as usize..end as usize]
                     ),
+                    #[cfg(feature = "rkyv_08")]
+                    {
+                        // Transmute the archived slice to the regular type slice
+                        let archived_slice = &self.leaf_items[start as usize..end as usize];
+                        #[allow(clippy::missing_transmute_annotations)]
+                        unsafe { std::mem::transmute(archived_slice) }
+                    },
+                    #[cfg(not(feature = "rkyv_08"))]
                     &self.leaf_items[start as usize..end as usize],
                 );
 
