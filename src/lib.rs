@@ -5,6 +5,7 @@
 #![warn(rustdoc::private_intra_doc_links)]
 #![doc(html_root_url = "https://docs.rs/kiddo/5.0.3")]
 #![doc(issue_tracker_base_url = "https://github.com/sdd/kiddo/issues/")]
+#![feature(stmt_expr_attributes)]
 
 //! # Kiddo
 //!

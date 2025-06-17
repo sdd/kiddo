@@ -11,10 +11,10 @@
 //! As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
 //! values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
 
-#[cfg(feature = "rkyv_08")]
-use crate::immutable::float::rkyv_aligned_vec::EncodeAVec;
 pub use crate::float::kdtree::Axis;
 use crate::float_leaf_slice::leaf_slice::{LeafSlice, LeafSliceFloat, LeafSliceFloatChunk};
+#[cfg(feature = "rkyv_08")]
+use crate::immutable::float::rkyv_aligned_vec::EncodeAVec;
 #[cfg(feature = "modified_van_emde_boas")]
 use crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 use crate::traits::Content;
@@ -27,9 +27,9 @@ use ordered_float::OrderedFloat;
 use rkyv::vec::ArchivedVec;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::{cmp::PartialEq, fmt::Debug};
 #[cfg(feature = "rkyv_08")]
 use std::fmt::Formatter;
+use std::{cmp::PartialEq, fmt::Debug};
 
 /// Immutable floating point k-d tree
 ///
