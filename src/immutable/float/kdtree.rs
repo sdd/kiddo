@@ -777,7 +777,7 @@ mod tests {
         let tree: ImmutableKdTree<f32, usize, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
-        println!("tree: {:?}", tree);
+        println!("tree: {tree:?}");
     }
 
     #[test]

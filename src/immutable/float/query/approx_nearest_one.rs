@@ -1,4 +1,5 @@
 use crate::float::kdtree::Axis;
+#[allow(unused_imports)]
 use crate::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::generate_immutable_approx_nearest_one;
 use crate::immutable::float::kdtree::ImmutableKdTree;

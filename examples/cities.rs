@@ -160,7 +160,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             )
         })
         .collect::<Vec<_>>();
-    println!("\nNearest 5 cities to 52.5N, 1.9W: {:?}", nearest_5);
+    println!("\nNearest 5 cities to 52.5N, 1.9W: {nearest_5:?}");
 
     // ### Find all cities within 1000km of 0N, 0E
     // Kiddo's `within` method returns the indices of all points within
@@ -174,7 +174,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .iter()
         .map(|neighbour| &cities[neighbour.item].name)
         .collect::<Vec<_>>();
-    println!("\nAll cities within 1000km of 0N, 0W: {:?}", all_within);
+    println!("\nAll cities within 1000km of 0N, 0W: {all_within:?}");
 
     // ### Find the most populous 3 cities within 500km of 0N, 0E
     // Kiddo provides a `best_n_within` method that can provide great performance
@@ -192,10 +192,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let best_3 = best_3_iter
         .map(|neighbour| (&cities[neighbour.item].name))
         .collect::<Vec<_>>();
-    println!(
-        "\nMost populous 3 cities within 1000km of 0N, 0W: {:?}",
-        best_3
-    );
+    println!("\nMost populous 3 cities within 1000km of 0N, 0W: {best_3:?}");
 
     Ok(())
 }

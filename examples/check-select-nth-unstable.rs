@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Starting test\n");
     for trial_num in 0..NUM_TRIALS {
         let progress = trial_num * 100 / NUM_TRIALS;
-        print!("\rProgress: {:?}%", progress);
+        print!("\rProgress: {progress:?}%");
         let _ = io::stdout().flush();
 
         // 1) Build a list, consisting of the numbers 0 to NUM_DISTINCT_VALS,
