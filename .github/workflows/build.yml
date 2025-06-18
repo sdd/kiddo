@@ -238,6 +238,8 @@ jobs:
 
       - name: Cargo test (dev build)
         run: |
+          cargo run --example build-float-doctest-tree --features="rkyv"
+          cargo run --example build-immutable-doctest-tree --features="rkyv"
           cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
           cargo test --workspace --all-features
 
@@ -245,5 +247,7 @@ jobs:
         env:
           RUSTFLAGS: '-C target-cpu=native'
         run: |
+          cargo run --example build-float-doctest-tree --features="rkyv"
+          cargo run --example build-immutable-doctest-tree --features="rkyv"
           cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
           cargo test --workspace --all-features --release
