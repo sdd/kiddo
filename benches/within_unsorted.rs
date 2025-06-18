@@ -51,7 +51,7 @@ pub fn within_unsorted_large(c: &mut Criterion) {
 }
 
 fn within_unsorted(c: &mut Criterion, radius: f64, radius_name: &str) {
-    let mut group = c.benchmark_group(format!("Query: within_unsorted, {} radius", radius_name));
+    let mut group = c.benchmark_group(format!("Query: within_unsorted, {radius_name} radius"));
     group.throughput(Throughput::Elements(QUERY_POINTS_PER_LOOP as u64));
 
     let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);

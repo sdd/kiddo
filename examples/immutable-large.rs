@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let content_to_add: Vec<[f64; 4]> = (0..TREE_SIZE).map(|_| rng.gen::<[f64; 4]>()).collect();
 
     let start = Instant::now();
-    println!("Building an optimized tree of {:?} items...", TREE_SIZE);
+    println!("Building an optimized tree of {TREE_SIZE:?} items...");
     let tree: ImmutableKdTree<f64, usize, 4, 32> = ImmutableKdTree::new_from_slice(&content_to_add);
     println!(
         "Construction complete. ({})",
@@ -56,7 +56,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // println!("Tree Stats: {:?}", tree.generate_stats());
 
     let query_points = build_query_points_float(QUERY_POINT_QTY);
-    println!("Performing {:?} random NN queries...", QUERY_POINT_QTY);
+    println!("Performing {QUERY_POINT_QTY:?} random NN queries...");
 
     let start = Instant::now();
     query_points.par_iter().for_each(|point| {

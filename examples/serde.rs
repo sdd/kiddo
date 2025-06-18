@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
     let nearest_neighbour = kdtree.nearest_one::<SquaredEuclidean>(&query);
     let nearest_city = &cities[nearest_neighbour.item as usize];
-    println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest_city);
+    println!("\nNearest city to 52.5N, 1.9W: {nearest_city:?}");
 
     let start = Instant::now();
     let file = File::create("./examples/geonames-tree.bincode.gz")?;
@@ -99,7 +99,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
     let nearest_neighbour = deserialized_tree.nearest_one::<SquaredEuclidean>(&query);
     let nearest_city = &cities[nearest_neighbour.item as usize];
-    println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest_city);
+    println!("\nNearest city to 52.5N, 1.9W: {nearest_city:?}");
 
     let city_points: Vec<_> = cities.iter().map(|city| city.as_xyz()).collect();
     println!("Building an ImmutableKdTree...");
@@ -134,7 +134,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
     let nearest_neighbour_result = deserialized_tree.nearest_one::<SquaredEuclidean>(&query);
     let nearest = &cities[nearest_neighbour_result.item as usize];
-    println!("\nNearest city to 52.5N, 1.9W: {:?}", nearest);
+    println!("\nNearest city to 52.5N, 1.9W: {nearest:?}");
 
     Ok(())
 }
