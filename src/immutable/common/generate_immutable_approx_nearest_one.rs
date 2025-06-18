@@ -43,42 +43,36 @@ macro_rules! generate_immutable_approx_nearest_one {
                     dim = (dim + 1) % K;
                 }
 
-                // Handle the archived tuple differently depending on the feature
                 #[cfg(feature = "rkyv_08")]
-                let leaf_extent = unsafe { self.leaf_extents.get_unchecked(leaf_idx) };
-                #[cfg(feature = "rkyv_08")]
-                let start = leaf_extent.0;
-                #[cfg(feature = "rkyv_08")]
-                let end = leaf_extent.1;
+                #[allow(clippy::missing_transmute_annotations)]
+                let leaf_slice = {
+                    let leaf_extent = unsafe { self.leaf_extents.get_unchecked(leaf_idx) };
+                    let start = Into::<u32>::into(leaf_extent.0);
+                    let end = Into::<u32>::into(leaf_extent.1);
+
+                    $crate::float_leaf_slice::leaf_slice::LeafSlice::new(
+                        array_init::array_init(|i| {
+                            let archived_slice = &self.leaf_points[i][start as usize..end as usize];
+                            unsafe { std::mem::transmute(archived_slice) }
+                        }),
+                        {
+                            let archived_slice = &self.leaf_items[start as usize..end as usize];
+                            unsafe { std::mem::transmute(archived_slice) }
+                        }
+                    )
+                };
 
                 #[cfg(not(feature = "rkyv_08"))]
-                let (start, end) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
+                let leaf_slice = {
+                    let (start, end) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
 
-                let start = Into::<u32>::into(start);
-                let end = Into::<u32>::into(end);
-
-                let leaf_slice = $crate::float_leaf_slice::leaf_slice::LeafSlice::new(
-                    array_init::array_init(|i|
-                        #[cfg(feature = "rkyv_08")]
-                        {
-                            // Transmute the archived slice to the regular type slice
-                            let archived_slice = &self.leaf_points[i][start as usize..end as usize];
-                            #[allow(clippy::missing_transmute_annotations)]
-                            unsafe { std::mem::transmute(archived_slice) }
-                        },
-                        #[cfg(not(feature = "rkyv_08"))]
-                        &self.leaf_points[i][start as usize..end as usize]
-                    ),
-                    #[cfg(feature = "rkyv_08")]
-                    {
-                        // Transmute the archived slice to the regular type slice
-                        let archived_slice = &self.leaf_items[start as usize..end as usize];
-                        #[allow(clippy::missing_transmute_annotations)]
-                        unsafe { std::mem::transmute(archived_slice) }
-                    },
-                    #[cfg(not(feature = "rkyv_08"))]
-                    &self.leaf_items[start as usize..end as usize],
-                );
+                    $crate::float_leaf_slice::leaf_slice::LeafSlice::new(
+                        array_init::array_init(|i|
+                            &self.leaf_points[i][start as usize..end as usize]
+                        ),
+                        &self.leaf_items[start as usize..end as usize],
+                    )
+                };
 
                 leaf_slice.nearest_one::<D>(
                     query,
