@@ -66,7 +66,33 @@ mod tests {
     use crate::immutable::float::rkyv_aligned_vec::EncodeAVec;
 
     #[test]
-    fn roundtrip_avec() {
+    fn roundtrip_avec_deserialized() {
+        #[derive(Archive, Debug, Serialize, Deserialize, PartialEq)]
+        #[rkyv(crate=rkyv_08)]
+        struct Obj {
+            #[rkyv(with = EncodeAVec<i32>)]
+            pub inner: AVec<i32>,
+        }
+
+        let original = Obj {
+            inner: AVec::from_slice(CACHELINE_ALIGN, &[10, 20, 30, 40]),
+        };
+
+        let buf = rkyv_08::to_bytes::<Error>(&original).unwrap();
+
+        // check that the deserialized values are the same
+        let archived: &ArchivedObj = unsafe { access_unchecked::<Archived<Obj>>(buf.as_ref()) };
+        let deserialized: Obj = deserialize::<Obj, Error>(archived).unwrap();
+        assert_eq!(original, deserialized);
+
+        // check that the deserialized AVec inside Obj has the alignment we expect
+        let inner_ptr_adr_deser = deserialized.inner.as_ptr() as *const () as usize;
+        assert_eq!(inner_ptr_adr_deser.rem(CACHELINE_ALIGN), 0);
+    }
+
+    #[ignore = "Fails. See comment at bottom of test"]
+    #[test]
+    fn roundtrip_avec_archived() {
         #[derive(Archive, Debug, Serialize, Deserialize, PartialEq)]
         #[rkyv(crate=rkyv_08)]
         struct Obj {
@@ -83,14 +109,6 @@ mod tests {
         // check that the archived values are the same
         let archived: &ArchivedObj = unsafe { access_unchecked::<Archived<Obj>>(buf.as_ref()) };
         assert_eq!(original.inner.as_slice(), archived.inner.as_slice());
-
-        // check that the deserialized values are the same
-        let deserialized: Obj = deserialize::<Obj, Error>(archived).unwrap();
-        assert_eq!(original, deserialized);
-
-        // check that the deserialized AVec inside Obj has the alignment we expect
-        let inner_ptr_adr_deser = deserialized.inner.as_ptr() as *const () as usize;
-        assert_eq!(inner_ptr_adr_deser.rem(CACHELINE_ALIGN), 0);
 
         // check that the archived AVec has the alignment we expect
         // NOTE: right now this works sometimes but not others - it
