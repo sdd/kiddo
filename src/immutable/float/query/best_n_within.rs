@@ -90,11 +90,10 @@ where
     generate_immutable_float_best_n_within!(
         "use std::fs::File;
     use memmap::MmapOptions;
+    use kiddo::immutable::float::kdtree::ArchivedImmutableKdTree;
 
-    use kiddo::immutable::float::kdtree::AlignedArchivedImmutableKdTree;
-
-    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
-    let tree: AlignedArchivedImmutableKdTree<f64, u32, 3, 256> = AlignedArchivedImmutableKdTree::from_bytes(&mmap);"
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree_rkyv08.rkyv\").unwrap()).unwrap() };
+    let tree = unsafe { rkyv_08::access_unchecked::<ArchivedImmutableKdTree<f64, u32, 3, 256>>(&mmap) };"
     );
 }
 

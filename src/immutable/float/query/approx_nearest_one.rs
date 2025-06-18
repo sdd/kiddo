@@ -79,10 +79,11 @@ where
     generate_immutable_approx_float_nearest_one!(
         "use std::fs::File;
     use memmap::MmapOptions;
-    use rkyv::{access_unchecked, Archived};
+    use rkyv_08::{access_unchecked, Archived};
+    use kiddo::immutable::float::kdtree::ArchivedImmutableKdTree;
 
-    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-test-tree-r08.rkyv\").unwrap()).unwrap() };
-    let tree = unsafe { access_unchecked::<ArchivedImmutableKdTree<Archived<f64>, Archived<u32>, 3, 256>>(&mmap) };"
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree_rkyv08.rkyv\").unwrap()).unwrap() };
+    let tree = unsafe { access_unchecked::<ArchivedImmutableKdTree<f64, u32, 3, 256>>(&mmap) };"
     );
 }
 
