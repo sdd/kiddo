@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.0.4] - 2025-06-19
+
+### Chore
+
+- Convert doctest file load unwraps to expects to help track down which files are missing. Fix broken CI tests by ensuring missing test files are created before running the test
+
 ## [5.0.3] - 2024-12-21
 
 ### Deps
