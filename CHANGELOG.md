@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.0.4] - 2025-06-19
+
+### Chore
+
+- Clean up unused deps and move some deps to dev-deps
+
 ## [5.0.3] - 2024-12-21
 
 ### Deps
