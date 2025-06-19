@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.0.4] - 2025-06-19
+
+### 🐛 Bug Fixes
+
+- Update rust crate ordered-float to v5
+
 ## [5.0.3] - 2024-12-21
 
 ### Deps
