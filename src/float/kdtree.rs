@@ -1,6 +1,9 @@
 //! Floating point k-d tree, for use when the co-ordinates of the points being stored in the tree
 //! are floats. f64 or f32 are supported currently, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html)
-//! if the `f16` feature is enabled.
+//! if the `f16` feature is enabled. (NB if you are using `rkyv` 0.8 via the `rkyv_08` feature and want
+//! to use `f16`, you'll need to enable the `f16_rkyv_08` feature instead of `f16`. this is because versions
+//! of the `half`  up to 2.4.1 support `rkyv` 0.7 only, and versions of the `half` crate from 2.5.0 onwards
+//! support `rkyv` 0.8 only.
 //!
 //! (Most of the structs listed in these docs are only relevant when using `rkyv` for zero-copy
 //! deserialization. The main Struct in here, [`KdTree`], is usually what you're looking for.)
@@ -21,7 +24,8 @@ use serde::{Deserialize, Serialize};
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
 /// on the float [`KdTree`]. This will be [`f64`] or [`f32`],
-/// or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
+/// or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` or `f16_rkyv_08` features
+/// are enabled
 #[cfg(not(feature = "rkyv_08"))]
 pub trait Axis: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign {
     /// returns absolute diff between two values of a type implementing this trait
@@ -34,7 +38,8 @@ pub trait Axis: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::Add
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
 /// on the float [`KdTree`]. This will be [`f64`] or [`f32`],
-/// or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
+/// or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` or `f16_rkyv_08` features
+/// are enabled
 #[cfg(feature = "rkyv_08")]
 pub trait Axis:
     FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign + rkyv_08::Archive
@@ -86,7 +91,8 @@ impl<
 ///
 /// For use when the co-ordinates of the points being stored in the tree
 /// on the float [`KdTree`]. This will be [`f64`] or [`f32`],
-/// or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
+/// or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` or `f16_rkyv_08` features
+/// are enabled
 ///
 /// A convenient type alias exists for KdTree with some sensible defaults set: [`kiddo::KdTree`](`crate::KdTree`).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

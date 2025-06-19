@@ -9,7 +9,8 @@
 //! This comes at the expense of not being able to modify the contents of the tree after its initial
 //! construction, and longer construction times - perhaps prohibitively so.
 //! As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
-//! values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
+//! values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` or `f16_rkyv_08` features
+//! are enabled.
 
 pub use crate::float::kdtree::Axis;
 use crate::float_leaf_slice::leaf_slice::{LeafSlice, LeafSliceFloat, LeafSliceFloatChunk};
@@ -44,7 +45,8 @@ use std::{cmp::PartialEq, fmt::Debug};
 /// more so than the standard and non-dynamic immutable tree types.
 ///
 /// As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
-/// values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` feature is enabled
+/// values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` or `f16_rkyv_08` features
+/// are enabled
 ///
 /// A convenient type alias exists for ImmutableKdTree with some sensible defaults set: [`kiddo::ImmutableKdTree`](`crate::ImmutableKdTree`).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

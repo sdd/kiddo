@@ -181,7 +181,7 @@ jobs:
         run: cargo hack check --workspace --each-feature --all-targets
 
   test-basic:
-    name: Run Tests (Stable, no crate features enabled that require unstable Rust)
+    name: Run Tests (Stable, no crate features enabled that require unstable Rust, Rkyv 0.7)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -207,11 +207,41 @@ jobs:
 
       - name: Cargo test
         run: |
-          cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
-          cargo test --workspace --features=serde,rkyv_08,test_utils
+          cargo run --example build-immutable-doctest-tree --features="rkyv"
+          cargo test --workspace --features=serde,rkyv,test_utils
 
-  test-all-features:
-    name: Run Tests (Nightly, all features enabled)
+  test-basic-rkyv-08:
+    name: Run Tests (Stable, no crate features enabled that require unstable Rust, Rkyv 0.8)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        show-progress: false
+
+    - name: Get latest stable Rust version
+      run: |
+        echo "LATEST_STABLE_RUST_VERSION=$(gh api /repos/rust-lang/rust/releases --jq ".[0].tag_name")" >> "$GITHUB_ENV"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Cache Toolchain
+      uses: actions/cache@v4
+      with:
+        path: ~/.rustup
+        key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
+
+    - name: Install `stable` Toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        components: rustfmt,clippy
+
+    - name: Cargo test
+      run: |
+        cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
+        cargo test --workspace --features=serde,rkyv_08,test_utils
+
+  test-all-features-rkyv-07:
+    name: Run Tests (Nightly, all features enabled except `rkyv_08`)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -240,8 +270,7 @@ jobs:
         run: |
           cargo run --example build-float-doctest-tree --features="rkyv"
           cargo run --example build-immutable-doctest-tree --features="rkyv"
-          cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
-          cargo test --workspace --all-features
+          cargo test --workspace --features "csv,f16,las,serde,simd,rkyv,test_utils,tracing"
 
       - name: Cargo test (release build)
         env:
@@ -249,5 +278,42 @@ jobs:
         run: |
           cargo run --example build-float-doctest-tree --features="rkyv"
           cargo run --example build-immutable-doctest-tree --features="rkyv"
+          cargo test --workspace --features "csv,f16,las,serde,simd,rkyv,test_utils,tracing" --release
+
+  test-all-features-rkyv-08:
+    name: Run Tests (Nightly, all features enabled except `rkyv` to allow rkyv 0.8 support)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          show-progress: false
+
+      - name: Get date
+        run: |
+          echo "TODAY_DATE=$(date -Idate)" >> "$GITHUB_ENV"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.rustup
+          key: toolchain-x86-64-nightly-${{ env.TODAY_DATE }}
+
+      - name: Install `nightly` Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rustfmt,clippy
+
+      - name: Cargo test (dev build)
+        run: |
           cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
-          cargo test --workspace --all-features --release
+          cargo test --workspace --features "csv,f16_rkyv_08,las,serde,simd,rkyv_08,test_utils,tracing"
+
+      - name: Cargo test (release build)
+        env:
+          RUSTFLAGS: '-C target-cpu=native'
+        run: |
+          cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
+          cargo test --workspace --features "csv,f16_rkyv_08,las,serde,simd,rkyv_08,test_utils,tracing" --release
