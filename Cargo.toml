@@ -70,7 +70,7 @@ optional = true
 
 # half 2.5.0 switched from rkyv 0.7 to rkyv 0.8.
 [dependencies.half]
-version = "<=2.4.1"
+version = "<=2.6.0"
 optional = true
 features = ["num-traits"]
 
