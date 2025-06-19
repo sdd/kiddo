@@ -91,7 +91,7 @@ version = "0.8"
 optional = true
 
 [dependencies.rand_chacha]
-version = "0.3"
+version = "0.9"
 optional = true
 
 [dependencies.rayon]
