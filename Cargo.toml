@@ -30,22 +30,18 @@ az = "1"
 cmov = "0.3"
 divrem = "1"
 doc-comment = "0.3"
-elapsed = "0.1"
-init_with = "1"
-itertools = "0.14"
-log = "0.4"
 num-traits = "0.2"
 ordered-float = "5"
 sorted-vec = "0.8"
-ubyte = "0.10"
 
 [dev-dependencies]
 bincode = "1.3"
 codspeed-criterion-compat = "2"
 criterion = "0.5"
+elapsed = "0.1"
 flate2 = { version = "1", features = ["zlib-ng-compat"], default-features = false }
+itertools = "0.14"
 las = { version = "0.9", features = ["laz-parallel"] }
-log = "0.4"
 memmap = "0.7"
 proc-macro2 = { version = "1", features=["default", "proc-macro"] }
 radians = "0.3"
@@ -55,6 +51,7 @@ rayon = "1"
 rstest = "0.25"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
+ubyte = "0.10"
 # required to be able to run tests without specifying --features=test_utils
 # see https://github.com/rust-lang/cargo/issues/2911#issuecomment-749580481
 kiddo = { path = ".", features = ["test_utils"] }
