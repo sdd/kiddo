@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.0.4] - 2025-06-19
+
+### Ci
+
+- Update renovate bot config so that it ignores deps that are pined to old versions for legacy feature compatibility
+
 ## [5.0.3] - 2024-12-21
 
 ### Deps
