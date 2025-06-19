@@ -71,7 +71,7 @@ impl<
 
     use kiddo::immutable::float::kdtree::AlignedArchivedImmutableKdTree;
 
-    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").unwrap()).unwrap() };
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").expect(\"./examples/immutable-doctest-tree.rkyv missing\")).unwrap() };
     let tree: AlignedArchivedImmutableKdTree<f64, u32, 3, 256> = AlignedArchivedImmutableKdTree::from_bytes(&mmap);"
     );
 }
@@ -89,7 +89,7 @@ where
     use memmap::MmapOptions;
     use rkyv::{access_unchecked, Archived};
 
-    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-test-tree-r08.rkyv\").unwrap()).unwrap() };
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-test-tree-r08.rkyv\").expect(\"./examples/immutable-test-tree-r08.rkyv missing\")).unwrap() };
     let tree = unsafe { access_unchecked::<ArchivedImmutableKdTree<Archived<f64>, Archived<u32>, 3, 256>>(&mmap) };"
     );
 }

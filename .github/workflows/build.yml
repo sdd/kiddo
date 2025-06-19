@@ -207,6 +207,7 @@ jobs:
 
       - name: Cargo test
         run: |
+          cargo run --example build-float-doctest-tree --features="rkyv"
           cargo run --example build-immutable-doctest-tree --features="rkyv"
           cargo test --workspace --features=serde,rkyv,test_utils
 

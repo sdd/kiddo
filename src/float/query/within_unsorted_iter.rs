@@ -66,7 +66,7 @@ where
         "use std::fs::File;
 use memmap::MmapOptions;
 
-let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/float-doctest-tree.rkyv\").unwrap()).unwrap() };
+let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/float-doctest-tree.rkyv\").expect(\"./examples/float-doctest-tree.rkyv missing\")).unwrap() };
 let tree = unsafe { rkyv::archived_root::<KdTree<f64, 3>>(&mmap) };"
     );
 }
