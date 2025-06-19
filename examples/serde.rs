@@ -79,8 +79,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let start = Instant::now();
     let file = File::create("./examples/geonames-tree.bincode.gz")?;
-    let encoder = GzEncoder::new(file, Compression::default());
-    bincode::serialize_into(encoder, &kdtree)?;
+    let mut encoder = GzEncoder::new(file, Compression::default());
+    bincode::serde::encode_into_std_write(&kdtree, &mut encoder, bincode::config::standard())?;
     println!(
         "Serialized k-d tree to gzipped bincode file ({})",
         ElapsedDuration::new(start.elapsed())
@@ -88,8 +88,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let start = Instant::now();
     let file = File::open("./examples/geonames-tree.bincode.gz")?;
-    let decompressor = GzDecoder::new(file);
-    let deserialized_tree: Tree = bincode::deserialize_from(decompressor)?;
+    let mut decompressor = GzDecoder::new(file);
+    let deserialized_tree: Tree =
+        bincode::serde::decode_from_std_read(&mut decompressor, bincode::config::standard())?;
     println!(
         "Deserialized gzipped bincode file back into a k-d tree ({})",
         ElapsedDuration::new(start.elapsed())
@@ -113,8 +114,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let start = Instant::now();
     let file = File::create("./examples/geonames-immutable-tree.bincode.gz")?;
-    let encoder = GzEncoder::new(file, Compression::default());
-    bincode::serialize_into(encoder, &kdtree)?;
+    let mut encoder = GzEncoder::new(file, Compression::default());
+    bincode::serde::encode_into_std_write(&kdtree, &mut encoder, bincode::config::standard())?;
     println!(
         "Serialized k-d tree to gzipped bincode file ({})",
         ElapsedDuration::new(start.elapsed())
@@ -122,9 +123,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let start = Instant::now();
     let file = File::open("./examples/geonames-immutable-tree.bincode.gz")?;
-    let decompressor = GzDecoder::new(file);
+    let mut decompressor = GzDecoder::new(file);
     let deserialized_tree: ImmutableKdTree<f32, u32, 3, 32> =
-        bincode::deserialize_from(decompressor)?;
+        bincode::serde::decode_from_std_read(&mut decompressor, bincode::config::standard())?;
     println!(
         "Deserialized gzipped bincode file back into a k-d tree ({})",
         ElapsedDuration::new(start.elapsed())

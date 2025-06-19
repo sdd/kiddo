@@ -35,10 +35,10 @@ ordered-float = "5"
 sorted-vec = "0.8"
 
 [dev-dependencies]
-bincode = "1.3"
+bincode = {  version = "2", features = ["serde"] }
 codspeed-criterion-compat = "2.10"
 criterion = "0.6"
-elapsed = "0.1"
+elapsed = "0.1.2"
 flate2 = { version = "1", features = ["zlib-ng-compat"], default-features = false }
 itertools = "0.14"
 las = { version = "0.9", features = ["laz-parallel"] }
