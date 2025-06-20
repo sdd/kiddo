@@ -16,11 +16,11 @@ use std::fmt::Debug;
 /// particular, we use T::default() to initialize the KdTree content.
 #[cfg(not(feature = "rkyv_08"))]
 pub trait Content:
-    PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync + Send
+    PartialEq + Default + Clone + Copy + Ord + Debug + Sync + Send
 {
 }
 #[cfg(not(feature = "rkyv_08"))]
-impl<T: PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync + Send>
+impl<T: PartialEq + Default + Clone + Copy + Ord + Debug + Sync + Send>
     Content for T
 {
 }
@@ -42,7 +42,6 @@ pub trait Content:
     + Copy
     + Ord
     + Debug
-    + std::ops::SubAssign
     + Sync
     + Send
     + rkyv_08::Archive
@@ -56,7 +55,6 @@ impl<
             + Copy
             + Ord
             + Debug
-            + std::ops::SubAssign
             + Sync
             + Send
             + rkyv_08::Archive,
