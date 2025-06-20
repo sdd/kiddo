@@ -15,7 +15,7 @@ use std::fmt::Debug;
 /// performance. Any type that satisfies these trait constraints may be used; in
 /// particular, we use T::default() to initialize the KdTree content.
 pub trait Content:
-    PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync + Send
+    PartialEq + Default + Clone + Copy + Ord + Debug + Sync + Send
 {
 }
 
@@ -26,7 +26,6 @@ impl<
         + Copy
         + Ord
         + Debug
-        + std::ops::SubAssign
         + Sync
         + Send
 > Content for T
