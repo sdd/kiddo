@@ -1,5 +1,52 @@
 # Kiddo Changelog
 
+## [5.1.0] - 2025-06-20
+
+### Chore
+
+- Update rust crate rstest to 0.24
+- Update rust crate rstest to 0.25
+- Temp disable half/f16 example until f16 working with rkyv_08
+- Try to get half example working again
+- Convert doctest file load unwraps to expects to help track down which files are missing. Fix broken CI tests by ensuring missing test files are created before running the test
+- Clean up unused deps and move some deps to dev-deps
+- Update to latest versions of rand crates
+- Update to latest version of criterion
+- Update serde example to bincode v2
+
+### Ci
+
+- Update github actions to use rkyv_08 feature instead of rkyv
+- Update github actions to use rkyv_08 feature instead of rkyv
+- Update renovate bot config so that it ignores deps that are pined to old versions for legacy feature compatibility
+
+### ✨ Features
+
+- Preallocate binary heap capacity
+- Rkyv v0.8
+- More progress towards rkyv 0.8
+- Implemented remaining query methods for rkyv_08
+- Gate fixed behind a compilation feature to reduce compile times
+
+### 🐛 Bug Fixes
+
+- Update rust crate itertools to 0.14
+- Address issue applying feature
+- Update firmatting to match latest lint rules. Allow unused import for problematic approx nearest one import
+- Remove unneeded unstable feature
+- Ensure that f16 works with rkyv_08 by adding the f16_rkyv_08 feature
+- Update rust crate ordered-float to v5
+
+### 📝 Documentation
+
+- Fix extra spacing causing clippy lint failure
+
+### 🧪 Testing
+
+- Ignore alignment test that always fails
+- Fix rkyv_08 doctests
+- Fixup rkyv doctests
+
 ## [5.0.3] - 2024-12-21
 
 ### Deps
