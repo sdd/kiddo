@@ -131,13 +131,13 @@ mod tests {
             .collect();
         assert_eq!(result, expected);
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _i in 0..1000 {
             let query_point = [
-                rng.gen_range(0f32..1f32),
-                rng.gen_range(0f32..1f32),
-                rng.gen_range(0f32..1f32),
-                rng.gen_range(0f32..1f32),
+                rng.random_range(0f32..1f32),
+                rng.random_range(0f32..1f32),
+                rng.random_range(0f32..1f32),
+                rng.random_range(0f32..1f32),
             ];
             let radius = 0.2;
             let max_qty = NonZero::new(3).unwrap();
@@ -205,13 +205,13 @@ mod tests {
         stabilize_sort(&mut result);
         assert_eq!(result, expected);
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _i in 0..1000 {
             let query_point = [
-                rng.gen_range(0f32..1f32),
-                rng.gen_range(0f32..1f32),
-                rng.gen_range(0f32..1f32),
-                rng.gen_range(0f32..1f32),
+                rng.random_range(0f32..1f32),
+                rng.random_range(0f32..1f32),
+                rng.random_range(0f32..1f32),
+                rng.random_range(0f32..1f32),
             ];
             let radius = 0.2;
             let max_qty = NonZero::new(3).unwrap();

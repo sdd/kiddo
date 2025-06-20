@@ -770,7 +770,7 @@ mod tests {
         let seed = 100045;
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
-        let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
+        let content_to_add: Vec<[f32; 4]> = (0..tree_size).map(|_| rng.random::<[f32; 4]>()).collect();
 
         let _tree: KdTree<f32, usize, 4, 4, u32> = KdTree::optimize_from(&content_to_add);
     }
@@ -785,7 +785,7 @@ mod tests {
                 let result = panic::catch_unwind(|| {
                     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
                     let content_to_add: Vec<[f32; 4]> =
-                        (0..tree_size).map(|_| rng.gen::<[f32; 4]>()).collect();
+                        (0..tree_size).map(|_| rng.random::<[f32; 4]>()).collect();
 
                     let _tree: KdTree<f32, usize, 4, 4, u32> =
                         KdTree::optimize_from(&content_to_add);
@@ -808,7 +808,7 @@ mod tests {
         const TREE_SIZE: usize = 2usize.pow(19); // ~ 500k
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(493);
-        let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE).map(|_| rng.gen::<[f32; 4]>()).collect();
+        let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
         let num_uniq = content_to_add
             .iter()
@@ -829,7 +829,7 @@ mod tests {
         const TREE_SIZE: usize = 2usize.pow(23); // ~8M
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(493);
-        let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE).map(|_| rng.gen::<[f32; 4]>()).collect();
+        let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
         // let num_uniq = content_to_add
         //     .iter()

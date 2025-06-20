@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // build and serialize a large ImmutableKdTree
     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(1);
-    let content_to_add: Vec<[f64; 3]> = (0..NUM_ITEMS).map(|_| rng.gen::<[f64; 3]>()).collect();
+    let content_to_add: Vec<[f64; 3]> = (0..NUM_ITEMS).map(|_| rng.random::<[f64; 3]>()).collect();
 
     let start = Instant::now();
     let tree: Tree = ImmutableKdTree::new_from_slice(&content_to_add);

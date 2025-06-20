@@ -1170,13 +1170,13 @@ mod tests {
     fn can_add_shitloads_of_points() {
         let mut tree: KdTree<Flt, u32, 4, 4, u32> = KdTree::with_capacity(1000);
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for i in 0..1000 {
             let point = [
-                n(rng.gen_range(0f32..0.99998f32)),
-                n(rng.gen_range(0f32..0.99998f32)),
-                n(rng.gen_range(0f32..0.99998f32)),
-                n(rng.gen_range(0f32..0.99998f32)),
+                n(rng.random_range(0f32..0.99998f32)),
+                n(rng.random_range(0f32..0.99998f32)),
+                n(rng.random_range(0f32..0.99998f32)),
+                n(rng.random_range(0f32..0.99998f32)),
             ];
 
             tree.add(&point, i);

@@ -15,8 +15,8 @@ use std::error::Error;
 use std::io;
 use std::io::Write;
 
+use rand::rng;
 use rand::seq::SliceRandom;
-use rand::thread_rng;
 
 const NUM_TRIALS: usize = 1000;
 const NUM_DISTINCT_VALS: usize = 1_000_000;
@@ -24,7 +24,7 @@ const TIMES_REPEATED: usize = 10;
 
 #[allow(dead_code)]
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut rng = thread_rng();
+    let mut rng = rng();
 
     println!("Starting test\n");
     for trial_num in 0..NUM_TRIALS {

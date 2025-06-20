@@ -673,13 +673,13 @@ impl<T> Drop for CopyOnDrop<T> {
 #[test]
 fn test_mirror_select_nth_unstable_by() {
     use core::cmp::Ordering::{Equal, Greater, Less};
+    use rand::prelude::IndexedRandom;
     use rand::rngs::StdRng;
-    use rand::seq::SliceRandom;
     use rand::{Rng, SeedableRng};
 
     const LEN: usize = 32;
 
-    let mut rng = StdRng::from_entropy();
+    let mut rng = StdRng::from_os_rng();
 
     let mut orig = [0; LEN];
     let mut orig_mirror = [0; LEN];
@@ -687,7 +687,7 @@ fn test_mirror_select_nth_unstable_by() {
     for &modulus in &[5, 10, 1000] {
         for _ in 0..10 {
             for i in 0..LEN {
-                orig[i] = rng.gen::<i32>() % modulus;
+                orig[i] = rng.random::<i32>() % modulus;
                 orig_mirror[i] = 1_000_000 - orig[i]
             }
 

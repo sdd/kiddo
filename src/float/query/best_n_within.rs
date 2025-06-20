@@ -140,11 +140,11 @@ mod tests {
 
         let max_qty = 2;
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _i in 0..1000 {
             let query = [
-                rng.gen_range(-10f64..20f64),
-                rng.gen_range(-1000f64..1000f64),
+                rng.random_range(-10f64..20f64),
+                rng.random_range(-1000f64..1000f64),
             ];
             let radius = 100000f64;
             let expected = linear_search(&content_to_add, &query, radius, max_qty);
