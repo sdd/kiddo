@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.0.4] - 2025-06-20
+
+### Chore
+
+- Update to latest version of criterion
+
 ## [5.0.3] - 2024-12-21
 
 ### Deps
