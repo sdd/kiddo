@@ -125,11 +125,11 @@ mod tests {
             .collect();
         assert_eq!(result, expected);
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _i in 0..1000 {
             let query = [
-                n(rng.gen_range(0.0f32..0.9f32)),
-                n(rng.gen_range(0.0f32..0.9f32)),
+                n(rng.random_range(0.0f32..0.9f32)),
+                n(rng.random_range(0.0f32..0.9f32)),
             ];
             let radius = n(0.1f32);
             let expected = linear_search(&content_to_add, &query, radius, max_qty);

@@ -137,13 +137,13 @@ mod tests {
         let result = tree.nearest_one::<SquaredEuclidean>(&query_point);
         assert_eq!(result.distance, expected.distance);
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _i in 0..1000 {
             let query_point = [
-                rng.gen_range(0f64..1f64),
-                rng.gen_range(0f64..1f64),
-                rng.gen_range(0f64..1f64),
-                rng.gen_range(0f64..1f64),
+                rng.random_range(0f64..1f64),
+                rng.random_range(0f64..1f64),
+                rng.random_range(0f64..1f64),
+                rng.random_range(0f64..1f64),
             ];
             let expected = linear_search(&content_to_add, &query_point);
 
@@ -191,13 +191,13 @@ mod tests {
         let result = tree.nearest_one::<SquaredEuclidean>(&query_point);
         assert_eq!(result.distance, expected.distance);
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _i in 0..1000 {
             let query_point = [
-                rng.gen_range(0f32..1f32),
-                rng.gen_range(0f32..1f32),
-                rng.gen_range(0f32..1f32),
-                rng.gen_range(0f32..1f32),
+                rng.random_range(0f32..1f32),
+                rng.random_range(0f32..1f32),
+                rng.random_range(0f32..1f32),
+                rng.random_range(0f32..1f32),
             ];
             let expected = linear_search(&content_to_add, &query_point);
 
@@ -215,14 +215,16 @@ mod tests {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 1000;
 
-        let content_to_add: Vec<[f64; 4]> = (0..TREE_SIZE).map(|_| rng.gen::<[f64; 4]>()).collect();
+        let content_to_add: Vec<[f64; 4]> =
+            (0..TREE_SIZE).map(|_| rng.random::<[f64; 4]>()).collect();
 
         let tree: ImmutableKdTree<f64, u32, 4, 256> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), TREE_SIZE);
 
-        let query_points: Vec<[f64; 4]> = (0..NUM_QUERIES).map(|_| rng.gen::<[f64; 4]>()).collect();
+        let query_points: Vec<[f64; 4]> =
+            (0..NUM_QUERIES).map(|_| rng.random::<[f64; 4]>()).collect();
 
         for query_point in query_points.iter() {
             let expected = linear_search(&content_to_add, query_point);
@@ -244,7 +246,8 @@ mod tests {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 1000;
 
-        let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE).map(|_| rng.gen::<[f32; 4]>()).collect();
+        let content_to_add: Vec<[f32; 4]> =
+            (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
         let tree: ImmutableKdTree<f32, u32, 4, 256> =
             ImmutableKdTree::new_from_slice(&content_to_add);

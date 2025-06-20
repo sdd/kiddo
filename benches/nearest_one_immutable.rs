@@ -11,7 +11,7 @@ use kiddo::test_utils::{
     build_populated_tree_and_query_points_immutable_float, process_queries_immutable_float,
 };
 use kiddo::traits::Content;
-use rand::distributions::Standard;
+use rand::distr::StandardUniform;
 use rand_distr::Distribution;
 
 const BUCKET_SIZE: usize = 32;
@@ -68,8 +68,8 @@ fn bench_query_nearest_one_immutable_float<A, T: Content + 'static, const K: usi
 ) where
     A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + 'static,
     usize: Cast<T>,
-    Standard: Distribution<T>,
-    Standard: Distribution<[A; K]>,
+    StandardUniform: Distribution<T>,
+    StandardUniform: Distribution<[A; K]>,
 {
     group.bench_with_input(
         BenchmarkId::new(subtype, initial_size),

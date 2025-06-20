@@ -6,7 +6,7 @@ use codspeed_criterion_compat::{
 
 use fixed::types::extra::{Unsigned, U16};
 use fixed::FixedU16;
-use rand::distributions::{Distribution, Standard};
+use rand::distr::{Distribution, StandardUniform};
 
 use kiddo::batch_benches;
 use kiddo::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
@@ -120,7 +120,7 @@ fn bench_add_to_empty_float<A: Axis, T: Content, const K: usize, IDX: Index<T = 
     subtype: &str,
 ) where
     usize: Cast<IDX>,
-    Standard: Distribution<([A; K], T)>,
+    StandardUniform: Distribution<([A; K], T)>,
 {
     group.bench_with_input(
         BenchmarkId::new(subtype, qty_to_add),
@@ -154,7 +154,7 @@ fn bench_add_to_populated_float<A: Axis, T: Content, const K: usize, IDX: Index<
     subtype: &str,
 ) where
     usize: Cast<IDX>,
-    Standard: Distribution<([A; K], T)>,
+    StandardUniform: Distribution<([A; K], T)>,
 {
     group.bench_with_input(
         BenchmarkId::new(subtype, initial_size),
@@ -198,7 +198,7 @@ fn bench_add_to_empty_fixed_u16<A: Unsigned, T: Content, const K: usize, IDX: In
     subtype: &str,
 ) where
     usize: Cast<IDX>,
-    Standard: Distribution<T>,
+    StandardUniform: Distribution<T>,
     FixedU16<A>: AxisFixed,
 {
     group.bench_with_input(
@@ -235,7 +235,7 @@ fn bench_add_to_populated_fixed_u16<A: Unsigned, T: Content, const K: usize, IDX
     subtype: &str,
 ) where
     usize: Cast<IDX>,
-    Standard: Distribution<T>,
+    StandardUniform: Distribution<T>,
     FixedU16<A>: AxisFixed,
 {
     group.bench_with_input(

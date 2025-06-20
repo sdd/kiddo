@@ -100,13 +100,13 @@ mod tests {
         stabilize_sort(&mut result);
         assert_eq!(result, expected);
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _i in 0..1000 {
             let query_point = [
-                n(rng.gen_range(0f32..1f32)),
-                n(rng.gen_range(0f32..1f32)),
-                n(rng.gen_range(0f32..1f32)),
-                n(rng.gen_range(0f32..1f32)),
+                n(rng.random_range(0f32..1f32)),
+                n(rng.random_range(0f32..1f32)),
+                n(rng.random_range(0f32..1f32)),
+                n(rng.random_range(0f32..1f32)),
             ];
             let radius = n(0.2);
             let expected = linear_search(&content_to_add, &query_point, radius);

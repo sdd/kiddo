@@ -2,7 +2,7 @@
 use az::Cast;
 use fixed::types::extra::Unsigned;
 use fixed::FixedU16;
-use rand::distributions::{Distribution, Standard};
+use rand::distr::{Distribution, StandardUniform};
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefIterator;
 use std::array;
@@ -17,7 +17,7 @@ use crate::traits::{Content, Index};
 // use rand_distr::UnitSphere as SPHERE;
 
 /*fn rand_unit_sphere_point_f64() -> [f64; 3] {
-    SPHERE.sample(&mut rand::thread_rng())
+    SPHERE.sample(&mut rand::rng())
 }
 
 fn rand_sphere_data() -> ([f64; 3], usize) {
@@ -41,7 +41,7 @@ where
 
 pub fn rand_data_fixed_u16_entry<A: Unsigned, T: Content, const K: usize>() -> ([FixedU16<A>; K], T)
 where
-    Standard: Distribution<T>,
+    StandardUniform: Distribution<T>,
     FixedU16<A>: AxisFixed,
 {
     (rand_data_fixed_u16_point::<A, K>(), rand::random())
@@ -91,7 +91,7 @@ pub fn build_populated_tree_fixed<
 ) -> FixedKdTree<FixedU16<A>, T, K, B, IDX>
 where
     usize: Cast<IDX>,
-    Standard: Distribution<T>,
+    StandardUniform: Distribution<T>,
     FixedU16<A>: AxisFixed,
 {
     let mut kdtree = FixedKdTree::<FixedU16<A>, T, K, B, IDX>::with_capacity(size + spare_capacity);
@@ -116,9 +116,9 @@ pub fn build_populated_tree_float<
 ) -> KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
-    Standard: Distribution<T>,
-    Standard: Distribution<([A; K], T)>,
-    Standard: Distribution<[A; K]>,
+    StandardUniform: Distribution<T>,
+    StandardUniform: Distribution<([A; K], T)>,
+    StandardUniform: Distribution<[A; K]>,
 {
     let mut kdtree = KdTree::<A, T, K, B, IDX>::with_capacity(size + spare_capacity);
 
@@ -135,9 +135,9 @@ pub fn build_populated_tree_immutable_float<A, T: Content, const K: usize, const
 ) -> ImmutableKdTree<A, T, K, B>
 where
     usize: Cast<T>,
-    Standard: Distribution<T>,
-    Standard: Distribution<([A; K], T)>,
-    Standard: Distribution<[A; K]>,
+    StandardUniform: Distribution<T>,
+    StandardUniform: Distribution<([A; K], T)>,
+    StandardUniform: Distribution<[A; K]>,
     A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
 {
     let mut points = vec![];
@@ -159,9 +159,9 @@ pub fn build_populated_tree_float_sss<
 ) -> KdTreeSSS<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
-    Standard: Distribution<T>,
-    Standard: Distribution<([A; K], T)>,
-    Standard: Distribution<[A; K]>,
+    StandardUniform: Distribution<T>,
+    StandardUniform: Distribution<([A; K], T)>,
+    StandardUniform: Distribution<[A; K]>,
 {
     let mut kdtree = KdTreeSSS::<A, T, K, B, IDX>::with_capacity(size + spare_capacity);
 
@@ -200,7 +200,7 @@ pub fn build_populated_tree_and_query_points_fixed<
 )
 where
     usize: Cast<IDX>,
-    Standard: Distribution<T>,
+    StandardUniform: Distribution<T>,
     FixedU16<A>: AxisFixed,
 {
     (
@@ -284,7 +284,7 @@ where
 
 pub fn build_query_points_float<A: Axis, const K: usize>(points_qty: usize) -> Vec<[A; K]>
 where
-    Standard: Distribution<[A; K]>,
+    StandardUniform: Distribution<[A; K]>,
 {
     (0..points_qty).map(|_| rand::random::<[A; K]>()).collect()
 }
@@ -301,8 +301,8 @@ pub fn build_populated_tree_and_query_points_float<
 ) -> (KdTree<A, T, K, B, IDX>, Vec<[A; K]>)
 where
     usize: Cast<IDX>,
-    Standard: Distribution<T>,
-    Standard: Distribution<[A; K]>,
+    StandardUniform: Distribution<T>,
+    StandardUniform: Distribution<[A; K]>,
 {
     (
         build_populated_tree_float(size, 0),
@@ -322,8 +322,8 @@ pub fn build_populated_tree_and_query_points_immutable_float<
 where
     A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     usize: Cast<T>,
-    Standard: Distribution<T>,
-    Standard: Distribution<[A; K]>,
+    StandardUniform: Distribution<T>,
+    StandardUniform: Distribution<[A; K]>,
 {
     (
         build_populated_tree_immutable_float(size),
@@ -344,8 +344,8 @@ pub fn build_populated_tree_and_query_points_float_sss<
 ) -> (KdTreeSSS<A, T, K, B, IDX>, Vec<[A; K]>)
 where
     usize: Cast<IDX>,
-    Standard: Distribution<T>,
-    Standard: Distribution<[A; K]>,
+    StandardUniform: Distribution<T>,
+    StandardUniform: Distribution<[A; K]>,
 {
     (
         build_populated_tree_float_sss(size, 0),
@@ -367,8 +367,8 @@ pub fn process_queries_float<
 ) -> Box<dyn Fn((KdTree<A, T, K, B, IDX>, Vec<[A; K]>))>
 where
     usize: Cast<IDX>,
-    Standard: Distribution<T>,
-    Standard: Distribution<[A; K]>,
+    StandardUniform: Distribution<T>,
+    StandardUniform: Distribution<[A; K]>,
     F: Fn(&KdTree<A, T, K, B, IDX>, &[A; K]) + 'static + Sync,
 {
     Box::new(
@@ -394,8 +394,8 @@ pub fn process_queries_immutable_float<
 ) -> Box<dyn Fn((ImmutableKdTree<A, T, K, B>, Vec<[A; K]>))>
 where
     usize: Cast<T>,
-    Standard: Distribution<T>,
-    Standard: Distribution<[A; K]>,
+    StandardUniform: Distribution<T>,
+    StandardUniform: Distribution<[A; K]>,
     F: Fn(&ImmutableKdTree<A, T, K, B>, &[A; K]) + 'static + Sync,
 {
     Box::new(
@@ -423,8 +423,8 @@ pub fn process_queries_float_sss<
 ) -> Box<dyn Fn((KdTreeSSS<A, T, K, B, IDX>, Vec<[A; K]>))>
 where
     usize: Cast<IDX>,
-    Standard: Distribution<T>,
-    Standard: Distribution<[A; K]>,
+    StandardUniform: Distribution<T>,
+    StandardUniform: Distribution<[A; K]>,
     F: Fn(&KdTreeSSS<A, T, K, B, IDX>, &[A; K]) + 'static,
 {
     Box::new(
@@ -452,8 +452,8 @@ pub fn process_queries_float_parameterized<
 ) -> Box<dyn Fn((KdTree<A, T, K, B, IDX>, Vec<[A; K]>))>
 where
     usize: Cast<IDX>,
-    Standard: Distribution<T>,
-    Standard: Distribution<[A; K]>,
+    StandardUniform: Distribution<T>,
+    StandardUniform: Distribution<[A; K]>,
     F: Fn(&KdTree<A, T, K, B, IDX>, &[A; K], f64) + 'static,
 {
     Box::new(

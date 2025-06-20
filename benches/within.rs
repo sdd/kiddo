@@ -15,7 +15,7 @@ use kiddo::test_utils::{
     process_queries_fixed_parameterized, process_queries_float_parameterized,
 };
 use kiddo::traits::{Content, Index};
-use rand::distributions::Standard;
+use rand::distr::StandardUniform;
 use rand_distr::Distribution;
 
 const BUCKET_SIZE: usize = 32;
@@ -134,8 +134,8 @@ fn bench_query_float<
 ) where
     usize: Cast<IDX>,
     f64: Cast<A>,
-    Standard: Distribution<T>,
-    Standard: Distribution<[A; K]>,
+    StandardUniform: Distribution<T>,
+    StandardUniform: Distribution<[A; K]>,
 {
     group.bench_with_input(
         BenchmarkId::new(subtype, initial_size),
@@ -170,7 +170,7 @@ fn bench_query_fixed<
     subtype: &str,
 ) where
     usize: Cast<IDX>,
-    Standard: Distribution<T>,
+    StandardUniform: Distribution<T>,
     FixedU16<A>: AxisFixed,
 {
     group.bench_with_input(
