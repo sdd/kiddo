@@ -2,50 +2,57 @@
 
 ## [5.1.0] - 2025-06-20
 
-### Chore
+It's been a while since the last release as my focus has been elsewhere, but I'm back in the k-d tree groove now
+and looking to bring some new features and performance updates over the next few weeks.
 
-- Update rust crate rstest to 0.24
-- Update rust crate rstest to 0.25
-- Temp disable half/f16 example until f16 working with rkyv_08
-- Try to get half example working again
-- Convert doctest file load unwraps to expects to help track down which files are missing. Fix broken CI tests by ensuring missing test files are created before running the test
-- Clean up unused deps and move some deps to dev-deps
-- Update to latest versions of rand crates
-- Update to latest version of criterion
-- Update serde example to bincode v2
+The major addition in this release is support for version 0.8 of Rkyv. Rkyv 0.8 is almost a complete rewrite compared to 0.7,
+and so this required quite a lot of changes.
 
-### Ci
+Right now, the pre-existing `rkyv` crate feature still provides support for
+Rkyv 0.7 as before, and so the introduction of Rkyv 0.8 is non-breaking. To use Rkyv 0.8, enable the crate feature that is 
+unsurprisingly named `rkyv_08`. There are some caveats to Rkyv 0.8 support:
 
-- Update github actions to use rkyv_08 feature instead of rkyv
-- Update github actions to use rkyv_08 feature instead of rkyv
-- Update renovate bot config so that it ignores deps that are pined to old versions for legacy feature compatibility
+* Use of `rkyv` and `rkyv_08` is mutually exclusive; due to limitations in Rkyv's derive macros and trait system, it seems
+  impossible to support both at the same time. You may be able to achieve this to a limited extent by importing two versions of Kiddo
+  at the same time, one with `rkyv` activated and the other with `rkyv_08`, but interop between the two will be limited
+* You're unlikely to be able to successfully deserialize a tree serialized with Rkyv 0.7 into an Rkyv 0.8 object, and vice-versa.
+* Anyone using `rkyv` and `f16` / `half` at the same time may encounter issues updating to Rkyv 0.8. This is because the `half`
+  crate, on which Kiddo's f16 support depends, only supports Rkyv 0.7 at version 2.4.1 and below, and only supports Rkyv 0.8 at versions
+  2.5.0+. To use f16 in Kiddo with Rkyv 0.8, you need to enable the `f16_rkyv_08` crate feature to ensure that the correct versions
+  of both Rkyv and half are pulled in.
+* Supporting both Rkyv 0.7 and 0.8 in the Kiddo library at the same time is a massive pain and will add significant maintenance burden
+  going forward. As such, **this 5.1.0 version will be the only one that supports both Rkyv 0.7 and Rkyv 0.8. An upcoming version 6
+  of Kiddo will remove support for Rkyv 0.7 entirely and only support Rkyv 0.8.**
+
+All the best! Scott (@sdd)
 
 ### ✨ Features
 
+- Add support for Rkyv v0.8
+- Gate `fixed` support behind a crate feature to reduce compile times
 - Preallocate binary heap capacity
-- Rkyv v0.8
-- More progress towards rkyv 0.8
-- Implemented remaining query methods for rkyv_08
-- Gate fixed behind a compilation feature to reduce compile times
-
-### 🐛 Bug Fixes
-
-- Update rust crate itertools to 0.14
-- Address issue applying feature
-- Update firmatting to match latest lint rules. Allow unused import for problematic approx nearest one import
-- Remove unneeded unstable feature
-- Ensure that f16 works with rkyv_08 by adding the f16_rkyv_08 feature
-- Update rust crate ordered-float to v5
-
-### 📝 Documentation
-
-- Fix extra spacing causing clippy lint failure
 
 ### 🧪 Testing
 
-- Ignore alignment test that always fails
-- Fix rkyv_08 doctests
 - Fixup rkyv doctests
+
+### Ci
+
+- Update github actions to exercise `rkyv_08` feature
+- Update renovate bot config so that it ignores deps that are pined to old versions for legacy feature compatibility
+
+### Chore
+
+- address spacing causing clippy lint failure
+- Update rust crate rstest to 0.25
+- Convert doctest file load `unwrap`s to `expect`s to help track down when files are missing
+- Clean up unused deps and move some deps to dev-deps that did not need to be full deps
+- Update to latest versions of rand crates
+- Update to latest version of criterion
+- Update bincode dev dep to v2 for serde example
+- Update `itertools` dependency to 0.14
+- Update formatting to comply with updated clippy rules of recent versions of Rust
+- Update rust crate ordered-float to v5
 
 ## [5.0.3] - 2024-12-21
 
