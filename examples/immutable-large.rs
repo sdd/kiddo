@@ -2,14 +2,14 @@
 // and then performs some random queries against it.
 
 use std::error::Error;
+use std::hint::black_box;
+use std::time::Instant;
 
-use criterion::black_box;
 use elapsed::ElapsedDuration;
 use kiddo::float::distance::SquaredEuclidean;
 use rand::{Rng, SeedableRng};
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
-use std::time::Instant;
 
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::test_utils::build_query_points_float;
