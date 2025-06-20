@@ -9,7 +9,7 @@ struct MyFixedString {
 impl MyFixedString {
     fn from_str(s: &str) -> Self {
         let mut bytes = [0u8; 32];
-        let copy_length = s.as_bytes().len().min(32);
+        let copy_length = s.len().min(32);
         bytes[..copy_length].copy_from_slice(&s.as_bytes()[..copy_length]);
         Self { bytes }
     }
@@ -38,7 +38,7 @@ fn test_kdtree_with_numeric_id() {
     // The closest point should be [0.0, 0.0] with ID 1001
     assert_eq!(nearest.item, 1001);
     //assert!((nearest.distance - 0.5).abs() < f64::EPSILON);
-    assert!((nearest.distance - (0.5f64 * 0.5 + 0.25 * 0.25).sqrt()) < f64::EPSILON);
+    assert!((nearest.distance - (0.5f64 * 0.5 + 0.25 * 0.25).sqrt()).abs() < f64::EPSILON);
 
     // Test k-nearest neighbors
     let k_nearest = tree.nearest_n::<SquaredEuclidean>(&query_point, 2);
@@ -72,14 +72,14 @@ fn test_kdtree_with_fixed_string() {
 
     // The closest point should be [0.0, 0.0] with data "Origin"
     assert_eq!(nearest.item.as_str(), "Origin");
-    assert!((nearest.distance - (0.5f64 * 0.5 + 0.25 * 0.25).sqrt()) < f64::EPSILON);
+    assert!((nearest.distance - (0.5f64 * 0.5 + 0.25 * 0.25).sqrt()).abs() < f64::EPSILON);
 
     let (nearest, nearest_point) = tree.nearest_one_point::<SquaredEuclidean>(&query_point);
 
     // The closest point should be [0.0, 0.0] with data "Origin"
     assert_eq!(nearest.item.as_str(), "Origin");
     assert_eq!(nearest_point, [0.0, 0.0]);
-    assert!((nearest.distance - (0.5f64 * 0.5 + 0.25 * 0.25).sqrt()) < f64::EPSILON);
+    assert!((nearest.distance - (0.5f64 * 0.5 + 0.25 * 0.25).sqrt()).abs() < f64::EPSILON);
 
     // Test k-nearest neighbors
     let k_nearest = tree.nearest_n::<SquaredEuclidean>(&query_point, 2);
