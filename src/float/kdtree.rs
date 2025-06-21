@@ -2,8 +2,8 @@
 //! are floats. f64 or f32 are supported currently, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html)
 //! if the `f16` feature is enabled. (NB if you are using `rkyv` 0.8 via the `rkyv_08` feature and want
 //! to use `f16`, you'll need to enable the `f16_rkyv_08` feature instead of `f16`. this is because versions
-//! of the `half`  up to 2.4.1 support `rkyv` 0.7 only, and versions of the `half` crate from 2.5.0 onwards
-//! support `rkyv` 0.8 only.
+//! of the `half` up to 2.4.1 support `rkyv` 0.7 only, and versions of the `half` crate from 2.5.0 onwards
+//! support `rkyv` 0.8 only).
 //!
 //! (Most of the structs listed in these docs are only relevant when using `rkyv` for zero-copy
 //! deserialization. The main Struct in here, [`KdTree`], is usually what you're looking for.)
@@ -14,10 +14,14 @@ use num_traits::float::FloatCore;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 
+#[allow(unused_imports)]
+// RustRover keeps adding the below, but Clippy complains it is unnecessary
+use crate::rkyv_utils::transform;
 use crate::{
     iter::{IterableTreeData, TreeIter},
     traits::{Content, Index},
 };
+
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -31,7 +35,7 @@ pub trait Axis: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::Add
     /// returns absolute diff between two values of a type implementing this trait
     fn saturating_dist(self, other: Self) -> Self;
 
-    /// used in query methods to update the rd value. Basically a saturating add for Fixed and an add for Float
+    /// Used in query methods to update the rd value. A saturating add for Fixed and an add for Float
     fn rd_update(rd: Self, delta: Self) -> Self;
 }
 
@@ -47,7 +51,7 @@ pub trait Axis:
     /// returns absolute diff between two values of a type implementing this trait
     fn saturating_dist(self, other: Self) -> Self;
 
-    /// used in query methods to update the rd value. Basically a saturating add for Fixed and an add for Float
+    /// Used in query methods to update the rd value. A saturating add for Fixed and an add for Float
     fn rd_update(rd: Self, delta: Self) -> Self;
 }
 
@@ -100,6 +104,11 @@ impl<
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
+#[cfg_attr(
+    feature = "rkyv_08",
+    derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
+)]
+#[cfg_attr(feature = "rkyv_08", rkyv(crate=rkyv_08))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
     pub(crate) leaves: Vec<LeafNode<A, T, K, B, IDX>>,
@@ -114,6 +123,12 @@ pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B:
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
+#[cfg_attr(
+    feature = "rkyv_08",
+    derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
+)]
+#[cfg_attr(feature = "rkyv_08", rkyv(crate=rkyv_08))]
+#[cfg_attr(feature = "rkyv_08", rkyv(attr(doc(hidden))))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
     pub(crate) left: IDX,
@@ -127,6 +142,12 @@ pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
+#[cfg_attr(
+    feature = "rkyv_08",
+    derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
+)]
+#[cfg_attr(feature = "rkyv_08", rkyv(crate=rkyv_08))]
+#[cfg_attr(feature = "rkyv_08", rkyv(attr(doc(hidden))))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
     #[cfg_attr(
@@ -153,11 +174,8 @@ pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const 
     pub size: IDX,
 }
 
-impl<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX>
-    LeafNode<A, T, K, B, IDX>
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX> LeafNode<A, T, K, B, IDX>
 where
-    A: Axis,
-    T: Content,
     IDX: Index<T = IDX>,
 {
     pub(crate) fn new() -> Self {
@@ -335,6 +353,37 @@ where
     usize: Cast<IDX>,
 {
     generate_common_methods!(ArchivedKdTree);
+}
+
+#[cfg(feature = "rkyv_08")]
+impl<
+        A: Axis,
+        T: Content,
+        const K: usize,
+        const B: usize,
+        IDX: Index<T = IDX> + rkyv_08::Archive,
+    > ArchivedKdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    /// Returns the current number of elements stored in the tree
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use kiddo::KdTree;
+    ///
+    /// let mut tree: KdTree<f64, 3> = KdTree::new();
+    ///
+    /// tree.add(&[1.0, 2.0, 5.0], 100);
+    /// tree.add(&[1.1, 2.1, 5.1], 101);
+    ///
+    /// assert_eq!(tree.size(), 2);
+    /// ```
+    #[inline]
+    pub fn size(&self) -> T {
+        *transform(&self.size)
+    }
 }
 
 #[cfg(test)]

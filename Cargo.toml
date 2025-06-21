@@ -199,6 +199,11 @@ path = "examples/build-float-doctest-tree.rs"
 required-features = ["rkyv"]
 
 [[example]]
+name = "build-float-doctest-tree-rkyv_08"
+path = "examples/build-float-doctest-tree-rkyv_08.rs"
+required-features = ["rkyv_08"]
+
+[[example]]
 name = "build-immutable-doctest-tree"
 path = "examples/build-immutable-doctest-tree.rs"
 required-features = ["rkyv"]
@@ -216,6 +221,16 @@ path = "examples/check-select-nth-unstable.rs"
 name = "cities"
 path = "examples/cities.rs"
 required-features = ["csv"]
+
+[[example]]
+name = "float-rkyv_08-serialize"
+path = "examples/float-rkyv_08-serialize.rs"
+required-features = ["rkyv_08"]
+
+[[example]]
+name = "float-rkyv_08-deserialize"
+path = "examples/float-rkyv_08-deserialize.rs"
+required-features = ["rkyv_08"]
 
 [[example]]
 name = "half"

@@ -4,6 +4,7 @@ use std::ops::Rem;
 
 use crate::float::kdtree::{Axis, KdTree};
 use crate::nearest_neighbour::NearestNeighbour;
+use crate::rkyv_utils::transform;
 use crate::traits::DistanceMetric;
 use crate::traits::{is_stem_index, Content, Index};
 use crate::within_unsorted_iter::WithinUnsortedIter;
@@ -35,7 +36,7 @@ assert_eq!(within.len(), 2);
     };
 }
 
-impl<'a, A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+impl<'a, A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX> + Send>
     KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
@@ -57,7 +58,7 @@ impl<
         T: Content + rkyv::Archive<Archived = T>,
         const K: usize,
         const B: usize,
-        IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>,
+        IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX> + Send,
     > ArchivedKdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
@@ -68,6 +69,33 @@ use memmap::MmapOptions;
 
 let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/float-doctest-tree.rkyv\").expect(\"./examples/float-doctest-tree.rkyv missing\")).unwrap() };
 let tree = unsafe { rkyv::archived_root::<KdTree<f64, 3>>(&mmap) };"
+    );
+}
+
+#[cfg(feature = "rkyv_08")]
+use crate::float::kdtree::ArchivedKdTree;
+#[cfg(feature = "rkyv_08")]
+impl<
+        'a,
+        A: Axis + Send,
+        T: Content + Send,
+        const K: usize,
+        const B: usize,
+        IDX: Index<T = IDX> + Send,
+    > ArchivedKdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+    <A as rkyv_08::Archive>::Archived: Sync,
+    <T as rkyv_08::Archive>::Archived: Sync,
+    <IDX as rkyv_08::Archive>::Archived: Sync,
+{
+    generate_float_within_unsorted_iter!(
+        "use std::fs::File;
+    use memmap::MmapOptions;
+    use kiddo::float::kdtree::ArchivedKdTree;
+
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/float-doctest-tree-rkyv_08.rkyv\").expect(\"./examples/float-doctest-tree-rkyv_08.rkyv missing\")).unwrap() };
+    let tree = unsafe { rkyv_08::access_unchecked::<ArchivedKdTree<f64, u64, 3, 32, u32>>(&mmap) };"
     );
 }
 

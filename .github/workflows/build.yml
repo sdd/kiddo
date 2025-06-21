@@ -105,8 +105,14 @@ jobs:
       - uses: LoliGothick/clippy-check@master
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          options: --all-features --no-deps
-          name: Clippy (nightly)
+          options: --features tracing,fixed,f16,rkyv,serde --no-deps
+          name: Clippy (nightly, rkyv 0.7)
+
+      - uses: LoliGothick/clippy-check@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          options: --features tracing,fixed,f16_rkyv_08,serde --no-deps
+          name: Clippy (nightly, rkyv 0.8)
 
       - name: Check Rustdoc Links
         run: RUSTDOCFLAGS="--deny broken_intra_doc_links" cargo doc --verbose --workspace --no-deps --document-private-items
@@ -142,8 +148,11 @@ jobs:
           crate: cargo-hack
           version: "^0.6"
 
-      - name: Cargo check all targets and features
-        run: cargo hack check --workspace --each-feature --all-targets --exclude-features global_allocate,simd
+      - name: Cargo check all targets and features (rkyv 0.7)
+        run: cargo hack check --workspace --each-feature --all-targets --exclude-features global_allocate,simd,rkyv_08,f16_rkyv_08
+
+      - name: Cargo check all targets and features (rkyv 0.8)
+        run: cargo hack check --workspace --each-feature --all-targets --exclude-features global_allocate,simd,rkyv,f16
 
   check-unstable:
     name: Cargo Check (Nightly)
@@ -177,8 +186,11 @@ jobs:
           crate: cargo-hack
           version: "^0.6"
 
-      - name: Cargo check all targets and features
-        run: cargo hack check --workspace --each-feature --all-targets
+      - name: Cargo check all targets and features (rkyv 0.7)
+        run: cargo hack check --workspace --each-feature --all-targets --exclude-features rkyv_08,f16_rkyv_08
+
+      - name: Cargo check all targets and features (rkyv 0.8)
+        run: cargo hack check --workspace --each-feature --all-targets --exclude-features rkyv,f16
 
   test-basic:
     name: Run Tests (Stable, no crate features enabled that require unstable Rust, Rkyv 0.7)
@@ -238,6 +250,7 @@ jobs:
 
     - name: Cargo test
       run: |
+        cargo run --example build-float-doctest-tree-rkyv_08 --features="rkyv_08"
         cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
         cargo test --workspace --features=serde,rkyv_08,test_utils
 
@@ -309,6 +322,7 @@ jobs:
 
       - name: Cargo test (dev build)
         run: |
+          cargo run --example build-float-doctest-tree-rkyv_08 --features="rkyv_08"
           cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
           cargo test --workspace --features "csv,f16_rkyv_08,las,serde,simd,rkyv_08,test_utils,tracing"
 
@@ -316,5 +330,6 @@ jobs:
         env:
           RUSTFLAGS: '-C target-cpu=native'
         run: |
+          cargo run --example build-float-doctest-tree-rkyv_08 --features="rkyv_08"
           cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
           cargo test --workspace --features "csv,f16_rkyv_08,las,serde,simd,rkyv_08,test_utils,tracing" --release

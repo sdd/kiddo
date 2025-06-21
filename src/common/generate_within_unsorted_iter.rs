@@ -14,13 +14,14 @@ macro_rules! generate_within_unsorted_iter {
                 D: DistanceMetric<A, K>,
             {
                 let mut off = [A::zero(); K];
+                let root_index: IDX = *transform(&self.root_index);
 
                 let gen = Gn::new_scoped(move |gen_scope| {
                     unsafe {
                         self.within_unsorted_iter_recurse::<D>(
                             query,
                             dist,
-                            self.root_index,
+                            root_index,
                             0,
                             gen_scope,
                             &mut off,
@@ -50,16 +51,19 @@ macro_rules! generate_within_unsorted_iter {
             {
                 if is_stem_index(curr_node_idx) {
                     let node = self.stems.get_unchecked(curr_node_idx.az::<usize>());
+                    let split_val: A = *transform(&node.split_val);
+                    let node_left: IDX = *transform(&node.left);
+                    let node_right: IDX = *transform(&node.right);
 
                     let mut rd = rd;
                     let old_off = off[split_dim];
-                    let new_off = query[split_dim].saturating_dist(node.split_val);
+                    let new_off = query[split_dim].saturating_dist(split_val);
 
                     let [closer_node_idx, further_node_idx] =
-                        if *query.get_unchecked(split_dim) < node.split_val {
-                            [node.left, node.right]
+                        if *query.get_unchecked(split_dim) < split_val {
+                            [node_left, node_right]
                         } else {
-                            [node.right, node.left]
+                            [node_right, node_left]
                         };
                     let next_split_dim = (split_dim + 1).rem(K);
 
@@ -93,18 +97,23 @@ macro_rules! generate_within_unsorted_iter {
                         .leaves
                         .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
 
+                    let size: IDX = *transform(&leaf_node.size);
+
                     leaf_node
                         .content_points
                         .iter()
                         .enumerate()
-                        .take(leaf_node.size.az::<usize>())
+                        .take(size.az::<usize>())
                         .for_each(|(idx, entry)| {
-                            let distance = D::dist(query, entry);
+                            let distance = D::dist(query, transform(entry));
 
                             if distance < radius {
+                                let item = unsafe { leaf_node.content_items.get_unchecked(idx) };
+                                let item = *transform(item);
+
                                 gen_scope.yield_with(NearestNeighbour {
                                     distance,
-                                    item: *leaf_node.content_items.get_unchecked(idx.az::<usize>()),
+                                    item,
                                 });
                             }
                         });

@@ -4,13 +4,14 @@ use std::ops::Rem;
 
 use crate::fixed::kdtree::{Axis, KdTree};
 use crate::nearest_neighbour::NearestNeighbour;
+use crate::rkyv_utils::transform;
 use crate::traits::DistanceMetric;
 use crate::traits::{is_stem_index, Content, Index};
 use crate::within_unsorted_iter::WithinUnsortedIter;
 
 use crate::generate_within_unsorted_iter;
 
-impl<'a, A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+impl<'a, A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX> + Send>
     KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,

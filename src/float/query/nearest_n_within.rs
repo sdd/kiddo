@@ -6,6 +6,7 @@ use std::ops::Rem;
 use crate::float::kdtree::{Axis, KdTree};
 use crate::float::result_collection::ResultCollection;
 use crate::nearest_neighbour::NearestNeighbour;
+use crate::rkyv_utils::transform;
 use crate::traits::DistanceMetric;
 use crate::traits::{is_stem_index, Content, Index};
 
@@ -71,6 +72,24 @@ use memmap::MmapOptions;
 
 let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/float-doctest-tree.rkyv\").expect(\"./examples/float-doctest-tree.rkyv missing\")).unwrap() };
 let tree = unsafe { rkyv::archived_root::<KdTree<f64, 3>>(&mmap) };"
+    );
+}
+
+#[cfg(feature = "rkyv_08")]
+use crate::float::kdtree::ArchivedKdTree;
+#[cfg(feature = "rkyv_08")]
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    ArchivedKdTree<A, T, K, B, IDX>
+where
+    usize: Cast<IDX>,
+{
+    generate_float_nearest_n_within!(
+        "use std::fs::File;
+    use memmap::MmapOptions;
+    use kiddo::float::kdtree::ArchivedKdTree;
+
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/float-doctest-tree-rkyv_08.rkyv\").expect(\"./examples/float-doctest-tree-rkyv_08.rkyv missing\")).unwrap() };
+    let tree = unsafe { rkyv_08::access_unchecked::<ArchivedKdTree<f64, u64, 3, 32, u32>>(&mmap) };"
     );
 }
 

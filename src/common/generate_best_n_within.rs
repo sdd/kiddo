@@ -16,13 +16,14 @@ macro_rules! generate_best_n_within {
     {
         let mut off = [A::zero(); K];
         let mut best_items: BinaryHeap<BestNeighbour<A, T>> = BinaryHeap::with_capacity(max_qty);
+        let root_index: IDX = *transform(&self.root_index);
 
         unsafe {
             self.best_n_within_recurse::<D>(
                 query,
                 dist,
                 max_qty,
-                self.root_index,
+                root_index,
                 0,
                 &mut best_items,
                 &mut off,
@@ -49,16 +50,19 @@ macro_rules! generate_best_n_within {
     {
         if is_stem_index(curr_node_idx) {
             let node = self.stems.get_unchecked(curr_node_idx.az::<usize>());
+            let split_val: A = *transform(&node.split_val);
+            let node_left: IDX = *transform(&node.left);
+            let node_right: IDX = *transform(&node.right);
 
             let mut rd = rd;
             let old_off = off[split_dim];
-            let new_off = query[split_dim].saturating_dist(node.split_val);
+            let new_off = query[split_dim].saturating_dist(split_val);
 
             let [closer_node_idx, further_node_idx] =
-                if *query.get_unchecked(split_dim) < node.split_val {
-                    [node.left, node.right]
+                if *query.get_unchecked(split_dim) < split_val {
+                    [node_left, node_right]
                 } else {
-                    [node.right, node.left]
+                    [node_right, node_left]
                 };
             let next_split_dim = (split_dim + 1).rem(K);
 
@@ -108,11 +112,13 @@ macro_rules! generate_best_n_within {
     ) where
         D: DistanceMetric<A, K>,
     {
+        let size: IDX = *transform(&leaf_node.size);
+
         leaf_node
             .content_points
             .iter()
-            .take(leaf_node.size.az::<usize>())
-            .map(|entry| D::dist(query, entry))
+            .take(size.az::<usize>())
+            .map(|entry| D::dist(query, transform(entry)))
             .enumerate()
             .filter(|(_, distance)| *distance <= radius)
             .for_each(|(idx, distance)| {
@@ -128,7 +134,9 @@ macro_rules! generate_best_n_within {
         idx: usize,
         distance: A,
     ) {
-        let item = *leaf_node.content_items.get_unchecked(idx.az::<usize>());
+        let item = leaf_node.content_items.get_unchecked(idx.az::<usize>());
+        let item = *transform(item);
+
         if best_items.len() < max_qty {
             best_items.push(BestNeighbour{ distance, item });
         } else {
