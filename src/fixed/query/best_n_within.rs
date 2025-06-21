@@ -4,6 +4,7 @@ use std::ops::Rem;
 
 use crate::best_neighbour::BestNeighbour;
 use crate::fixed::kdtree::{Axis, KdTree, LeafNode};
+use crate::rkyv_utils::transform;
 use crate::traits::DistanceMetric;
 use crate::traits::{is_stem_index, Content, Index};
 

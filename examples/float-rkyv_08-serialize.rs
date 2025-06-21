@@ -1,5 +1,4 @@
 use elapsed::ElapsedDuration;
-// use memmap::MmapOptions;
 use rand::Rng;
 use rand_chacha::rand_core::SeedableRng;
 use rkyv_08::{rancor::Error as RkyvError, to_bytes};
@@ -14,11 +13,11 @@ use tracing_subscriber::fmt;
 use ubyte::ToByteUnit;
 
 use kiddo::float::distance::SquaredEuclidean;
-use kiddo::immutable::float::kdtree::ImmutableKdTree;
+use kiddo::float::kdtree::KdTree;
 
-const NUM_ITEMS: usize = 50_000_000;
+const NUM_ITEMS: usize = 50_000;
 
-type Tree = ImmutableKdTree<f64, u32, 3, 256>;
+type Tree = KdTree<f64, u32, 3, 32, u32>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "tracing")]
@@ -33,9 +32,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let content_to_add: Vec<[f64; 3]> = (0..NUM_ITEMS).map(|_| rng.random::<[f64; 3]>()).collect();
 
     let start = Instant::now();
-    let tree: Tree = ImmutableKdTree::new_from_slice(&content_to_add);
+    let tree: Tree = Tree::from_iter(
+        content_to_add
+            .into_iter()
+            .enumerate()
+            .map(|(idx, pt)| (pt, idx as u32)),
+    );
     println!(
-        "Populated ImmutableKdTree with {} items ({})",
+        "Populated KdTree with {} items ({})",
         tree.size(),
         ElapsedDuration::new(start.elapsed())
     );
@@ -48,13 +52,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let buf = to_bytes::<RkyvError>(&tree)?;
 
-    let mut file = File::create("./examples/immutable-test-tree-rkyv_08.rkyv")?;
+    let mut file = File::create("./examples/float-test-tree-rkyv_08.rkyv")?;
     file.write_all(&buf)
         .expect("Could not write serialized rkyv to file");
 
     let file_size = file.metadata().unwrap().len().bytes();
     println!(
-        "Serialized k-d tree to rkyv file 'immutable-test-tree-rkyv_08.rkyv' ({}). File size: {:.2}",
+        "Serialized k-d tree to rkyv file 'float-test-tree-rkyv_08.rkyv' ({}). File size: {:.2}",
         ElapsedDuration::new(start.elapsed()),
         file_size
     );

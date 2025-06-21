@@ -89,7 +89,7 @@ where
     use memmap::MmapOptions;
     use rkyv::{access_unchecked, Archived};
 
-    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-test-tree-r08.rkyv\").expect(\"./examples/immutable-test-tree-r08.rkyv missing\")).unwrap() };
+    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-test-tree-rkyv_08.rkyv\").expect(\"./examples/immutable-test-tree-rkyv_08.rkyv missing\")).unwrap() };
     let tree = unsafe { access_unchecked::<ArchivedImmutableKdTree<Archived<f64>, Archived<u32>, 3, 256>>(&mmap) };"
     );
 }

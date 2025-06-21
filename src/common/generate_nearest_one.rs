@@ -10,11 +10,12 @@ macro_rules! generate_nearest_one {
                     D: DistanceMetric<A, K>,
             {
                 let mut off = [A::zero(); K];
+                let root_index: IDX = *transform(&self.root_index);
 
                 unsafe {
                     self.nearest_one_recurse::<D>(
                         query,
-                        self.root_index,
+                        root_index,
                         0,
                         NearestNeighbour { distance: A::max_value(), item: T::zero() },
                         &mut off,
@@ -38,16 +39,19 @@ macro_rules! generate_nearest_one {
             {
                 if is_stem_index(curr_node_idx) {
                     let node = &self.stems.get_unchecked(curr_node_idx.az::<usize>());
+                    let split_val: A = *transform(&node.split_val);
+                    let node_left: IDX = *transform(&node.left);
+                    let node_right: IDX = *transform(&node.right);
 
                     let mut rd = rd;
                     let old_off = off[split_dim];
-                    let new_off = query[split_dim].saturating_dist(node.split_val);
+                    let new_off = query[split_dim].saturating_dist(split_val);
 
                     let [closer_node_idx, further_node_idx] =
-                        if *query.get_unchecked(split_dim) < node.split_val {
-                            [node.left, node.right]
+                        if *query.get_unchecked(split_dim) < split_val {
+                            [node_left, node_right]
                         } else {
-                            [node.right, node.left]
+                            [node_right, node_left]
                         };
                     let next_split_dim = (split_dim + 1).rem(K);
 
@@ -105,16 +109,19 @@ macro_rules! generate_nearest_one {
             ) where
                 D: DistanceMetric<A, K>,
             {
+                let size: IDX = *transform(&leaf_node.size);
+
                 leaf_node
                     .content_points
                     .iter()
                     .enumerate()
-                    .take(leaf_node.size.az::<usize>())
+                    .take(size.az::<usize>())
                     .for_each(|(idx, entry)| {
-                        let dist = D::dist(query, entry);
+                        let dist = D::dist(query, transform(entry));
                         if dist < nearest.distance {
                             nearest.distance = dist;
-                            nearest.item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
+                            let item = unsafe { leaf_node.content_items.get_unchecked(idx) };
+                            nearest.item = *transform(item)
                         }
                     });
             }

@@ -11,11 +11,12 @@ macro_rules! generate_nearest_n {
     {
         let mut off = [A::zero(); K];
         let mut result: BinaryHeap<NearestNeighbour<A, T>> = BinaryHeap::with_capacity(qty);
+        let root_index: IDX = *transform(&self.root_index);
 
         unsafe {
             self.nearest_n_recurse::<D>(
                 query,
-                self.root_index,
+                root_index,
                 0,
                 &mut result,
                 &mut off,
@@ -40,16 +41,19 @@ macro_rules! generate_nearest_n {
     {
         if is_stem_index(curr_node_idx) {
             let node = &self.stems.get_unchecked(curr_node_idx.az::<usize>());
+            let split_val: A = *transform(&node.split_val);
+            let node_left: IDX = *transform(&node.left);
+            let node_right: IDX = *transform(&node.right);
 
             let mut rd = rd;
             let old_off = off[split_dim];
-            let new_off = query[split_dim].saturating_dist(node.split_val);
+            let new_off = query[split_dim].saturating_dist(split_val);
 
             let [closer_node_idx, further_node_idx] =
-                if *query.get_unchecked(split_dim) < node.split_val {
-                    [node.left, node.right]
+                if *query.get_unchecked(split_dim) < split_val {
+                    [node_left, node_right]
                 } else {
-                    [node.right, node.left]
+                    [node_right, node_left]
                 };
             let next_split_dim = (split_dim + 1).rem(K);
 
@@ -81,15 +85,20 @@ macro_rules! generate_nearest_n {
                 .leaves
                 .get_unchecked((curr_node_idx - IDX::leaf_offset()).az::<usize>());
 
+            let size: IDX = *transform(&leaf_node.size);
+
             leaf_node
                 .content_points
                 .iter()
-                .take(leaf_node.size.az::<usize>())
+                .take(size.az::<usize>())
                 .enumerate()
                 .for_each(|(idx, entry)| {
-                    let distance: A = D::dist(query, entry);
+                    let distance: A = D::dist(query, transform(entry));
+
                     if Self::dist_belongs_in_heap(distance, results) {
-                        let item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
+                        let item = unsafe { leaf_node.content_items.get_unchecked(idx) };
+                        let item = *transform(item);
+
                         let element = NearestNeighbour { distance, item };
                         if results.len() < results.capacity() {
                             results.push(element)

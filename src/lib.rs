@@ -110,6 +110,7 @@ pub mod within_unsorted_iter;
 #[doc(hidden)]
 pub mod float_leaf_slice;
 mod modified_van_emde_boas;
+mod rkyv_utils;
 
 /// A floating-point k-d tree with default parameters.
 ///
