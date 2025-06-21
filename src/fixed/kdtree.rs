@@ -33,37 +33,6 @@ impl<T: Fixed + Default + Debug + Copy + Sync + Send> Axis for T {
     }
 }
 
-/// Rkyv-serializable equivalent of `kiddo::fixed::kdtree::Axis`
-#[cfg(feature = "rkyv")]
-pub trait AxisRK: num_traits::Zero + Default + Debug + rkyv::Archive {}
-#[cfg(feature = "rkyv")]
-impl<T: num_traits::Zero + Default + Debug + rkyv::Archive> AxisRK for T {}
-
-/// Rkyv-serializable fixed point k-d tree
-///
-/// This is only required when using Rkyv to serialize to / deserialize from
-/// a [`FixedKdTree`](crate::fixed::kdtree::KdTree). The types in the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed)  crate do not support [`Rkyv`](https://crates.io/crates/rkyv/0.7.39) yet.
-/// As a workaround, we need to [`std::mem::transmute`] a [`crate::fixed::kdtree::KdTree`] into
-/// an equivalent [`crate::fixed::kdtree::KdTreeRK`] before serializing via Rkyv,
-/// and vice-versa when deserializing.
-#[cfg_attr(
-    feature = "rkyv",
-    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
-)]
-#[cfg(feature = "rkyv")]
-pub struct KdTreeRK<
-    A: num_traits::PrimInt,
-    T: Content,
-    const K: usize,
-    const B: usize,
-    IDX: Index<T = IDX>,
-> {
-    pub(crate) leaves: Vec<LeafNodeRK<A, T, K, B, IDX>>,
-    pub(crate) stems: Vec<StemNodeRK<A, K, IDX>>,
-    pub(crate) root_index: IDX,
-    pub(crate) size: usize,
-}
-
 /// Fixed point k-d tree
 ///
 /// For use when the co-ordinates of the points being stored in the tree
@@ -79,43 +48,12 @@ pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B:
     pub(crate) size: usize,
 }
 
-#[doc(hidden)]
-#[cfg_attr(
-    feature = "rkyv",
-    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
-)]
-#[cfg(feature = "rkyv")]
-pub struct StemNodeRK<A: num_traits::PrimInt, const K: usize, IDX: Index<T = IDX>> {
-    pub(crate) left: IDX,
-    pub(crate) right: IDX,
-    pub(crate) split_val: A,
-}
-
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct StemNode<A: Copy + Default, const K: usize, IDX> {
     pub(crate) left: IDX,
     pub(crate) right: IDX,
     pub(crate) split_val: A,
-}
-
-#[doc(hidden)]
-#[cfg_attr(
-    feature = "rkyv",
-    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
-)]
-#[cfg(feature = "rkyv")]
-pub struct LeafNodeRK<
-    A: num_traits::PrimInt,
-    T: Content,
-    const K: usize,
-    const B: usize,
-    IDX: Index<T = IDX>,
-> {
-    // TODO: Refactor content_points to be [[A; B]; K] to see if this helps vectorisation
-    pub(crate) content_points: [[A; K]; B],
-    pub(crate) content_items: [T; B],
-    pub(crate) size: IDX,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

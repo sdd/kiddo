@@ -1,7 +1,7 @@
 use aligned_vec::{AVec, CACHELINE_ALIGN};
-use rkyv_08::rancor::Fallible;
-use rkyv_08::with::{ArchiveWith, DeserializeWith, SerializeWith};
-use rkyv_08::{
+use rkyv::rancor::Fallible;
+use rkyv::with::{ArchiveWith, DeserializeWith, SerializeWith};
+use rkyv::{
     ser::{Allocator, Writer},
     vec::{ArchivedVec, VecResolver},
     Archive, Place, Serialize,
@@ -59,7 +59,7 @@ mod tests {
     use aligned_vec::{AVec, CACHELINE_ALIGN};
     use std::ops::Rem;
 
-    use rkyv_08::{
+    use rkyv::{
         access_unchecked, deserialize, rancor::Error, Archive, Archived, Deserialize, Serialize,
     };
 
@@ -68,7 +68,6 @@ mod tests {
     #[test]
     fn roundtrip_avec_deserialized() {
         #[derive(Archive, Debug, Serialize, Deserialize, PartialEq)]
-        #[rkyv(crate=rkyv_08)]
         struct Obj {
             #[rkyv(with = EncodeAVec<i32>)]
             pub inner: AVec<i32>,
@@ -78,7 +77,7 @@ mod tests {
             inner: AVec::from_slice(CACHELINE_ALIGN, &[10, 20, 30, 40]),
         };
 
-        let buf = rkyv_08::to_bytes::<Error>(&original).unwrap();
+        let buf = rkyv::to_bytes::<Error>(&original).unwrap();
 
         // check that the deserialized values are the same
         let archived: &ArchivedObj = unsafe { access_unchecked::<Archived<Obj>>(buf.as_ref()) };
@@ -94,7 +93,6 @@ mod tests {
     #[test]
     fn roundtrip_avec_archived() {
         #[derive(Archive, Debug, Serialize, Deserialize, PartialEq)]
-        #[rkyv(crate=rkyv_08)]
         struct Obj {
             #[rkyv(with = EncodeAVec<i32>)]
             pub inner: AVec<i32>,
@@ -104,7 +102,7 @@ mod tests {
             inner: AVec::from_slice(CACHELINE_ALIGN, &[10, 20, 30, 40]),
         };
 
-        let buf = rkyv_08::to_bytes::<Error>(&original).unwrap();
+        let buf = rkyv::to_bytes::<Error>(&original).unwrap();
 
         // check that the archived values are the same
         let archived: &ArchivedObj = unsafe { access_unchecked::<Archived<Obj>>(buf.as_ref()) };

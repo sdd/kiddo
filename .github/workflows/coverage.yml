@@ -40,8 +40,7 @@ jobs:
       - name: Generate Coverage
         run: |
           cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
-          cargo run --example build-immutable-doctest-tree --features="rkyv"
-          cargo llvm-cov --features "csv,las,serde,simd,rkyv,rkyv_08,test_utils,tracing" --tests --ignore-run-fail --workspace --codecov --output-path codecov.json
+          cargo llvm-cov --features "csv,las,serde,simd,rkyv_08,test_utils,tracing" --tests --ignore-run-fail --workspace --codecov --output-path codecov.json
 
       - uses: codecov/codecov-action@v5
         with:

@@ -4,7 +4,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 
-use rkyv_08::{rancor::Error as RkyvError, to_bytes};
+use rkyv::{rancor::Error as RkyvError, to_bytes};
 
 use kiddo::KdTree;
 

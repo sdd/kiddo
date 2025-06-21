@@ -88,10 +88,6 @@ impl<T: Float + Default + Debug + Copy + Sync + FloatLSB> Axis for T {}
 /// For use when the co-ordinates of the points being stored in the tree
 /// are floats. f64 or f32 are supported currently
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-    feature = "rkyv",
-    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
-)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
     pub(crate) leaves: Vec<LeafNode<A, T, K, B, IDX>>,
@@ -105,10 +101,6 @@ pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B:
 
 #[doc(hidden)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-    feature = "rkyv",
-    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
-)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
     // pub(crate) left: IDX,
@@ -119,10 +111,6 @@ pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
 
 #[doc(hidden)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-    feature = "rkyv",
-    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
-)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
     #[cfg_attr(feature = "serde", serde(with = "array_of_arrays"))]

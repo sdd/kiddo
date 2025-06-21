@@ -95,14 +95,10 @@ impl<T: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign> 
 /// deserialization, you may get better performance from [`immutable::float::kdtree::ImmutableKdTree`](`crate::immutable::float::kdtree::ImmutableKdTree`)
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
-    feature = "rkyv",
+    feature = "rkyv_08",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
-#[cfg_attr(
-    feature = "rkyv_08",
-    derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
-)]
-#[cfg_attr(feature = "rkyv_08", rkyv(crate=rkyv_08, archived=ArchivedR8KdTree, resolver=KdTreeR8Resolver))]
+#[cfg_attr(feature = "rkyv_08", rkyv(archived=ArchivedR8KdTree, resolver=KdTreeR8Resolver))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
     pub(crate) leaves: Vec<LeafNode<A, T, K, B, IDX>>,
@@ -114,14 +110,10 @@ pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B:
 #[doc(hidden)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
-    feature = "rkyv",
+    feature = "rkyv_08",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
-#[cfg_attr(
-    feature = "rkyv_08",
-    derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
-)]
-#[cfg_attr(feature = "rkyv_08", rkyv(crate=rkyv_08, archived=ArchivedR8StemNode, resolver=StemNodeR8Resolver))]
+#[cfg_attr(feature = "rkyv_08", rkyv(archived=ArchivedR8StemNode, resolver=StemNodeR8Resolver))]
 #[cfg_attr(feature = "rkyv_08", rkyv(attr(doc(hidden))))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
@@ -133,14 +125,10 @@ pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
 #[doc(hidden)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
-    feature = "rkyv",
+    feature = "rkyv_08",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
-#[cfg_attr(
-    feature = "rkyv_08",
-    derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
-)]
-#[cfg_attr(feature = "rkyv_08", rkyv(crate=rkyv_08, archived=ArchivedR8LeafNode, resolver=LeafNodeR8Resolver))]
+#[cfg_attr(feature = "rkyv_08", rkyv(archived=ArchivedR8LeafNode, resolver=LeafNodeR8Resolver))]
 #[cfg_attr(feature = "rkyv_08", rkyv(attr(doc(hidden))))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
@@ -335,27 +323,13 @@ where
     generate_common_methods!(KdTree);
 }
 
-#[cfg(feature = "rkyv")]
-impl<
-        A: Axis + rkyv::Archive<Archived = A>,
-        T: Content + rkyv::Archive<Archived = T>,
-        const K: usize,
-        const B: usize,
-        IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>,
-    > ArchivedKdTree<A, T, K, B, IDX>
-where
-    usize: Cast<IDX>,
-{
-    generate_common_methods!(ArchivedKdTree);
-}
-
 #[cfg(feature = "rkyv_08")]
 impl<
-        A: Axis + rkyv_08::Archive,
-        T: Content + rkyv_08::Archive,
+        A: Axis + rkyv::Archive,
+        T: Content + rkyv::Archive,
         const K: usize,
         const B: usize,
-        IDX: Index<T = IDX> + rkyv_08::Archive,
+        IDX: Index<T = IDX> + rkyv::Archive,
     > ArchivedR8KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,

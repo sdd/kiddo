@@ -9,7 +9,7 @@ use tracing::Level;
 #[cfg(feature = "tracing")]
 use tracing_subscriber::fmt;
 
-use rkyv_08::rancor::Error as RkyvError;
+use rkyv::rancor::Error as RkyvError;
 
 use kiddo::float::kdtree::ArchivedR8KdTree;
 use kiddo::float::kdtree::KdTree;
@@ -34,7 +34,7 @@ where
     {
         // full deserialization
         let start = Instant::now();
-        let tree = unsafe { rkyv_08::from_bytes_unchecked::<Tree, RkyvError>(&buf) }?;
+        let tree = unsafe { rkyv::from_bytes_unchecked::<Tree, RkyvError>(&buf) }?;
         let loaded = Instant::now();
 
         // perform some queries
@@ -116,7 +116,7 @@ where
 
         // Get archived tree
         let archived_tree =
-            rkyv_08::access::<ArchivedR8KdTree<f64, u32, 3, 32, u32>, RkyvError>(&buf[..]).unwrap();
+            rkyv::access::<ArchivedR8KdTree<f64, u32, 3, 32, u32>, RkyvError>(&buf[..]).unwrap();
         let loaded = Instant::now();
 
         println!("Tree Size: {}", archived_tree.size());
@@ -200,7 +200,7 @@ where
 
         // Get archived tree using unsafe method
         let archived_tree =
-            unsafe { rkyv_08::access_unchecked::<ArchivedR8KdTree<f64, u32, 3, 32, u32>>(&buf) };
+            unsafe { rkyv::access_unchecked::<ArchivedR8KdTree<f64, u32, 3, 32, u32>>(&buf) };
         let loaded = Instant::now();
 
         // perform a query using the wrapper
