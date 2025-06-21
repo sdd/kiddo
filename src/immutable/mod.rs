@@ -20,7 +20,7 @@
 //! As per the other Kiddo float-type trees, points being stored
 //! in the tree must be floats ([`f64`] or [`f32`],
 //! or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` or `f16_rkyv_08` features
-//! are enabled.
+//! are enabled).
 #[doc(hidden)]
 pub(crate) mod common;
 pub mod float;

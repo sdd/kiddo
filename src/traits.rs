@@ -11,7 +11,7 @@ use std::fmt::Debug;
 /// than 65535 points, you could use a `u16`. All these types implement `Content` with no
 /// extra changes. Start off with a `usize` as that's easiest
 /// since you won't need to cast to / from usize when using query results to index into
-/// a Vec, and try switching tqo a smaller type and benchmarking to see if you get better
+/// a Vec, and try switching to a smaller type and benchmarking to see if you get better
 /// performance.
 #[cfg(not(feature = "rkyv_08"))]
 pub trait Content:
