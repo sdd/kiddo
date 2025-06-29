@@ -1,5 +1,12 @@
 # Kiddo Changelog
 
+## [5.2.2] - 2025-06-29
+
+### ♻️ Refactor
+
+- refactor `within_unsorted_iter` to decouple the lifetime of the iterator from that of the query by
+  copying `query` once at the start of the call.
+
 ## [5.2.1] - 2025-06-29
 
 ### 📝 Documentation
