@@ -45,6 +45,7 @@ macro_rules! generate_within_unsorted_iter {
                 D: DistanceMetric<A, K>,
             {
                 let mut off = [A::zero(); K];
+                let root_index: IDX = *transform(&self.root_index);
 
                 let gen = Gn::new_scoped(move |gen_scope| {
                     let query_ref = &query;
@@ -52,7 +53,7 @@ macro_rules! generate_within_unsorted_iter {
                         self.within_unsorted_iter_recurse::<D>(
                             query_ref,
                             dist,
-                            self.root_index,
+                            root_index,
                             0,
                             gen_scope,
                             &mut off,
