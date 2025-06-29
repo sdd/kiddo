@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.2.1] - 2025-06-29
+
+### 📝 Documentation
+
+- Update some stale documentation. Remove the global_allocate feature which is no longer used for anything
+
 ## [5.2.0] - 2025-06-29
 
 It's been a while since the last release as my focus has been elsewhere, but I'm back in the k-d tree groove now
