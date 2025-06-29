@@ -79,7 +79,7 @@ where
 }
 
 #[cfg(feature = "rkyv_08")]
-use crate::float::kdtree::{ArchivedKdTree, ArchivedLeafNode};
+use crate::float::kdtree::{ArchivedR8KdTree, ArchivedR8LeafNode};
 #[cfg(feature = "rkyv_08")]
 impl<
         A: Axis + rkyv_08::Archive,
@@ -87,19 +87,19 @@ impl<
         const K: usize,
         const B: usize,
         IDX: Index<T = IDX>,
-    > ArchivedKdTree<A, T, K, B, IDX>
+    > ArchivedR8KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
     IDX: rkyv_08::Archive,
 {
     generate_float_best_n_within!(
-        ArchivedLeafNode,
+        ArchivedR8LeafNode,
         "use std::fs::File;
     use memmap::MmapOptions;
-    use kiddo::float::kdtree::ArchivedKdTree;
+    use kiddo::float::kdtree::ArchivedR8KdTree;
 
     let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/float-doctest-tree-rkyv_08.rkyv\").expect(\"./examples/float-doctest-tree-rkyv_08.rkyv missing\")).unwrap() };
-    let tree = unsafe { rkyv_08::access_unchecked::<ArchivedKdTree<f64, u64, 3, 32, u32>>(&mmap) };"
+    let tree = unsafe { rkyv_08::access_unchecked::<ArchivedR8KdTree<f64, u64, 3, 32, u32>>(&mmap) };"
     );
 }
 

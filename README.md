@@ -19,8 +19,8 @@ Kiddo provides:
  - Its standard floating point k-d tree, exposed as [`kiddo::KdTree`](`crate::KdTree`)
  - An [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) with space and performance advantages over the standard
    k-d tree, for situations where the tree does not need to be modified after creation
- - **Integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) library;
- - **`f16` support** via the [`half`](https://docs.rs/half/latest/half/) library; 
+ - **Integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) crate;
+ - **`f16` support** via the [`half`](https://docs.rs/half/latest/half/) crate; 
  - **Instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
 
 ## Usage

@@ -1,17 +1,50 @@
 //! Immutable Floating point k-d tree.
 //!
-//! (Most of the structs listed in these docs are only relevant when using `rkyv` for zero-copy
-//! deserialization.
-//! The main Struct in here, [`ImmutableKdTree`], is usually what you're looking for.)
-//!
 //! [`ImmutableKdTree`] offers improved memory utilisation, smaller size
-//! when serialized, and faster more consistent query performance, when compared to [`crate::float::kdtree::KdTree`].
+//! when serialised, and faster more consistent query performance, when compared to [`crate::float::kdtree::KdTree`].
 //! This comes at the expense of not being able to modify the contents of the tree after its initial
-//! construction, and longer construction times - perhaps prohibitively so.
+//! construction, and potentially longer construction times.
 //! As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
 //! values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` or `f16_rkyv_08` features
 //! are enabled.
-
+//!
+//! ## Normal Usage
+//! Most of the structs listed in these docs are only relevant when using `rkyv` for zero-copy
+//! serialisation. **The main Struct in here, [`ImmutableKdTree`], is usually what you're looking for.**
+//!
+//! ## Rkyv Usage
+//! This release of Kiddo supports usage of both Rkyv 0.7 and Rkyv 0.8 simultaneously.
+//! Rkyv 0.7.x support is gated behind the `rkyv` crate feature, as has historically been the case since
+//! Kiddo introduced Rkyv support.
+//! Rkyv 0.8 support is gated behind the newer `rkyv_08` crate feature.
+//! Usage with Rkyv 0.8 is considerably more straightforward, since the base `ImmutableKdTree` implements rkyv
+//! 0.8's Archive trait directly (compared to rkyv 0.7 where you needed to transform an `ImmutableKdTree` to and
+//! from an `ImmutableKdTreeRK`). See the examples folder for examples of serializing and deserializing
+//! with both rkyv 0.7 and 0.8, using both the deserialize, ZC checked, and ZC unchecked approaches, along with
+//! the timings of each approach.
+//!
+//! ### Deprecation Notice
+//! Rkyv can be a tricky beast to work with. Implementing support for both 0.7.x and 0.8.x branches of Rkyv
+//! simultaneously was especially painful. As such, **support for Rkyv 0.7.x will be dropped in Kiddo v6**
+//! and only 0.8.x will be supported. This will be the only version that supports both.
+//! The `rkyv_08` feature will remain and still be called `rkyv_08` to protect against breaking changes should
+//! a future version of rkyv be released.
+//! With the removal of rkyv 0.7 support, the rkyv 0.8 structs will revert to the default names that are currently
+//! being used for the rkyv 0.7 structs.
+//!
+//! ### Struct Naming
+//! Since both rkyv 0.7 and 0.8 by default will attempt to name the structs derived by the `Archive` macro
+//! as `ArchivedImmutableKdTree` etc., it was necessary to choose a different name for the Rkyv 0.8.x derived types
+//! to avoid them clashing with the existing Rkyv 0.7 ones.
+//! So, the `ArchivedImmutableKdTree` struct is the rkyv 0.7.x Archived version of `KdTree`. The `ArchivedImmutableR8KdTree`
+//! is the rkyv 0.8.x Archived version of `KdTree`.
+//!
+//! ### Using both Rkyv and `f16` / `half` support at the same time
+//! Additionally, if you are using `rkyv` 0.8 via the `rkyv_08` feature and want
+//! to use `f16`, you'll need to enable the `f16_rkyv_08` feature instead of `f16`. this is because versions
+//! of the `half` up to 2.4.1 support `rkyv` 0.7 only, and versions of the `half` crate from 2.5.0 onwards
+//! support `rkyv` 0.8 only.
+//!
 pub use crate::float::kdtree::Axis;
 use crate::float_leaf_slice::leaf_slice::{LeafSlice, LeafSliceFloat, LeafSliceFloatChunk};
 #[cfg(feature = "rkyv_08")]
@@ -35,11 +68,11 @@ use std::{cmp::PartialEq, fmt::Debug};
 /// Immutable floating point k-d tree
 ///
 /// Offers less memory utilisation, smaller size vs non-immutable tree
-/// when serialized, and faster more consistent query performance. This comes at the
+/// when serialised, and faster more consistent query performance. This comes at the
 /// expense of not being able to modify the contents of the tree after its initial
 /// construction, and longer construction times.
 ///
-/// Compared to non-dynamic ImmutableKdTree, this can handle data like point clouds
+/// Compared to non-dynamic `ImmutableKdTree`, this can handle data like point clouds
 /// that may have many occurrences of multiple points have the exact same value on a given axis.
 /// This comes at the expense of slower performance. Memory usage should still be very efficient,
 /// more so than the standard and non-dynamic immutable tree types.
@@ -54,7 +87,7 @@ use std::{cmp::PartialEq, fmt::Debug};
     feature = "rkyv_08",
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
 )]
-#[cfg_attr(feature = "rkyv_08", rkyv(crate=rkyv_08))]
+#[cfg_attr(feature = "rkyv_08", rkyv(crate=rkyv_08, archived=ArchivedR8ImmutableKdTree, resolver=ImmutableKdTreeR8Resolver))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct ImmutableKdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize> {
     #[cfg_attr(feature = "rkyv_08", rkyv(with = EncodeAVec<A>))]
@@ -228,13 +261,13 @@ impl<
         T: Copy + Default + rkyv_08::Archive,
         const K: usize,
         const B: usize,
-    > Debug for ArchivedImmutableKdTree<A, T, K, B>
+    > Debug for ArchivedR8ImmutableKdTree<A, T, K, B>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // just log out the generic types and size
         write!(
             f,
-            "ArchivedImmutableKdTree<{}, {}, {}, {}> with {} items",
+            "ArchivedR8ImmutableKdTree<{}, {}, {}, {}> with {} items",
             std::any::type_name::<A>(),
             std::any::type_name::<T>(),
             K,
@@ -245,7 +278,7 @@ impl<
 }
 
 #[cfg(feature = "rkyv_08")]
-impl<A, T, const K: usize, const B: usize> ArchivedImmutableKdTree<A, T, K, B>
+impl<A, T, const K: usize, const B: usize> ArchivedR8ImmutableKdTree<A, T, K, B>
 where
     A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + rkyv_08::Archive,
     T: Content + rkyv_08::Archive,

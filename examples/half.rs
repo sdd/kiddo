@@ -1,8 +1,4 @@
-#[cfg(all(
-    feature = "f16",
-    not(feature = "rkyv_08"),
-    not(feature = "f16_rkyv_08")
-))]
+#[cfg(feature = "f16")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use half::f16;
     use kiddo::{KdTree, SquaredEuclidean};
@@ -32,9 +28,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[cfg(any(not(feature = "f16"), feature = "f16_rkyv_08", feature = "rkyv_08"))]
+#[cfg(not(feature = "f16"))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Activate the 'f16' feature to run this example properly. Ensure that the 'f16_rkyv_08' and 'rkyv_80' features are disabled.");
+    println!("Activate the 'f16' feature to run this example properly.");
     println!("Try this: cargo run --example half --features=f16");
 
     Ok(())

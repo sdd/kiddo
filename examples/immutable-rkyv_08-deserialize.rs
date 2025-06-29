@@ -11,7 +11,7 @@ use tracing_subscriber::fmt;
 
 use rkyv_08::{access, access_unchecked, from_bytes_unchecked, rancor::Error as RkyvError};
 
-use kiddo::immutable::float::kdtree::ArchivedImmutableKdTree;
+use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::SquaredEuclidean;
 
@@ -115,7 +115,7 @@ where
 
         // Get archived tree
         let archived_tree =
-            access::<ArchivedImmutableKdTree<f64, u32, 3, 256>, RkyvError>(&buf[..]).unwrap();
+            access::<ArchivedR8ImmutableKdTree<f64, u32, 3, 256>, RkyvError>(&buf[..]).unwrap();
         let loaded = Instant::now();
 
         // perform a query using the wrapper
@@ -196,7 +196,7 @@ where
 
         // Get archived tree using unsafe method
         let archived_tree =
-            unsafe { access_unchecked::<ArchivedImmutableKdTree<f64, u32, 3, 256>>(&buf) };
+            unsafe { access_unchecked::<ArchivedR8ImmutableKdTree<f64, u32, 3, 256>>(&buf) };
         let loaded = Instant::now();
 
         // perform a query using the wrapper
