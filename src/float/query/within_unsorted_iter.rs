@@ -7,7 +7,7 @@ use crate::nearest_neighbour::NearestNeighbour;
 use crate::rkyv_utils::transform;
 use crate::traits::DistanceMetric;
 use crate::traits::{is_stem_index, Content, Index};
-use crate::within_unsorted_iter::{WithinUnsortedIter, WithinUnsortedIterOwned};
+use crate::within_unsorted_iter::WithinUnsortedIter;
 
 use crate::generate_within_unsorted_iter;
 
@@ -36,8 +36,15 @@ assert_eq!(within.len(), 2);
     };
 }
 
-impl<'a, A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX> + Send>
-    KdTree<A, T, K, B, IDX>
+impl<
+        'a,
+        'query,
+        A: Axis,
+        T: Content,
+        const K: usize,
+        const B: usize,
+        IDX: Index<T = IDX> + Send,
+    > KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {
@@ -54,6 +61,7 @@ use crate::float::kdtree::ArchivedKdTree;
 #[cfg(feature = "rkyv")]
 impl<
         'a,
+        'query,
         A: Axis + rkyv::Archive<Archived = A>,
         T: Content + rkyv::Archive<Archived = T>,
         const K: usize,
@@ -77,6 +85,7 @@ use crate::float::kdtree::ArchivedR8KdTree;
 #[cfg(feature = "rkyv_08")]
 impl<
         'a,
+        'query,
         A: Axis + Send + rkyv_08::Archive,
         T: Content + Send + rkyv_08::Archive,
         const K: usize,
@@ -145,10 +154,25 @@ mod tests {
         let radius = 0.2;
         let expected = linear_search(&content_to_add, &query_point, radius);
 
-        let result: Vec<_> = tree
-            .within_unsorted_iter::<Manhattan>(&query_point, radius)
-            .collect();
-        assert_eq!(result, expected);
+        // Store some iterators in a way that the test will fail to compile
+        // if the lifetime of the iterator is tied to the query as well as to
+        // the lifetime of the tree
+        let mut iterators = Vec::new();
+        for _ in 0..2 {
+            // take a copy of query_point to ensure that the lifetime of the
+            // iterator is tied to the lifetime of the tree and not the lifetime
+            // of the query
+            let temp_query = query_point;
+
+            let iter = tree.within_unsorted_iter::<Manhattan>(&temp_query, radius);
+
+            iterators.push(iter);
+        }
+
+        for iter in iterators {
+            let result: Vec<_> = iter.collect();
+            assert_eq!(result, expected);
+        }
 
         let mut rng = rand::rng();
         for _i in 0..1000 {
