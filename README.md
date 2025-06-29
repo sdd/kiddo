@@ -67,17 +67,14 @@ See the [examples documentation](https://github.com/sdd/kiddo/tree/master/exampl
 ## Optional Features
 
 The Kiddo crate exposes the following features. Any labelled as **(NIGHTLY)** are not available on `stable` Rust as they require some unstable features. You'll need to build with `nightly` in order to user them.
+* `fixed`: enables the fixed module, which provides a version of KdTree that supports fixed-point types via the [`fixed`](https://docs.rs/fixed/latest/fixed) crate
+* `rkyv` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.7. 
+* `rkyv_08` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.8.
 * `serde` - serialization / deserialization via [`Serde`](https://docs.rs/serde/latest/serde/)
-* `rkyv` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.7. **NOTE**: this feature cannot be used at the same time as `rkyv_08` or `f16_rkyv_08`)
-* `rkyv_08` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.8. **NOTE**: this feature cannot be used at the same time as the `rkyv` feature. If you need support for `f16` as well as `rkyv_08`, you will need to enable the `f16_rkyv_08` feature and ensure that the `f16` feature is disabled. This is because the `half` crate, which
-  we depend on for `f16` support, supports rkyv 0.7 when at version 2.4.1 and below, and rkyv 0.8 from versions 2.5.0 upwards.
-* `global_allocate` **(NIGHTLY)** -  When enabled Kiddo will use the unstable allocator_api feature within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) to get a slight performance improvement when allocating space for leaves.
-* `simd` **(NIGHTLY)** - enables some hand-written SIMD intrinsic code within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) that may improve performance (currently only on the nearest_one method when using `f64`)
-* `f16` - enables usage of `f16` from the `half` crate for float trees, when not using `rkyv_08`
-* `f16_rkyv_08` - enables usage of `f16` from the `half` crate for float trees, when using `rkyv_08`
-* `csv` and `las` features are only required for building some of the examples.
+* `simd` **(NIGHTLY)** - enables some handwritten SIMD intrinsic code within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) that may improve performance (currently only on the nearest_one method when using `f64`)
 * `tracing` feature is enabled by default and adds some tracing output.
 * `modified_van_emde_boas`: disabled by default. Enabling will switch the stem node ordering from Eytzinger to a modified Van Emde Boas ordering that may in some circumstances be slightly faster.
+* The `f16`, `csv` and `las` features are only required for building some of the examples and are not required to support any features by consumers of this crate
 
 
 ## v5.x

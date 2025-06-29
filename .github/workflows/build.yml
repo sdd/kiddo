@@ -143,7 +143,7 @@ jobs:
           version: "^0.6"
 
       - name: Cargo check all targets and features
-        run: cargo hack check --workspace --each-feature --all-targets --exclude-features global_allocate,simd
+        run: cargo hack check --workspace --each-feature --all-targets --exclude-features simd
 
   check-unstable:
     name: Cargo Check (Nightly)
