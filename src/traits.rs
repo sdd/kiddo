@@ -13,12 +13,10 @@ use std::fmt::Debug;
 /// since you won't need to cast to / from usize when using query results to index into
 /// a Vec, and try switching tqo a smaller type and benchmarking to see if you get better
 /// performance.
-#[cfg(not(feature = "rkyv_08"))]
 pub trait Content:
     Zero + One + PartialEq + Default + Clone + Copy + Ord + Debug + std::ops::SubAssign + Sync + Send
 {
 }
-#[cfg(not(feature = "rkyv_08"))]
 impl<
         T: Zero
             + One
@@ -35,49 +33,6 @@ impl<
 {
 }
 
-/// Content trait.
-///
-/// Must be implemented by any type that you want to use to represent the content
-/// stored in a KdTree. Generally this will be `usize`, `u32`, or for trees with less
-/// than 65535 points, you could use a `u16`. All these types implement `Content` with no
-/// extra changes. Start off with a `usize` as that's easiest
-/// since you won't need to cast to / from usize when using query results to index into
-/// a Vec, and try switching to a smaller type and benchmarking to see if you get better
-/// performance.
-#[cfg(feature = "rkyv_08")]
-pub trait Content:
-    Zero
-    + One
-    + PartialEq
-    + Default
-    + Clone
-    + Copy
-    + Ord
-    + Debug
-    + std::ops::SubAssign
-    + Sync
-    + Send
-    + rkyv_08::Archive
-{
-}
-#[cfg(feature = "rkyv_08")]
-impl<
-        T: Zero
-            + One
-            + PartialEq
-            + Default
-            + Clone
-            + Copy
-            + Ord
-            + Debug
-            + std::ops::SubAssign
-            + Sync
-            + Send
-            + rkyv_08::Archive,
-    > Content for T
-{
-}
-
 /// Implemented on u16 and u32 so that they can be used internally to index the
 /// `Vec`s of Stem and Leaf nodes.
 ///
@@ -87,35 +42,7 @@ impl<
 /// ensuring that more of them can be kept in the CPU cache, which may improve
 /// performance (this may be offset on some architectures if it results in a
 /// misalignment penalty).
-#[cfg(not(feature = "rkyv_08"))]
 pub trait Index: PrimInt + Unsigned + Zero + Cast<usize> + Sync {
-    #[doc(hidden)]
-    type T: Cast<usize>;
-    #[doc(hidden)]
-    fn max() -> Self;
-    #[doc(hidden)]
-    fn min() -> Self;
-    #[doc(hidden)]
-    fn leaf_offset() -> Self;
-    #[doc(hidden)]
-    fn ilog2(self) -> Self;
-    #[doc(hidden)]
-    fn div_ceil(self, b: Self::T) -> Self;
-    #[doc(hidden)]
-    fn capacity_with_bucket_size(bucket_size: usize) -> usize;
-}
-
-/// Implemented on u16 and u32 so that they can be used internally to index the
-/// `Vec`s of Stem and Leaf nodes.
-///
-/// Allows `u32` or `u16` to be used as the 5th generic parameter of `float::KdTree`
-/// and `fixed::KdTree`. If you will be storing fewer than `BUCKET_SIZE` * ~32k items
-/// in the tree, selecting `u16` will slightly reduce the size of the Stem Nodes,
-/// ensuring that more of them can be kept in the CPU cache, which may improve
-/// performance (this may be offset on some architectures if it results in a
-/// misalignment penalty).
-#[cfg(feature = "rkyv_08")]
-pub trait Index: PrimInt + Unsigned + Zero + Cast<usize> + Sync + Send + rkyv_08::Archive {
     #[doc(hidden)]
     type T: Cast<usize>;
     #[doc(hidden)]

@@ -247,8 +247,8 @@ impl<
 #[cfg(feature = "rkyv_08")]
 impl<A, T, const K: usize, const B: usize> ArchivedImmutableKdTree<A, T, K, B>
 where
-    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
-    T: Content,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + rkyv_08::Archive,
+    T: Content + rkyv_08::Archive,
     usize: Cast<T>,
 {
     /// Returns the current number of elements stored in the tree
