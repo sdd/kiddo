@@ -1,6 +1,6 @@
 # Kiddo Changelog
 
-## [5.1.0] - 2025-06-20
+## [5.2.0] - 2025-06-29
 
 It's been a while since the last release as my focus has been elsewhere, but I'm back in the k-d tree groove now
 and looking to bring some new features and performance updates over the next few weeks.
@@ -12,20 +12,17 @@ Right now, the pre-existing `rkyv` crate feature still provides support for
 Rkyv 0.7 as before, and so the introduction of Rkyv 0.8 is non-breaking. To use Rkyv 0.8, enable the crate feature that is 
 unsurprisingly named `rkyv_08`. There are some caveats to Rkyv 0.8 support:
 
-* Use of `rkyv` and `rkyv_08` is mutually exclusive; due to limitations in Rkyv's derive macros and trait system, it seems
-  impossible to support both at the same time. You may be able to achieve this to a limited extent by importing two versions of Kiddo
-  at the same time, one with `rkyv` activated and the other with `rkyv_08`, but interop between the two will be limited
+* The rkyv 0.8.x Archived structs are prefixed with `ArchivedR8` rather than `Archived` to avoid clashing with the pre-existing
+  rkyv 0.7 types.
 * You're unlikely to be able to successfully deserialize a tree serialized with Rkyv 0.7 into an Rkyv 0.8 object, and vice-versa.
 * Anyone using `rkyv` and `f16` / `half` at the same time may encounter issues updating to Rkyv 0.8. This is because the `half`
-  crate, on which Kiddo's f16 support depends, only supports Rkyv 0.7 at version 2.4.1 and below, and only supports Rkyv 0.8 at versions
-  2.5.0+. To use f16 in Kiddo with Rkyv 0.8, you need to enable the `f16_rkyv_08` crate feature to ensure that the correct versions
-  of both Rkyv and half are pulled in.
-* Supporting both Rkyv 0.7 and 0.8 in the Kiddo library at the same time is a massive pain and will add significant maintenance burden
-  going forward. As such, **this 5.1.0 version will be the only one that supports both Rkyv 0.7 and Rkyv 0.8. An upcoming version 6
-  of Kiddo will remove support for Rkyv 0.7 entirely and only support Rkyv 0.8.**
-
-All the best! Scott (@sdd)
-
+  crate only supports Rkyv 0.7 at version 2.4.1 and below, and only supports Rkyv 0.8 at versions
+  2.5.0+.
+* Supporting both Rkyv 0.7 and 0.8 in the Kiddo crate at the same time is a massive pain and will add significant maintenance burden
+  going forward. As such, **this 5.2.0 version will be the only one that supports both Rkyv 0.7 and Rkyv 0.8. An upcoming version 6
+  of Kiddo will remove support for Rkyv 0.7 entirely and only support Rkyv 0.8.** At this point the annoying non-standard `ArchivedR8`
+  prefix for the rkyv 0.8 types will be dropped in favour of the default naming scheme.
+* 
 ### ✨ Features
 
 - Add support for Rkyv v0.8
@@ -53,6 +50,16 @@ All the best! Scott (@sdd)
 - Update `itertools` dependency to 0.14
 - Update formatting to comply with updated clippy rules of recent versions of Rust
 - Update rust crate ordered-float to v5
+
+All the best! Scott (@sdd)
+
+## [5.1.0] - 2025-06-20: **YANKED**
+
+5.1.0 was yanked. It only supported Rkyv 0.7 and 0.8 in a mutually exclusive way, but I found a way to support both simultaneously
+a few days after publishing 5.1.0. This came at the expense of being a breaking change to 5.1.0, and to respect semver I'd have needed
+to release a 6.0.0 version that would have been immediately superseded by 7.0.0 that removed rkyv 0.7. Since 5.1.0 had only been out
+for a couple of days, and since the mutual exclusivity meant that the rkyv 0.8 structs were not even mentioned in the 5.1.0
+docs on docs.rs, I chose to yank 5.1.0 instead.
 
 ## [5.0.3] - 2024-12-21
 
@@ -119,7 +126,8 @@ See `immutable-rkyv-serialize` and `immutable-rkyv-deserialize` in the examples 
 **BREAKING CHANGE**: It was pointed out in https://github.com/sdd/kiddo/issues/159 that it was necessary to enable both `rkyv` and `serialize_rkyv` features to use Rkyv serialization. I took the opportunity of the major version bump to rationalize the feature names to make them easier to use.
 `serialize_rkyv` has been removed and now only `rkyv` feature is needed to enable Rkyv serialization.
 `serialize` has been renamed to `serde` in line with ecosystem conventions.
-`half` has been renamed to `f16` for clarity.
+`half` has been renamed to `f16` for clarity (but is not needed for `f16` support anyway and is only used to ensure that the `half` crate is only
+depended upon within the "half" examples and not as a core dependency)
 
 ### `max_qty` Changed to `NonZero<usize>`
 

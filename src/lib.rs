@@ -15,14 +15,14 @@
 //! Kiddo provides:
 //! - A standard floating-point k-d tree, exposed as [`kiddo::KdTree`](`crate::KdTree`), for when you may need to add or remove
 //!   points to the tree after the initial construction / deserialization
-//! - An [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) with performance space and advantages over the standard
+//! - An [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) with performance and space advantages over the standard
 //!   k-d tree, for situations where the tree does not need to be modified after creation
 //! - **integer / fixed point support** via the [`fixed`](https://docs.rs/fixed/latest/fixed/) crate;
 //! - **`f16` support** via the [`half`](https://docs.rs/half/latest/half/) crate;
-//! - **instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
+//! - **instant zero-copy deserialization** and serialisation via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
 
 //!
-//! Kiddo is ideal for super-fast spatial / geospatial lookups and nearest-neighbour / KNN
+//! Kiddo is ideal for superfast spatial / geospatial lookups and nearest-neighbour / KNN
 //! queries for low-ish numbers of dimensions, where you want to ask questions such as:
 //!  - Find the [nearest_n](`float::kdtree::KdTree::nearest_n`) item(s) to a query point, ordered by distance;
 //!  - Find all items [within](`float::kdtree::KdTree::within`) a specified radius of a query point;
@@ -79,7 +79,6 @@
 //! * **rkyv** - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/0.7.45/rkyv/index.html) version 0.7.x
 //! * **rkyv_08** - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.8.x
 //! * `simd` **(NIGHTLY)** - enables some handwritten SIMD and pre-fetch intrinsics code within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) that may improve performance (currently only on nearest_one with `f64`)
-//! * `f16` - enables usage of `f16` from the `half` crate for float trees.
 //! * `fixed` - enables usage of `kiddo::fixed::KdTree` for use with the `fixed` library's fixed-point number types
 //!
 //! **NOTE**: Use of the `rkyv` feature is mutually exclusive with `rkyv_08` since they both attempt to derive an `ArchivedKdTree` struct.
@@ -121,7 +120,7 @@ mod rkyv_utils;
 
 /// A floating-point k-d tree with default parameters.
 ///
-/// `A` is the floating point type (`f32` or `f64`, or `f16` if the `f16` feature is enabled).
+/// `A` is the floating point type (`f32` or `f64`, or `f16` in conjunction with the [`half`](https://docs.rs/half/latest/half/) crate).
 /// `K` is the number of dimensions. See [`KdTree`](`float::kdtree::KdTree`) for details of how to use.
 ///
 /// To manually specify more advanced parameters, use [`KdTree`](`float::kdtree::KdTree`) directly.
@@ -130,7 +129,7 @@ pub type KdTree<A, const K: usize> = float::kdtree::KdTree<A, u64, K, 32, u32>;
 
 /// An immutable floating-point k-d tree with default parameters.
 ///
-/// `A` is the floating point type (`f32` or `f64`, or `f16` if the `f16` feature is enabled).
+/// `A` is the floating point type (`f32` or `f64`, or `f16` in conjunction with the [`half`](https://docs.rs/half/latest/half/) crate).
 /// `K` is the number of dimensions. See [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) for details of how to use.
 ///
 /// To manually specify more advanced parameters, use [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) directly.

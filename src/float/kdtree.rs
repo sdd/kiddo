@@ -1,12 +1,38 @@
 //! Floating point k-d tree, for use when the co-ordinates of the points being stored in the tree
 //! are floats. f64 or f32 are supported currently, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html)
-//! if the `f16` feature is enabled. (NB if you are using `rkyv` 0.8 via the `rkyv_08` feature and want
+//! if the `f16` feature is enabled.
+//!
+//! ## Normal Usage
+//! Most of the structs listed in these docs are only relevant when using `rkyv` for zero-copy
+//! serialisation. **The main Struct in here, [`KdTree`], is usually what you're looking for.**
+//!
+//! ## Rkyv Usage
+//! This release of Kiddo supports usage of both Rkyv 0.7 and Rkyv 0.8 simultaneously.
+//! Rkyv 0.7.x support is gated behind the `rkyv` crate feature, as has historically been the case since
+//! Kiddo introduced Rkyv support.
+//! Rkyv 0.8 support is gated behind the newer `rkyv_08` crate feature.
+//!
+//! ### Deprecation Notice
+//! Rkyv can be a tricky beast to work with. Implementing support for both 0.7.x and 0.8.x branches of Rkyv
+//! simultaneously was especially painful. As such, **support for Rkyv 0.7.x will be dropped in Kiddo v6**
+//! and only 0.8.x will be supported. This will be the only version that supports both.
+//! The `rkyv_08` feature will remain and still be called `rkyv_08` to protect against breaking changes should
+//! a future version of rkyv be released.
+//! With the removal of rkyv 0.7 support, the rkyv 0.8 structs will revert to the default names that are currently
+//! being used for the rkyv 0.7 structs.
+//!
+//! ### Struct Naming
+//! Since both rkyv 0.7 and 0.8 by default will attempt to name the structs derived by the `Archive` macro
+//! as `ArchivedKdTree` etc., it was necessary to choose a different name for the Rkyv 0.8.x derived types
+//! to avoid them clashing with the existing Rkyv 0.7 ones.
+//! So, the `ArchivedKdTree` struct is the rkyv 0.7.x Archived version of `KdTree`. The `ArchivedR8KdTree`
+//! is the rkyv 0.8.x Archived version of `KdTree`.
+//!
+//! ### Using both Rkyv and `f16` / `half` support at the same time
+//! Additionally, if you are using `rkyv` 0.8 via the `rkyv_08` feature and want
 //! to use `f16`, you'll need to enable the `f16_rkyv_08` feature instead of `f16`. this is because versions
 //! of the `half` up to 2.4.1 support `rkyv` 0.7 only, and versions of the `half` crate from 2.5.0 onwards
-//! support `rkyv` 0.8 only).
-//!
-//! (Most of the structs listed in these docs are only relevant when using `rkyv` for zero-copy
-//! deserialization. The main Struct in here, [`KdTree`], is usually what you're looking for.)
+//! support `rkyv` 0.8 only.
 //!
 use az::{Az, Cast};
 use divrem::DivCeil;
@@ -71,7 +97,7 @@ impl<T: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign> 
     feature = "rkyv_08",
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
 )]
-#[cfg_attr(feature = "rkyv_08", rkyv(crate=rkyv_08))]
+#[cfg_attr(feature = "rkyv_08", rkyv(crate=rkyv_08, archived=ArchivedR8KdTree, resolver=KdTreeR8Resolver))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
     pub(crate) leaves: Vec<LeafNode<A, T, K, B, IDX>>,
@@ -90,7 +116,7 @@ pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B:
     feature = "rkyv_08",
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
 )]
-#[cfg_attr(feature = "rkyv_08", rkyv(crate=rkyv_08))]
+#[cfg_attr(feature = "rkyv_08", rkyv(crate=rkyv_08, archived=ArchivedR8StemNode, resolver=StemNodeR8Resolver))]
 #[cfg_attr(feature = "rkyv_08", rkyv(attr(doc(hidden))))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
@@ -109,7 +135,7 @@ pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
     feature = "rkyv_08",
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
 )]
-#[cfg_attr(feature = "rkyv_08", rkyv(crate=rkyv_08))]
+#[cfg_attr(feature = "rkyv_08", rkyv(crate=rkyv_08, archived=ArchivedR8LeafNode, resolver=LeafNodeR8Resolver))]
 #[cfg_attr(feature = "rkyv_08", rkyv(attr(doc(hidden))))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeafNode<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize, IDX> {
@@ -325,7 +351,7 @@ impl<
         const K: usize,
         const B: usize,
         IDX: Index<T = IDX> + rkyv_08::Archive,
-    > ArchivedKdTree<A, T, K, B, IDX>
+    > ArchivedR8KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {

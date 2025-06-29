@@ -71,7 +71,7 @@ impl<
 
 #[cfg(feature = "rkyv_08")]
 impl<A, T, const K: usize, const B: usize>
-    crate::immutable::float::kdtree::ArchivedImmutableKdTree<A, T, K, B>
+    crate::immutable::float::kdtree::ArchivedR8ImmutableKdTree<A, T, K, B>
 where
     A: Copy
         + Default
@@ -87,10 +87,10 @@ where
         "use std::fs::File;
     use memmap::MmapOptions;
     use rkyv_08::{access_unchecked, Archived};
-    use kiddo::immutable::float::kdtree::ArchivedImmutableKdTree;
+    use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
 
     let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree_rkyv08.rkyv\").expect(\"./examples/immutable-doctest-tree_rkyv08.rkyv missing\")).unwrap() };
-    let tree = unsafe { access_unchecked::<ArchivedImmutableKdTree<f64, u32, 3, 256>>(&mmap) };"
+    let tree = unsafe { access_unchecked::<ArchivedR8ImmutableKdTree<f64, u32, 3, 256>>(&mmap) };"
     );
 }
 
