@@ -1,7 +1,7 @@
 //! Definitions and implementations for some traits that are common between the [`float`](crate::float), [`immutable`](crate::immutable) and [`fixed`](crate::fixed)  modules
 use az::Cast;
 use divrem::DivCeil;
-use num_traits::{One, PrimInt, Unsigned, Zero};
+use num_traits::{PrimInt, Unsigned, Zero};
 use std::fmt::Debug;
 
 /// Content trait.
@@ -14,23 +14,9 @@ use std::fmt::Debug;
 /// a Vec. Try switching to a smaller type and benchmarking to see if you get better
 /// performance. Any type that satisfies these trait constraints may be used; in
 /// particular, we use T::default() to initialize the KdTree content.
-pub trait Content:
-    PartialEq + Default + Clone + Copy + Ord + Debug + Sync + Send
-{
-}
+pub trait Content: PartialEq + Default + Clone + Copy + Ord + Debug + Sync + Send {}
 
-impl<
-    T: PartialEq
-        + Default
-        + Clone
-        + Copy
-        + Ord
-        + Debug
-        + Sync
-        + Send
-> Content for T
-{
-}
+impl<T: PartialEq + Default + Clone + Copy + Ord + Debug + Sync + Send> Content for T {}
 
 /// Implemented on u16 and u32 so that they can be used internally to index the
 /// `Vec`s of Stem and Leaf nodes.
