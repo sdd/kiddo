@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.2.2] - 2025-06-29
+
+### 🧪 Testing
+
+- Fix broken test of custom struct as T. Add test for () as T
+
 ## [5.2.1] - 2025-06-29
 
 ### 📝 Documentation
