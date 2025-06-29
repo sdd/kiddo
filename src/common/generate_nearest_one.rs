@@ -98,6 +98,7 @@ macro_rules! generate_nearest_one {
 
                         if result < nearest {
                             nearest = result;
+                            let result_entry: [A; K] = *transform(&result_entry);
                             nearest_entry.copy_from_slice( &result_entry );
                         }
                     }
@@ -138,8 +139,10 @@ macro_rules! generate_nearest_one {
                         if dist < nearest.distance {
                             nearest.distance = dist;
                             let item = unsafe { leaf_node.content_items.get_unchecked(idx) };
-                            nearest.item = *transform(item)
-                            nearest_entry.copy_from_slice( entry );
+                            nearest.item = *transform(item);
+
+                            let entry: &&[A; K] = transform(&entry);
+                            nearest_entry.copy_from_slice( *entry );
                         }
                     });
             }
