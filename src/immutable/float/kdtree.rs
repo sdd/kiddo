@@ -5,8 +5,8 @@
 //! This comes at the expense of not being able to modify the contents of the tree after its initial
 //! construction, and potentially longer construction times.
 //! As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
-//! values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` or `f16_rkyv_08` features
-//! are enabled.
+//! values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if used with the
+//! [`half`](https://docs.rs/half/latest/half) crate.
 //!
 //! ## Normal Usage
 //! Most of the structs listed in these docs are only relevant when using `rkyv` for zero-copy
@@ -41,8 +41,8 @@
 //!
 //! ### Using both Rkyv and `f16` / `half` support at the same time
 //! Additionally, if you are using `rkyv` 0.8 via the `rkyv_08` feature and want
-//! to use `f16`, you'll need to enable the `f16_rkyv_08` feature instead of `f16`. this is because versions
-//! of the `half` up to 2.4.1 support `rkyv` 0.7 only, and versions of the `half` crate from 2.5.0 onwards
+//! to use `f16`, bear in mind that versions
+//! of [`half`](https://docs.rs/half/latest/half) up to 2.4.1 support `rkyv` 0.7 only, and versions of `half` crate from 2.5.0 onwards
 //! support `rkyv` 0.8 only.
 //!
 pub use crate::float::kdtree::Axis;
@@ -78,8 +78,8 @@ use std::{cmp::PartialEq, fmt::Debug};
 /// more so than the standard and non-dynamic immutable tree types.
 ///
 /// As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
-/// values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if the `f16` or `f16_rkyv_08` features
-/// are enabled
+/// values, or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if used with the
+/// [`half`](https://docs.rs/half/latest/half) crate.
 ///
 /// A convenient type alias exists for ImmutableKdTree with some sensible defaults set: [`kiddo::ImmutableKdTree`](`crate::ImmutableKdTree`).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

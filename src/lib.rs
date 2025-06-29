@@ -81,8 +81,7 @@
 //! * `simd` **(NIGHTLY)** - enables some handwritten SIMD and pre-fetch intrinsics code within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) that may improve performance (currently only on nearest_one with `f64`)
 //! * `fixed` - enables usage of `kiddo::fixed::KdTree` for use with the `fixed` library's fixed-point number types
 //!
-//! **NOTE**: Use of the `rkyv` feature is mutually exclusive with `rkyv_08` since they both attempt to derive an `ArchivedKdTree` struct.
-//! Additionally, support for rkyv 0.7 is now deprecated and will be removed in Kiddo v6.
+//! **NOTE**: Support for rkyv 0.7 is now deprecated and will be removed in Kiddo v6.
 
 #[macro_use]
 extern crate doc_comment;
