@@ -77,14 +77,15 @@ use crate::float::kdtree::ArchivedKdTree;
 #[cfg(feature = "rkyv_08")]
 impl<
         'a,
-        A: Axis + Send,
-        T: Content + Send,
+        A: Axis + Send + rkyv_08::Archive,
+        T: Content + Send + rkyv_08::Archive,
         const K: usize,
         const B: usize,
         IDX: Index<T = IDX> + Send,
     > ArchivedKdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
+    IDX: rkyv_08::Archive,
     <A as rkyv_08::Archive>::Archived: Sync,
     <T as rkyv_08::Archive>::Archived: Sync,
     <IDX as rkyv_08::Archive>::Archived: Sync,

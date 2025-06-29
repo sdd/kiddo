@@ -78,10 +78,16 @@ let tree = unsafe { rkyv::archived_root::<KdTree<f64, 3>>(&mmap) };"
 #[cfg(feature = "rkyv_08")]
 use crate::float::kdtree::ArchivedKdTree;
 #[cfg(feature = "rkyv_08")]
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
-    ArchivedKdTree<A, T, K, B, IDX>
+impl<
+        A: Axis + rkyv_08::Archive,
+        T: Content + rkyv_08::Archive,
+        const K: usize,
+        const B: usize,
+        IDX: Index<T = IDX>,
+    > ArchivedKdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
+    IDX: rkyv_08::Archive,
 {
     generate_float_nearest_n_within!(
         "use std::fs::File;

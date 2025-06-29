@@ -83,8 +83,14 @@ where
 impl<A, T, const K: usize, const B: usize>
     crate::immutable::float::kdtree::ArchivedImmutableKdTree<A, T, K, B>
 where
-    A: Copy + Default + PartialOrd + Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
-    T: Copy + Default + Content,
+    A: Copy
+        + Default
+        + PartialOrd
+        + Axis
+        + LeafSliceFloat<T>
+        + LeafSliceFloatChunk<T, K>
+        + rkyv_08::Archive,
+    T: Copy + Default + Content + rkyv_08::Archive,
     usize: Cast<T>,
 {
     generate_immutable_float_best_n_within!(
