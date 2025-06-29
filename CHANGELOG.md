@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.2.2] - 2025-06-29
+
+### ♻️ Refactor
+
+- Remove within_unsorted_iter_owned in favour of modifying within_unsorted_iter
+
 ## [5.2.1] - 2025-06-29
 
 ### 📝 Documentation
