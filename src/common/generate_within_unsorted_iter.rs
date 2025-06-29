@@ -7,7 +7,7 @@ macro_rules! generate_within_unsorted_iter {
             #[inline]
             pub fn within_unsorted_iter<D>(
                 &'a self,
-                query: &'a [A; K],
+                query: &'query [A; K],
                 dist: A,
             ) -> WithinUnsortedIter<'a, A, T>
             where
@@ -16,37 +16,7 @@ macro_rules! generate_within_unsorted_iter {
                 let mut off = [A::zero(); K];
                 let root_index: IDX = *transform(&self.root_index);
 
-                let gen = Gn::new_scoped(move |gen_scope| {
-                    unsafe {
-                        self.within_unsorted_iter_recurse::<D>(
-                            query,
-                            dist,
-                            root_index,
-                            0,
-                            gen_scope,
-                            &mut off,
-                            A::zero(),
-                        );
-                    }
-
-                    done!();
-                });
-
-                WithinUnsortedIter::new(gen)
-            }
-
-            #[inline]
-            pub fn within_unsorted_iter_owned<D>(
-                &'a self,
-                query: [A; K],
-                dist: A,
-            ) -> WithinUnsortedIterOwned<'a, A, T>
-            where
-                D: DistanceMetric<A, K>,
-            {
-                let mut off = [A::zero(); K];
-                let root_index: IDX = *transform(&self.root_index);
-
+                let query = query.clone();
                 let gen = Gn::new_scoped(move |gen_scope| {
                     let query_ref = &query;
                     unsafe {
@@ -64,7 +34,7 @@ macro_rules! generate_within_unsorted_iter {
                     done!();
                 });
 
-                WithinUnsortedIterOwned::new(gen)
+                WithinUnsortedIter::new(gen)
             }
 
             #[allow(clippy::too_many_arguments)]
