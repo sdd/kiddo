@@ -36,7 +36,7 @@ sorted-vec = "0.8"
 
 [dev-dependencies]
 bincode = {  version = "2", features = ["serde"] }
-codspeed-criterion-compat = "2.10"
+codspeed-criterion-compat = "3.0"
 criterion = "0.6"
 elapsed = "0.1.2"
 flate2 = { version = "1", features = ["zlib-ng-compat"], default-features = false }
