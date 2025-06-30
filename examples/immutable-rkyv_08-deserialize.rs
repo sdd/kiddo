@@ -9,7 +9,7 @@ use tracing::Level;
 #[cfg(feature = "tracing")]
 use tracing_subscriber::fmt;
 
-use rkyv_08::{access, access_unchecked, from_bytes_unchecked, rancor::Error as RkyvError};
+use rkyv::{access, access_unchecked, from_bytes_unchecked, rancor::Error as RkyvError};
 
 use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;

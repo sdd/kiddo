@@ -56,31 +56,6 @@ where
     );
 }
 
-#[cfg(feature = "rkyv")]
-use crate::immutable::float::kdtree::AlignedArchivedImmutableKdTree;
-#[cfg(feature = "rkyv")]
-impl<
-        A: Axis + rkyv::Archive<Archived = A>,
-        T: Content + rkyv::Archive<Archived = T>,
-        const K: usize,
-        const B: usize,
-    > AlignedArchivedImmutableKdTree<'_, A, T, K, B>
-where
-    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
-    T: Content,
-    usize: Cast<T>,
-{
-    generate_immutable_float_nearest_n_within!(
-        "use std::fs::File;
-    use memmap::MmapOptions;
-
-    use kiddo::immutable::float::kdtree::AlignedArchivedImmutableKdTree;
-
-    let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree.rkyv\").expect(\"./examples/immutable-doctest-tree.rkyv missing\")).unwrap() };
-    let tree: AlignedArchivedImmutableKdTree<f64, u32, 3, 256> = AlignedArchivedImmutableKdTree::from_bytes(&mmap);"
-    );
-}
-
 #[cfg(feature = "rkyv_08")]
 impl<A, T, const K: usize, const B: usize>
     crate::immutable::float::kdtree::ArchivedR8ImmutableKdTree<A, T, K, B>
@@ -91,8 +66,8 @@ where
         + Axis
         + LeafSliceFloat<T>
         + LeafSliceFloatChunk<T, K>
-        + rkyv_08::Archive,
-    T: Copy + Default + Content + rkyv_08::Archive,
+        + rkyv::Archive,
+    T: Copy + Default + Content + rkyv::Archive,
     usize: Cast<T>,
 {
     generate_immutable_float_nearest_n_within!(
@@ -102,7 +77,7 @@ where
     use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
 
     let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree_rkyv08.rkyv\").expect(\"./examples/immutable-doctest-tree_rkyv08.rkyv missing\")).unwrap() };
-    let tree = unsafe { rkyv_08::access_unchecked::<ArchivedR8ImmutableKdTree<f64, u32, 3, 256>>(&mmap) };"
+    let tree = unsafe { rkyv::access_unchecked::<ArchivedR8ImmutableKdTree<f64, u32, 3, 256>>(&mmap) };"
     );
 }
 

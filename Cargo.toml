@@ -68,9 +68,9 @@ version = "1"
 features = ["num-traits"]
 optional = true
 
-# half 2.5.0 switched from rkyv 0.7 to rkyv 0.8.
 [dependencies.half]
-version = "=2.4.1"
+package = "half"
+version = "2.5"
 optional = true
 features = ["num-traits"]
 
@@ -92,12 +92,6 @@ version = "1"
 optional = true
 
 [dependencies.rkyv]
-version = "0.7"
-optional = true
-default-features = false
-features = ["alloc", "copy_unsafe", "size_64"]
-
-[dependencies.rkyv_08]
 package = "rkyv"
 version = "0.8.9"
 optional = true
@@ -133,8 +127,7 @@ fixed = ["dep:fixed"]
 las = ["dep:las"]
 serde = ["dep:serde", "serde/derive", "dep:serde_derive", "dep:serde_with", "fixed/serde", "aligned-vec/serde"]
 simd = []
-rkyv = ["dep:rkyv"]
-rkyv_08 = ["dep:rkyv_08"]
+rkyv_08 = ["dep:rkyv"]
 test_utils = ["dep:rand", "dep:rand_chacha", "dep:rayon", "dep:fixed"]
 tracing = ["dep:tracing", "dep:tracing-subscriber"]
 
@@ -185,19 +178,9 @@ name = "avx2-check"
 path = "examples/avx2-check.rs"
 
 [[example]]
-name = "build-float-doctest-tree"
-path = "examples/build-float-doctest-tree.rs"
-required-features = ["rkyv"]
-
-[[example]]
 name = "build-float-doctest-tree-rkyv_08"
 path = "examples/build-float-doctest-tree-rkyv_08.rs"
 required-features = ["rkyv_08"]
-
-[[example]]
-name = "build-immutable-doctest-tree"
-path = "examples/build-immutable-doctest-tree.rs"
-required-features = ["rkyv"]
 
 [[example]]
 name = "build-immutable-doctest-tree-rkyv_08"
@@ -234,16 +217,6 @@ path = "examples/immutable-large.rs"
 required-features = ["test_utils"]
 
 [[example]]
-name = "immutable-rkyv-serialize"
-path = "examples/immutable-rkyv-serialize.rs"
-required-features = ["rkyv"]
-
-[[example]]
-name = "immutable-rkyv-deserialize"
-path = "examples/immutable-rkyv-deserialize.rs"
-required-features = ["rkyv"]
-
-[[example]]
 name = "immutable-rkyv_08-serialize"
 path = "examples/immutable-rkyv_08-serialize.rs"
 required-features = ["rkyv_08"]
@@ -256,27 +229,12 @@ required-features = ["rkyv_08"]
 [[example]]
 name = "pointcloud-las"
 path = "examples/pointcloud-las.rs"
-required-features = ["las", "rkyv"]
+required-features = ["las", "rkyv_08"]
 
 [[example]]
 name = "pointcloud-csv"
 path = "examples/pointcloud-csv.rs"
-required-features = ["csv", "rkyv"]
-
-[[example]]
-name = "rkyv"
-path = "examples/rkyv.rs"
-required-features = ["csv", "rkyv"]
-
-[[example]]
-name = "rkyv-large-serialize"
-path = "examples/rkyv-large-serialize.rs"
-required-features = ["rkyv"]
-
-[[example]]
-name = "rkyv-large-deserialize"
-path = "examples/rkyv-large-deserialize.rs"
-required-features = ["rkyv"]
+required-features = ["csv", "rkyv_08"]
 
 [[example]]
 name = "serde"
