@@ -1,10 +1,9 @@
-use crate::float::kdtree::Axis;
-use crate::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::generate_immutable_within_unsorted;
 use crate::immutable::float::kdtree::ImmutableKdTree;
+use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::traits::Content;
-use crate::traits::DistanceMetric;
+use crate::traits::{Axis, Content, DistanceMetric};
+
 use az::Cast;
 
 macro_rules! generate_immutable_float_within_unsorted {
@@ -96,9 +95,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::SquaredEuclidean;
-    use crate::float::kdtree::Axis;
+    use crate::distance::float::SquaredEuclidean;
     use crate::immutable::float::kdtree::ImmutableKdTree;
+    use crate::traits::Axis;
     use crate::traits::DistanceMetric;
     use rand::Rng;
     use std::cmp::Ordering;

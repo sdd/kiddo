@@ -13,13 +13,13 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use std::time::Instant;
 
-use kiddo::float::kdtree::KdTree;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
+use kiddo::mutable::float::kdtree::KdTree;
 
 use serde::Deserialize;
 
 use cities::{degrees_lat_lng_to_unit_sphere, parse_csv_file};
-use kiddo::float::distance::SquaredEuclidean;
+use kiddo::distance::float::SquaredEuclidean;
 
 /// Each `CityCsvRecord` corresponds to 1 row in our city source data CSV.
 ///

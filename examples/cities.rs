@@ -1,5 +1,6 @@
 use csv::Reader;
-use kiddo::float::{distance::SquaredEuclidean, kdtree::KdTree};
+use kiddo::distance::float::SquaredEuclidean;
+use kiddo::mutable::float::kdtree::KdTree;
 use serde::Deserialize;
 /// Kiddo example 1: Cities
 ///
@@ -84,7 +85,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     //    If your data covers a narrow dynamic range (e.g. all of the values are within
     //    a few orders of magnitude of each other) and performance (or memory usage)
     //    is a key concern, then you may want to experiment with converting your
-    //    positions into 16-bit fixed point and using a kiddo::FixedKdTree.
+    //    positions into 16-bit fixed point and using a kiddo::mutable::fixedKdTree.
     // 2) `T`: `u16` - this specifies the type of the item indexes that are stored in the tree.
     //    A `u16` will suffice for up to 2^16 (approx 65k) different items. A `u32` will allow you
     //    to store 2^32 (around 4 billion) different indices. Using a `u16` may
