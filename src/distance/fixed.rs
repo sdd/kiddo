@@ -5,7 +5,7 @@
 // #[cfg(any(target_arch = "x86_64"))]
 // use std::arch::x86_64::*;
 
-use crate::fixed::kdtree::Axis;
+use crate::mutable::fixed::kdtree::Axis;
 use crate::traits::DistanceMetric;
 
 /// Returns the squared euclidean distance between two points. When you only
@@ -19,7 +19,7 @@ use crate::traits::DistanceMetric;
 /// use fixed::types::extra::U0;
 /// use fixed::FixedU16;
 /// use kiddo::traits::DistanceMetric;
-/// use kiddo::fixed::distance::Manhattan;
+/// use kiddo::mutable::fixed::fixed::Manhattan;
 /// type Fxd = FixedU16<U0>;
 ///
 /// let ZERO = Fxd::from_num(0);
@@ -68,7 +68,7 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
 /// use fixed::types::extra::U0;
 /// use fixed::FixedU16;
 /// use kiddo::traits::DistanceMetric;
-/// use kiddo::fixed::distance::SquaredEuclidean;
+/// use kiddo::mutable::fixed::fixed::SquaredEuclidean;
 /// type Fxd = FixedU16<U0>;
 ///
 /// let ZERO = Fxd::from_num(0);

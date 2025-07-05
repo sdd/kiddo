@@ -6,14 +6,15 @@ use codspeed_criterion_compat::{
 use fixed::types::extra::{LeEqU16, Unsigned, U16};
 use fixed::FixedU16;
 use kiddo::batch_benches_parameterized;
-use kiddo::fixed::distance::SquaredEuclidean as SquaredEuclideanFixed;
-use kiddo::fixed::kdtree::{Axis as AxisFixed, KdTree as KdTreeFixed};
-use kiddo::float::distance::SquaredEuclidean;
-use kiddo::float::kdtree::{Axis, KdTree};
+use kiddo::distance::fixed::SquaredEuclidean as SquaredEuclideanFixed;
+use kiddo::distance::float::SquaredEuclidean;
+use kiddo::mutable::fixed::kdtree::{Axis as AxisFixed, KdTree as KdTreeFixed};
+use kiddo::mutable::float::kdtree::KdTree;
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_fixed, build_populated_tree_and_query_points_float,
     process_queries_fixed_parameterized, process_queries_float_parameterized,
 };
+use kiddo::traits::Axis;
 use kiddo::traits::{Content, Index};
 use rand::distr::StandardUniform;
 use rand_distr::Distribution;

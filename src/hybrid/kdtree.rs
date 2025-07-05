@@ -594,7 +594,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float_sss::kdtree::KdTree;
+    use crate::mutable::float_sss::kdtree::KdTree;
     use num_traits::Pow;
     use ordered_float::OrderedFloat;
     use rand::{Rng, SeedableRng};

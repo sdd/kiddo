@@ -1,4 +1,4 @@
-use crate::float::result_collection::ResultCollection;
+use crate::mutable::float::result_collection::ResultCollection;
 use az::Cast;
 use std::collections::BinaryHeap;
 use std::slice::ChunksExact;
@@ -25,8 +25,10 @@ use super::fallback::{
     update_nearest_dists_within_autovec,
 };
 
-use crate::traits::DistanceMetric;
-use crate::{float::kdtree::Axis, traits::Content, BestNeighbour, NearestNeighbour};
+use crate::{
+    traits::{Axis, Content, DistanceMetric},
+    BestNeighbour, NearestNeighbour,
+};
 
 #[doc(hidden)]
 #[allow(dead_code)]

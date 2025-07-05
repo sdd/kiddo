@@ -1,20 +1,25 @@
 use az::{Az, Cast};
-use std::collections::BinaryHeap;
 use std::ops::Rem;
 
-use crate::float::kdtree::{Axis, KdTree};
+use crate::generate_nearest_one;
+use crate::mutable::float::kdtree::{KdTree, LeafNode};
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::rkyv_utils::transform;
-use crate::traits::DistanceMetric;
-use crate::traits::{is_stem_index, Content, Index};
+use crate::traits::{is_stem_index, Axis, Content, DistanceMetric, Index};
 
-use crate::generate_nearest_n;
-
-macro_rules! generate_float_nearest_n {
-    ($doctest_build_tree:tt) => {
-        generate_nearest_n!((
-            "Finds the nearest `qty` elements to `query`, using the specified
+macro_rules! generate_float_nearest_one {
+    ($leafnode:ident, $doctest_build_tree:tt) => {
+        generate_nearest_one!(
+            $leafnode,
+            (
+                "Finds the nearest element to `query`, using the specified
 distance metric function.
+
+Faster than querying for nearest_n(point, 1, ...) due
+to not needing to allocate memory or maintain sorted results.
+
+The nearest_one_point version also returns the coordinates of the nearest point.
+
 # Examples
 
 ```rust
@@ -22,16 +27,22 @@ distance metric function.
     use kiddo::SquaredEuclidean;
 
     ",
-            $doctest_build_tree,
-            "
+                $doctest_build_tree,
+                "
 
-    let nearest: Vec<_> = tree.nearest_n::<SquaredEuclidean>(&[1.0, 2.0, 5.1], 1);
+    let nearest = tree.nearest_one::<SquaredEuclidean>(&[1.0, 2.0, 5.1]);
 
-    assert_eq!(nearest.len(), 1);
-    assert!((nearest[0].distance - 0.01f64).abs() < f64::EPSILON);
-    assert_eq!(nearest[0].item, 100);
+    assert!((nearest.distance - 0.01f64).abs() < f64::EPSILON);
+    assert_eq!(nearest.item, 100);
+
+    let (nearest, nearest_point) = tree.nearest_one_point::<SquaredEuclidean>(&[1.0, 2.0, 5.1]);
+
+    assert!((nearest.distance - 0.01f64).abs() < f64::EPSILON);
+    assert_eq!(nearest.item, 100);
+    assert_eq!(nearest_point, [1.0, 2.0, 5.0]);
 ```"
-        ));
+            )
+        );
     };
 }
 
@@ -40,7 +51,8 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
-    generate_float_nearest_n!(
+    generate_float_nearest_one!(
+        LeafNode,
         "let mut tree: KdTree<f64, 3> = KdTree::new();
     tree.add(&[1.0, 2.0, 5.0], 100);
     tree.add(&[2.0, 3.0, 6.0], 101);"
@@ -48,7 +60,7 @@ where
 }
 
 #[cfg(feature = "rkyv")]
-use crate::float::kdtree::ArchivedKdTree;
+use crate::mutable::float::kdtree::{ArchivedKdTree, ArchivedLeafNode};
 #[cfg(feature = "rkyv")]
 impl<
         A: Axis + rkyv::Archive<Archived = A>,
@@ -60,7 +72,8 @@ impl<
 where
     usize: Cast<IDX>,
 {
-    generate_float_nearest_n!(
+    generate_float_nearest_one!(
+        ArchivedLeafNode,
         "use std::fs::File;
     use memmap::MmapOptions;
 
@@ -70,7 +83,7 @@ where
 }
 
 #[cfg(feature = "rkyv_08")]
-use crate::float::kdtree::ArchivedR8KdTree;
+use crate::mutable::float::kdtree::{ArchivedR8KdTree, ArchivedR8LeafNode};
 #[cfg(feature = "rkyv_08")]
 impl<
         A: Axis + rkyv_08::Archive,
@@ -83,7 +96,8 @@ where
     usize: Cast<IDX>,
     IDX: rkyv_08::Archive,
 {
-    generate_float_nearest_n!(
+    generate_float_nearest_one!(
+        ArchivedR8LeafNode,
         "use std::fs::File;
     use memmap::MmapOptions;
     use kiddo::float::kdtree::ArchivedR8KdTree;
@@ -95,15 +109,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::SquaredEuclidean;
-    use crate::float::kdtree::{Axis, KdTree};
+    use crate::distance::float::Manhattan;
+    use crate::mutable::float::kdtree::KdTree;
+    use crate::nearest_neighbour::NearestNeighbour;
+    use crate::traits::Axis;
     use crate::traits::DistanceMetric;
     use rand::Rng;
 
     type AX = f32;
 
     #[test]
-    fn can_query_nearest_n_item() {
+    fn can_query_nearest_one_item() {
         let mut tree: KdTree<AX, u32, 4, 8, u32> = KdTree::new();
 
         let content_to_add: [([AX; 4], u32); 16] = [
@@ -133,16 +149,14 @@ mod tests {
 
         let query_point = [0.78f32, 0.55f32, 0.78f32, 0.55f32];
 
-        let expected = vec![(0.17569996, 6), (0.19139998, 5), (0.24420004, 7)];
+        let expected = NearestNeighbour {
+            distance: 0.819_999_93,
+            item: 5,
+        };
 
-        let result: Vec<_> = tree
-            .nearest_n::<SquaredEuclidean>(&query_point, 3)
-            .into_iter()
-            .map(|n| (n.distance, n.item))
-            .collect();
-        assert_eq!(result, expected);
+        let result = tree.nearest_one::<Manhattan>(&query_point);
+        assert_eq!(result.distance, expected.distance);
 
-        let qty = 10;
         let mut rng = rand::rng();
         for _i in 0..1000 {
             let query_point = [
@@ -151,26 +165,18 @@ mod tests {
                 rng.random_range(0f32..1f32),
                 rng.random_range(0f32..1f32),
             ];
-            let expected = linear_search(&content_to_add, qty, &query_point);
+            let expected = linear_search(&content_to_add, &query_point);
 
-            let result: Vec<_> = tree
-                .nearest_n::<SquaredEuclidean>(&query_point, qty)
-                .into_iter()
-                .map(|n| (n.distance, n.item))
-                .collect();
+            let result = tree.nearest_one::<Manhattan>(&query_point);
 
-            let result_dists: Vec<_> = result.iter().map(|(d, _)| d).collect();
-            let expected_dists: Vec<_> = expected.iter().map(|(d, _)| d).collect();
-
-            assert_eq!(result_dists, expected_dists);
+            assert_eq!(result.distance, expected.distance);
         }
     }
 
     #[test]
-    fn can_query_nearest_10_items_large_scale() {
+    fn can_query_nearest_one_item_large_scale() {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
-        const N: usize = 10;
 
         let content_to_add: Vec<([f32; 4], u32)> = (0..TREE_SIZE)
             .map(|_| rand::random::<([f32; 4], u32)>())
@@ -187,39 +193,33 @@ mod tests {
             .collect();
 
         for query_point in query_points {
-            let expected = linear_search(&content_to_add, N, &query_point);
+            let expected = linear_search(&content_to_add, &query_point);
 
-            let result: Vec<_> = tree
-                .nearest_n::<SquaredEuclidean>(&query_point, N)
-                .into_iter()
-                .map(|n| (n.distance, n.item))
-                .collect();
+            let result = tree.nearest_one::<Manhattan>(&query_point);
 
-            let result_dists: Vec<_> = result.iter().map(|(d, _)| d).collect();
-            let expected_dists: Vec<_> = expected.iter().map(|(d, _)| d).collect();
-
-            assert_eq!(result_dists, expected_dists);
+            assert_eq!(result.distance, expected.distance);
+            assert_eq!(result.item, expected.item);
         }
     }
 
     fn linear_search<A: Axis, const K: usize>(
         content: &[([A; K], u32)],
-        qty: usize,
         query_point: &[A; K],
-    ) -> Vec<(A, u32)> {
-        let mut results = vec![];
+    ) -> NearestNeighbour<A, u32> {
+        let mut best_dist: A = A::infinity();
+        let mut best_item: u32 = u32::MAX;
 
         for &(p, item) in content {
-            let dist = SquaredEuclidean::dist(query_point, &p);
-            if results.len() < qty {
-                results.push((dist, item));
-                results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(b_dist).unwrap());
-            } else if dist < results[qty - 1].0 {
-                results[qty - 1] = (dist, item);
-                results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(b_dist).unwrap());
+            let dist = Manhattan::dist(query_point, &p);
+            if dist < best_dist {
+                best_item = item;
+                best_dist = dist;
             }
         }
 
-        results
+        NearestNeighbour {
+            distance: best_dist,
+            item: best_item,
+        }
     }
 }

@@ -13,7 +13,7 @@ use tracing::Level;
 use tracing_subscriber::fmt;
 use ubyte::ToByteUnit;
 
-use kiddo::float::distance::SquaredEuclidean;
+use kiddo::distance::float::SquaredEuclidean;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 
 const NUM_ITEMS: usize = 50_000_000;

@@ -14,7 +14,8 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::time::Instant;
 
-use kiddo::{float::distance::SquaredEuclidean, float::kdtree::KdTree};
+use kiddo::distance::float::SquaredEuclidean;
+use kiddo::mutable::float::kdtree::KdTree;
 
 use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
 use rkyv::ser::Serializer;

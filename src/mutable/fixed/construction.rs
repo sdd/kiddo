@@ -1,5 +1,5 @@
-use crate::fixed::kdtree::{Axis, KdTree, LeafNode, StemNode};
 use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
+use crate::mutable::fixed::kdtree::{Axis, KdTree, LeafNode, StemNode};
 use crate::traits::{is_stem_index, Content, Index};
 use az::{Az, Cast};
 use std::ops::Rem;
@@ -19,7 +19,7 @@ where
     /// ```rust
     /// use fixed::FixedU16;
     /// use fixed::types::extra::U0;
-    /// use kiddo::fixed::kdtree::KdTree;
+    /// use kiddo::mutable::fixed::kdtree::KdTree;
     ///
     /// type Fxd = FixedU16<U0>;
     ///
@@ -92,7 +92,7 @@ where
     /// ```rust
     /// use fixed::FixedU16;
     /// use fixed::types::extra::U0;
-    /// use kiddo::fixed::kdtree::KdTree;
+    /// use kiddo::mutable::fixed::kdtree::KdTree;
     ///
     /// type Fxd = FixedU16<U0>;
     ///
@@ -350,7 +350,7 @@ mod tests {
     use fixed::types::extra::U16;
     use fixed::FixedU16;
 
-    use crate::fixed::kdtree::KdTree;
+    use crate::mutable::fixed::kdtree::KdTree;
 
     type Fxd = FixedU16<U16>;
 
