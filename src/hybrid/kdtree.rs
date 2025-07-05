@@ -186,7 +186,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
+    /// use kiddo::mutable::float::kdtree::KdTree;
     ///
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
     ///
@@ -204,7 +204,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
+    /// use kiddo::mutable::float::kdtree::KdTree;
     ///
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
     ///
@@ -267,7 +267,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
+    /// use kiddo::mutable::float::kdtree::KdTree;
     ///
     /// let points: Vec<[f64; 3]> = vec!();
     /// let tree: KdTree<f64, u32, 3, 32, u32> = KdTree::optimize_from(points);
@@ -513,7 +513,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
+    /// use kiddo::mutable::float::kdtree::KdTree;
     ///
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
     ///
@@ -594,7 +594,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float_sss::kdtree::KdTree;
+    use crate::mutable::float_sss::kdtree::KdTree;
     use num_traits::Pow;
     use ordered_float::OrderedFloat;
     use rand::{Rng, SeedableRng};

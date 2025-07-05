@@ -4,7 +4,7 @@
 // #[cfg(any(target_arch = "x86_64"))]
 // use std::arch::x86_64::*;
 
-use crate::float::kdtree::Axis;
+use crate::traits::Axis;
 
 /// Returns the squared euclidean distance between two points.
 ///
@@ -14,7 +14,7 @@ use crate::float::kdtree::Axis;
 /// # Examples
 ///
 /// ```rust
-/// use kiddo::float::distance::squared_euclidean;
+/// use kiddo::mutable::float::distance::squared_euclidean;
 ///
 /// assert_eq!(0f32, squared_euclidean(&[0f32, 0f32], &[0f32, 0f32]));
 /// assert_eq!(1f32, squared_euclidean(&[0f32, 0f32], &[1f32, 0f32]));
@@ -34,7 +34,7 @@ pub fn squared_euclidean<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A {
 /// # Examples
 ///
 /// ```rust
-/// use kiddo::float::distance::manhattan;
+/// use kiddo::mutable::float::distance::manhattan;
 ///
 /// assert_eq!(0f32, manhattan(&[0f32, 0f32], &[0f32, 0f32]));
 /// assert_eq!(1f32, manhattan(&[0f32, 0f32], &[1f32, 0f32]));

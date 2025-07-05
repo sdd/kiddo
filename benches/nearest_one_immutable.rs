@@ -4,12 +4,13 @@ use codspeed_criterion_compat::{
     BenchmarkId, Criterion, PlotConfiguration, Throughput,
 };
 use kiddo::batch_benches;
-use kiddo::float::distance::SquaredEuclidean;
-use kiddo::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
-use kiddo::immutable::float::kdtree::{Axis, ImmutableKdTree};
+use kiddo::distance::float::SquaredEuclidean;
+use kiddo::immutable::float::kdtree::ImmutableKdTree;
+use kiddo::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_immutable_float, process_queries_immutable_float,
 };
+use kiddo::traits::Axis;
 use kiddo::traits::Content;
 use rand::distr::StandardUniform;
 use rand_distr::Distribution;

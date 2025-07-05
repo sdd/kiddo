@@ -6,7 +6,7 @@
 //!
 //! Expect improvements in query time of 10-15%, and a reduction
 //! in the size of serialized trees by 33% or so on average vs
-//! the standard [`float::kdtree::KdTree`](`crate::float::kdtree::KdTree`)
+//! the standard [`mutable::float::kdtree::KdTree``](`crate::mutable::float::kdtree::KdTree`)
 //!
 //! These capabilities come with a few trade-offs:
 //! 1) This tree does not provide the capability
@@ -14,7 +14,7 @@
 //!    The co-ordinates of the points to be stored must
 //!    have all been generated in advance.
 //! 2) Construction time can be a bit slower - anecdotally
-//!    this can be twice as long as the default [`float::kdtree::KdTree`](`crate::float::kdtree::KdTree`).
+//!    this can be twice as long as the default [`mutable::float::kdtree::KdTree``](`crate::mutable::float::kdtree::KdTree`).
 //!    NB construction time improved massively in Kiddo v5 compared to earlier versions.
 //!
 //! As per the other Kiddo float-type trees, points being stored

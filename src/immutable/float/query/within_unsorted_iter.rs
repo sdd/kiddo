@@ -3,8 +3,8 @@ use generator::{done, Gn, Scope};
 use std::ops::Rem;
 
 use crate::distance_metric::DistanceMetric;
-use crate::float::kdtree::Axis;
-use crate::float_leaf_slice::leaf_slice::LeafSliceFloat;
+use crate::traits::Axis;
+use crate::leaf_slice::float::LeafSliceFloat;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::types::Content;
@@ -97,8 +97,8 @@ where
 #[cfg(test)]
 mod tests {
     use crate::distance_metric::DistanceMetric;
-    use crate::float::distance::Manhattan;
-    use crate::float::kdtree::Axis;
+    use crate::mutable::float::distance::Manhattan;
+    use crate::traits::Axis;
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use crate::nearest_neighbour::NearestNeighbour;
     use rand::Rng;

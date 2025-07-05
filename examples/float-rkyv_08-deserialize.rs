@@ -11,8 +11,8 @@ use tracing_subscriber::fmt;
 
 use rkyv_08::rancor::Error as RkyvError;
 
-use kiddo::float::kdtree::ArchivedR8KdTree;
-use kiddo::float::kdtree::KdTree;
+use kiddo::mutable::float::kdtree::ArchivedR8KdTree;
+use kiddo::mutable::float::kdtree::KdTree;
 use kiddo::SquaredEuclidean;
 
 type Tree = KdTree<f64, u32, 3, 32, u32>;

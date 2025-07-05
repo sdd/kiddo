@@ -12,7 +12,7 @@ use tracing::Level;
 use tracing_subscriber::fmt;
 use ubyte::ToByteUnit;
 
-use kiddo::float::distance::SquaredEuclidean;
+use kiddo::distance::float::SquaredEuclidean;
 use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
 use rkyv::ser::Serializer;
 use rkyv::{AlignedVec, Infallible};

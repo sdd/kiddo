@@ -1,5 +1,5 @@
 //! A result item returned by a query
-use crate::float::kdtree::Axis;
+use crate::traits::Axis;
 use std::cmp::Ordering;
 
 /// Represents an entry in the results of a query, with `distance` being the distance of this

@@ -1,5 +1,5 @@
-use crate::float_sss::kdtree::{Axis, KdTree};
-use crate::float_sss::neighbour::Neighbour;
+use crate::mutable::float_sss::kdtree::{Axis, KdTree};
+use crate::mutable::float_sss::neighbour::Neighbour;
 use crate::types::{Content, Index};
 use az::{Az, Cast};
 use std::collections::BinaryHeap;
@@ -16,7 +16,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
+    /// use kiddo::mutable::float::kdtree::KdTree;
     /// use kiddo::distance::squared_euclidean;
     ///
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
@@ -141,8 +141,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::squared_euclidean;
-    use crate::float::kdtree::{Axis, KdTree};
+    use crate::mutable::float::distance::squared_euclidean;
+    use crate::mutable::float::kdtree::{KdTree};
+use crate::traits::Axis;
     use rand::Rng;
 
     type AX = f32;

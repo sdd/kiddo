@@ -8,11 +8,11 @@ use rayon::prelude::IntoParallelRefIterator;
 use std::array;
 use std::hint::black_box;
 
-use crate::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
-use crate::float::kdtree::{Axis, KdTree};
-use crate::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::immutable::float::kdtree::ImmutableKdTree;
-use crate::traits::{Content, Index};
+use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
+use crate::mutable::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
+use crate::mutable::float::kdtree::KdTree;
+use crate::traits::{Axis, Content, Index};
 
 // use rand_distr::UnitSphere as SPHERE;
 

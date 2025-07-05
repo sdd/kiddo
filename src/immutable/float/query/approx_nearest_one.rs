@@ -1,11 +1,10 @@
-use crate::float::kdtree::Axis;
-#[allow(unused_imports)]
-use crate::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::generate_immutable_approx_nearest_one;
 use crate::immutable::float::kdtree::ImmutableKdTree;
+#[allow(unused_imports)]
+use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::traits::Content;
 use crate::traits::DistanceMetric;
+use crate::traits::{Axis, Content};
 use az::Cast;
 
 macro_rules! generate_immutable_approx_float_nearest_one {
@@ -95,7 +94,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::Manhattan;
+    use crate::distance::float::Manhattan;
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use crate::nearest_neighbour::NearestNeighbour;
 
