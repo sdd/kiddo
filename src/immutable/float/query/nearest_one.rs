@@ -1,12 +1,10 @@
 use az::Cast;
 
-use crate::float::kdtree::Axis;
-use crate::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::generate_immutable_nearest_one;
 use crate::immutable::float::kdtree::ImmutableKdTree;
+use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::traits::Content;
-use crate::traits::DistanceMetric;
+use crate::traits::{Axis, Content, DistanceMetric};
 
 macro_rules! generate_immutable_float_nearest_one {
     ($doctest_build_tree:tt) => {
@@ -98,10 +96,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::SquaredEuclidean;
-    use crate::float::kdtree::Axis;
+    use crate::distance::float::SquaredEuclidean;
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use crate::nearest_neighbour::NearestNeighbour;
+    use crate::traits::Axis;
     use crate::traits::DistanceMetric;
     use rand::{Rng, SeedableRng};
 

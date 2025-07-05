@@ -1,4 +1,4 @@
-use kiddo::float::kdtree::KdTree;
+use kiddo::mutable::float::kdtree::KdTree;
 use kiddo::SquaredEuclidean;
 
 #[derive(Clone, Copy, Debug, PartialEq, Default, Eq, Ord, PartialOrd)]

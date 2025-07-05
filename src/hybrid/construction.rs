@@ -1,4 +1,4 @@
-use crate::float_sss::kdtree::{Axis, KdTree, StemNode};
+use crate::mutable::float_sss::kdtree::{Axis, KdTree, StemNode};
 use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
 use crate::types::{Content, Index};
 use az::{Az, Cast};
@@ -23,7 +23,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
+    /// use kiddo::mutable::float::kdtree::KdTree;
     ///
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
     ///
@@ -185,7 +185,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
+    /// use kiddo::mutable::float::kdtree::KdTree;
     ///
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
     ///

@@ -2,7 +2,7 @@ use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
-use crate::float_sss::{
+use crate::mutable::float_sss::{
     kdtree::{Axis, KdTree},
     neighbour::Neighbour,
 };
@@ -21,7 +21,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::float::kdtree::KdTree;
+    /// use kiddo::mutable::float::kdtree::KdTree;
     /// use kiddo::distance::squared_euclidean;
     ///
     /// let mut tree: KdTree<f64, u32, 3, 32, u32> = KdTree::new();
@@ -141,8 +141,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::manhattan;
-    use crate::float::kdtree::{Axis, KdTree};
+    use crate::mutable::float::distance::manhattan;
+    use crate::mutable::float::kdtree::{KdTree};
+use crate::traits::Axis;
     use rand::Rng;
     use std::cmp::Ordering;
 

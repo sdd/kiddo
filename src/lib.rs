@@ -24,9 +24,9 @@
 //!
 //! Kiddo is ideal for superfast spatial / geospatial lookups and nearest-neighbour / KNN
 //! queries for low-ish numbers of dimensions, where you want to ask questions such as:
-//!  - Find the [nearest_n](`float::kdtree::KdTree::nearest_n`) item(s) to a query point, ordered by distance;
-//!  - Find all items [within](`float::kdtree::KdTree::within`) a specified radius of a query point;
-//!  - Find the ["best" n item(s) within](`float::kdtree::KdTree::best_n_within`) a specified distance of a query point, for some definition of "best",
+//!  - Find the [nearest_n](`mutable::float::kdtree::KdTree`::nearest_n`) item(s) to a query point, ordered by distance;
+//!  - Find all items [within](`mutable::float::kdtree::KdTree`::within`) a specified radius of a query point;
+//!  - Find the ["best" n item(s) within](`mutable::float::kdtree::KdTree`::best_n_within`) a specified distance of a query point, for some definition of "best",
 //!    For example, "give me the 5 largest settlements within 50km of a given point, ordered by descending population", or "the 5 brightest stars
 //!    within a degree of a point on the sky, ordered by brightest first".
 //!
@@ -79,7 +79,7 @@
 //! * **rkyv** - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/0.7.45/rkyv/index.html) version 0.7.x
 //! * **rkyv_08** - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.8.x
 //! * `simd` **(NIGHTLY)** - enables some handwritten SIMD and pre-fetch intrinsics code within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) that may improve performance (currently only on nearest_one with `f64`)
-//! * `fixed` - enables usage of `kiddo::fixed::KdTree` for use with the `fixed` library's fixed-point number types
+//! * `fixed` - enables usage of `kiddo::mutable::fixed::KdTree` for use with the `fixed` library's fixed-point number types
 //!
 //! **NOTE**: Support for rkyv 0.7 is now deprecated and will be removed in Kiddo v6.
 
@@ -90,15 +90,17 @@ extern crate core;
 #[doc(hidden)]
 pub mod best_neighbour;
 #[doc(hidden)]
-pub(crate) mod common;
 #[cfg(feature = "serde")]
 #[doc(hidden)]
 mod custom_serde;
-#[cfg(feature = "fixed")]
-pub mod fixed;
-pub mod float;
+
+#[doc(hidden)]
+pub mod leaf_slice;
+
 pub mod immutable;
 mod mirror_select_nth_unstable_by;
+#[cfg(feature = "fixed")]
+pub mod mutable;
 #[doc(hidden)]
 pub mod nearest_neighbour;
 #[doc(hidden)]
@@ -112,19 +114,18 @@ mod iter;
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 pub mod within_unsorted_iter;
 
-#[doc(hidden)]
-pub mod float_leaf_slice;
+pub mod distance;
 mod modified_van_emde_boas;
 mod rkyv_utils;
 
 /// A floating-point k-d tree with default parameters.
 ///
 /// `A` is the floating point type (`f32` or `f64`, or `f16` in conjunction with the [`half`](https://docs.rs/half/latest/half/) crate).
-/// `K` is the number of dimensions. See [`KdTree`](`float::kdtree::KdTree`) for details of how to use.
+/// `K` is the number of dimensions. See [`KdTree`](`mutable::float::kdtree::KdTree``) for details of how to use.
 ///
-/// To manually specify more advanced parameters, use [`KdTree`](`float::kdtree::KdTree`) directly.
-/// To store positions using integer or fixed-point types, use [`fixed::kdtree::KdTree`].
-pub type KdTree<A, const K: usize> = float::kdtree::KdTree<A, u64, K, 32, u32>;
+/// To manually specify more advanced parameters, use [`KdTree`](`mutable::float::kdtree::KdTree``) directly.
+/// To store positions using integer or fixed-point types, use [`mutable::fixed::kdtree::KdTree`].
+pub type KdTree<A, const K: usize> = mutable::float::kdtree::KdTree<A, u64, K, 32, u32>;
 
 /// An immutable floating-point k-d tree with default parameters.
 ///
@@ -132,13 +133,13 @@ pub type KdTree<A, const K: usize> = float::kdtree::KdTree<A, u64, K, 32, u32>;
 /// `K` is the number of dimensions. See [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) for details of how to use.
 ///
 /// To manually specify more advanced parameters, use [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) directly.
-/// To store positions using integer or fixed-point types, use [`fixed::kdtree::KdTree`].
+/// To store positions using integer or fixed-point types, use [`mutable::fixed::kdtree::KdTree`].
 pub type ImmutableKdTree<A, const K: usize> =
     immutable::float::kdtree::ImmutableKdTree<A, u64, K, 32>;
 
 pub use best_neighbour::BestNeighbour;
-pub use float::distance::Manhattan;
-pub use float::distance::SquaredEuclidean;
+pub use distance::float::Manhattan;
+pub use distance::float::SquaredEuclidean;
 pub use nearest_neighbour::NearestNeighbour;
 
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]

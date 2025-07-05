@@ -1,8 +1,33 @@
-//! Definitions and implementations for some traits that are common between the [`float`](crate::float), [`immutable`](crate::immutable) and [`fixed`](crate::fixed)  modules
+//! Definitions and implementations for some traits that are common between the [`float`](crate::mutable::float), [`immutable`](crate::immutable) and [`fixed`](crate::mutable::fixed)  modules
 use az::Cast;
 use divrem::DivCeil;
+use num_traits::float::FloatCore;
 use num_traits::{PrimInt, Unsigned, Zero};
 use std::fmt::Debug;
+
+/// Axis trait represents the traits that must be implemented
+/// by the type that is used as the first generic parameter, `A`,
+/// on float `KdTree`s. This will be [`f64`] or [`f32`],
+/// or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if used with
+/// the [`half`](https://docs.rs/half/latest/half) crate
+pub trait Axis: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign {
+    /// returns absolute diff between two values of a type implementing this trait
+    fn saturating_dist(self, other: Self) -> Self;
+
+    /// Used in query methods to update the rd value. A saturating add for Fixed and an add for Float
+    fn rd_update(rd: Self, delta: Self) -> Self;
+}
+
+impl<T: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign> Axis for T {
+    fn saturating_dist(self, other: Self) -> Self {
+        (self - other).abs()
+    }
+
+    #[inline]
+    fn rd_update(rd: Self, delta: Self) -> Self {
+        rd + delta
+    }
+}
 
 /// Content trait.
 ///

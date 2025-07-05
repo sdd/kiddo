@@ -1,7 +1,7 @@
 //! Immutable Floating point k-d tree.
 //!
 //! [`ImmutableKdTree`] offers improved memory utilisation, smaller size
-//! when serialised, and faster more consistent query performance, when compared to [`crate::float::kdtree::KdTree`].
+//! when serialised, and faster more consistent query performance, when compared to [`crate::mutable::float::kdtree::KdTree`].
 //! This comes at the expense of not being able to modify the contents of the tree after its initial
 //! construction, and potentially longer construction times.
 //! As with the vanilla tree, [`f64`] or [`f32`] are supported currently for co-ordinate
@@ -45,13 +45,12 @@
 //! of [`half`](https://docs.rs/half/latest/half) up to 2.4.1 support `rkyv` 0.7 only, and versions of `half` crate from 2.5.0 onwards
 //! support `rkyv` 0.8 only.
 //!
-pub use crate::float::kdtree::Axis;
-use crate::float_leaf_slice::leaf_slice::{LeafSlice, LeafSliceFloat, LeafSliceFloatChunk};
 #[cfg(feature = "rkyv_08")]
 use crate::immutable::float::rkyv_aligned_vec::EncodeAVec;
+use crate::leaf_slice::float::{LeafSlice, LeafSliceFloat, LeafSliceFloatChunk};
 #[cfg(feature = "modified_van_emde_boas")]
 use crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
-use crate::traits::Content;
+use crate::traits::{Axis, Content};
 use aligned_vec::{avec, AVec, ConstAlign, CACHELINE_ALIGN};
 use array_init::array_init;
 use az::{Az, Cast};
@@ -350,7 +349,7 @@ where
 
 // prevent clippy complaining that the feature unreliable_select_nth_unstable
 // is not defined (I don't want to explicitly define it as if I do then
-// passing --all-features in CI will enable it, which I don't want to do
+// passing --all-features in CI will enable it, which I don't want to do)
 #[allow(unexpected_cfgs)]
 impl<A, T, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
 where
