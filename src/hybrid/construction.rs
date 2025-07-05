@@ -1,4 +1,4 @@
-use crate::float_sss::kdtree::{Axis, KdTree, StemNode};
+use crate::mutable::float_sss::kdtree::{Axis, KdTree, StemNode};
 use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
 use crate::types::{Content, Index};
 use az::{Az, Cast};

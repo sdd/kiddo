@@ -1,11 +1,10 @@
 use az::{Az, Cast};
 use std::ops::Rem;
 
-use crate::float::kdtree::{Axis, KdTree};
+use crate::mutable::float::kdtree::KdTree;
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::rkyv_utils::transform;
-use crate::traits::DistanceMetric;
-use crate::traits::{is_stem_index, Content, Index};
+use crate::traits::{is_stem_index, Axis, Content, DistanceMetric, Index};
 
 use crate::generate_within_unsorted;
 
@@ -48,7 +47,7 @@ tree.add(&[2.0, 3.0, 6.0], 101);"
 }
 
 #[cfg(feature = "rkyv")]
-use crate::float::kdtree::ArchivedKdTree;
+use crate::mutable::float::kdtree::ArchivedKdTree;
 #[cfg(feature = "rkyv")]
 impl<
         A: Axis + rkyv::Archive<Archived = A>,
@@ -70,7 +69,7 @@ let tree = unsafe { rkyv::archived_root::<KdTree<f64, 3>>(&mmap) };"
 }
 
 #[cfg(feature = "rkyv_08")]
-use crate::float::kdtree::ArchivedR8KdTree;
+use crate::mutable::float::kdtree::ArchivedR8KdTree;
 #[cfg(feature = "rkyv_08")]
 impl<
         A: Axis + rkyv_08::Archive,
@@ -95,8 +94,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::SquaredEuclidean;
-    use crate::float::kdtree::{Axis, KdTree};
+    use crate::distance::float::SquaredEuclidean;
+    use crate::mutable::float::kdtree::KdTree;
+    use crate::traits::Axis;
     use crate::traits::DistanceMetric;
     use rand::Rng;
     use std::cmp::Ordering;

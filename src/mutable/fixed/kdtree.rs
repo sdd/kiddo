@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
-/// on [`FixedKdTree`](crate::fixed::kdtree::KdTree). A type from the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate will implement
+/// on [`FixedKdTree`](crate::mutable::fixed::kdtree::KdTree). A type from the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate will implement
 /// all of the traits required by Axis. For example [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html).
 pub trait Axis: Fixed + Default + Debug + Copy + Sync + Send {
     /// used in query methods to update the rd value. Basically a saturating add for Fixed and an add for Float
@@ -33,7 +33,7 @@ impl<T: Fixed + Default + Debug + Copy + Sync + Send> Axis for T {
     }
 }
 
-/// Rkyv-serializable equivalent of `kiddo::fixed::kdtree::Axis`
+/// Rkyv-serializable equivalent of `kiddo::mutable::fixed::kdtree::Axis`
 #[cfg(feature = "rkyv")]
 pub trait AxisRK: num_traits::Zero + Default + Debug + rkyv::Archive {}
 #[cfg(feature = "rkyv")]
@@ -42,9 +42,9 @@ impl<T: num_traits::Zero + Default + Debug + rkyv::Archive> AxisRK for T {}
 /// Rkyv-serializable fixed point k-d tree
 ///
 /// This is only required when using Rkyv to serialize to / deserialize from
-/// a [`FixedKdTree`](crate::fixed::kdtree::KdTree). The types in the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed)  crate do not support [`Rkyv`](https://crates.io/crates/rkyv/0.7.39) yet.
-/// As a workaround, we need to [`std::mem::transmute`] a [`crate::fixed::kdtree::KdTree`] into
-/// an equivalent [`crate::fixed::kdtree::KdTreeRK`] before serializing via Rkyv,
+/// a [`FixedKdTree`](crate::mutable::fixed::kdtree::KdTree). The types in the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed)  crate do not support [`Rkyv`](https://crates.io/crates/rkyv/0.7.39) yet.
+/// As a workaround, we need to [`std::mem::transmute`] a [`crate::mutable::fixed::kdtree::KdTree`] into
+/// an equivalent [`crate::mutable::fixed::kdtree::KdTreeRK`] before serializing via Rkyv,
 /// and vice-versa when deserializing.
 #[cfg_attr(
     feature = "rkyv",
@@ -197,7 +197,7 @@ where
     /// ```rust
     /// use fixed::FixedU16;
     /// use fixed::types::extra::U14;
-    /// use kiddo::fixed::kdtree::KdTree;
+    /// use kiddo::mutable::fixed::kdtree::KdTree;
     ///
     /// let mut tree: KdTree<FixedU16<U14>, u32, 3, 32, u32> = KdTree::new();
     ///
@@ -215,7 +215,7 @@ where
     /// ```rust
     /// use fixed::FixedU16;
     /// use fixed::types::extra::U14;
-    /// use kiddo::fixed::kdtree::KdTree;
+    /// use kiddo::mutable::fixed::kdtree::KdTree;
     ///
     /// let mut tree: KdTree<FixedU16<U14>, u32, 3, 32, u32> = KdTree::with_capacity(1_000_000);
     ///
@@ -243,7 +243,7 @@ where
     /// ```rust
     /// use fixed::FixedU16;
     /// use fixed::types::extra::U0;
-    /// use kiddo::fixed::kdtree::KdTree;
+    /// use kiddo::mutable::fixed::kdtree::KdTree;
     ///
     /// type Fxd = FixedU16<U0>;
     ///
@@ -264,7 +264,7 @@ where
     /// ```
     /// use fixed::FixedU16;
     /// use fixed::types::extra::U0;
-    /// use kiddo::fixed::kdtree::KdTree;
+    /// use kiddo::mutable::fixed::kdtree::KdTree;
     ///
     /// type Fxd = FixedU16<U0>;
     ///
@@ -305,7 +305,7 @@ mod tests {
     use fixed::types::extra::U14;
     use fixed::FixedU16;
 
-    use crate::fixed::kdtree::KdTree;
+    use crate::mutable::fixed::kdtree::KdTree;
 
     type Fxd = FixedU16<U14>;
 

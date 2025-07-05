@@ -1,4 +1,4 @@
-use crate::float_sss::kdtree::{Axis, KdTree, LeafNode};
+use crate::mutable::float_sss::kdtree::{Axis, KdTree, LeafNode};
 
 use crate::types::{Content, Index};
 use az::{Az, Cast};
@@ -176,8 +176,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::squared_euclidean;
-    use crate::float::kdtree::KdTree;
+    use crate::mutable::float::distance::squared_euclidean;
+    use crate::mutable::float::kdtree::KdTree;
     use rand::Rng;
 
     type AX = f64;

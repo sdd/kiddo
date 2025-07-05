@@ -1,43 +1,32 @@
 use az::{Az, Cast};
-use generator::{done, Gn, Scope};
 use std::ops::Rem;
 
-use crate::fixed::kdtree::{Axis, KdTree};
+use crate::mutable::fixed::kdtree::{Axis, KdTree};
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::rkyv_utils::transform;
 use crate::traits::DistanceMetric;
 use crate::traits::{is_stem_index, Content, Index};
-use crate::within_unsorted_iter::WithinUnsortedIter;
 
-use crate::generate_within_unsorted_iter;
+use crate::generate_within_unsorted;
 
-impl<
-        'a,
-        'query,
-        A: Axis,
-        T: Content,
-        const K: usize,
-        const B: usize,
-        IDX: Index<T = IDX> + Send,
-    > KdTree<A, T, K, B, IDX>
+impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {
-    generate_within_unsorted_iter!(
+    generate_within_unsorted!(
         (r#"Finds all elements within `dist` of `query`, using the specified
 distance metric function.
 
-Only available on x86_64 and aarch64 target architectures (this is due to a dependency
-on the generator crate).
-Returns an Iterator. Results are returned in arbitrary order. Faster than `within`.
+Results are returned in arbitrary order. Faster than `within`.
 
 # Examples
 
 ```rust
     use fixed::FixedU16;
     use fixed::types::extra::U0;
-    use kiddo::fixed::kdtree::KdTree;
-    use kiddo::fixed::distance::SquaredEuclidean;
+    use kiddo::mutable::fixed::kdtree::KdTree;
+    use kiddo::distance::fixed::SquaredEuclidean;
 
     type Fxd = FixedU16<U0>;
 
@@ -48,7 +37,7 @@ Returns an Iterator. Results are returned in arbitrary order. Faster than `withi
     tree.add(&[Fxd::from_num(2), Fxd::from_num(3), Fxd::from_num(6)], 101);
     tree.add(&[Fxd::from_num(20), Fxd::from_num(30), Fxd::from_num(60)], 102);
 
-    let within = tree.within_unsorted_iter::<SquaredEuclidean>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], Fxd::from_num(10)).collect::<Vec<_>>();
+    let within = tree.within::<SquaredEuclidean>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], Fxd::from_num(10));
 
     assert_eq!(within.len(), 2);
 ```"#)
@@ -57,8 +46,8 @@ Returns an Iterator. Results are returned in arbitrary order. Faster than `withi
 
 #[cfg(test)]
 mod tests {
-    use crate::fixed::distance::Manhattan;
-    use crate::fixed::kdtree::{Axis, KdTree};
+    use crate::distance::fixed::Manhattan;
+    use crate::mutable::fixed::kdtree::{Axis, KdTree};
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
     use crate::traits::DistanceMetric;
     use fixed::types::extra::U14;

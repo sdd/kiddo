@@ -9,10 +9,10 @@ use fixed::FixedU16;
 use rand::distr::{Distribution, StandardUniform};
 
 use kiddo::batch_benches;
-use kiddo::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
-use kiddo::float::kdtree::{Axis, KdTree};
+use kiddo::mutable::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
+use kiddo::mutable::float::kdtree::KdTree;
 use kiddo::test_utils::rand_data_fixed_u16_entry;
-use kiddo::traits::{Content, Index};
+use kiddo::traits::{Axis, Content, Index};
 
 const BUCKET_SIZE: usize = 32;
 const QTY_TO_ADD_TO_POPULATED: u64 = 100;

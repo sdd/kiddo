@@ -1,4 +1,4 @@
-use crate::float_sss::kdtree::{Axis, KdTree};
+use crate::mutable::float_sss::kdtree::{Axis, KdTree};
 use crate::types::{Content, Index};
 use az::{Az, Cast};
 use std::ops::Rem;
@@ -278,8 +278,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float_sss::distance::manhattan;
-    use crate::float_sss::kdtree::{Axis, KdTree};
+    use crate::mutable::float_sss::distance::manhattan;
+    use crate::mutable::float_sss::kdtree::{Axis, KdTree};
     use rand::Rng;
 
     type AX = f32;

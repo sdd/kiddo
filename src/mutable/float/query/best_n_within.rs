@@ -3,10 +3,9 @@ use std::collections::BinaryHeap;
 use std::ops::Rem;
 
 use crate::best_neighbour::BestNeighbour;
-use crate::float::kdtree::{Axis, KdTree, LeafNode};
+use crate::mutable::float::kdtree::{KdTree, LeafNode};
 use crate::rkyv_utils::transform;
-use crate::traits::DistanceMetric;
-use crate::traits::{is_stem_index, Content, Index};
+use crate::traits::{is_stem_index, Axis, Content, DistanceMetric, Index};
 
 use crate::generate_best_n_within;
 
@@ -56,7 +55,7 @@ where
 }
 
 #[cfg(feature = "rkyv")]
-use crate::float::kdtree::{ArchivedKdTree, ArchivedLeafNode};
+use crate::mutable::float::kdtree::{ArchivedKdTree, ArchivedLeafNode};
 #[cfg(feature = "rkyv")]
 impl<
         A: Axis + rkyv::Archive<Archived = A>,
@@ -79,7 +78,7 @@ where
 }
 
 #[cfg(feature = "rkyv_08")]
-use crate::float::kdtree::{ArchivedR8KdTree, ArchivedR8LeafNode};
+use crate::mutable::float::kdtree::{ArchivedR8KdTree, ArchivedR8LeafNode};
 #[cfg(feature = "rkyv_08")]
 impl<
         A: Axis + rkyv_08::Archive,
@@ -106,8 +105,8 @@ where
 #[cfg(test)]
 mod tests {
     use crate::best_neighbour::BestNeighbour;
-    use crate::float::distance::SquaredEuclidean;
-    use crate::float::kdtree::KdTree;
+    use crate::distance::float::SquaredEuclidean;
+    use crate::mutable::float::kdtree::KdTree;
     use crate::traits::DistanceMetric;
     use rand::Rng;
 

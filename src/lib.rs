@@ -90,15 +90,17 @@ extern crate core;
 #[doc(hidden)]
 pub mod best_neighbour;
 #[doc(hidden)]
-pub(crate) mod common;
 #[cfg(feature = "serde")]
 #[doc(hidden)]
 mod custom_serde;
-#[cfg(feature = "fixed")]
-pub mod fixed;
-pub mod float;
+
+#[doc(hidden)]
+pub mod float_leaf_slice;
+
 pub mod immutable;
 mod mirror_select_nth_unstable_by;
+#[cfg(feature = "fixed")]
+pub mod mutable;
 #[doc(hidden)]
 pub mod nearest_neighbour;
 #[doc(hidden)]
@@ -112,8 +114,7 @@ mod iter;
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 pub mod within_unsorted_iter;
 
-#[doc(hidden)]
-pub mod float_leaf_slice;
+pub mod distance;
 mod modified_van_emde_boas;
 mod rkyv_utils;
 
@@ -124,7 +125,7 @@ mod rkyv_utils;
 ///
 /// To manually specify more advanced parameters, use [`KdTree`](`float::kdtree::KdTree`) directly.
 /// To store positions using integer or fixed-point types, use [`fixed::kdtree::KdTree`].
-pub type KdTree<A, const K: usize> = float::kdtree::KdTree<A, u64, K, 32, u32>;
+pub type KdTree<A, const K: usize> = mutable::float::kdtree::KdTree<A, u64, K, 32, u32>;
 
 /// An immutable floating-point k-d tree with default parameters.
 ///
@@ -137,8 +138,8 @@ pub type ImmutableKdTree<A, const K: usize> =
     immutable::float::kdtree::ImmutableKdTree<A, u64, K, 32>;
 
 pub use best_neighbour::BestNeighbour;
-pub use float::distance::Manhattan;
-pub use float::distance::SquaredEuclidean;
+pub use distance::float::Manhattan;
+pub use distance::float::SquaredEuclidean;
 pub use nearest_neighbour::NearestNeighbour;
 
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]

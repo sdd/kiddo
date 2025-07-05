@@ -6,7 +6,7 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use elapsed::ElapsedDuration;
-use kiddo::float::distance::SquaredEuclidean;
+use kiddo::distance::float::SquaredEuclidean;
 use rand::{Rng, SeedableRng};
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;

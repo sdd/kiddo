@@ -1,5 +1,6 @@
 use csv::Reader;
-use kiddo::float::{distance::SquaredEuclidean, kdtree::KdTree};
+use kiddo::distance::float::SquaredEuclidean;
+use kiddo::mutable::float::kdtree::KdTree;
 use serde::Deserialize;
 /// Kiddo example 1: Cities
 ///

@@ -1,6 +1,6 @@
-use crate::float::kdtree::{Axis, KdTree, LeafNode, StemNode};
 use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
-use crate::traits::{is_stem_index, Content, Index};
+use crate::mutable::float::kdtree::{KdTree, LeafNode, StemNode};
+use crate::traits::{is_stem_index, Axis, Content, Index};
 use az::{Az, Cast};
 use std::ops::Rem;
 
@@ -338,7 +338,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::kdtree::KdTree;
+    use crate::mutable::float::kdtree::KdTree;
     use rand::Rng;
 
     type Flt = f32;

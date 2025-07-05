@@ -5,7 +5,6 @@
 
 #[doc(hidden)]
 pub mod construction;
-pub mod distance;
 pub mod kdtree;
 #[doc(hidden)]
 pub mod query;

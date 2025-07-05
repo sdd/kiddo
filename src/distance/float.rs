@@ -4,8 +4,7 @@
 // #[cfg(any(target_arch = "x86_64"))]
 // use std::arch::x86_64::*;
 
-use crate::float::kdtree::Axis;
-use crate::traits::DistanceMetric;
+use crate::traits::{Axis, DistanceMetric};
 
 /// Returns the Manhattan / "taxi cab" distance between two points.
 ///

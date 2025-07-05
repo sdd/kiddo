@@ -38,7 +38,6 @@
 //!
 use az::{Az, Cast};
 use divrem::DivCeil;
-use num_traits::float::FloatCore;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 
@@ -47,35 +46,11 @@ use std::fmt::Debug;
 use crate::rkyv_utils::transform;
 use crate::{
     iter::{IterableTreeData, TreeIter},
-    traits::{Content, Index},
+    traits::{Axis, Content, Index},
 };
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-
-/// Axis trait represents the traits that must be implemented
-/// by the type that is used as the first generic parameter, `A`,
-/// on the float [`KdTree`]. This will be [`f64`] or [`f32`],
-/// or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if used with
-/// the [`half`](https://docs.rs/half/latest/half) crate
-pub trait Axis: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign {
-    /// returns absolute diff between two values of a type implementing this trait
-    fn saturating_dist(self, other: Self) -> Self;
-
-    /// Used in query methods to update the rd value. A saturating add for Fixed and an add for Float
-    fn rd_update(rd: Self, delta: Self) -> Self;
-}
-
-impl<T: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign> Axis for T {
-    fn saturating_dist(self, other: Self) -> Self {
-        (self - other).abs()
-    }
-
-    #[inline]
-    fn rd_update(rd: Self, delta: Self) -> Self {
-        rd + delta
-    }
-}
 
 // TODO: make LeafNode and StemNode `pub(crate)` so that they,
 //       and their Archived types, don't show up in docs.
@@ -384,7 +359,7 @@ where
 mod tests {
     use std::collections::HashMap;
 
-    use crate::float::kdtree::KdTree;
+    use crate::mutable::float::kdtree::KdTree;
     type AX = f64;
 
     #[test]

@@ -1,30 +1,36 @@
-use az::Cast;
+use az::{Az, Cast};
+use std::ops::Rem;
 
-use crate::fixed::kdtree::{Axis, KdTree};
+use crate::mutable::fixed::kdtree::{Axis, KdTree, LeafNode};
 use crate::nearest_neighbour::NearestNeighbour;
+use crate::rkyv_utils::transform;
 use crate::traits::DistanceMetric;
-use crate::traits::{Content, Index};
+use crate::traits::{is_stem_index, Content, Index};
 
-use crate::generate_within;
+use crate::generate_nearest_one;
 
 impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {
-    generate_within!(
-        (r#"Finds all elements within `dist` of `query`, using the specified
+    generate_nearest_one!(
+        LeafNode,
+        (r#"Queries the tree to find the nearest element to `query`, using the specified
 distance metric function.
 
-Results are returned sorted nearest-first
+Faster than querying for nearest_n(point, 1, ...) due
+to not needing to allocate memory or maintain sorted results.
+
+The nearest_one_point version also returns the coordinates of the nearest point.
 
 # Examples
 
 ```rust
     use fixed::FixedU16;
     use fixed::types::extra::U0;
-    use kiddo::fixed::kdtree::KdTree;
-    use kiddo::fixed::distance::SquaredEuclidean;
+    use kiddo::mutable::fixed::kdtree::KdTree;
+    use kiddo::distance::fixed::SquaredEuclidean;
 
     type Fxd = FixedU16<U0>;
 
@@ -32,25 +38,31 @@ Results are returned sorted nearest-first
 
     tree.add(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 100);
     tree.add(&[Fxd::from_num(2), Fxd::from_num(3), Fxd::from_num(6)], 101);
-    tree.add(&[Fxd::from_num(20), Fxd::from_num(30), Fxd::from_num(60)], 102);
 
-    let within = tree.within::<SquaredEuclidean>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], Fxd::from_num(10));
+    let nearest = tree.nearest_one::<SquaredEuclidean>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)]);
 
-    assert_eq!(within.len(), 2);
+    assert_eq!(nearest.distance, Fxd::from_num(0));
+    assert_eq!(nearest.item, 100);
+
+    let (nearest, nearest_point) = tree.nearest_one_point::<SquaredEuclidean>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)]);
+
+    assert_eq!(nearest.distance, Fxd::from_num(0));
+    assert_eq!(nearest.item, 100);
+    assert_eq!(nearest_point, [Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)]);
 ```"#)
     );
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::fixed::distance::Manhattan;
-    use crate::fixed::kdtree::{Axis, KdTree};
+    use crate::distance::fixed::Manhattan;
+    use crate::mutable::fixed::kdtree::{Axis, KdTree};
+    use crate::nearest_neighbour::NearestNeighbour;
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
     use crate::traits::DistanceMetric;
     use fixed::types::extra::U14;
     use fixed::FixedU16;
     use rand::Rng;
-    use std::cmp::Ordering;
 
     type Fxd = FixedU16<U14>;
 
@@ -59,7 +71,7 @@ mod tests {
     }
 
     #[test]
-    fn can_query_items_within_radius() {
+    fn can_query_nearest_one_item() {
         let mut tree: KdTree<Fxd, u32, 4, 4, u32> = KdTree::new();
 
         let content_to_add: [([Fxd; 4], u32); 16] = [
@@ -88,16 +100,12 @@ mod tests {
         assert_eq!(tree.size(), 16);
 
         let query_point = [n(0.78f32), n(0.55f32), n(0.78f32), n(0.55f32)];
+        let expected = NearestNeighbour {
+            distance: n(0.86),
+            item: 7,
+        };
 
-        let radius = n(0.2);
-        let expected = linear_search(&content_to_add, &query_point, radius);
-
-        let mut result: Vec<_> = tree
-            .within::<Manhattan>(&query_point, radius)
-            .into_iter()
-            .map(|n| (n.distance, n.item))
-            .collect();
-        stabilize_sort(&mut result);
+        let result = tree.nearest_one::<Manhattan>(&query_point);
         assert_eq!(result, expected);
 
         let mut rng = rand::rng();
@@ -108,25 +116,18 @@ mod tests {
                 n(rng.random_range(0f32..1f32)),
                 n(rng.random_range(0f32..1f32)),
             ];
-            let radius = n(0.2);
-            let expected = linear_search(&content_to_add, &query_point, radius);
+            let expected = linear_search(&content_to_add, &query_point);
 
-            let mut result: Vec<_> = tree
-                .within::<Manhattan>(&query_point, radius)
-                .into_iter()
-                .map(|n| (n.distance, n.item))
-                .collect();
-            stabilize_sort(&mut result);
+            let result = tree.nearest_one::<Manhattan>(&query_point);
 
-            assert_eq!(result, expected);
+            assert_eq!(result.distance, expected.distance);
         }
     }
 
     #[test]
-    fn can_query_items_within_radius_large_scale() {
+    fn can_query_nearest_one_item_large_scale() {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
-        let radius: Fxd = n(0.2);
 
         let content_to_add: Vec<([Fxd; 4], u32)> = (0..TREE_SIZE)
             .map(|_| rand_data_fixed_u16_entry::<U14, u32, 4>())
@@ -143,44 +144,32 @@ mod tests {
             .collect();
 
         for query_point in query_points {
-            let expected = linear_search(&content_to_add, &query_point, radius);
+            let expected = linear_search(&content_to_add, &query_point);
 
-            let result: Vec<_> = tree
-                .within::<Manhattan>(&query_point, radius)
-                .into_iter()
-                .map(|n| (n.distance, n.item))
-                .collect();
-            assert_eq!(result, expected);
+            let result = tree.nearest_one::<Manhattan>(&query_point);
+
+            assert_eq!(result.distance, expected.distance);
         }
     }
 
     fn linear_search<A: Axis, const K: usize>(
         content: &[([A; K], u32)],
         query_point: &[A; K],
-        radius: A,
-    ) -> Vec<(A, u32)> {
-        let mut matching_items = vec![];
+    ) -> NearestNeighbour<A, u32> {
+        let mut best_dist: A = A::max_value();
+        let mut best_item: u32 = u32::MAX;
 
         for &(p, item) in content {
             let dist = Manhattan::dist(query_point, &p);
-            if dist < radius {
-                matching_items.push((dist, item));
+            if dist < best_dist {
+                best_item = item;
+                best_dist = dist;
             }
         }
 
-        stabilize_sort(&mut matching_items);
-
-        matching_items
-    }
-
-    fn stabilize_sort<A: Axis>(matching_items: &mut [(A, u32)]) {
-        matching_items.sort_unstable_by(|a, b| {
-            let dist_cmp = a.0.partial_cmp(&b.0).unwrap();
-            if dist_cmp == Ordering::Equal {
-                a.1.cmp(&b.1)
-            } else {
-                dist_cmp
-            }
-        });
+        NearestNeighbour {
+            distance: best_dist,
+            item: best_item,
+        }
     }
 }

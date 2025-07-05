@@ -1,8 +1,9 @@
 use az::Cast;
 use std::collections::BinaryHeap;
 
-use crate::float::result_collection::ResultCollection;
-use crate::{float::kdtree::Axis, traits::Content, BestNeighbour, NearestNeighbour};
+use crate::mutable::float::result_collection::ResultCollection;
+use crate::traits::{Axis, Content};
+use crate::{BestNeighbour, NearestNeighbour};
 
 #[inline]
 pub(crate) fn update_nearest_dist_autovec<A: Axis, T: Content>(

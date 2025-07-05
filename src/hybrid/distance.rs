@@ -4,7 +4,7 @@
 // #[cfg(any(target_arch = "x86_64"))]
 // use std::arch::x86_64::*;
 
-use crate::float::kdtree::Axis;
+use crate::traits::Axis;
 
 /// Returns the squared euclidean distance between two points.
 ///
