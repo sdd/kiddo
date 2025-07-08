@@ -2,42 +2,42 @@ use az::{Az, Cast};
 use std::collections::BinaryHeap;
 use std::ops::Rem;
 
-use crate::mutable::fixed::kdtree::{Axis, KdTree};
+use crate::mutable::fixed::kdtree::KdTree;
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::rkyv_utils::transform;
-use crate::traits::DistanceMetric;
-use crate::traits::{is_stem_index, Content, Index};
+use crate::traits::{is_stem_index, AxisFixed, Content, DistanceMetricFixed, Index};
 
-use crate::generate_nearest_n;
+use crate::generate_fixed_nearest_n;
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+impl<A: AxisFixed, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {
-    generate_nearest_n!(
+    generate_fixed_nearest_n!(
         (r#"Finds the nearest `qty` elements to `query`, using the specified
 distance metric function.
 
 # Examples
 
 ```rust
-    use fixed::FixedU16;
+    use fixed::{FixedU16, FixedU32};
     use fixed::types::extra::U0;
     use kiddo::mutable::fixed::kdtree::KdTree;
     use kiddo::distance::fixed::SquaredEuclidean;
 
     type Fxd = FixedU16<U0>;
+    type FxdR = FixedU32<U0>;
 
     let mut tree: KdTree<Fxd, u32, 3, 32, u32> = KdTree::new();
 
     tree.add(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 100);
     tree.add(&[Fxd::from_num(2), Fxd::from_num(3), Fxd::from_num(6)], 101);
 
-    let nearest: Vec<_> = tree.nearest_n::<SquaredEuclidean>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 1);
+    let nearest: Vec<_> = tree.nearest_n::<SquaredEuclidean, FxdR>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 1);
 
     assert_eq!(nearest.len(), 1);
-    assert_eq!(nearest[0].distance, Fxd::from_num(0));
+    assert_eq!(nearest[0].distance, FxdR::from_num(0));
     assert_eq!(nearest[0].item, 100);
 ```"#)
     );
@@ -46,17 +46,22 @@ distance metric function.
 #[cfg(test)]
 mod tests {
     use crate::distance::fixed::Manhattan;
-    use crate::mutable::fixed::kdtree::{Axis, KdTree};
+    use crate::mutable::fixed::kdtree::KdTree;
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
-    use crate::traits::DistanceMetric;
+    use crate::traits::{AxisFixed, DistanceMetricFixed};
     use fixed::types::extra::U14;
-    use fixed::FixedU16;
+    use fixed::{FixedU16, FixedU32};
     use rand::Rng;
 
     type Fxd = FixedU16<U14>;
+    type FxdR = FixedU32<U14>;
 
     fn n(num: f32) -> Fxd {
         Fxd::from_num(num)
+    }
+
+    fn nr(num: f32) -> FxdR {
+        FxdR::from_num(num)
     }
 
     #[test]
@@ -90,10 +95,10 @@ mod tests {
 
         let query_point = [n(0.78f32), n(0.55f32), n(0.78f32), n(0.55f32)];
 
-        let expected = vec![(n(0.86), 7), (n(0.86), 4), (n(0.86), 5)];
+        let expected = vec![(nr(0.86), 7), (nr(0.86), 4), (nr(0.86), 5)];
 
         let result: Vec<_> = tree
-            .nearest_n::<Manhattan>(&query_point, 3)
+            .nearest_n::<Manhattan, FxdR>(&query_point, 3)
             .into_iter()
             .map(|n| (n.distance, n.item))
             .collect();
@@ -111,13 +116,13 @@ mod tests {
             let expected = linear_search(&content_to_add, qty, &query_point);
 
             let result: Vec<_> = tree
-                .nearest_n::<Manhattan>(&query_point, qty)
+                .nearest_n::<Manhattan, FxdR>(&query_point, qty)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
 
             let result_dists: Vec<_> = result.iter().map(|(d, _)| d).collect();
-            let expected_dists: Vec<_> = expected.iter().map(|(d, _)| d).collect();
+            let expected_dists: Vec<_> = expected.iter().map(|(d, _): &(FxdR, _)| d).collect();
 
             assert_eq!(result_dists, expected_dists);
         }
@@ -147,27 +152,27 @@ mod tests {
             let expected = linear_search(&content_to_add, N, &query_point);
 
             let result: Vec<_> = tree
-                .nearest_n::<Manhattan>(&query_point, N)
+                .nearest_n::<Manhattan, FxdR>(&query_point, N)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
 
             let result_dists: Vec<_> = result.iter().map(|(d, _)| d).collect();
-            let expected_dists: Vec<_> = expected.iter().map(|(d, _)| d).collect();
+            let expected_dists: Vec<_> = expected.iter().map(|(d, _): &(FxdR, _)| d).collect();
 
             assert_eq!(result_dists, expected_dists);
         }
     }
 
-    fn linear_search<A: Axis, const K: usize>(
+    fn linear_search<A: AxisFixed, R: AxisFixed, const K: usize>(
         content: &[([A; K], u32)],
         qty: usize,
         query_point: &[A; K],
-    ) -> Vec<(A, u32)> {
+    ) -> Vec<(R, u32)> {
         let mut results = vec![];
 
         for &(p, item) in content {
-            let dist = Manhattan::dist(query_point, &p);
+            let dist: R = Manhattan::dist(query_point, &p);
             if results.len() < qty {
                 results.push((dist, item));
                 results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(b_dist).unwrap());

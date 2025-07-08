@@ -1,18 +1,17 @@
 use az::Cast;
 
-use crate::mutable::fixed::kdtree::{Axis, KdTree};
+use crate::mutable::fixed::kdtree::KdTree;
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::traits::DistanceMetric;
-use crate::traits::{Content, Index};
+use crate::traits::{AxisFixed, Content, DistanceMetricFixed, Index};
 
-use crate::generate_within;
+use crate::generate_fixed_within;
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+impl<A: AxisFixed, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {
-    generate_within!(
+    generate_fixed_within!(
         (r#"Finds all elements within `dist` of `query`, using the specified
 distance metric function.
 
@@ -21,12 +20,13 @@ Results are returned sorted nearest-first
 # Examples
 
 ```rust
-    use fixed::FixedU16;
+    use fixed::{FixedU16, FixedU32};
     use fixed::types::extra::U0;
     use kiddo::mutable::fixed::kdtree::KdTree;
     use kiddo::distance::fixed::SquaredEuclidean;
 
     type Fxd = FixedU16<U0>;
+    type FxdR = FixedU32<U0>;
 
     let mut tree: KdTree<Fxd, u32, 3, 32, u32> = KdTree::new();
 
@@ -34,7 +34,7 @@ Results are returned sorted nearest-first
     tree.add(&[Fxd::from_num(2), Fxd::from_num(3), Fxd::from_num(6)], 101);
     tree.add(&[Fxd::from_num(20), Fxd::from_num(30), Fxd::from_num(60)], 102);
 
-    let within = tree.within::<SquaredEuclidean>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], Fxd::from_num(10));
+    let within = tree.within::<SquaredEuclidean, FxdR>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], FxdR::from_num(10));
 
     assert_eq!(within.len(), 2);
 ```"#)
@@ -44,18 +44,23 @@ Results are returned sorted nearest-first
 #[cfg(test)]
 mod tests {
     use crate::distance::fixed::Manhattan;
-    use crate::mutable::fixed::kdtree::{Axis, KdTree};
+    use crate::mutable::fixed::kdtree::KdTree;
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
-    use crate::traits::DistanceMetric;
+    use crate::traits::{AxisFixed, DistanceMetricFixed};
     use fixed::types::extra::U14;
-    use fixed::FixedU16;
+    use fixed::{FixedU16, FixedU32};
     use rand::Rng;
     use std::cmp::Ordering;
 
     type Fxd = FixedU16<U14>;
+    type FxdR = FixedU32<U14>;
 
     fn n(num: f32) -> Fxd {
         Fxd::from_num(num)
+    }
+
+    fn nr(num: f32) -> FxdR {
+        FxdR::from_num(num)
     }
 
     #[test]
@@ -89,11 +94,11 @@ mod tests {
 
         let query_point = [n(0.78f32), n(0.55f32), n(0.78f32), n(0.55f32)];
 
-        let radius = n(0.2);
+        let radius = nr(0.2);
         let expected = linear_search(&content_to_add, &query_point, radius);
 
         let mut result: Vec<_> = tree
-            .within::<Manhattan>(&query_point, radius)
+            .within::<Manhattan, FxdR>(&query_point, radius)
             .into_iter()
             .map(|n| (n.distance, n.item))
             .collect();
@@ -108,11 +113,11 @@ mod tests {
                 n(rng.random_range(0f32..1f32)),
                 n(rng.random_range(0f32..1f32)),
             ];
-            let radius = n(0.2);
+            let radius = nr(0.2);
             let expected = linear_search(&content_to_add, &query_point, radius);
 
             let mut result: Vec<_> = tree
-                .within::<Manhattan>(&query_point, radius)
+                .within::<Manhattan, FxdR>(&query_point, radius)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -126,7 +131,7 @@ mod tests {
     fn can_query_items_within_radius_large_scale() {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
-        let radius: Fxd = n(0.2);
+        let radius: FxdR = nr(0.2);
 
         let content_to_add: Vec<([Fxd; 4], u32)> = (0..TREE_SIZE)
             .map(|_| rand_data_fixed_u16_entry::<U14, u32, 4>())
@@ -146,7 +151,7 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, radius);
 
             let result: Vec<_> = tree
-                .within::<Manhattan>(&query_point, radius)
+                .within::<Manhattan, FxdR>(&query_point, radius)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -154,11 +159,11 @@ mod tests {
         }
     }
 
-    fn linear_search<A: Axis, const K: usize>(
+    fn linear_search<A: AxisFixed, R: AxisFixed, const K: usize>(
         content: &[([A; K], u32)],
         query_point: &[A; K],
-        radius: A,
-    ) -> Vec<(A, u32)> {
+        radius: R,
+    ) -> Vec<(R, u32)> {
         let mut matching_items = vec![];
 
         for &(p, item) in content {
@@ -173,7 +178,7 @@ mod tests {
         matching_items
     }
 
-    fn stabilize_sort<A: Axis>(matching_items: &mut [(A, u32)]) {
+    fn stabilize_sort<A: AxisFixed>(matching_items: &mut [(A, u32)]) {
         matching_items.sort_unstable_by(|a, b| {
             let dist_cmp = a.0.partial_cmp(&b.0).unwrap();
             if dist_cmp == Ordering::Equal {

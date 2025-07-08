@@ -3,19 +3,18 @@ use std::collections::BinaryHeap;
 use std::ops::Rem;
 
 use crate::best_neighbour::BestNeighbour;
-use crate::mutable::fixed::kdtree::{Axis, KdTree, LeafNode};
+use crate::mutable::fixed::kdtree::{KdTree, LeafNode};
 use crate::rkyv_utils::transform;
-use crate::traits::DistanceMetric;
-use crate::traits::{is_stem_index, Content, Index};
+use crate::traits::{is_stem_index, AxisFixed, Content, DistanceMetricFixed, Index};
 
-use crate::generate_best_n_within;
+use crate::generate_fixed_best_n_within;
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+impl<A: AxisFixed, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {
-    generate_best_n_within!(
+    generate_fixed_best_n_within!(
         LeafNode,
         (r#"Queries the tree to find the best `n` elements within `dist` of `point`, using the specified
 distance metric.
@@ -27,13 +26,14 @@ performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt
 # Examples
 
 ```rust
-    use fixed::FixedU16;
+    use fixed::{FixedU16, FixedU32};
     use fixed::types::extra::U0;
     use kiddo::best_neighbour::BestNeighbour;
     use kiddo::mutable::fixed::kdtree::KdTree;
     use kiddo::distance::fixed::SquaredEuclidean;
 
     type Fxd = FixedU16<U0>;
+    type FxdR = FixedU32<U0>;
 
     let mut tree: KdTree<Fxd, u32, 3, 32, u32> = KdTree::new();
 
@@ -41,10 +41,10 @@ performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt
     tree.add(&[Fxd::from_num(2), Fxd::from_num(3), Fxd::from_num(6)], 1);
     tree.add(&[Fxd::from_num(20), Fxd::from_num(30), Fxd::from_num(60)], 102);
 
-    let mut best_n_within_iter = tree.best_n_within::<SquaredEuclidean>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], Fxd::from_num(10), 1);
+    let mut best_n_within_iter = tree.best_n_within::<SquaredEuclidean, FxdR>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], FxdR::from_num(10), 1);
     let first = best_n_within_iter.next().unwrap();
 
-    assert_eq!(first, BestNeighbour { distance: Fxd::from_num(3), item: 1 });
+    assert_eq!(first, BestNeighbour { distance: FxdR::from_num(3), item: 1 });
 ```"#)
     );
 }
@@ -53,17 +53,22 @@ performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt
 mod tests {
     use crate::best_neighbour::BestNeighbour;
     use crate::distance::fixed::Manhattan;
-    use crate::mutable::fixed::kdtree::{Axis, KdTree};
+    use crate::mutable::fixed::kdtree::KdTree;
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
-    use crate::traits::DistanceMetric;
+    use crate::traits::{AxisFixed, DistanceMetricFixed};
     use fixed::types::extra::U14;
-    use fixed::FixedU16;
+    use fixed::{FixedU16, FixedU32};
     use rand::Rng;
 
     type Fxd = FixedU16<U14>;
+    type FxdR = FixedU32<U14>;
 
     fn n(num: f32) -> Fxd {
         Fxd::from_num(num)
+    }
+
+    fn nr(num: f32) -> FxdR {
+        FxdR::from_num(num)
     }
 
     #[test]
@@ -97,32 +102,32 @@ mod tests {
         let max_qty = 5;
 
         let query = [n(0.9f32), n(0.7f32)];
-        let radius = n(0.8f32);
+        let radius = nr(0.8f32);
         let expected = vec![
             BestNeighbour {
-                distance: n(0.7001f32),
+                distance: nr(0.7001f32),
                 item: 6,
             },
             BestNeighbour {
-                distance: n(0.7f32),
+                distance: nr(0.7f32),
                 item: 5,
             },
             BestNeighbour {
-                distance: n(0.7001f32),
+                distance: nr(0.7001f32),
                 item: 3,
             },
             BestNeighbour {
-                distance: n(0.7f32),
+                distance: nr(0.7f32),
                 item: 2,
             },
             BestNeighbour {
-                distance: n(0.7f32),
+                distance: nr(0.7f32),
                 item: 4,
             },
         ];
 
         let result: Vec<_> = tree
-            .best_n_within::<Manhattan>(&query, radius, max_qty)
+            .best_n_within::<Manhattan, FxdR>(&query, radius, max_qty)
             .collect();
         assert_eq!(result, expected);
 
@@ -132,11 +137,11 @@ mod tests {
                 n(rng.random_range(0.0f32..0.9f32)),
                 n(rng.random_range(0.0f32..0.9f32)),
             ];
-            let radius = n(0.1f32);
+            let radius = nr(0.1f32);
             let expected = linear_search(&content_to_add, &query, radius, max_qty);
 
             let mut result: Vec<_> = tree
-                .best_n_within::<Manhattan>(&query, radius, max_qty)
+                .best_n_within::<Manhattan, FxdR>(&query, radius, max_qty)
                 .collect();
 
             result.sort_unstable();
@@ -148,7 +153,7 @@ mod tests {
     fn can_query_best_items_within_radius_large_scale() {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
-        let radius: Fxd = n(0.6);
+        let radius = nr(0.6);
         let max_qty = 5;
 
         let content_to_add: Vec<([Fxd; 4], u32)> = (0..TREE_SIZE)
@@ -169,7 +174,7 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, radius, max_qty);
 
             let mut result: Vec<_> = tree
-                .best_n_within::<Manhattan>(&query_point, radius, max_qty)
+                .best_n_within::<Manhattan, FxdR>(&query_point, radius, max_qty)
                 .collect();
 
             result.sort_unstable();
@@ -177,12 +182,12 @@ mod tests {
         }
     }
 
-    fn linear_search<A: Axis, const K: usize>(
+    fn linear_search<A: AxisFixed, R: AxisFixed, const K: usize>(
         content: &[([A; K], u32)],
         query: &[A; K],
-        radius: A,
+        radius: R,
         max_qty: usize,
-    ) -> Vec<BestNeighbour<A, u32>> {
+    ) -> Vec<BestNeighbour<R, u32>> {
         let mut best_items = Vec::with_capacity(max_qty);
 
         for &(p, item) in content {

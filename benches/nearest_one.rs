@@ -3,26 +3,26 @@ use codspeed_criterion_compat::{
     criterion_group, criterion_main, measurement::WallTime, AxisScale, BatchSize, BenchmarkGroup,
     BenchmarkId, Criterion, PlotConfiguration, Throughput,
 };
-use fixed::types::extra::{Unsigned, U16};
-use fixed::FixedU16;
+use fixed::types::extra::{Unsigned, U8};
+use fixed::{FixedU16, FixedU32};
 use kiddo::batch_benches;
 use kiddo::distance::fixed::SquaredEuclidean as SquaredEuclideanFixed;
 use kiddo::distance::float::SquaredEuclidean;
-use kiddo::mutable::fixed::kdtree::{Axis as AxisFixed, KdTree as KdTreeFixed};
+use kiddo::mutable::fixed::kdtree::KdTree as KdTreeFixed;
 use kiddo::mutable::float::kdtree::KdTree;
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_fixed, build_populated_tree_and_query_points_float,
     process_queries_fixed, process_queries_float,
 };
-use kiddo::traits::Axis;
-use kiddo::traits::{Content, Index};
+use kiddo::traits::{Axis, AxisFixed, Content, Index};
 use rand::distr::StandardUniform;
 use rand_distr::Distribution;
 
 const BUCKET_SIZE: usize = 32;
 const QUERY_POINTS_PER_LOOP: usize = 1000;
 
-type Fxd = U16; // FixedU16<U16>;
+type Fxd = U8; // FixedU16<U8>;
+type FxdR = FixedU32<U8>;
 
 macro_rules! bench_float {
     ($group:ident, $a:ty, $t:ty, $k:tt, $idx: ty, $size:tt, $subtype: expr) => {
@@ -109,7 +109,7 @@ fn perform_query_fixed<
     usize: Cast<IDX>,
     FixedU16<A>: AxisFixed,
 {
-    kdtree.nearest_one::<SquaredEuclideanFixed>(point);
+    kdtree.nearest_one::<SquaredEuclideanFixed, FxdR>(point);
 }
 
 fn bench_query_nearest_one_float<

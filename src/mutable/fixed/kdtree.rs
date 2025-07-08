@@ -5,7 +5,6 @@
 
 use az::{Az, Cast};
 use divrem::DivCeil;
-use fixed::traits::Fixed;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 
@@ -15,23 +14,9 @@ use crate::{
     traits::{Content, Index},
 };
 
+use crate::traits::AxisFixed;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-
-/// Axis trait represents the traits that must be implemented
-/// by the type that is used as the first generic parameter, `A`,
-/// on [`FixedKdTree`](crate::mutable::fixed::kdtree::KdTree). A type from the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate will implement
-/// all of the traits required by Axis. For example [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html).
-pub trait Axis: Fixed + Default + Debug + Copy + Sync + Send {
-    /// used in query methods to update the rd value. Basically a saturating add for Fixed and an add for Float
-    fn rd_update(rd: Self, delta: Self) -> Self;
-}
-impl<T: Fixed + Default + Debug + Copy + Sync + Send> Axis for T {
-    #[inline]
-    fn rd_update(rd: Self, delta: Self) -> Self {
-        rd.saturating_add(delta)
-    }
-}
 
 /// Rkyv-serializable equivalent of `kiddo::mutable::fixed::kdtree::Axis`
 #[cfg(feature = "rkyv")]
@@ -156,7 +141,7 @@ pub(crate) struct LeafNode<
 
 impl<A, T, const K: usize, const B: usize, IDX> LeafNode<A, T, K, B, IDX>
 where
-    A: Axis,
+    A: AxisFixed,
     T: Content,
     IDX: Index<T = IDX>,
 {
@@ -171,7 +156,7 @@ where
 
 impl<A, T, const K: usize, const B: usize, IDX> Default for KdTree<A, T, K, B, IDX>
 where
-    A: Axis,
+    A: AxisFixed,
     T: Content,
     IDX: Index<T = IDX>,
     usize: Cast<IDX>,
@@ -183,7 +168,7 @@ where
 
 impl<A, T, const K: usize, const B: usize, IDX> KdTree<A, T, K, B, IDX>
 where
-    A: Axis,
+    A: AxisFixed,
     T: Content,
     IDX: Index<T = IDX>,
     usize: Cast<IDX>,
@@ -281,7 +266,7 @@ where
     }
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+impl<A: AxisFixed, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     IterableTreeData<A, T, K> for KdTree<A, T, K, B, IDX>
 {
     fn get_leaf_data(&self, idx: usize, out: &mut Vec<(T, [A; K])>) -> Option<usize> {

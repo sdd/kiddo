@@ -1,10 +1,10 @@
 use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
-use crate::mutable::fixed::kdtree::{Axis, KdTree, LeafNode, StemNode};
-use crate::traits::{is_stem_index, Content, Index};
+use crate::mutable::fixed::kdtree::{KdTree, LeafNode, StemNode};
+use crate::traits::{is_stem_index, AxisFixed, Content, Index};
 use az::{Az, Cast};
 use std::ops::Rem;
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+impl<A: AxisFixed, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
@@ -285,7 +285,7 @@ where
     }
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+impl<A: AxisFixed, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     FromIterator<([A; K], T)> for KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
@@ -301,8 +301,14 @@ where
     }
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>, const N: usize>
-    From<[([A; K], T); N]> for KdTree<A, T, K, B, IDX>
+impl<
+        A: AxisFixed,
+        T: Content,
+        const K: usize,
+        const B: usize,
+        IDX: Index<T = IDX>,
+        const N: usize,
+    > From<[([A; K], T); N]> for KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {
@@ -312,8 +318,8 @@ where
     }
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> Extend<([A; K], T)>
-    for KdTree<A, T, K, B, IDX>
+impl<A: AxisFixed, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+    Extend<([A; K], T)> for KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {
@@ -328,7 +334,7 @@ where
 impl<
         'a,
         't,
-        A: Axis + Copy,
+        A: AxisFixed + Copy,
         T: Content + Copy,
         const K: usize,
         const B: usize,

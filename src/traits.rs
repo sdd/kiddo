@@ -1,6 +1,8 @@
 //! Definitions and implementations for some traits that are common between the [`float`](crate::mutable::float), [`immutable`](crate::immutable) and [`fixed`](crate::mutable::fixed)  modules
 use az::Cast;
 use divrem::DivCeil;
+use fixed::prelude::ToFixed;
+use fixed::traits::Fixed;
 use num_traits::float::FloatCore;
 use num_traits::{PrimInt, Unsigned, Zero};
 use std::fmt::Debug;
@@ -26,6 +28,21 @@ impl<T: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign> 
     #[inline]
     fn rd_update(rd: Self, delta: Self) -> Self {
         rd + delta
+    }
+}
+
+/// Axis trait represents the traits that must be implemented
+/// by the type that is used as the first generic parameter, `A`,
+/// on [`FixedKdTree`](crate::mutable::fixed::kdtree::KdTree). A type from the [`Fixed`](https://docs.rs/fixed/1.21.0/fixed) crate will implement
+/// all of the traits required by Axis. For example, [`FixedU16<U14>`](https://docs.rs/fixed/1.21.0/fixed/struct.FixedU16.html).
+pub trait AxisFixed: Fixed + ToFixed + PartialOrd + Default + Debug + Copy + Sync + Send {
+    /// used in query methods to update the rd value. Basically a saturating add for Fixed and an add for Float
+    fn rd_update(rd: Self, delta: Self) -> Self;
+}
+impl<T: Fixed + ToFixed + PartialOrd + Default + Debug + Copy + Sync + Send> AxisFixed for T {
+    #[inline]
+    fn rd_update(rd: Self, delta: Self) -> Self {
+        rd.saturating_add(delta)
     }
 }
 
@@ -131,6 +148,22 @@ pub trait DistanceMetric<A, const K: usize> {
     /// to extend the minimum acceptable distance for a node when recursing
     /// back up the tree)
     fn dist1(a: A, b: A) -> A;
+}
+
+/// Trait that needs to be implemented by any potential distance
+/// metric to be used within queries on fixed-point trees
+pub trait DistanceMetricFixed<A, const K: usize, R = A> {
+    /// returns the distance between two K-d points, as measured
+    /// by a particular distance metric
+    fn dist(a: &[A; K], b: &[A; K]) -> R;
+
+    /// returns the distance between two points along a single axis,
+    /// as measured by a particular distance metric.
+    ///
+    /// (needs to be implemented as it is used by the NN query implementations
+    /// to extend the minimum acceptable distance for a node when recursing
+    /// back up the tree)
+    fn dist1(a: A, b: A) -> R;
 }
 
 #[cfg(test)]

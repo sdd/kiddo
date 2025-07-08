@@ -10,9 +10,9 @@ use std::hint::black_box;
 
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
-use crate::mutable::fixed::kdtree::{Axis as AxisFixed, KdTree as FixedKdTree};
+use crate::mutable::fixed::kdtree::KdTree as FixedKdTree;
 use crate::mutable::float::kdtree::KdTree;
-use crate::traits::{Axis, Content, Index};
+use crate::traits::{Axis, AxisFixed, Content, Index};
 
 // use rand_distr::UnitSphere as SPHERE;
 

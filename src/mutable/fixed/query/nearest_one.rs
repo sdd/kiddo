@@ -1,20 +1,19 @@
 use az::{Az, Cast};
 use std::ops::Rem;
 
-use crate::mutable::fixed::kdtree::{Axis, KdTree, LeafNode};
+use crate::mutable::fixed::kdtree::{KdTree, LeafNode};
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::rkyv_utils::transform;
-use crate::traits::DistanceMetric;
-use crate::traits::{is_stem_index, Content, Index};
+use crate::traits::{is_stem_index, AxisFixed, Content, DistanceMetricFixed, Index};
 
-use crate::generate_nearest_one;
+use crate::generate_fixed_nearest_one;
 
-impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
+impl<A: AxisFixed, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
     KdTree<A, T, K, B, IDX>
 where
     usize: Cast<IDX>,
 {
-    generate_nearest_one!(
+    generate_fixed_nearest_one!(
         LeafNode,
         (r#"Queries the tree to find the nearest element to `query`, using the specified
 distance metric function.
@@ -27,26 +26,27 @@ The nearest_one_point version also returns the coordinates of the nearest point.
 # Examples
 
 ```rust
-    use fixed::FixedU16;
+    use fixed::{FixedU16, FixedU32};
     use fixed::types::extra::U0;
     use kiddo::mutable::fixed::kdtree::KdTree;
     use kiddo::distance::fixed::SquaredEuclidean;
 
     type Fxd = FixedU16<U0>;
+    type FxdR = FixedU32<U0>;
 
     let mut tree: KdTree<Fxd, u32, 3, 32, u32> = KdTree::new();
 
     tree.add(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 100);
     tree.add(&[Fxd::from_num(2), Fxd::from_num(3), Fxd::from_num(6)], 101);
 
-    let nearest = tree.nearest_one::<SquaredEuclidean>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)]);
+    let nearest = tree.nearest_one::<SquaredEuclidean, FxdR>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)]);
 
-    assert_eq!(nearest.distance, Fxd::from_num(0));
+    assert_eq!(nearest.distance, FxdR::from_num(0));
     assert_eq!(nearest.item, 100);
 
-    let (nearest, nearest_point) = tree.nearest_one_point::<SquaredEuclidean>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)]);
+    let (nearest, nearest_point) = tree.nearest_one_point::<SquaredEuclidean, FxdR>(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)]);
 
-    assert_eq!(nearest.distance, Fxd::from_num(0));
+    assert_eq!(nearest.distance, FxdR::from_num(0));
     assert_eq!(nearest.item, 100);
     assert_eq!(nearest_point, [Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)]);
 ```"#)
@@ -56,18 +56,23 @@ The nearest_one_point version also returns the coordinates of the nearest point.
 #[cfg(test)]
 mod tests {
     use crate::distance::fixed::Manhattan;
-    use crate::mutable::fixed::kdtree::{Axis, KdTree};
+    use crate::mutable::fixed::kdtree::KdTree;
     use crate::nearest_neighbour::NearestNeighbour;
     use crate::test_utils::{rand_data_fixed_u16_entry, rand_data_fixed_u16_point};
-    use crate::traits::DistanceMetric;
+    use crate::traits::{AxisFixed, DistanceMetricFixed};
     use fixed::types::extra::U14;
-    use fixed::FixedU16;
+    use fixed::{FixedU16, FixedU32};
     use rand::Rng;
 
     type Fxd = FixedU16<U14>;
+    type FxdR = FixedU32<U14>;
 
     fn n(num: f32) -> Fxd {
         Fxd::from_num(num)
+    }
+
+    fn nr(num: f32) -> FxdR {
+        FxdR::from_num(num)
     }
 
     #[test]
@@ -101,11 +106,11 @@ mod tests {
 
         let query_point = [n(0.78f32), n(0.55f32), n(0.78f32), n(0.55f32)];
         let expected = NearestNeighbour {
-            distance: n(0.86),
+            distance: nr(0.86),
             item: 7,
         };
 
-        let result = tree.nearest_one::<Manhattan>(&query_point);
+        let result = tree.nearest_one::<Manhattan, FxdR>(&query_point);
         assert_eq!(result, expected);
 
         let mut rng = rand::rng();
@@ -116,9 +121,9 @@ mod tests {
                 n(rng.random_range(0f32..1f32)),
                 n(rng.random_range(0f32..1f32)),
             ];
-            let expected = linear_search(&content_to_add, &query_point);
+            let expected: NearestNeighbour<FxdR, _> = linear_search(&content_to_add, &query_point);
 
-            let result = tree.nearest_one::<Manhattan>(&query_point);
+            let result = tree.nearest_one::<Manhattan, FxdR>(&query_point);
 
             assert_eq!(result.distance, expected.distance);
         }
@@ -144,19 +149,19 @@ mod tests {
             .collect();
 
         for query_point in query_points {
-            let expected = linear_search(&content_to_add, &query_point);
+            let expected: NearestNeighbour<FxdR, _> = linear_search(&content_to_add, &query_point);
 
-            let result = tree.nearest_one::<Manhattan>(&query_point);
+            let result = tree.nearest_one::<Manhattan, FxdR>(&query_point);
 
             assert_eq!(result.distance, expected.distance);
         }
     }
 
-    fn linear_search<A: Axis, const K: usize>(
+    fn linear_search<A: AxisFixed, R: AxisFixed, const K: usize>(
         content: &[([A; K], u32)],
         query_point: &[A; K],
-    ) -> NearestNeighbour<A, u32> {
-        let mut best_dist: A = A::max_value();
+    ) -> NearestNeighbour<R, u32> {
+        let mut best_dist: R = R::max_value();
         let mut best_item: u32 = u32::MAX;
 
         for &(p, item) in content {
