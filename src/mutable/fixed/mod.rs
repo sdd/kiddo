@@ -3,6 +3,7 @@
 //! via the Fixed crate, eg [`FixedU16<U14>`](fixed::FixedU16<U14>) for a 16-bit fixed point number with 14 bits after the
 //! decimal point.
 
+mod common;
 #[doc(hidden)]
 pub mod construction;
 pub mod kdtree;

@@ -4,18 +4,17 @@ use codspeed_criterion_compat::{
     BenchmarkGroup, BenchmarkId, Criterion, PlotConfiguration, Throughput,
 };
 use fixed::types::extra::{LeEqU16, Unsigned, U16};
-use fixed::FixedU16;
+use fixed::{FixedU16, FixedU32};
 use kiddo::batch_benches;
 use kiddo::distance::fixed::SquaredEuclidean as SquaredEuclideanFixed;
 use kiddo::distance::float::SquaredEuclidean;
-use kiddo::mutable::fixed::kdtree::{Axis as AxisFixed, KdTree as KdTreeFixed};
+use kiddo::mutable::fixed::kdtree::KdTree as KdTreeFixed;
 use kiddo::mutable::float::kdtree::KdTree;
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_fixed, build_populated_tree_and_query_points_float,
     process_queries_fixed, process_queries_float,
 };
-use kiddo::traits::Axis;
-use kiddo::traits::{Content, Index};
+use kiddo::traits::{Axis, AxisFixed, Content, Index};
 use rand::distr::StandardUniform;
 use rand_distr::Distribution;
 
@@ -23,6 +22,7 @@ const BUCKET_SIZE: usize = 32;
 const QUERY_POINTS_PER_LOOP: usize = 100;
 
 type Fxd = U16; // FixedU16<U16>;
+type FxdR = FixedU32<U16>;
 
 macro_rules! bench_float_10 {
     ($group:ident, $a:ty, $t:ty, $k:tt, $idx: ty, $size:tt, $subtype: expr) => {
@@ -108,7 +108,7 @@ fn perform_query_fixed_10<
     FixedU16<A>: AxisFixed,
 {
     kdtree
-        .best_n_within::<SquaredEuclideanFixed>(point, FixedU16::<A>::from_num(0.05f64), 10)
+        .best_n_within::<SquaredEuclideanFixed, FxdR>(point, FxdR::from_num(0.05f64), 10)
         .for_each(|res_item| {
             {
                 let _x = res_item;
