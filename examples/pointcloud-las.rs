@@ -9,18 +9,12 @@ use std::fs::File;
 use std::io::Write;
 use std::time::Instant;
 
+use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::SquaredEuclidean;
 use las::Reader;
-
-use kiddo::immutable::float::kdtree::{ImmutableKdTree, ImmutableKdTreeRK};
-use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
-use rkyv::ser::Serializer;
-use rkyv::{AlignedVec, Infallible};
+use rkyv_08::{rancor::Error as RkyvError, to_bytes};
 use tracing::Level;
 use tracing_subscriber::fmt;
-
-const BUFFER_LEN: usize = 10_000_000_000;
-const SCRATCH_LEN: usize = 1_000_000_000;
 
 type Tree = ImmutableKdTree<f32, u32, 3, 64>;
 
@@ -63,7 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // create a file for us to serialize into
     let mut file = File::create("./examples/house.rkyv")?;
 
-    serialize_to_rkyv(&mut file, kdtree);
+    serialize_to_rkyv(&mut file, kdtree)?;
     println!(
         "Serialized k-d tree to rkyv file ({})\n\n",
         ElapsedDuration::new(start.elapsed())
@@ -76,28 +70,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+fn serialize_to_rkyv(file: &mut File, tree: Tree) -> Result<(), Box<dyn Error>> {
+    let buf = to_bytes::<RkyvError>(&tree)?;
 
-fn serialize_to_rkyv(file: &mut File, tree: Tree) {
-    let tree_rk: ImmutableKdTreeRK<f32, u32, 3, 64> = tree.into();
+    file.write_all(&buf)?;
 
-    let mut serialize_buffer = AlignedVec::with_capacity(BUFFER_LEN);
-    let mut serialize_scratch = AlignedVec::with_capacity(SCRATCH_LEN);
-
-    unsafe { serialize_scratch.set_len(SCRATCH_LEN) };
-    serialize_buffer.clear();
-
-    let mut serializer = CompositeSerializer::new(
-        AlignedSerializer::new(&mut serialize_buffer),
-        BufferScratch::new(&mut serialize_scratch),
-        Infallible,
-    );
-
-    serializer
-        .serialize_value(&tree_rk)
-        .expect("Could not serialize with rkyv");
-
-    let buf = serializer.into_serializer().into_inner();
-
-    file.write_all(buf)
-        .expect("Could not write serialized rkyv to file");
+    Ok(())
 }
