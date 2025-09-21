@@ -13,37 +13,18 @@
 //! serialisation. **The main Struct in here, [`ImmutableKdTree`], is usually what you're looking for.**
 //!
 //! ## Rkyv Usage
-//! This release of Kiddo supports usage of both Rkyv 0.7 and Rkyv 0.8 simultaneously.
-//! Rkyv 0.7.x support is gated behind the `rkyv` crate feature, as has historically been the case since
-//! Kiddo introduced Rkyv support.
-//! Rkyv 0.8 support is gated behind the newer `rkyv_08` crate feature.
-//! Usage with Rkyv 0.8 is considerably more straightforward, since the base `ImmutableKdTree` implements rkyv
-//! 0.8's Archive trait directly (compared to rkyv 0.7 where you needed to transform an `ImmutableKdTree` to and
-//! from an `ImmutableKdTreeRK`). See the examples folder for examples of serializing and deserializing
-//! with both rkyv 0.7 and 0.8, using both the deserialize, ZC checked, and ZC unchecked approaches, along with
+//! This release of Kiddo supports usage of Rkyv 0.8 only. Kiddo v5.x was the last version of Kiddo
+//! with support for Rkyv 0.7.x.
+//! Rkyv 0.8 support is now gated behind the `rkyv` crate feature (previously in later versions of
+//! Kiddo v5, this was behind the `rkyv_08` feature).
+//!
+//! See the examples folder for examples of serializing and deserializing
+//! with rkyv 0.8, using both the full-deserialize, ZC checked, and ZC unchecked approaches, along with
 //! the timings of each approach.
 //!
-//! ### Deprecation Notice
-//! Rkyv can be a tricky beast to work with. Implementing support for both 0.7.x and 0.8.x branches of Rkyv
-//! simultaneously was especially painful. As such, **support for Rkyv 0.7.x will be dropped in Kiddo v6**
-//! and only 0.8.x will be supported. This will be the only version that supports both.
-//! The `rkyv_08` feature will remain and still be called `rkyv_08` to protect against breaking changes should
-//! a future version of rkyv be released.
-//! With the removal of rkyv 0.7 support, the rkyv 0.8 structs will revert to the default names that are currently
-//! being used for the rkyv 0.7 structs.
-//!
-//! ### Struct Naming
-//! Since both rkyv 0.7 and 0.8 by default will attempt to name the structs derived by the `Archive` macro
-//! as `ArchivedImmutableKdTree` etc., it was necessary to choose a different name for the Rkyv 0.8.x derived types
-//! to avoid them clashing with the existing Rkyv 0.7 ones.
-//! So, the `ArchivedImmutableKdTree` struct is the rkyv 0.7.x Archived version of `KdTree`. The `ArchivedImmutableR8KdTree`
-//! is the rkyv 0.8.x Archived version of `KdTree`.
-//!
 //! ### Using both Rkyv and `f16` / `half` support at the same time
-//! Additionally, if you are using `rkyv` 0.8 via the `rkyv_08` feature and want
-//! to use `f16`, bear in mind that versions
-//! of [`half`](https://docs.rs/half/latest/half) up to 2.4.1 support `rkyv` 0.7 only, and versions of `half` crate from 2.5.0 onwards
-//! support `rkyv` 0.8 only.
+//! If you are using Kiddo's `rkyv` feature and want to use `f16`, bear in mind that only
+//! [`half`](https://docs.rs/half/latest/half) 2.5.0 onwards support `rkyv` 0.8.
 //!
 #[cfg(feature = "rkyv_08")]
 use crate::immutable::float::rkyv_aligned_vec::EncodeAVec;
@@ -56,8 +37,6 @@ use array_init::array_init;
 use az::{Az, Cast};
 use cmov::Cmov;
 use ordered_float::OrderedFloat;
-#[cfg(feature = "rkyv")]
-use rkyv::vec::ArchivedVec;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "rkyv_08")]
@@ -104,154 +83,6 @@ pub struct ImmutableKdTree<A: Copy + Default, T: Copy + Default, const K: usize,
     pub(crate) leaf_items: Vec<T>,
     pub(crate) leaf_extents: Vec<(u32, u32)>,
     pub(crate) max_stem_level: i32,
-}
-
-/// rkyv-Archivable / Serializable version of an [`ImmutableKdTree`].
-///
-/// Convert an ImmutableKdTree into this in order to serialize the tree via [`rkyv`].
-/// Required because the AlignedVec used for storing stem node values cannot
-/// be zero-copy deserialized.
-#[cfg(feature = "rkyv")]
-#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
-pub struct ImmutableKdTreeRK<A: Copy + Default, T: Copy + Default, const K: usize, const B: usize> {
-    pub(crate) stems: Vec<A>,
-    pub(crate) leaf_points: [Vec<A>; K],
-    pub(crate) leaf_items: Vec<T>,
-    pub(crate) leaf_extents: Vec<(u32, u32)>,
-    pub(crate) max_stem_level: i32,
-}
-
-#[cfg(feature = "rkyv")]
-impl<A: Axis, T: Content, const K: usize, const B: usize> From<ImmutableKdTree<A, T, K, B>>
-    for ImmutableKdTreeRK<A, T, K, B>
-where
-    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
-    T: Content,
-    usize: Cast<T>,
-{
-    /// Creates an [`ImmutableKdTreeRK`]  from an [`ImmutableKdTree`]
-    ///
-    /// `ImmutableKdTreeRK` implements `rkyv::Archive`, permitting it to be serialized to
-    /// as close to a zero-copy form as possible. Zero-copy-deserialized [`ImmutableKdTreeRK`]
-    /// instances can be converted to instances of [`AlignedArchivedImmutableKdTree`], which involves
-    /// a copy of the stems to ensure correct alignment, but re-use of the rest of the structure.
-    /// [`AlignedArchivedImmutableKdTree`] instances can then be queried in the same way as the original
-    /// [`ImmutableKdTree`].
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use kiddo::immutable::float::kdtree::ImmutableKdTree;
-    ///
-    /// let points: Vec<[f64; 3]> = vec!([1.0f64, 2.0f64, 3.0f64]);
-    /// let tree: ImmutableKdTree<f64, u32, 3, 32> = (&*points).into();
-    ///
-    /// assert_eq!(tree.size(), 1);
-    /// ```
-    fn from(orig: ImmutableKdTree<A, T, K, B>) -> Self {
-        let ImmutableKdTree {
-            stems,
-            leaf_points,
-            leaf_items,
-            leaf_extents,
-            max_stem_level,
-        } = orig;
-
-        let (ptr, _, length, capacity) = stems.into_raw_parts();
-        let stems = unsafe { Vec::from_raw_parts(ptr, length, capacity) };
-
-        ImmutableKdTreeRK {
-            stems,
-            leaf_points,
-            leaf_items,
-            leaf_extents,
-            max_stem_level,
-        }
-    }
-}
-
-/// rkyv zero-copy deserializable version of an `ImmutableKdTree`.
-///
-/// Convert an `ImmutableKdTreeRK` into this in order to perform queries.
-/// Required because the AlignedVec used for storing stem node values cannot
-/// be zero-copy deserialized. You need to first zero-copy-deserialize into an
-/// `ImmutableKdTreeRK` and then convert that into one of these, re-aligning the stems.
-#[cfg(feature = "rkyv")]
-#[derive(Debug, PartialEq)]
-pub struct AlignedArchivedImmutableKdTree<
-    'a,
-    A: Copy + Default,
-    T: Copy + Default,
-    const K: usize,
-    const B: usize,
-> {
-    pub(crate) stems: AVec<A, ConstAlign<CACHELINE_ALIGN>>,
-    pub(crate) leaf_points: &'a [ArchivedVec<A>; K],
-    pub(crate) leaf_items: &'a ArchivedVec<T>,
-    pub(crate) leaf_extents: &'a ArchivedVec<(u32, u32)>,
-    pub(crate) max_stem_level: i32,
-}
-
-#[cfg(feature = "rkyv")]
-impl<
-        'a,
-        A: Copy + Default + rkyv::Archive<Archived = A>,
-        T: Copy + Default + rkyv::Archive<Archived = T>,
-        const K: usize,
-        const B: usize,
-    > AlignedArchivedImmutableKdTree<'a, A, T, K, B>
-{
-    pub(crate) fn new_from(
-        value: &'a ArchivedImmutableKdTreeRK<A, T, K, B>,
-    ) -> AlignedArchivedImmutableKdTree<'a, A, T, K, B> {
-        AlignedArchivedImmutableKdTree {
-            stems: AVec::from_slice(CACHELINE_ALIGN, &value.stems[..]),
-            leaf_points: &value.leaf_points,
-            leaf_extents: &value.leaf_extents,
-            leaf_items: &value.leaf_items,
-            max_stem_level: value.max_stem_level,
-        }
-    }
-
-    /// create an `AlignedArchivedImmutableKdTree` from `Bytes`
-    ///
-    /// Intended to be used on raw / mem-mapped bytes from a `File` containing data serialized from an
-    /// `ArchivedImmutableKdTreeRK`
-    #[cfg(feature = "rkyv")]
-    pub fn from_bytes(bytes: &'a [u8]) -> AlignedArchivedImmutableKdTree<'a, A, T, K, B> {
-        let tree_rk = unsafe { rkyv::archived_root::<ImmutableKdTreeRK<A, T, K, B>>(bytes) };
-
-        AlignedArchivedImmutableKdTree::new_from(tree_rk)
-    }
-}
-
-#[cfg(feature = "rkyv")]
-impl<A, T, const K: usize, const B: usize> AlignedArchivedImmutableKdTree<'_, A, T, K, B>
-where
-    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + rkyv::Archive<Archived = A>,
-    T: Content + rkyv::Archive<Archived = T>,
-    usize: Cast<T>,
-{
-    /// Returns the current number of elements stored in the tree
-    #[inline]
-    pub fn size(&self) -> usize {
-        self.leaf_items.len()
-    }
-
-    /// Returns a LeafSlice for a given leaf index
-    #[inline]
-    pub(crate) fn get_leaf_slice(&self, leaf_idx: usize) -> LeafSlice<'_, A, T, K> {
-        let (start, end) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
-
-        // Artificially extend size to be at least chunk length for faster processing
-        // TODO: why does this slow things down?
-        // let end = end.max(start + 32).min(self.leaf_items.len() as u32);
-
-        LeafSlice::new(
-            array_init::array_init(|i| &self.leaf_points[i][start as usize..end as usize]),
-            &self.leaf_items[start as usize..end as usize],
-        )
-    }
 }
 
 #[cfg(feature = "rkyv_08")]

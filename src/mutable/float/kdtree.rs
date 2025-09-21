@@ -10,31 +10,18 @@
 //! serialisation. **The main Struct in here, [`KdTree`], is usually what you're looking for.**
 //!
 //! ## Rkyv Usage
-//! This release of Kiddo supports usage of both Rkyv 0.7 and Rkyv 0.8 simultaneously.
-//! Rkyv 0.7.x support is gated behind the `rkyv` crate feature, as has historically been the case since
-//! Kiddo introduced Rkyv support.
-//! Rkyv 0.8 support is gated behind the newer `rkyv_08` crate feature.
+//! This release of Kiddo supports usage of Rkyv 0.8 only. Kiddo v5.x was the last version of Kiddo
+//! with support for Rkyv 0.7.x.
+//! Rkyv 0.8 support is now gated behind the `rkyv` crate feature (previously in later versions of
+//! Kiddo v5, this was behind the `rkyv_08` feature).
 //!
-//! ### Deprecation Notice
-//! Rkyv can be a tricky beast to work with. Implementing support for both 0.7.x and 0.8.x branches of Rkyv
-//! simultaneously was especially painful. As such, **support for Rkyv 0.7.x will be dropped in Kiddo v6**
-//! and only 0.8.x will be supported. This will be the only version that supports both.
-//! The `rkyv_08` feature will remain and still be called `rkyv_08` to protect against breaking changes should
-//! a future version of rkyv be released.
-//! With the removal of rkyv 0.7 support, the rkyv 0.8 structs will revert to the default names that are currently
-//! being used for the rkyv 0.7 structs.
-//!
-//! ### Struct Naming
-//! Since both rkyv 0.7 and 0.8 by default will attempt to name the structs derived by the `Archive` macro
-//! as `ArchivedKdTree` etc., it was necessary to choose a different name for the Rkyv 0.8.x derived types
-//! to avoid them clashing with the existing Rkyv 0.7 ones.
-//! So, the `ArchivedKdTree` struct is the rkyv 0.7.x Archived version of `KdTree`. The `ArchivedR8KdTree`
-//! is the rkyv 0.8.x Archived version of `KdTree`.
+//! See the examples folder for examples of serializing and deserializing
+//! with rkyv 0.8, using both the full-deserialize, ZC checked, and ZC unchecked approaches, along with
+//! the timings of each approach.
 //!
 //! ### Using both Rkyv and `f16` / `half` support at the same time
-//! Additionally, if you are using `rkyv` 0.8 via the `rkyv_08` feature and want
-//! to use `f16`, bear in mind that versions of the `half` up to 2.4.1 support `rkyv` 0.7 only,
-//! and versions of the `half` crate from 2.5.0 onwards support `rkyv` 0.8 only.
+//! If you are using Kiddo's `rkyv` feature and want to use `f16`, bear in mind that only
+//! [`half`](https://docs.rs/half/latest/half) 2.5.0 onwards support `rkyv` 0.8.
 //!
 use az::{Az, Cast};
 use divrem::DivCeil;
@@ -70,10 +57,6 @@ use serde::{Deserialize, Serialize};
 /// deserialization, you may get better performance from [`immutable::float::kdtree::ImmutableKdTree`](`crate::immutable::float::kdtree::ImmutableKdTree`)
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
-    feature = "rkyv",
-    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
-)]
-#[cfg_attr(
     feature = "rkyv_08",
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
 )]
@@ -89,10 +72,6 @@ pub struct KdTree<A: Copy + Default, T: Copy + Default, const K: usize, const B:
 #[doc(hidden)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
-    feature = "rkyv",
-    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
-)]
-#[cfg_attr(
     feature = "rkyv_08",
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
 )]
@@ -107,10 +86,6 @@ pub struct StemNode<A: Copy + Default, const K: usize, IDX> {
 
 #[doc(hidden)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-    feature = "rkyv",
-    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
-)]
 #[cfg_attr(
     feature = "rkyv_08",
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
@@ -308,20 +283,6 @@ where
     usize: Cast<IDX>,
 {
     generate_common_methods!(KdTree);
-}
-
-#[cfg(feature = "rkyv")]
-impl<
-        A: Axis + rkyv::Archive<Archived = A>,
-        T: Content + rkyv::Archive<Archived = T>,
-        const K: usize,
-        const B: usize,
-        IDX: Index<T = IDX> + rkyv::Archive<Archived = IDX>,
-    > ArchivedKdTree<A, T, K, B, IDX>
-where
-    usize: Cast<IDX>,
-{
-    generate_common_methods!(ArchivedKdTree);
 }
 
 #[cfg(feature = "rkyv_08")]

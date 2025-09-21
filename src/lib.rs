@@ -76,12 +76,11 @@
 
 //! The Kiddo crate exposes the following features. Any labelled as **(NIGHTLY)** are not available on `stable` Rust as they require some unstable features. You'll need to build with `nightly` in order to user them.
 //! * **serde** - serialization / deserialization via [`Serde`](https://docs.rs/serde/latest/serde/)
-//! * **rkyv** - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/0.7.45/rkyv/index.html) version 0.7.x
 //! * **rkyv_08** - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.8.x
 //! * `simd` **(NIGHTLY)** - enables some handwritten SIMD and pre-fetch intrinsics code within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) that may improve performance (currently only on nearest_one with `f64`)
 //! * `fixed` - enables usage of `kiddo::mutable::fixed::KdTree` for use with the `fixed` library's fixed-point number types
 //!
-//! **NOTE**: Support for rkyv 0.7 is now deprecated and will be removed in Kiddo v6.
+//! **NOTE**: Support for rkyv 0.7 was removed in Kiddo v6.
 
 #[macro_use]
 extern crate doc_comment;
@@ -120,7 +119,7 @@ mod rkyv_utils;
 
 /// A floating-point k-d tree with default parameters.
 ///
-/// `A` is the floating point type (`f32` or `f64`, or `f16` in conjunction with the [`half`](https://docs.rs/half/latest/half/) crate).
+/// `A` ("Axis") is the floating point type (`f32` or `f64`, or `f16` in conjunction with the [`half`](https://docs.rs/half/latest/half/) crate).
 /// `K` is the number of dimensions. See [`KdTree`](`mutable::float::kdtree::KdTree``) for details of how to use.
 ///
 /// To manually specify more advanced parameters, use [`KdTree`](`mutable::float::kdtree::KdTree``) directly.
@@ -129,7 +128,7 @@ pub type KdTree<A, const K: usize> = mutable::float::kdtree::KdTree<A, u64, K, 3
 
 /// An immutable floating-point k-d tree with default parameters.
 ///
-/// `A` is the floating point type (`f32` or `f64`, or `f16` in conjunction with the [`half`](https://docs.rs/half/latest/half/) crate).
+/// `A` ("Axis") is the floating point type (`f32` or `f64`, or `f16` in conjunction with the [`half`](https://docs.rs/half/latest/half/) crate).
 /// `K` is the number of dimensions. See [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) for details of how to use.
 ///
 /// To manually specify more advanced parameters, use [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) directly.
