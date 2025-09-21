@@ -37,7 +37,7 @@ where
     /// assert!((nearest.0 - 0.01f64).abs() < f64::EPSILON);
     /// assert_eq!(nearest.1, 100);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn nearest_one<F>(&self, query: &[A; K], distance_fn: &F) -> (A, T)
     where
         F: Fn(&[A; K], &[A; K]) -> A,
@@ -57,7 +57,7 @@ where
         }
     }
 
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     unsafe fn nearest_one_recurse<F>(
         &self,
         query: &[A; K],
@@ -226,7 +226,7 @@ where
         (best_dist, best_item)
     }
 
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
     fn prefetch_stems(&self, idx: usize) {
         #[cfg(target_arch = "x86_64")]

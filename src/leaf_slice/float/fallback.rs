@@ -5,7 +5,7 @@ use crate::mutable::float::result_collection::ResultCollection;
 use crate::traits::{Axis, Content};
 use crate::{BestNeighbour, NearestNeighbour};
 
-#[inline]
+#[cfg_attr(not(feature = "no_inline"), inline)]
 pub(crate) fn update_nearest_dist_autovec<A: Axis, T: Content>(
     dists: &[A],
     items: &[T],
@@ -29,7 +29,7 @@ pub(crate) fn update_nearest_dist_autovec<A: Axis, T: Content>(
     }
 }
 
-#[inline]
+#[cfg_attr(not(feature = "no_inline"), inline)]
 pub(crate) fn update_nearest_dists_within_autovec<A: Axis, T: Content, R>(
     dists: &[A],
     items: &[T],
@@ -49,7 +49,7 @@ pub(crate) fn update_nearest_dists_within_autovec<A: Axis, T: Content, R>(
         });
 }
 
-#[inline]
+#[cfg_attr(not(feature = "no_inline"), inline)]
 pub(crate) fn update_best_dists_within_autovec<A: Axis, T: Content>(
     dists: &[A],
     items: &[T],

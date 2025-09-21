@@ -45,7 +45,7 @@ where
     usize: Cast<T>,
 {
     #[allow(dead_code)]
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub(crate) fn nearest_one<D>(&self, query: &[A; K], best_dist: &mut A, best_item: &mut T)
     where
         D: DistanceMetric<A, K>,
@@ -73,7 +73,7 @@ pub(crate) struct LeafSlice<'a, A: Axis, T: Content, const K: usize> {
 
 impl<A: Axis, T: Content, const K: usize> LeafSlice<'_, A, T, K> {
     #[allow(dead_code)]
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn len(&self) -> usize {
         self.content_items.len()
     }
@@ -89,7 +89,7 @@ impl<'a, A: Axis, T: Content, const K: usize, const C: usize> Iterator
 {
     type Item = ([&'a [A; C]; K], &'a [T; C]);
 
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn next(&mut self) -> Option<Self::Item> {
         if self.items_iterator.len() == 0 {
             None
@@ -106,7 +106,7 @@ impl<'a, A: Axis, T: Content, const K: usize, const C: usize> Iterator
 impl<'a, A: Axis, T: Content, const K: usize, const C: usize>
     LeafFixedSliceIterator<'a, A, T, K, C>
 {
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn remainder(&self) -> ([&'a [A]; K], &'a [T]) {
         (
             array_init::array_init(|i| self.points_iterators[i].remainder()),
@@ -163,7 +163,7 @@ where
     T: Content,
     usize: Cast<T>,
 {
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub(crate) fn new<'a>(
         content_points: [&'a [A]; K],
         content_items: &'a [T],

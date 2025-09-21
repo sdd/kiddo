@@ -37,7 +37,7 @@ use crate::traits::{AxisFixed, DistanceMetricFixed};
 pub struct Manhattan {}
 
 impl<A: AxisFixed, R: AxisFixed, const K: usize> DistanceMetricFixed<A, K, R> for Manhattan {
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn dist(a: &[A; K], b: &[A; K]) -> R {
         a.iter()
             .zip(b.iter())
@@ -51,7 +51,7 @@ impl<A: AxisFixed, R: AxisFixed, const K: usize> DistanceMetricFixed<A, K, R> fo
             .fold(R::ZERO, |a, b| a.saturating_add(b))
     }
 
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn dist1(a: A, b: A) -> R {
         if a > b {
             R::from_num(a) - R::from_num(b)
@@ -96,7 +96,7 @@ impl<A: AxisFixed, R: AxisFixed, const K: usize> DistanceMetricFixed<A, K, R> fo
 pub struct SquaredEuclidean {}
 
 impl<A: AxisFixed, R: AxisFixed, const K: usize> DistanceMetricFixed<A, K, R> for SquaredEuclidean {
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn dist(a: &[A; K], b: &[A; K]) -> R {
         a.iter()
             .zip(b.iter())
@@ -107,7 +107,7 @@ impl<A: AxisFixed, R: AxisFixed, const K: usize> DistanceMetricFixed<A, K, R> fo
             .fold(R::ZERO, |a, b| a.saturating_add(b))
     }
 
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn dist1(a: A, b: A) -> R {
         let diff: R = R::from_num(a).dist(R::from_num(b));
         diff * diff

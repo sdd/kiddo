@@ -31,7 +31,7 @@ pub(crate) mod array {
             formatter.write_str(&format!("an array of length {N}"))
         }
 
-        #[inline]
+        #[cfg_attr(not(feature = "no_inline"), inline)]
         fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
         where
             A: SeqAccess<'de>,
@@ -96,7 +96,7 @@ pub(crate) mod array_of_2ples {
             formatter.write_str(&format!("an array of 2ples of length {}", N))
         }
 
-        #[inline]
+        #[cfg_attr(not(feature = "no_inline"), inline)]
         fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
         where
             A: SeqAccess<'de>,
@@ -170,7 +170,7 @@ pub(crate) mod array_of_arrays {
             formatter.write_str(&format!("an array of arrays, dimensions of {K}x{N}"))
         }
 
-        #[inline]
+        #[cfg_attr(not(feature = "no_inline"), inline)]
         fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
         where
             A: SeqAccess<'de>,
@@ -237,7 +237,7 @@ pub(crate) mod array_of_vecs {
             formatter.write_str(&format!("an array of vecs, dimension of {N}"))
         }
 
-        #[inline]
+        #[cfg_attr(not(feature = "no_inline"), inline)]
         fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
         where
             A: SeqAccess<'de>,

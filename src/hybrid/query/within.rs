@@ -34,7 +34,7 @@ where
     ///
     /// assert_eq!(within.len(), 2);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn within<F>(&self, query: &[A; K], dist: A, distance_fn: &F) -> Vec<Neighbour<A, T>>
     where
         F: Fn(&[A; K], &[A; K]) -> A,

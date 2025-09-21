@@ -30,7 +30,7 @@ where
     ///
     /// assert_eq!(tree.size(), 2);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn add(&mut self, query: &[A; K], item: T) {
         unsafe {
             let mut stem_idx = self.root_index;
@@ -108,7 +108,7 @@ where
     /// tree.remove(&[Fxd::from_num(1), Fxd::from_num(2), Fxd::from_num(5)], 101);
     /// assert_eq!(tree.size(), 0);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn remove(&mut self, query: &[A; K], item: T) -> usize {
         let mut stem_idx = self.root_index;
         let mut split_dim = 0;
@@ -290,7 +290,7 @@ impl<A: AxisFixed, T: Content, const K: usize, const B: usize, IDX: Index<T = ID
 where
     usize: Cast<IDX>,
 {
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn from_iter<I: IntoIterator<Item = ([A; K], T)>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let mut tree = Self::with_capacity(iter.size_hint().0);

@@ -33,7 +33,7 @@ where
     ///
     /// assert_eq!(first, 1);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn best_n_within<F>(
         &self,
         query: &[A; K],

@@ -4,7 +4,7 @@ macro_rules! generate_immutable_within_unsorted_iter {
     ($comments:tt) => {
         doc_comment! {
             concat!$comments,
-            #[inline]
+            #[cfg_attr(not(feature = "no_inline"), inline)]
             pub fn within_unsorted_iter<D>(
                 &'a self,
                 query: &'a [A; K],

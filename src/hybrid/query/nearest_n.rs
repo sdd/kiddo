@@ -30,7 +30,7 @@ where
     /// assert!((nearest[0].distance - 0.01f64).abs() < f64::EPSILON);
     /// assert_eq!(nearest[0].item, 100);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn nearest_n<F>(&self, query: &[A; K], qty: usize, distance_fn: &F) -> Vec<Neighbour<A, T>>
     where
         F: Fn(&[A; K], &[A; K]) -> A,

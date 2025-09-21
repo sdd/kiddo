@@ -25,7 +25,7 @@ use crate::traits::{Axis, DistanceMetric};
 pub struct Manhattan {}
 
 impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn dist(a: &[A; K], b: &[A; K]) -> A {
         a.iter()
             .zip(b.iter())
@@ -33,7 +33,7 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
             .fold(A::zero(), std::ops::Add::add)
     }
 
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn dist1(a: A, b: A) -> A {
         (a - b).abs()
     }
@@ -59,7 +59,7 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
 pub struct SquaredEuclidean {}
 
 impl<A: Axis, const K: usize> DistanceMetric<A, K> for SquaredEuclidean {
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn dist(a: &[A; K], b: &[A; K]) -> A {
         a.iter()
             .zip(b.iter())
@@ -67,7 +67,7 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for SquaredEuclidean {
             .fold(A::zero(), std::ops::Add::add)
     }
 
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn dist1(a: A, b: A) -> A {
         (a - b) * (a - b)
     }

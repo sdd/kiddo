@@ -31,7 +31,7 @@ where
     ///
     /// assert_eq!(within.len(), 2);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn within_unsorted<F>(
         &self,
         query: &[A; K],

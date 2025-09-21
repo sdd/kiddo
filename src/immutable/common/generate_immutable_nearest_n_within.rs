@@ -4,7 +4,7 @@ macro_rules! generate_immutable_nearest_n_within {
     ($comments:tt) => {
         doc_comment! {
             concat!$comments,
-            #[inline]
+            #[cfg_attr(not(feature = "no_inline"), inline)]
             pub fn nearest_n_within<D>(&self, query: &[A; K], dist: A, max_items: NonZero<usize>, sorted: bool) -> Vec<NearestNeighbour<A, T>>
             where
                 D: DistanceMetric<A, K>,
@@ -210,7 +210,7 @@ macro_rules! generate_immutable_nearest_n_within {
                 }
             }
 
-            #[inline]
+            #[cfg_attr(not(feature = "no_inline"), inline)]
             fn search_leaf_for_nearest_n_within<D, R>(
                 &self,
                 query: &[A; K],

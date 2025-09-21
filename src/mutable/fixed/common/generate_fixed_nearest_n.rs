@@ -4,7 +4,7 @@ macro_rules! generate_fixed_nearest_n {
     ($comments:tt) => {
     doc_comment! {
     concat!$comments,
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn nearest_n<D, R: AxisFixed>(&self, query: &[A; K], qty: usize) -> Vec<NearestNeighbour<R, T>>
     where
         D: DistanceMetricFixed<A, K, R>,
@@ -113,7 +113,7 @@ macro_rules! generate_fixed_nearest_n {
         }
     }
 
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn dist_belongs_in_heap<R: AxisFixed>(dist: R, heap: &BinaryHeap<NearestNeighbour<R, T>>) -> bool {
         heap.is_empty() || dist < heap.peek().unwrap().distance || heap.len() < heap.capacity()
     }

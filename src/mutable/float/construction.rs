@@ -25,7 +25,7 @@ where
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn add(&mut self, query: &[A; K], item: T) {
         unsafe {
             let mut stem_idx = self.root_index;
@@ -99,7 +99,7 @@ where
     /// tree.remove(&[1.0, 2.0, 5.0], 200);
     /// assert_eq!(tree.size(), 0);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn remove(&mut self, query: &[A; K], item: T) -> usize {
         let mut stem_idx = self.root_index;
         let mut split_dim = 0;
@@ -281,7 +281,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>>
 where
     usize: Cast<IDX>,
 {
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn from_iter<I: IntoIterator<Item = ([A; K], T)>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let mut tree = Self::with_capacity(iter.size_hint().0);
@@ -297,7 +297,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>, c
 where
     usize: Cast<IDX>,
 {
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn from(value: [([A; K], T); N]) -> Self {
         value.into_iter().collect()
     }
@@ -308,7 +308,7 @@ impl<A: Axis, T: Content, const K: usize, const B: usize, IDX: Index<T = IDX>> E
 where
     usize: Cast<IDX>,
 {
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn extend<I: IntoIterator<Item = ([A; K], T)>>(&mut self, iter: I) {
         for (point, item) in iter {
             self.add(&point, item);

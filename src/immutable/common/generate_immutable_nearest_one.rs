@@ -4,7 +4,7 @@ macro_rules! generate_immutable_nearest_one {
     ($comments:tt) => {
         doc_comment! {
             concat!$comments,
-            #[inline]
+            #[cfg_attr(not(feature = "no_inline"), inline)]
             pub fn nearest_one<D>(&self, query: &[A; K]) -> NearestNeighbour<A, T>
                 where
                     D: DistanceMetric<A, K>,
@@ -53,7 +53,7 @@ macro_rules! generate_immutable_nearest_one {
 
             #[allow(clippy::too_many_arguments)]
             #[cfg(feature = "modified_van_emde_boas")]
-            #[inline]
+            #[cfg_attr(not(feature = "no_inline"), inline)]
             fn nearest_one_recurse<D>(
                 &self,
                 query: &[A; K],
@@ -131,7 +131,7 @@ macro_rules! generate_immutable_nearest_one {
 
             #[allow(clippy::too_many_arguments)]
             #[cfg(not(feature = "modified_van_emde_boas"))]
-            #[inline]
+            #[cfg_attr(not(feature = "no_inline"), inline)]
             fn nearest_one_recurse<D>(
                 &self,
                 query: &[A; K],
@@ -194,7 +194,7 @@ macro_rules! generate_immutable_nearest_one {
                 }
             }
 
-            #[inline]
+            #[cfg_attr(not(feature = "no_inline"), inline)]
             fn search_leaf_for_nearest_one<D>(
                 &self,
                 query: &[A; K],

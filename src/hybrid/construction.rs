@@ -31,7 +31,7 @@ where
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn add(&mut self, query: &[A; K], item: T) {
         let mut split_dim = 0;
         let mut is_right_child: bool = false;
@@ -100,7 +100,7 @@ where
         }
     }
 
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub(crate) fn add_to_optimized(&mut self, query: &[A; K], item: T) {
         assert!(self.optimized_read_only);
 
@@ -199,7 +199,7 @@ where
     /// tree.remove(&[1.0, 2.0, 5.0], 200);
     /// assert_eq!(tree.size(), 0);
     /// ```
-    /*     #[inline]
+    /*     #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn remove(&mut self, query: &[A; K], item: T) -> usize {
         let mut stem_idx = self.root_index;
         let mut split_dim = 0;

@@ -4,7 +4,7 @@ macro_rules! generate_nearest_one {
     ($leafnode:ident, $comments:tt) => {
         doc_comment! {
             concat!$comments,
-            #[inline]
+            #[cfg_attr(not(feature = "no_inline"), inline)]
             pub fn nearest_one<D>(&self, query: &[A; K]) -> NearestNeighbour<A, T>
                 where
                     D: DistanceMetric<A, K>,
@@ -12,7 +12,7 @@ macro_rules! generate_nearest_one {
                 self.nearest_one_point::<D>(query).0
             }
 
-            #[inline]
+            #[cfg_attr(not(feature = "no_inline"), inline)]
             pub fn nearest_one_point<D>(&self, query: &[A; K]) -> (NearestNeighbour<A, T>, [A; K])
                 where
                     D: DistanceMetric<A, K>,
@@ -118,7 +118,7 @@ macro_rules! generate_nearest_one {
                 (nearest, nearest_entry.clone())
             }
 
-            #[inline]
+            #[cfg_attr(not(feature = "no_inline"), inline)]
             fn search_content_for_nearest<D>(
                 query: &[A; K],
                 nearest: &mut NearestNeighbour<A, T>,

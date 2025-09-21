@@ -8,7 +8,7 @@ const ITEMS_PER_CACHE_LINE_MASK_INV: u32 = !ITEMS_PER_CACHE_LINE_MASK;
 const LOG2_ITEMS_PER_CACHE_LINE: u32 = ITEMS_PER_CACHE_LINE.ilog2(); // f64 = 3 levels; f32 = 4 levels
 
 #[allow(dead_code)]
-#[inline]
+#[cfg_attr(not(feature = "no_inline"), inline)]
 pub(crate) fn modified_van_emde_boas_get_child_idx_v2(
     curr_idx: u32,
     is_right_child: bool,
@@ -32,7 +32,7 @@ pub(crate) fn modified_van_emde_boas_get_child_idx_v2(
 }
 
 #[allow(dead_code)]
-#[inline]
+#[cfg_attr(not(feature = "no_inline"), inline)]
 pub(crate) fn modified_van_emde_boas_get_child_idx_v2_branchless(
     curr_idx: u32,
     is_right_child: bool,

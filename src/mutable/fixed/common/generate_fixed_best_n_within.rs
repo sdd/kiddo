@@ -4,7 +4,7 @@ macro_rules! generate_fixed_best_n_within {
     ($leafnode:ident, $comments:tt) => {
     doc_comment! {
     concat!$comments,
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn best_n_within<D, R: AxisFixed>(
         &self,
         query: &[A; K],
@@ -102,7 +102,7 @@ macro_rules! generate_fixed_best_n_within {
         }
     }
 
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     unsafe fn process_leaf_node<D, R: AxisFixed>(
         query: &[A; K],
         radius: R,
@@ -126,7 +126,7 @@ macro_rules! generate_fixed_best_n_within {
             });
     }
 
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     unsafe fn get_item_and_add_if_good<R: AxisFixed>(
         max_qty: usize,
         best_items: &mut BinaryHeap<BestNeighbour<R, T>>,

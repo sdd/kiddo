@@ -115,13 +115,13 @@ where
     usize: Cast<T>,
 {
     /// Returns the current number of elements stored in the tree
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn size(&self) -> usize {
         self.leaf_items.len()
     }
 
     /// Returns a LeafSlice for a given leaf index
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub(crate) fn get_leaf_slice(&self, leaf_idx: usize) -> LeafSlice<'_, A, T, K> {
         let extents = unsafe { self.leaf_extents.get_unchecked(leaf_idx) };
         let start = Into::<u32>::into(extents.0) as usize;
@@ -204,7 +204,7 @@ where
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn new_from_slice(source: &[[A; K]]) -> Self
     where
         usize: Cast<T>,
@@ -415,7 +415,7 @@ where
     }
 
     #[cfg(not(feature = "unreliable_select_nth_unstable"))]
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn update_pivot(
         source: &[[A; K]],
         sort_index: &mut [usize],
@@ -455,7 +455,7 @@ where
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn size(&self) -> usize {
         self.leaf_items.len()
     }

@@ -165,7 +165,7 @@ where
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn new() -> Self {
         KdTree::with_capacity(B * 10)
     }
@@ -183,7 +183,7 @@ where
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn with_capacity(capacity: usize) -> Self {
         assert!(capacity <= <IDX as Index>::capacity_with_bucket_size(B));
         let mut tree = Self {
@@ -268,7 +268,7 @@ macro_rules! generate_common_methods {
         ///
         /// assert_eq!(tree.size(), 2);
         /// ```
-        #[inline]
+        #[cfg_attr(not(feature = "no_inline"), inline)]
         pub fn size(&self) -> usize {
             self.size as usize
         }
@@ -310,7 +310,7 @@ where
     ///
     /// assert_eq!(tree.size(), 2);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn size(&self) -> T {
         *transform(&self.size)
     }

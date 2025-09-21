@@ -4,7 +4,7 @@ macro_rules! generate_fixed_within {
     ($comments:tt) => {
         doc_comment! {
             concat!$comments,
-            #[inline]
+            #[cfg_attr(not(feature = "no_inline"), inline)]
             pub fn within<D, R: AxisFixed>(&self, query: &[A; K], dist: R) -> Vec<NearestNeighbour<R, T>>
             where
                 D: DistanceMetricFixed<A, K, R>,

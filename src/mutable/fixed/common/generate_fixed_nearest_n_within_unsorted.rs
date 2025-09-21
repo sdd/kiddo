@@ -5,7 +5,7 @@ macro_rules! generate_fixed_nearest_n_within_unsorted {
         doc_comment! {
             concat!$comments,
 
-            #[inline]
+            #[cfg_attr(not(feature = "no_inline"), inline)]
             pub fn nearest_n_within<D, R: AxisFixed>(&self, query: &[A; K], dist: R, max_items: std::num::NonZero<usize>, sorted: bool) -> Vec<NearestNeighbour<R, T>>
             where
                 D: DistanceMetricFixed<A, K, R>,

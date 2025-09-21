@@ -4,7 +4,7 @@ macro_rules! generate_immutable_nearest_n {
     ($comments:tt) => {
         doc_comment! {
             concat!$comments,
-            #[inline]
+            #[cfg_attr(not(feature = "no_inline"), inline)]
             pub fn nearest_n<D>(&self, query: &[A; K], max_qty: NonZero<usize>) -> Vec<NearestNeighbour<A, T>>
             where
                 A: LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,

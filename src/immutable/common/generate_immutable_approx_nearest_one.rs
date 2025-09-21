@@ -4,7 +4,7 @@ macro_rules! generate_immutable_approx_nearest_one {
     ($comments:tt) => {
         doc_comment! {
             concat!$comments,
-            #[inline]
+            #[cfg_attr(not(feature = "no_inline"), inline)]
             pub fn approx_nearest_one<D>(&self, query: &[A; K]) -> NearestNeighbour<A, T>
             where
                 A: $crate::leaf_slice::float::LeafSliceFloat<T> + $crate::leaf_slice::float::LeafSliceFloatChunk<T, K>,

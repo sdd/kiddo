@@ -354,7 +354,7 @@ where
 }
 */
 
-#[inline]
+#[cfg_attr(not(feature = "no_inline"), inline)]
 pub fn process_queries_float<
     A: Axis + 'static,
     T: Content,
@@ -382,7 +382,7 @@ where
     )
 }
 
-#[inline]
+#[cfg_attr(not(feature = "no_inline"), inline)]
 pub fn process_queries_immutable_float<
     A: Axis + 'static,
     T: Content,
@@ -410,7 +410,7 @@ where
 }
 
 /*
-#[inline]
+#[cfg_attr(not(feature = "no_inline"), inline)]
 pub fn process_queries_float_sss<
     A: AxisSSS + 'static,
     T: Content,

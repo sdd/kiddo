@@ -4,7 +4,7 @@ macro_rules! generate_immutable_within_unsorted {
     ($comments:tt) => {
         doc_comment! {
             concat!$comments,
-            #[inline]
+            #[cfg_attr(not(feature = "no_inline"), inline)]
             pub fn within_unsorted<D>(&self, query: &[A; K], dist: A) -> Vec<NearestNeighbour<A, T>>
             where
                 A: LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,

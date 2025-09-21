@@ -58,7 +58,7 @@ use crate::kiddo::Axis;
 //     }
 // }
 
-// #[inline(never)]
+#[cfg_attr(not(feature = "no_inline"), inline)]
 pub(crate) fn distance_to_bounds<F, A, const K: usize>(
     p1: &[A; K],
     min_bound: &[A; K],
@@ -86,7 +86,7 @@ where
     distance(p1, &p2)
 }
 
-// #[inline(never)]
+#[cfg_attr(not(feature = "no_inline"), inline)]
 #[allow(dead_code)]
 pub(crate) fn distance_to_bounds_simd<F, A, const K: usize>(
     p1: &[A; K],
@@ -115,7 +115,7 @@ where
     distance(p1, &p2)
 }
 
-// #[inline(never)]
+#[cfg_attr(not(feature = "no_inline"), inline)]
 pub(crate) fn clamp<A: Axis>(val: A, min_bound: A, max_bound: A) -> A {
     if val < min_bound {
         min_bound
@@ -126,7 +126,7 @@ pub(crate) fn clamp<A: Axis>(val: A, min_bound: A, max_bound: A) -> A {
     }
 }
 
-// #[inline(never)]
+#[cfg_attr(not(feature = "no_inline"), inline)]
 pub(crate) fn extend<A: Axis, const K: usize>(
     min_bound: &mut [A; K],
     max_bound: &mut [A; K],
@@ -146,7 +146,7 @@ pub(crate) fn extend<A: Axis, const K: usize>(
 }
 
 //// SLOWER
-// #[inline(never)]
+// #[cfg_attr(not(feature = "no_inline"), inline)]
 // pub(crate) fn extend<A: Axis, const K: usize>(bounds: &mut [(A, A); K], point: &[A; K]) {
 //     point.iter().zip(bounds.iter_mut()).for_each(|(&point_coord, bound)| {
 //         if point_coord < bound.0 {
@@ -159,7 +159,7 @@ pub(crate) fn extend<A: Axis, const K: usize>(
 // }
 
 //// SLOWER
-// #[inline(never)]
+// #[cfg_attr(not(feature = "no_inline"), inline)]
 // pub(crate) fn extend<A: Axis, const K: usize>(bounds: &mut [(A, A); K], point: &[A; K]) {
 //     point.iter().zip(bounds.iter_mut()).for_each(|(&point_coord, bound)| {
 //         bound.0 = bound.0.min(point_coord);
@@ -168,7 +168,7 @@ pub(crate) fn extend<A: Axis, const K: usize>(
 // }
 
 //// DOESN'T WORK
-// #[inline(never)]
+// #[cfg_attr(not(feature = "no_inline"), inline)]
 // pub(crate) fn extend<A: Axis, const K: usize>(bounds: &mut [(A, A); K], point: &[A; K]) {
 //     bounds = point.iter().zip(bounds.iter()).map(|(&point_coord, (&lo, &hi))| {
 //         (lo.min(point_coord), hi.max(point_coord))

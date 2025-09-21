@@ -25,7 +25,7 @@ impl<T: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign> 
         (self - other).abs()
     }
 
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn rd_update(rd: Self, delta: Self) -> Self {
         rd + delta
     }
@@ -40,7 +40,7 @@ pub trait AxisFixed: Fixed + ToFixed + PartialOrd + Default + Debug + Copy + Syn
     fn rd_update(rd: Self, delta: Self) -> Self;
 }
 impl<T: Fixed + ToFixed + PartialOrd + Default + Debug + Copy + Sync + Send> AxisFixed for T {
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn rd_update(rd: Self, delta: Self) -> Self {
         rd.saturating_add(delta)
     }

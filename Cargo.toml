@@ -21,6 +21,7 @@ default = ["tracing", "fixed"]
 modified_van_emde_boas = []
 f16 = ["dep:half"]
 fixed = ["dep:fixed"]
+no_inline = []
 las = ["dep:las"]
 serde = [
     "dep:serde",

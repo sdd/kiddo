@@ -194,7 +194,7 @@ where
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn new() -> Self {
         KdTree::with_capacity(B * 16)
     }
@@ -212,7 +212,7 @@ where
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn with_capacity(capacity: usize) -> Self {
         assert!(capacity <= <IDX as Index>::capacity_with_bucket_size(B));
 
@@ -274,7 +274,7 @@ where
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn optimize_from(source: &[[A; K]]) -> Self
     where
         usize: Cast<T>,
@@ -522,17 +522,17 @@ where
     ///
     /// assert_eq!(tree.size(), 2);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn size(&self) -> usize {
         self.size
     }
 
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn capacity(&self) -> usize {
         self.leaves.len() * B
     }
 
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub(crate) fn is_stem_index(x: IDX) -> bool {
         x < <IDX as Index>::leaf_offset()
     }
