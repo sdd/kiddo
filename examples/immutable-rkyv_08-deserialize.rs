@@ -13,9 +13,10 @@ use rkyv_08::{access, access_unchecked, from_bytes_unchecked, rancor::Error as R
 
 use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
+use kiddo::stem_orderings::Eytzinger;
 use kiddo::SquaredEuclidean;
 
-type Tree = ImmutableKdTree<f64, u32, 3, 256>;
+type Tree = ImmutableKdTree<f64, u32, Eytzinger, 3, 256>;
 
 fn main() -> Result<(), Box<dyn Error>>
 where
@@ -115,7 +116,8 @@ where
 
         // Get archived tree
         let archived_tree =
-            access::<ArchivedR8ImmutableKdTree<f64, u32, 3, 256>, RkyvError>(&buf[..]).unwrap();
+            access::<ArchivedR8ImmutableKdTree<f64, u32, Eytzinger, 3, 256>, RkyvError>(&buf[..])
+                .unwrap();
         let loaded = Instant::now();
 
         // perform a query using the wrapper
@@ -195,8 +197,9 @@ where
         let start = Instant::now();
 
         // Get archived tree using unsafe method
-        let archived_tree =
-            unsafe { access_unchecked::<ArchivedR8ImmutableKdTree<f64, u32, 3, 256>>(&buf) };
+        let archived_tree = unsafe {
+            access_unchecked::<ArchivedR8ImmutableKdTree<f64, u32, Eytzinger, 3, 256>>(&buf)
+        };
         let loaded = Instant::now();
 
         // perform a query using the wrapper

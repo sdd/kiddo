@@ -13,6 +13,7 @@ use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::mutable::fixed::kdtree::KdTree as FixedKdTree;
 use crate::mutable::float::kdtree::KdTree;
 use crate::traits::{Axis, AxisFixed, Content, Index};
+use crate::StemOrdering;
 
 // use rand_distr::UnitSphere as SPHERE;
 
@@ -130,9 +131,15 @@ where
     kdtree
 }
 
-pub fn build_populated_tree_immutable_float<A, T: Content, const K: usize, const B: usize>(
+pub fn build_populated_tree_immutable_float<
+    A,
+    T: Content,
+    SO: StemOrdering,
+    const K: usize,
+    const B: usize,
+>(
     size: usize,
-) -> ImmutableKdTree<A, T, K, B>
+) -> ImmutableKdTree<A, T, SO, K, B>
 where
     usize: Cast<T>,
     StandardUniform: Distribution<T>,
@@ -143,7 +150,7 @@ where
     let mut points = vec![];
     points.resize_with(size, rand::random::<[A; K]>);
 
-    ImmutableKdTree::<A, T, K, B>::new_from_slice(&points)
+    ImmutableKdTree::<A, T, SO, K, B>::new_from_slice(&points)
 }
 
 /*
@@ -313,12 +320,13 @@ where
 pub fn build_populated_tree_and_query_points_immutable_float<
     A,
     T: Content,
+    SO: StemOrdering,
     const K: usize,
     const B: usize,
 >(
     size: usize,
     query_point_qty: usize,
-) -> (ImmutableKdTree<A, T, K, B>, Vec<[A; K]>)
+) -> (ImmutableKdTree<A, T, SO, K, B>, Vec<[A; K]>)
 where
     A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     usize: Cast<T>,
@@ -386,20 +394,21 @@ where
 pub fn process_queries_immutable_float<
     A: Axis + 'static,
     T: Content,
+    SO: StemOrdering,
     const K: usize,
     const B: usize,
     F,
 >(
     query: F,
-) -> Box<dyn Fn((ImmutableKdTree<A, T, K, B>, Vec<[A; K]>))>
+) -> Box<dyn Fn((ImmutableKdTree<A, T, SO, K, B>, Vec<[A; K]>))>
 where
     usize: Cast<T>,
     StandardUniform: Distribution<T>,
     StandardUniform: Distribution<[A; K]>,
-    F: Fn(&ImmutableKdTree<A, T, K, B>, &[A; K]) + 'static + Sync,
+    F: Fn(&ImmutableKdTree<A, T, SO, K, B>, &[A; K]) + 'static + Sync,
 {
     Box::new(
-        move |(kdtree, points_to_query): (ImmutableKdTree<A, T, K, B>, Vec<[A; K]>)| {
+        move |(kdtree, points_to_query): (ImmutableKdTree<A, T, SO, K, B>, Vec<[A; K]>)| {
             black_box(
                 points_to_query
                     .par_iter()

@@ -107,6 +107,10 @@ pub mod traits;
 
 mod iter;
 
+/// Stem Orderings
+pub mod stem_orderings;
+pub use traits::StemOrdering;
+
 #[doc(hidden)]
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 pub mod within_unsorted_iter;
@@ -132,12 +136,13 @@ pub type KdTree<A, const K: usize> = mutable::float::kdtree::KdTree<A, u64, K, 3
 /// To manually specify more advanced parameters, use [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) directly.
 /// To store positions using integer or fixed-point types, use [`mutable::fixed::kdtree::KdTree`].
 pub type ImmutableKdTree<A, const K: usize> =
-    immutable::float::kdtree::ImmutableKdTree<A, u64, K, 32>;
+    immutable::float::kdtree::ImmutableKdTree<A, u64, Eytzinger, K, 32>;
 
 pub use best_neighbour::BestNeighbour;
 pub use distance::float::Manhattan;
 pub use distance::float::SquaredEuclidean;
 pub use nearest_neighbour::NearestNeighbour;
 
+pub use crate::stem_orderings::Eytzinger;
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 pub use within_unsorted_iter::WithinUnsortedIter;

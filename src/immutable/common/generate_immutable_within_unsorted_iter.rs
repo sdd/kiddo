@@ -13,12 +13,15 @@ macro_rules! generate_immutable_within_unsorted_iter {
                 D: DistanceMetric<A, K>,
             {
                 let mut off = [A::zero(); K];
+                let mut stem_ordering = SO::new_query();
+                let mut initial_stem_idx: usize = SO::get_initial_idx();
 
                 let gen = Gn::new_scoped(move |gen_scope| {
                     self.within_unsorted_iter_recurse::<D>(
                         query,
                         dist,
-                        0,
+                        initial_stem_idx,
+                        stem_ordering,
                         0,
                         gen_scope,
                         &mut off,
@@ -39,6 +42,7 @@ macro_rules! generate_immutable_within_unsorted_iter {
                 query: &[A; K],
                 radius: A,
                 stem_idx: usize,
+                mut stem_ordering: SO,
                 split_dim: usize,
                 mut gen_scope: Scope<'scope, 'a, (), NearestNeighbour<A, T>>,
                 off: &mut [A; K],
@@ -59,8 +63,7 @@ macro_rules! generate_immutable_within_unsorted_iter {
                     let closer_leaf_idx = leaf_idx + is_right_child;
                     let further_leaf_idx = leaf_idx + (1 - is_right_child);
 
-                    let closer_node_idx = modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx as u32, is_right_child == 1, /*minor_*/level as u32) as usize;
-                    let further_node_idx =  modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx as u32, is_right_child == 0, /*minor_*/level as u32) as usize;
+                    let (closer_node_idx, further_node_idx) = stem_ordering.get_closer_and_further_child_idx(stem_idx, is_right_child);
 
                     let mut rd = rd;
                     let old_off = off[split_dim];
@@ -75,6 +78,7 @@ macro_rules! generate_immutable_within_unsorted_iter {
                         query,
                         radius,
                         closer_node_idx,
+                        stem_ordering.clone(),       
                         next_split_dim,
                         gen_scope,
                         off,
@@ -91,6 +95,7 @@ macro_rules! generate_immutable_within_unsorted_iter {
                             query,
                             radius,
                             further_node_idx,
+                            stem_ordering,       
                             next_split_dim,
                             gen_scope,
                             off,

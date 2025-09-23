@@ -1,4 +1,5 @@
 //! Definitions and implementations for some traits that are common between the [`float`](crate::mutable::float), [`immutable`](crate::immutable) and [`fixed`](crate::mutable::fixed)  modules
+use aligned_vec::AVec;
 use az::Cast;
 use divrem::DivCeil;
 use fixed::prelude::ToFixed;
@@ -164,6 +165,38 @@ pub trait DistanceMetricFixed<A, const K: usize, R = A> {
     /// to extend the minimum acceptable distance for a node when recursing
     /// back up the tree)
     fn dist1(a: A, b: A) -> R;
+}
+
+/// Trait that needs to be implemented by any potential stem ordering
+/// algorithm used by a KdTree.
+pub trait StemOrdering: Clone + Sync + Send {
+    /// Create a new instance of this StemOrdering struct for a new query
+    fn new_query() -> Self;
+
+    /// Get the index of the child node based on the current node index and whether the next node is the right or left child
+    fn get_child_idx(&mut self, is_right_child: bool, curr_idx: usize) -> usize;
+
+    /// get the indices of both child nodes
+    fn get_both_child_idx(&mut self, curr_idx: usize) -> (usize, usize);
+
+    /// get the indices of the closer and further child nodes
+    fn get_closer_and_further_child_idx(
+        &mut self,
+        curr_idx: usize,
+        is_right_child: bool,
+    ) -> (usize, usize);
+
+    /// get the index of the root node under this ordering scheme
+    fn get_initial_idx() -> usize;
+
+    /// calculate the stem node count for a given leaf node count
+    fn get_stem_node_count_from_leaf_node_count(leaf_node_count: usize) -> usize;
+
+    // TODO: remove need for these by smarter construction
+    /// factor by which to pad the stem node allocation
+    fn stem_node_padding_factor() -> usize;
+    /// trim unneeded stem nodes
+    fn trim_unneeded_stems<A: Axis>(stems: &mut AVec<A>, max_stem_level: usize);
 }
 
 #[cfg(test)]

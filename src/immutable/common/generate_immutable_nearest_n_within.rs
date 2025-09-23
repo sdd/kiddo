@@ -27,24 +27,14 @@ macro_rules! generate_immutable_nearest_n_within {
                 let mut matching_items = H::new_with_capacity(res_capacity);
                 let mut off = [A::zero(); K];
 
-                #[cfg(not(feature = "modified_van_emde_boas"))]
-                self.nearest_n_within_recurse::<D, H>(
-                    query,
-                    dist,
-                    1,
-                    0,
-                    &mut matching_items,
-                    &mut off,
-                    A::zero(),
-                    0,
-                    0,
-                );
+                let stem_ordering = SO::new_query();
+                let initial_stem_idx: usize = SO::get_initial_idx();
 
-                #[cfg(feature = "modified_van_emde_boas")]
                 self.nearest_n_within_recurse::<D, H>(
                     query,
                     dist,
-                    0,
+                    initial_stem_idx,
+                    stem_ordering,
                     0,
                     &mut matching_items,
                     &mut off,
@@ -62,82 +52,12 @@ macro_rules! generate_immutable_nearest_n_within {
             }
 
             #[allow(clippy::too_many_arguments)]
-            #[cfg(not(feature = "modified_van_emde_boas"))]
             fn nearest_n_within_recurse<D, R>(
                 &self,
                 query: &[A; K],
                 radius: A,
                 stem_idx: usize,
-                split_dim: usize,
-                matching_items: &mut R,
-                off: &mut [A; K],
-                rd: A,
-                mut level: usize,
-                mut leaf_idx: usize,
-            ) where
-                D: DistanceMetric<A, K>,
-                R: ResultCollection<A, T>,
-            {
-                if level > i32::from(self.max_stem_level) as usize || self.stems.is_empty() {
-                    self.search_leaf_for_nearest_n_within::<D, R>(query, radius, matching_items, leaf_idx as usize);
-                    return;
-                }
-
-                let val = *unsafe { self.stems.get_unchecked(stem_idx as usize) };
-                let is_right_child = usize::from(*unsafe { query.get_unchecked(split_dim as usize) } >= val);
-
-                leaf_idx <<= 1;
-                let closer_leaf_idx = leaf_idx + is_right_child;
-                let further_leaf_idx = leaf_idx + (1 - is_right_child);
-
-                let closer_node_idx = (stem_idx << 1) + is_right_child;
-                let further_node_idx = (stem_idx << 1) + 1 - is_right_child;
-
-                let mut rd = rd;
-                let old_off = off[split_dim];
-                let new_off = query[split_dim].saturating_dist(val);
-
-                level += 1;
-                let next_split_dim = (split_dim + 1).rem(K);
-
-                self.nearest_n_within_recurse::<D, R>(
-                    query,
-                    radius,
-                    closer_node_idx,
-                    next_split_dim,
-                    matching_items,
-                    off,
-                    rd,
-                    level,
-                    closer_leaf_idx,
-                );
-
-                rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
-
-                if rd <= radius && rd < matching_items.max_dist() {
-                    off[split_dim] = new_off;
-                    self.nearest_n_within_recurse::<D, R>(
-                        query,
-                        radius,
-                        further_node_idx,
-                        next_split_dim,
-                        matching_items,
-                        off,
-                        rd,
-                        level,
-                        further_leaf_idx,
-                    );
-                    off[split_dim] = old_off;
-                }
-            }
-
-            #[cfg(feature = "modified_van_emde_boas")]
-            #[allow(clippy::too_many_arguments)]
-            fn nearest_n_within_recurse<D, R>(
-                &self,
-                query: &[A; K],
-                radius: A,
-                stem_idx: u32,
+                mut stem_ordering: SO,
                 split_dim: usize,
                 matching_items: &mut R,
                 off: &mut [A; K],
@@ -150,22 +70,21 @@ macro_rules! generate_immutable_nearest_n_within {
                 R: ResultCollection<A, T>,
             {
                 use cmov::Cmov;
-                use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 
                 if level > i32::from(self.max_stem_level) || self.stems.is_empty() {
                     self.search_leaf_for_nearest_n_within::<D, R>(query, radius, matching_items, leaf_idx as usize);
                     return;
                 }
 
-                let val = *unsafe { self.stems.get_unchecked(stem_idx as usize) };
-                let is_right_child = usize::from(*unsafe { query.get_unchecked(split_dim as usize) } >= val);
+                let val = *unsafe { self.stems.get_unchecked(stem_idx) };
+                let is_right_child: bool = *unsafe { query.get_unchecked(split_dim as usize) } >= val;
+
+                let (closer_node_idx, further_node_idx) = stem_ordering.get_closer_and_further_child_idx(stem_idx, is_right_child);
 
                 leaf_idx <<= 1;
+                let is_right_child = usize::from(is_right_child);
                 let closer_leaf_idx = leaf_idx + is_right_child;
                 let further_leaf_idx = leaf_idx + (1 - is_right_child);
-
-                let closer_node_idx = modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 1, minor_level);
-                let further_node_idx = modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 0, minor_level);
 
                 let mut rd = rd;
                 let old_off = off[split_dim];
@@ -180,6 +99,7 @@ macro_rules! generate_immutable_nearest_n_within {
                     query,
                     radius,
                     closer_node_idx,
+                    stem_ordering.clone(),
                     next_split_dim,
                     matching_items,
                     off,
@@ -197,6 +117,7 @@ macro_rules! generate_immutable_nearest_n_within {
                         query,
                         radius,
                         further_node_idx,
+                        stem_ordering,
                         next_split_dim,
                         matching_items,
                         off,

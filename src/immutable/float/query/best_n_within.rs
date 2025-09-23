@@ -6,7 +6,7 @@ use std::ops::Rem;
 use crate::best_neighbour::BestNeighbour;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
-use crate::traits::{Axis, Content, DistanceMetric};
+use crate::traits::{Axis, Content, DistanceMetric, StemOrdering};
 
 use crate::generate_immutable_best_n_within;
 
@@ -41,10 +41,11 @@ performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt
     };
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
+impl<A: Axis, T: Content, SO, const K: usize, const B: usize> ImmutableKdTree<A, T, SO, K, B>
 where
     A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     T: Content,
+    SO: StemOrdering,
     usize: Cast<T>,
 {
     generate_immutable_float_best_n_within!(
@@ -58,8 +59,8 @@ where
 }
 
 #[cfg(feature = "rkyv_08")]
-impl<A, T, const K: usize, const B: usize>
-    crate::immutable::float::kdtree::ArchivedR8ImmutableKdTree<A, T, K, B>
+impl<A, T, SO, const K: usize, const B: usize>
+    crate::immutable::float::kdtree::ArchivedR8ImmutableKdTree<A, T, SO, K, B>
 where
     A: Copy
         + Default
@@ -69,6 +70,7 @@ where
         + LeafSliceFloatChunk<T, K>
         + rkyv_08::Archive,
     T: Copy + Default + Content + rkyv_08::Archive,
+    SO: StemOrdering,
     usize: Cast<T>,
 {
     generate_immutable_float_best_n_within!(
@@ -86,7 +88,7 @@ mod tests {
     use crate::best_neighbour::BestNeighbour;
     use crate::distance::float::SquaredEuclidean;
     use crate::immutable::float::kdtree::ImmutableKdTree;
-    use crate::traits::DistanceMetric;
+    use crate::{traits::DistanceMetric, Eytzinger};
     use rand::Rng;
     use std::num::NonZero;
 
@@ -95,7 +97,8 @@ mod tests {
     #[test]
     fn can_query_single_bucket_tree() {
         let content: Vec<[AX; 3]> = vec![[1.0, 2.0, 5.0], [2.0, 3.0, 6.0]];
-        let tree: ImmutableKdTree<AX, i32, 3, 32> = ImmutableKdTree::new_from_slice(&content);
+        let tree: ImmutableKdTree<AX, i32, Eytzinger, 3, 32> =
+            ImmutableKdTree::new_from_slice(&content);
 
         let mut best_n_within = tree.best_n_within::<SquaredEuclidean>(
             &[1.0, 2.0, 5.0],
@@ -134,7 +137,8 @@ mod tests {
             [11f64, -200f64],
         ];
 
-        let tree: ImmutableKdTree<AX, i32, 2, 4> = ImmutableKdTree::new_from_slice(&content_to_add);
+        let tree: ImmutableKdTree<AX, i32, Eytzinger, 2, 4> =
+            ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), 16);
 
@@ -189,7 +193,7 @@ mod tests {
         let content_to_add: Vec<[AX; 2]> =
             (0..TREE_SIZE).map(|_| rand::random::<[AX; 2]>()).collect();
 
-        let tree: ImmutableKdTree<AX, i32, 2, 32> =
+        let tree: ImmutableKdTree<AX, i32, Eytzinger, 2, 32> =
             ImmutableKdTree::new_from_slice(&content_to_add);
         assert_eq!(tree.size(), TREE_SIZE);
 

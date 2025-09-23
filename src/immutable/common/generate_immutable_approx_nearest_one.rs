@@ -10,13 +10,8 @@ macro_rules! generate_immutable_approx_nearest_one {
                 D: DistanceMetric<A, K>,
                 usize: Cast<T>,
             {
-                #[cfg(feature = "modified_van_emde_boas")]
-                use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2;
-
-                #[cfg(feature = "modified_van_emde_boas")]
-                let mut curr_idx: usize = 0;
-                #[cfg(not(feature = "modified_van_emde_boas"))]
-                let mut curr_idx: usize = 1;
+                let mut stem_ordering = SO::new_query();
+                let mut curr_idx: usize = SO::get_initial_idx();
 
                 let mut dim: usize = 0;
                 let mut best_item = T::default();
@@ -28,12 +23,7 @@ macro_rules! generate_immutable_approx_nearest_one {
                     let val = *unsafe { self.stems.get_unchecked(curr_idx) };
                     let is_right_child = *unsafe { query.get_unchecked(dim) } >= val;
 
-                    #[cfg(feature = "modified_van_emde_boas")]
-                    let next_idx = modified_van_emde_boas_get_child_idx_v2(curr_idx as u32, is_right_child, level as u32) as usize;
-                    #[cfg(not(feature = "modified_van_emde_boas"))]
-                    let next_idx = (curr_idx << 1) + usize::from(is_right_child);
-
-                    curr_idx = next_idx;
+                    curr_idx = stem_ordering.get_child_idx(is_right_child, curr_idx);
 
                     let is_right_child = usize::from(is_right_child);
                     leaf_idx = (leaf_idx << 1) + is_right_child;

@@ -18,31 +18,15 @@ macro_rules! generate_immutable_best_n_within {
                 let mut off = [A::zero(); K];
                 let mut best_items: BinaryHeap<BestNeighbour<A, T>> = BinaryHeap::with_capacity(max_qty.into());
 
-                #[cfg(not(feature = "modified_van_emde_boas"))]
-                let initial_stem_idx = 1;
-                #[cfg(feature = "modified_van_emde_boas")]
-                let initial_stem_idx = 0;
+                let stem_ordering = SO::new_query();
+                let initial_stem_idx: usize = SO::get_initial_idx();
 
-                #[cfg(not(feature = "modified_van_emde_boas"))]
                 self.best_n_within_recurse::<D>(
                     query,
                     dist,
                     max_qty.into(),
                     initial_stem_idx,
-                    0,
-                    &mut best_items,
-                    &mut off,
-                    A::zero(),
-                    0,
-                    0,
-                );
-
-                #[cfg(feature = "modified_van_emde_boas")]
-                self.best_n_within_recurse::<D>(
-                    query,
-                    dist,
-                    max_qty.into(),
-                    initial_stem_idx,
+                    stem_ordering,
                     0,
                     &mut best_items,
                     &mut off,
@@ -55,7 +39,6 @@ macro_rules! generate_immutable_best_n_within {
                 best_items.into_iter()
             }
 
-            #[cfg(not(feature = "modified_van_emde_boas"))]
             #[allow(clippy::too_many_arguments)]
             fn best_n_within_recurse<D>(
                 &self,
@@ -63,80 +46,7 @@ macro_rules! generate_immutable_best_n_within {
                 radius: A,
                 max_qty: usize,
                 stem_idx: usize,
-                split_dim: usize,
-                best_items: &mut BinaryHeap<BestNeighbour<A, T>>,
-                off: &mut [A; K],
-                rd: A,
-                mut level: usize,
-                mut leaf_idx: usize,
-            ) where
-                A: LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
-                usize: Cast<T>,
-                D: DistanceMetric<A, K>,
-            {
-                if level as isize > i32::from(self.max_stem_level) as isize {
-                    self.search_leaf_for_best_n_within::<D>(query, radius, max_qty, best_items, leaf_idx as usize);
-                    return;
-                }
-
-                let val = *unsafe { self.stems.get_unchecked(stem_idx as usize) };
-                let is_right_child = usize::from(*unsafe { query.get_unchecked(split_dim as usize) } >= val);
-
-                leaf_idx <<= 1;
-                let closer_leaf_idx = leaf_idx + is_right_child;
-                let further_leaf_idx = leaf_idx + (1 - is_right_child);
-
-                let closer_node_idx = (stem_idx << 1) + is_right_child;
-                let further_node_idx = (stem_idx << 1) + 1 - is_right_child;
-
-                let mut rd = rd;
-                let old_off = off[split_dim];
-                let new_off = query[split_dim].saturating_dist(val);
-
-                level += 1;
-                let next_split_dim = (split_dim + 1).rem(K);
-
-                self.best_n_within_recurse::<D>(
-                    query,
-                    radius,
-                    max_qty,
-                    closer_node_idx,
-                    next_split_dim,
-                    best_items,
-                    off,
-                    rd,
-                    level,
-                    closer_leaf_idx,
-                );
-
-                rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
-
-                if rd <= radius {
-                    off[split_dim] = new_off;
-                    self.best_n_within_recurse::<D>(
-                        query,
-                        radius,
-                        max_qty,
-                        further_node_idx,
-                        next_split_dim,
-                        best_items,
-                        off,
-                        rd,
-                        level,
-                        further_leaf_idx,
-                    );
-                    off[split_dim] = old_off;
-                }
-            }
-
-            #[cfg(feature = "modified_van_emde_boas")]
-            #[allow(clippy::too_many_arguments)]
-            fn best_n_within_recurse<D>(
-                &self,
-                query: &[A; K],
-                radius: A,
-                max_qty: usize,
-                stem_idx: u32,
+                mut stem_ordering: SO,
                 split_dim: usize,
                 best_items: &mut BinaryHeap<BestNeighbour<A, T>>,
                 off: &mut [A; K],
@@ -150,22 +60,21 @@ macro_rules! generate_immutable_best_n_within {
                 D: DistanceMetric<A, K>,
             {
                 use cmov::Cmov;
-                use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 
                 if level > i32::from(self.max_stem_level) {
                     self.search_leaf_for_best_n_within::<D>(query, radius, max_qty, best_items, leaf_idx as usize);
                     return;
                 }
 
-                let val = *unsafe { self.stems.get_unchecked(stem_idx as usize) };
-                let is_right_child = usize::from(*unsafe { query.get_unchecked(split_dim as usize) } >= val);
+                let val = *unsafe { self.stems.get_unchecked(stem_idx) };
+                let is_right_child: bool = *unsafe { query.get_unchecked(split_dim as usize) } >= val;
+
+                let (closer_node_idx, further_node_idx) = stem_ordering.get_closer_and_further_child_idx(stem_idx, is_right_child);
 
                 leaf_idx <<= 1;
+                let is_right_child = usize::from(is_right_child);
                 let closer_leaf_idx = leaf_idx + is_right_child;
                 let further_leaf_idx = leaf_idx + (1 - is_right_child);
-
-                let closer_node_idx = modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 1, minor_level);
-                let further_node_idx = modified_van_emde_boas_get_child_idx_v2_branchless(stem_idx, is_right_child == 0, minor_level);
 
                 let mut rd = rd;
                 let old_off = off[split_dim];
@@ -181,6 +90,7 @@ macro_rules! generate_immutable_best_n_within {
                     radius,
                     max_qty,
                     closer_node_idx,
+                    stem_ordering.clone(),
                     next_split_dim,
                     best_items,
                     off,
@@ -199,6 +109,7 @@ macro_rules! generate_immutable_best_n_within {
                         radius,
                         max_qty,
                         further_node_idx,
+                        stem_ordering,
                         next_split_dim,
                         best_items,
                         off,

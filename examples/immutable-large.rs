@@ -12,6 +12,7 @@ use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
+use kiddo::stem_orderings::Eytzinger;
 use kiddo::test_utils::build_query_points_float;
 
 const TREE_SIZE: usize = 2usize.pow(28); // ~250M
@@ -47,7 +48,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let start = Instant::now();
     println!("Building an optimized tree of {TREE_SIZE:?} items...");
-    let tree: ImmutableKdTree<f64, usize, 4, 32> = ImmutableKdTree::new_from_slice(&content_to_add);
+    let tree: ImmutableKdTree<f64, usize, Eytzinger, 4, 32> =
+        ImmutableKdTree::new_from_slice(&content_to_add);
     println!(
         "Construction complete. ({})",
         ElapsedDuration::new(start.elapsed())

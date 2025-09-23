@@ -2,7 +2,7 @@ use crate::generate_immutable_within_unsorted;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::traits::{Axis, Content, DistanceMetric};
+use crate::traits::{Axis, Content, DistanceMetric, StemOrdering};
 
 use az::Cast;
 
@@ -31,10 +31,11 @@ assert_eq!(within.len(), 2);
     };
 }
 
-impl<A: Axis, T: Content, const K: usize, const B: usize> ImmutableKdTree<A, T, K, B>
+impl<A: Axis, T: Content, SO, const K: usize, const B: usize> ImmutableKdTree<A, T, SO, K, B>
 where
     A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     T: Content,
+    SO: StemOrdering,
     usize: Cast<T>,
 {
     generate_immutable_float_within_unsorted!(
@@ -48,8 +49,8 @@ where
 }
 
 #[cfg(feature = "rkyv_08")]
-impl<A, T, const K: usize, const B: usize>
-    crate::immutable::float::kdtree::ArchivedR8ImmutableKdTree<A, T, K, B>
+impl<A, T, SO, const K: usize, const B: usize>
+    crate::immutable::float::kdtree::ArchivedR8ImmutableKdTree<A, T, SO, K, B>
 where
     A: Copy
         + Default
@@ -59,6 +60,7 @@ where
         + LeafSliceFloatChunk<T, K>
         + rkyv_08::Archive,
     T: Copy + Default + Content + rkyv_08::Archive,
+    SO: StemOrdering,
     usize: Cast<T>,
 {
     generate_immutable_float_within_unsorted!(
@@ -66,9 +68,10 @@ where
     use memmap::MmapOptions;
     use rkyv_08::{access_unchecked, Archived};
     use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
+    use kiddo::Eytzinger;
 
     let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree_rkyv08.rkyv\").expect(\"./examples/immutable-doctest-tree_rkyv08.rkyv missing\")).unwrap() };
-    let tree = unsafe { access_unchecked::<ArchivedR8ImmutableKdTree<f64, u32, 3, 256>>(&mmap) };"
+    let tree = unsafe { access_unchecked::<ArchivedR8ImmutableKdTree<f64, u32, Eytzinger, 3, 256>>(&mmap) };"
     );
 }
 
@@ -78,6 +81,7 @@ mod tests {
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use crate::traits::Axis;
     use crate::traits::DistanceMetric;
+    use crate::Eytzinger;
     use rand::Rng;
     use std::cmp::Ordering;
 
@@ -102,7 +106,7 @@ mod tests {
             [0.11f32, 0.2f32, 0.11f32, 0.2f32],
         ];
 
-        let tree: ImmutableKdTree<f32, u32, 4, 4> =
+        let tree: ImmutableKdTree<f32, u32, Eytzinger, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), 16);
@@ -151,7 +155,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..TREE_SIZE).map(|_| rand::random::<[f32; 4]>()).collect();
 
-        let tree: ImmutableKdTree<f32, u32, 4, 32> =
+        let tree: ImmutableKdTree<f32, u32, Eytzinger, 4, 32> =
             ImmutableKdTree::new_from_slice(&content_to_add);
         assert_eq!(tree.size(), TREE_SIZE);
 
