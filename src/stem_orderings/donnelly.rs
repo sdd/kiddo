@@ -1,4 +1,4 @@
-use crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
+use crate::donnelly_stem_layout::donnelly_get_idx_v2_branchless;
 use crate::traits::Axis;
 use crate::StemOrdering;
 use aligned_vec::AVec;
@@ -16,7 +16,7 @@ impl StemOrdering for Donnelly {
     }
 
     fn get_child_idx(&mut self, is_right_child: bool, curr_idx: usize) -> usize {
-        let result = modified_van_emde_boas_get_child_idx_v2_branchless(
+        let result = donnelly_get_idx_v2_branchless(
             curr_idx as u32,
             is_right_child,
             self.minor_level,
@@ -29,13 +29,13 @@ impl StemOrdering for Donnelly {
     }
 
     fn get_both_child_idx(&mut self, curr_idx: usize) -> (usize, usize) {
-        let left = modified_van_emde_boas_get_child_idx_v2_branchless(
+        let left = donnelly_get_idx_v2_branchless(
             curr_idx as u32,
             false,
             self.minor_level,
         );
 
-        let right = modified_van_emde_boas_get_child_idx_v2_branchless(
+        let right = donnelly_get_idx_v2_branchless(
             curr_idx as u32,
             true,
             self.minor_level,
@@ -87,7 +87,7 @@ impl StemOrdering for Donnelly {
             loop {
                 let val = stems[stem_idx];
                 let is_right_child = val.is_finite();
-                stem_idx = modified_van_emde_boas_get_child_idx_v2_branchless(
+                stem_idx = donnelly_get_idx_v2_branchless(
                     stem_idx as u32,
                     is_right_child,
                     minor_level as u32,

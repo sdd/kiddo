@@ -116,7 +116,7 @@ pub use traits::StemOrdering;
 pub mod within_unsorted_iter;
 
 pub mod distance;
-mod modified_van_emde_boas;
+pub mod donnelly_stem_layout;
 mod rkyv_utils;
 
 /// A floating-point k-d tree with default parameters.

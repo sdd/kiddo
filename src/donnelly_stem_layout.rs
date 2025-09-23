@@ -1,15 +1,16 @@
 use cmov::Cmov;
 
-const CACHE_LINE_WIDTH: u32 = 64; // Intel and AMD x86-64 have 64 byte cache lines. Apple M2 has 128
-const FLOAT_WIDTH: u32 = 8; // f64 = 8 bytes; f32 = 4 bytes
-const ITEMS_PER_CACHE_LINE: u32 = CACHE_LINE_WIDTH / FLOAT_WIDTH; // f64 = 8 items; f32 = 16 items
-const ITEMS_PER_CACHE_LINE_MASK: u32 = ITEMS_PER_CACHE_LINE - 1;
-const ITEMS_PER_CACHE_LINE_MASK_INV: u32 = !ITEMS_PER_CACHE_LINE_MASK;
-const LOG2_ITEMS_PER_CACHE_LINE: u32 = ITEMS_PER_CACHE_LINE.ilog2(); // f64 = 3 levels; f32 = 4 levels
+pub const CACHE_LINE_WIDTH: u32 = 64; // Intel and AMD x86-64 have 64 byte cache lines. Apple M2 has 128
+pub const FLOAT_WIDTH: u32 = 8; // f64 = 8 bytes; f32 = 4 bytes
+pub const ITEMS_PER_CACHE_LINE: u32 = CACHE_LINE_WIDTH / FLOAT_WIDTH; // f64 = 8 items; f32 = 16 items
+pub const ITEMS_PER_CACHE_LINE_MASK: u32 = ITEMS_PER_CACHE_LINE - 1;
+pub const ITEMS_PER_CACHE_LINE_MASK_INV: u32 = !ITEMS_PER_CACHE_LINE_MASK;
+pub const LOG2_ITEMS_PER_CACHE_LINE: u32 = ITEMS_PER_CACHE_LINE.ilog2(); // f64 = 3 levels; f32 = 4 levels
 
 #[allow(dead_code)]
-#[inline]
-pub(crate) fn modified_van_emde_boas_get_child_idx_v2(
+#[cfg_attr(not(feature = "no_inline"), inline)]
+#[cfg_attr(feature = "no_inline", inline(never))]
+pub fn donnelly_get_idx_v2(
     curr_idx: u32,
     is_right_child: bool,
     level: u32,
@@ -32,8 +33,9 @@ pub(crate) fn modified_van_emde_boas_get_child_idx_v2(
 }
 
 #[allow(dead_code)]
-#[inline]
-pub(crate) fn modified_van_emde_boas_get_child_idx_v2_branchless(
+#[cfg_attr(not(feature = "no_inline"), inline)]
+#[cfg_attr(feature = "no_inline", inline(never))]
+pub fn donnelly_get_idx_v2_branchless(
     curr_idx: u32,
     is_right_child: bool,
     minor_level: u32,
@@ -114,13 +116,13 @@ mod tests {
     #[case((21, 5, true), 176)] // 40
     #[case((22, 5, false), 184)] // 41
     #[case((22, 5, true), 192)] // 42
-    fn mod_v_e_b_get_child_idx_produces_correct_values(
+    fn donnelly_v2_get_child_idx_produces_correct_values(
         #[case] input: (u32, u32, bool),
         #[case] expected: u32,
     ) {
         let (curr_idx, level, is_right_child) = input;
 
-        let next_idx = modified_van_emde_boas_get_child_idx_v2(curr_idx, is_right_child, level);
+        let next_idx = donnelly_get_idx_v2(curr_idx, is_right_child, level);
 
         assert_eq!(next_idx, expected);
     }
@@ -168,13 +170,13 @@ mod tests {
     #[case((21, 2, true), 176)] // 40
     #[case((22, 2, false), 184)] // 41
     #[case((22, 2, true), 192)] // 42
-    fn mod_v_e_b_get_child_idx_branchless_produces_correct_values(
+    fn donnelly_v2_branchless_get_child_idx_branchless_produces_correct_values(
         #[case] input: (u32, u32, bool),
         #[case] expected: u32,
     ) {
         let (curr_idx, minor_level, is_right_child) = input;
 
-        let next_idx = modified_van_emde_boas_get_child_idx_v2_branchless(
+        let next_idx = donnelly_get_idx_v2_branchless(
             curr_idx,
             is_right_child,
             minor_level,
