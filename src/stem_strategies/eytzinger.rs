@@ -1,12 +1,12 @@
 use aligned_vec::AVec;
 
-use crate::StemOrdering;
+use crate::StemStrategy;
 
 /// Eytzinger Stem Ordering
 #[derive(Clone, Debug)]
 pub struct Eytzinger;
 
-impl StemOrdering for Eytzinger {
+impl StemStrategy for Eytzinger {
     fn new_query() -> Self {
         Self
     }

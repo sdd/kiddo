@@ -10,11 +10,7 @@ pub const LOG2_ITEMS_PER_CACHE_LINE: u32 = ITEMS_PER_CACHE_LINE.ilog2(); // f64 
 #[allow(dead_code)]
 #[cfg_attr(not(feature = "no_inline"), inline)]
 #[cfg_attr(feature = "no_inline", inline(never))]
-pub fn donnelly_get_idx_v2(
-    curr_idx: u32,
-    is_right_child: bool,
-    level: u32,
-) -> u32 {
+pub fn donnelly_get_idx_v2(curr_idx: u32, is_right_child: bool, level: u32) -> u32 {
     let minor_level = level % LOG2_ITEMS_PER_CACHE_LINE;
     let maj_idx = curr_idx >> LOG2_ITEMS_PER_CACHE_LINE;
     let min_idx = curr_idx & ITEMS_PER_CACHE_LINE_MASK;
@@ -33,8 +29,9 @@ pub fn donnelly_get_idx_v2(
 }
 
 #[allow(dead_code)]
-#[cfg_attr(not(feature = "no_inline"), inline)]
+// #[cfg_attr(not(feature = "no_inline"), inline)]
 #[cfg_attr(feature = "no_inline", inline(never))]
+#[inline(never)]
 pub fn donnelly_get_idx_v2_branchless(
     curr_idx: u32,
     is_right_child: bool,
@@ -176,11 +173,7 @@ mod tests {
     ) {
         let (curr_idx, minor_level, is_right_child) = input;
 
-        let next_idx = donnelly_get_idx_v2_branchless(
-            curr_idx,
-            is_right_child,
-            minor_level,
-        );
+        let next_idx = donnelly_get_idx_v2_branchless(curr_idx, is_right_child, minor_level);
 
         assert_eq!(next_idx, expected);
     }

@@ -29,7 +29,7 @@
 #[cfg(feature = "rkyv_08")]
 use crate::immutable::float::rkyv_aligned_vec::EncodeAVec;
 use crate::leaf_slice::float::{LeafSlice, LeafSliceFloat, LeafSliceFloatChunk};
-use crate::traits::{Axis, Content, StemOrdering};
+use crate::traits::{Axis, Content, StemStrategy};
 use aligned_vec::{avec, AVec, ConstAlign, CACHELINE_ALIGN};
 use array_init::array_init;
 use az::{Az, Cast};
@@ -67,7 +67,7 @@ use std::{cmp::PartialEq, fmt::Debug};
 pub struct ImmutableKdTree<
     A: Copy + Default,
     T: Copy + Default,
-    SO: StemOrdering,
+    SO: StemStrategy,
     const K: usize,
     const B: usize,
 > {
@@ -95,7 +95,7 @@ pub struct ImmutableKdTree<
 impl<
         A: Copy + Default + rkyv_08::Archive,
         T: Copy + Default + rkyv_08::Archive,
-        SO: StemOrdering,
+        SO: StemStrategy,
         const K: usize,
         const B: usize,
     > Debug for ArchivedR8ImmutableKdTree<A, T, SO, K, B>
@@ -119,7 +119,7 @@ impl<A, T, SO, const K: usize, const B: usize> ArchivedR8ImmutableKdTree<A, T, S
 where
     A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + rkyv_08::Archive,
     T: Content + rkyv_08::Archive,
-    SO: StemOrdering,
+    SO: StemStrategy,
     usize: Cast<T>,
 {
     /// Returns the current number of elements stored in the tree
@@ -158,7 +158,7 @@ where
     }
 }
 
-impl<A: Axis, T: Content, SO: StemOrdering, const K: usize, const B: usize> From<&[[A; K]]>
+impl<A: Axis, T: Content, SO: StemStrategy, const K: usize, const B: usize> From<&[[A; K]]>
     for ImmutableKdTree<A, T, SO, K, B>
 where
     A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
@@ -191,7 +191,7 @@ where
 // is not defined (I don't want to explicitly define it as if I do then
 // passing --all-features in CI will enable it, which I don't want to do)
 #[allow(unexpected_cfgs)]
-impl<A, T, SO: StemOrdering, const K: usize, const B: usize> ImmutableKdTree<A, T, SO, K, B>
+impl<A, T, SO: StemStrategy, const K: usize, const B: usize> ImmutableKdTree<A, T, SO, K, B>
 where
     A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     T: Content,
@@ -339,7 +339,9 @@ where
             stems[stem_index] = source[sort_index[pivot]][dim];
         }
 
-        let (left_child_idx, right_child_idx) = stem_ordering.get_both_child_idx(stem_index);
+        let mut left_stem_ordering = stem_ordering.clone();
+        let left_child_idx = left_stem_ordering.get_child_idx(false, stem_index);
+        let right_child_idx = stem_ordering.get_child_idx(true, stem_index);
 
         let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
 
@@ -355,7 +357,7 @@ where
             source,
             lower_sort_index,
             left_child_idx,
-            stem_ordering.clone(),
+            left_stem_ordering,
             level,
             minor_level,
             max_stem_level,

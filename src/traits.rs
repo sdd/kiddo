@@ -169,7 +169,7 @@ pub trait DistanceMetricFixed<A, const K: usize, R = A> {
 
 /// Trait that needs to be implemented by any potential stem ordering
 /// algorithm used by a KdTree.
-pub trait StemOrdering: Clone + Sync + Send {
+pub trait StemStrategy: Clone + Sync + Send {
     /// Create a new instance of this StemOrdering struct for a new query
     fn new_query() -> Self;
 

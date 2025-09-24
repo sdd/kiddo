@@ -4,7 +4,7 @@ use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::traits::{Axis, Content};
-use crate::traits::{DistanceMetric, StemOrdering};
+use crate::traits::{DistanceMetric, StemStrategy};
 use az::Cast;
 
 macro_rules! generate_immutable_approx_float_nearest_one {
@@ -35,7 +35,7 @@ to not recursing up the tree to find potentially closer points in other branches
     };
 }
 
-impl<A: Axis, T: Content, SO: StemOrdering, const K: usize, const B: usize>
+impl<A: Axis, T: Content, SO: StemStrategy, const K: usize, const B: usize>
     ImmutableKdTree<A, T, SO, K, B>
 {
     generate_immutable_approx_float_nearest_one!(
@@ -60,7 +60,7 @@ where
         + LeafSliceFloatChunk<T, K>
         + rkyv_08::Archive,
     T: Copy + Default + Content + rkyv_08::Archive,
-    SO: StemOrdering,
+    SO: StemStrategy,
     usize: Cast<T>,
 {
     generate_immutable_approx_float_nearest_one!(

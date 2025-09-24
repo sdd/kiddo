@@ -13,7 +13,7 @@ use rkyv_08::{access, access_unchecked, from_bytes_unchecked, rancor::Error as R
 
 use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
-use kiddo::stem_orderings::Eytzinger;
+use kiddo::stem_strategies::Eytzinger;
 use kiddo::SquaredEuclidean;
 
 type Tree = ImmutableKdTree<f64, u32, Eytzinger, 3, 256>;

@@ -13,7 +13,13 @@ use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::mutable::fixed::kdtree::KdTree as FixedKdTree;
 use crate::mutable::float::kdtree::KdTree;
 use crate::traits::{Axis, AxisFixed, Content, Index};
-use crate::StemOrdering;
+use crate::StemStrategy;
+
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
+
+// Pick a fixed seed for all benches so the same points/queries are reused.
+const RNG_SEED: u64 = 42;
 
 // use rand_distr::UnitSphere as SPHERE;
 
@@ -134,7 +140,7 @@ where
 pub fn build_populated_tree_immutable_float<
     A,
     T: Content,
-    SO: StemOrdering,
+    SO: StemStrategy,
     const K: usize,
     const B: usize,
 >(
@@ -147,8 +153,12 @@ where
     StandardUniform: Distribution<[A; K]>,
     A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
 {
-    let mut points = vec![];
-    points.resize_with(size, rand::random::<[A; K]>);
+    let mut rng = StdRng::seed_from_u64(RNG_SEED);
+
+    let mut points = Vec::with_capacity(size);
+    for _ in 0..size {
+        points.push(rng.gen::<[A; K]>());
+    }
 
     ImmutableKdTree::<A, T, SO, K, B>::new_from_slice(&points)
 }
@@ -293,7 +303,9 @@ pub fn build_query_points_float<A: Axis, const K: usize>(points_qty: usize) -> V
 where
     StandardUniform: Distribution<[A; K]>,
 {
-    (0..points_qty).map(|_| rand::random::<[A; K]>()).collect()
+    let mut rng = StdRng::seed_from_u64(RNG_SEED);
+
+    (0..points_qty).map(|_| rng.gen::<[A; K]>()).collect()
 }
 
 pub fn build_populated_tree_and_query_points_float<
@@ -320,7 +332,7 @@ where
 pub fn build_populated_tree_and_query_points_immutable_float<
     A,
     T: Content,
-    SO: StemOrdering,
+    SO: StemStrategy,
     const K: usize,
     const B: usize,
 >(
@@ -394,7 +406,7 @@ where
 pub fn process_queries_immutable_float<
     A: Axis + 'static,
     T: Content,
-    SO: StemOrdering,
+    SO: StemStrategy,
     const K: usize,
     const B: usize,
     F,

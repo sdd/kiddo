@@ -2,7 +2,7 @@ use crate::generate_immutable_within;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::traits::{Axis, Content, DistanceMetric, StemOrdering};
+use crate::traits::{Axis, Content, DistanceMetric, StemStrategy};
 
 use az::Cast;
 
@@ -35,7 +35,7 @@ impl<A: Axis, T: Content, SO, const K: usize, const B: usize> ImmutableKdTree<A,
 where
     A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
     T: Content,
-    SO: StemOrdering,
+    SO: StemStrategy,
     usize: Cast<T>,
 {
     generate_immutable_float_within!(
@@ -60,7 +60,7 @@ where
         + LeafSliceFloatChunk<T, K>
         + rkyv_08::Archive,
     T: Copy + Default + Content + rkyv_08::Archive,
-    SO: StemOrdering,
+    SO: StemStrategy,
     usize: Cast<T>,
 {
     generate_immutable_float_within!(

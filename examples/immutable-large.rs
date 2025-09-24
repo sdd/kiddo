@@ -12,7 +12,7 @@ use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
-use kiddo::stem_orderings::Eytzinger;
+use kiddo::stem_strategies::Eytzinger;
 use kiddo::test_utils::build_query_points_float;
 
 const TREE_SIZE: usize = 2usize.pow(28); // ~250M
