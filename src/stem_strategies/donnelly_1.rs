@@ -3,6 +3,7 @@ use crate::traits::Axis;
 use crate::StemStrategy;
 use aligned_vec::AVec;
 use cmov::Cmov;
+use crate::stem_strategies::donnelly_4::DonnellyFullArith;
 
 // x86, f64 (64B lines, 3 levels per block)
 pub type Donnelly3X86F64 = Donnelly<3, 64, 8>;
@@ -138,5 +139,69 @@ impl<const L: u32, const CL: u32, const VB: u32> StemStrategy for Donnelly<L, CL
             }
             stems.truncate(stem_idx + 1);
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(vec![], 0)]
+    #[case(vec![false], 1)] // 1 Maj idx: 1
+    #[case(vec![true], 2)] // 2
+    #[case(vec![false, false], 3)] // 3
+    #[case(vec![false, true], 4)] // 4
+    #[case(vec![true, false], 5)] // 5
+    #[case(vec![true, true], 6)] // 6
+    #[case(vec![false, false, false], 8)] // 7
+    #[case(vec![false, false, true], 16)] // 8
+    #[case(vec![false, true, false], 24)] // 9
+    #[case(vec![false, true, true], 32)] // 10
+    #[case(vec![true, false, false], 40)] // 11
+    #[case(vec![true, false, true], 48)] // 12
+    #[case(vec![true, true, false], 56)] // 13
+    #[case(vec![true, true, true], 64)] // 14
+    #[case(vec![false, false, false, false], 9)] // 15 Maj idx: 2
+    #[case(vec![false, false, false, true], 10)] // 16
+    #[case(vec![false, false, false, false, false], 11)] // 17
+    #[case(vec![false, false, false, false, true], 12)] // 18
+    #[case(vec![false, false, false, true, false], 13)] // 19
+    #[case(vec![false, false, false, true, true], 14)] // 20
+    #[case(vec![false, false, false, false, false, false], 72)] // 21
+    #[case(vec![false, false, false, false, false, true], 80)] // 22
+    #[case(vec![false, false, false, false, true, false], 88)] // 23
+    #[case(vec![false, false, false, false, true, true], 96)] // 24
+    #[case(vec![false, false, false, true, false, false], 104)] // 25
+    #[case(vec![false, false, false, true, false, true], 112)] // 26
+    #[case(vec![false, false, false, true, true, false], 120)] // 27
+    #[case(vec![false, false, false, true, true, true], 128)] // 28
+    #[case(vec![false, false, true, false], 17)] // 29  Maj index: 3
+    #[case(vec![false, false, true, true], 18)] // 30
+    #[case(vec![false, false, true, false, false], 19)] // 31
+    #[case(vec![false, false, true, false, true], 20)] // 32
+    #[case(vec![false, false, true, true, false], 21)] // 33
+    #[case(vec![false, false, true, true, true], 22)] // 34
+    #[case(vec![false, false, true, false, false, false], 136)] // 35
+    #[case(vec![false, false, true, false, false, true], 144)] // 36
+    #[case(vec![false, false, true, false, true, false], 152)] // 37
+    #[case(vec![false, false, true, false, true, true], 160)] // 38
+    #[case(vec![false, false, true, true, false, false], 168)] // 39
+    #[case(vec![false, false, true, true, false, true], 176)] // 40
+    #[case(vec![false, false, true, true, true, false], 184)] // 41
+    #[case(vec![false, false, true, true, true, true], 192)] // 42
+    fn donnelly_v2_get_child_idx_produces_correct_values(
+        #[case] input: Vec<bool>,
+        #[case] expected: usize,
+    ) {
+        let mut stem_strat = Donnelly::<3, 64, 8>::new_query();
+        let mut result = 0;
+        input.iter().for_each(|selection| {
+            result = stem_strat.get_child_idx(*selection, result);
+        });
+
+        assert_eq!(result, expected);
     }
 }

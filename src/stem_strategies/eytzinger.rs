@@ -52,3 +52,9 @@ impl StemStrategy for Eytzinger {
     }
     fn trim_unneeded_stems<A>(_stems: &mut AVec<A>, _max_stem_level: usize) {}
 }
+
+/// Get the child index of a node.
+pub fn get_child_idx(is_right_child: bool, curr_idx: usize) -> usize {
+    curr_idx << 1 | is_right_child as usize
+}
+

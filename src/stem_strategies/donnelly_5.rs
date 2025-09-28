@@ -4,24 +4,44 @@ use crate::StemStrategy;
 use aligned_vec::AVec;
 use cmov::Cmov;
 
+/// Donnelly layout traversal using full arithmetic (no LUT).
+///
+/// Internal state is reduced to two integers:
+/// - `combined_idx` packs both `major_idx` and `minor_level`.
+///   * Layout: high bits = major index, low LOG2_L bits = minor level.
+///   * Incrementing this bumps both minor level and major index automatically.
+/// - `minor_index` tracks position within the current minor triangle.
 #[derive(Copy, Clone)]
-pub struct DonnellyFullArith<const L: u32, const CL: u32, const VB: u32> {
-    minor: u32,     // 0..L-1
-    min_idx: u32,   // index within block
-    maj_idx: u32,   // block number
-    base_maj: u32,  // maj_idx << L
-    base_majL: u32, // (maj_idx << L) << L  == maj_idx << (2*L)
+pub struct DonnellyFullArithCombined<const L: u32, const CACHELINE_BYTES: u32, const VALUE_BYTES: u32> {
+    /// Packed major index and minor level.
+    ///
+    /// `combined_idx = (major_idx << LOG2_L) | minor_level`
+    combined_idx: u32,
+
+    /// Index within the current minor triangle.
+    minor_index: u32,
 }
 
-impl<const L: u32, const CL: u32, const VB: u32> StemStrategy for DonnellyFullArith<L, CL, VB> {
+impl<const L: u32, const CL: u32, const VB: u32> StemStrategy for DonnellyFullArithCombined<L, CL, VB> {
+    /// Construct a new traversal state at the root of the tree.
     #[inline(always)]
     fn new_query() -> Self {
-        Self { minor: 0, min_idx: 0, maj_idx: 0, base_maj: 0, base_majL: 0 }
+        debug_assert!(L >= 2 && L <= 8);
+        Self {
+            combined_idx: 0,
+            minor_index: 0,
+        }
     }
 
+    /// Wrapper around a pure function so that we can easily run cargo-asm vs the inner
     #[inline(always)]
-    fn get_child_idx(&mut self, is_right: bool, _curr_idx: usize) -> usize {
-        self.step(is_right)
+    fn get_child_idx(&mut self, is_right_child: bool, _curr_idx: usize) -> usize {
+        let (new_combined, new_minor, idx) =
+            Self::get_child_idx_pure(self.combined_idx, self.minor_index, is_right_child);
+
+        self.combined_idx = new_combined;
+        self.minor_index  = new_minor;
+        idx
     }
 
     fn get_both_child_idx(&mut self, _child_idx: usize) -> (usize, usize) {
@@ -90,102 +110,79 @@ impl<const L: u32, const CL: u32, const VB: u32> StemStrategy for DonnellyFullAr
     }
 }
 
-impl<const L: u32, const CL: u32, const VB: u32> DonnellyFullArith<L, CL, VB> {
-    // Helpers derived from type-level params
-    #[inline(always)]
-    const fn items_per_line() -> u32 { CL / VB }
-    #[inline(always)]
-    const fn log2_items_per_line() -> u32 { Self::items_per_line().ilog2() }
-    #[inline(always)]
-    const fn last_row_start() -> u32 { (1u32 << (L - 1)) - 1 } // 2^(L-1) - 1
+impl<const L: u32, const CL: u32, const VB: u32> DonnellyFullArithCombined<L, CL, VB> {
+    // Number of low bits used for the minor level (log2 of L).
+    const LOG2_L: u32 = const_ceil_log2::<L>();
 
-    /// The pure step: returns (result_index, minor_lvl', min_idx', maj_idx', base_maj', base_majL').
     #[inline(always)]
-    fn step_pure(
-        mut minor_lvl: u32, // 0..L-1
-        mut min_idx:   u32, // index within current minor triangle
-        mut maj_idx:   u32, // which minor triangle (block) we’re in
-        mut base_maj:  u32, // maj_idx << LOG2_ITEMS_PER_LINE
-        mut base_majL: u32, // maj_idx << (LOG2_ITEMS_PER_LINE + L)  (kept for invariants)
-        is_right: bool,
-    ) -> (usize, u32, u32, u32, u32, u32) {
+    pub fn get_child_idx_pure(
+        combined_idx: u32,  // packed: (major_idx << BITS_FOR_MINOR) | minor_level
+        minor_index: u32,   // index within current minor triangle
+        is_right_child: bool,
+    ) -> (u32 /*new_combined*/, u32 /*new_minor*/, usize /*child idx*/) {
+        // Number of low bits we reserve to encode [0..L-1]
+        let bits_for_minor: u32 = const_ceil_log2::<L>();
         debug_assert!(L >= 2 && L <= 8);
 
-        let right = is_right as u32;
+        let right_flag: u32 = is_right_child as u32;
 
-        // ---- advance minor level and detect boundary ----
-        let t        = minor_lvl.wrapping_add(1);
-        let wrapped  = (t == L) as u32;                 // 1 at boundary, else 0
-        minor_lvl    = t.wrapping_sub(wrapped * L);     // wrap to 0 at boundary
+        // --- Decode current block/index from packed state ---
+        let major_idx: u32 = combined_idx >> bits_for_minor;
+        let base_major: u32  = major_idx << L;        // (= major_idx * 2^L)
+        let base_majorL: u32 = major_idx << (2 * L);  // (= major_idx * 2^(2L))
 
-        // ---- candidate inside SAME minor triangle ----
-        // child index within current triangle
-        let child_same = (min_idx << 1).wrapping_add(1).wrapping_add(right);
-        let same = base_maj.wrapping_add(child_same);
+        // --- Candidate A (stays in same block) ---
+        // new_minor = minor_index + ((minor_index << 1) + 1 + right)
+        let incr        = ((minor_index << 1) + 1) + right_flag;
+        let new_minor   = minor_index + incr;
+        let same_block  = base_major + new_minor;
 
-        // ---- candidate in the NEXT minor triangle (at boundary only) ----
-        // column in the last row of the current triangle
-        let r = min_idx.wrapping_sub(Self::last_row_start());
-        // child index inside the next triangle (its level-1 row)
-        let child_next = (r << 1).wrapping_add(1).wrapping_add(right);
+        // --- Candidate B (crosses into the next block) ---
+        // next_term = (( (minor_index - (L-1)) << 1 ) + 1 + right ) << L
+        // Use wrapping_sub to avoid UB on underflow during codegen; valid paths won’t underflow.
+        let min_row     = minor_index.wrapping_sub(L - 1);
+        let next_term   = ((min_row << 1) + 1 + right_flag) << L;
+        let next_block  = base_majorL + next_term;
 
-        // next triangle’s base (advance by ITEMS_PER_LINE)
-        let base_step    = wrapped << Self::log2_items_per_line();
-        let base_maj_nxt = base_maj.wrapping_add(base_step);
-        let next         = base_maj_nxt.wrapping_add(child_next);
+        // --- Bump packed state: increments both minor level and major index on wrap ---
+        let new_combined = combined_idx + 1;
 
-        // ---- branchless select between SAME and NEXT ----
-        let m   = 0u32.wrapping_sub(wrapped);           // 0xFFFF_FFFF if wrapped else 0
-        let res = ((same & !m) | (next & m)) as usize;
+        // --- Wrap detection and select ---
+        // If (new_combined & ((1<<BITS_FOR_MINOR) - 1)) == 0, we just wrapped to a new block.
+        let wrap_mask = (1u32 << bits_for_minor) - 1;
+        let wrapped = (new_combined & wrap_mask) == 0;
 
-        // ---- state update ----
-        // min_idx becomes child_same unless we wrapped, then it becomes child_next
-        min_idx   = (child_same & !m) | (child_next & m);
+        // On AArch64 this `if` commonly lowers to:
+        //   ands wzr, new_combined, #wrap_mask
+        //   csel result, next_block, same_block, eq
+        let result = if wrapped { next_block } else { same_block };
 
-        // maj_idx/base increments only on boundary
-        maj_idx   = maj_idx.wrapping_add(wrapped);
-        base_maj  = base_maj_nxt;
-
-        // keep base_majL consistent (it isn’t used by the step, but you store it in state)
-        let base_step_L = wrapped << (Self::log2_items_per_line() + L);
-        base_majL = base_majL.wrapping_add(base_step_L);
-
-        (res, minor_lvl, min_idx, maj_idx, base_maj, base_majL)
+        (new_combined, new_minor, result as usize)
     }
+}
 
-    #[inline(always)]
-    fn step(&mut self, is_right: bool) -> usize {
-        let (child_idx, minor, min_idx, maj_idx, base_maj, base_majL) = Self::step_pure(
-            self.minor,
-            self.min_idx,
-            self.maj_idx,
-            self.base_maj,
-            self.base_majL,
-            is_right,
-        );
-        
-        self.minor = minor;
-        self.min_idx = min_idx;
-        self.maj_idx = maj_idx;
-        self.base_maj = base_maj;
-        self.base_majL = base_majL;
-        
-        child_idx
+/// Small const helper: ceil(log2(x)) for x >= 2.
+/// For L in [2..8], this yields bits = 1..3 as expected.
+const fn const_ceil_log2<const L: u32>() -> u32 {
+    // assume x >= 2
+    let mut v = L - 1;
+    let mut bits = 0;
+    while v > 0 {
+        v >>= 1;
+        bits += 1;
     }
+    bits
 }
 
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
 pub fn calc_child_idx(
-    minor: u32,
-    min_idx: u32,
-    maj_idx: u32,
-    base_maj: u32,
-    base_majL: u32,
-    is_right: bool,
-) -> (usize, u32, u32, u32, u32, u32) {
-    DonnellyFullArith::<3, 64, 4>::step_pure(
-        minor, min_idx, maj_idx, base_maj, base_majL, is_right,
+    combined_idx: u32,
+    minor_index: u32,
+    is_right_child: bool,
+) -> (u32, u32, usize) {
+    DonnellyFullArithCombined::<3, 64, 4>::get_child_idx_pure(
+        combined_idx, minor_index, is_right_child,
     )
 }
 
@@ -242,7 +239,7 @@ mod tests {
         #[case] input: Vec<bool>,
         #[case] expected: usize,
     ) {
-        let mut stem_strat = DonnellyFullArith::<3, 64, 8>::new_query();
+        let mut stem_strat = DonnellyFullArithCombined::<3, 64, 8>::new_query();
         let mut result = 0;
         input.iter().for_each(|selection| {
             result = stem_strat.get_child_idx(*selection, result);
