@@ -12,7 +12,11 @@ use cmov::Cmov;
 ///   * Incrementing this bumps both minor level and major index automatically.
 /// - `minor_index` tracks position within the current minor triangle.
 #[derive(Copy, Clone)]
-pub struct DonnellyFullArithCombined<const L: u32, const CACHELINE_BYTES: u32, const VALUE_BYTES: u32> {
+pub struct DonnellyFullArithCombined<
+    const L: u32,
+    const CACHELINE_BYTES: u32,
+    const VALUE_BYTES: u32,
+> {
     /// Packed major index and minor level.
     ///
     /// `combined_idx = (major_idx << LOG2_L) | minor_level`
@@ -22,7 +26,9 @@ pub struct DonnellyFullArithCombined<const L: u32, const CACHELINE_BYTES: u32, c
     minor_index: u32,
 }
 
-impl<const L: u32, const CL: u32, const VB: u32> StemStrategy for DonnellyFullArithCombined<L, CL, VB> {
+impl<const L: u32, const CL: u32, const VB: u32> StemStrategy
+    for DonnellyFullArithCombined<L, CL, VB>
+{
     /// Construct a new traversal state at the root of the tree.
     #[inline(always)]
     fn new_query() -> Self {
@@ -40,7 +46,7 @@ impl<const L: u32, const CL: u32, const VB: u32> StemStrategy for DonnellyFullAr
             Self::get_child_idx_pure(self.combined_idx, self.minor_index, is_right_child);
 
         self.combined_idx = new_combined;
-        self.minor_index  = new_minor;
+        self.minor_index = new_minor;
         idx
     }
 
@@ -116,10 +122,14 @@ impl<const L: u32, const CL: u32, const VB: u32> DonnellyFullArithCombined<L, CL
 
     #[inline(always)]
     pub fn get_child_idx_pure(
-        combined_idx: u32,  // packed: (major_idx << BITS_FOR_MINOR) | minor_level
-        minor_index: u32,   // index within current minor triangle
+        combined_idx: u32, // packed: (major_idx << BITS_FOR_MINOR) | minor_level
+        minor_index: u32,  // index within current minor triangle
         is_right_child: bool,
-    ) -> (u32 /*new_combined*/, u32 /*new_minor*/, usize /*child idx*/) {
+    ) -> (
+        u32,   /*new_combined*/
+        u32,   /*new_minor*/
+        usize, /*child idx*/
+    ) {
         // Number of low bits we reserve to encode [0..L-1]
         let bits_for_minor: u32 = const_ceil_log2::<L>();
         debug_assert!(L >= 2 && L <= 8);
@@ -128,21 +138,21 @@ impl<const L: u32, const CL: u32, const VB: u32> DonnellyFullArithCombined<L, CL
 
         // --- Decode current block/index from packed state ---
         let major_idx: u32 = combined_idx >> bits_for_minor;
-        let base_major: u32  = major_idx << L;        // (= major_idx * 2^L)
-        let base_majorL: u32 = major_idx << (2 * L);  // (= major_idx * 2^(2L))
+        let base_major: u32 = major_idx << L; // (= major_idx * 2^L)
+        let base_majorL: u32 = major_idx << (2 * L); // (= major_idx * 2^(2L))
 
         // --- Candidate A (stays in same block) ---
         // new_minor = minor_index + ((minor_index << 1) + 1 + right)
-        let incr        = ((minor_index << 1) + 1) + right_flag;
-        let new_minor   = minor_index + incr;
-        let same_block  = base_major + new_minor;
+        let incr = ((minor_index << 1) + 1) + right_flag;
+        let new_minor = minor_index + incr;
+        let same_block = base_major + new_minor;
 
         // --- Candidate B (crosses into the next block) ---
         // next_term = (( (minor_index - (L-1)) << 1 ) + 1 + right ) << L
         // Use wrapping_sub to avoid UB on underflow during codegen; valid paths won’t underflow.
-        let min_row     = minor_index.wrapping_sub(L - 1);
-        let next_term   = ((min_row << 1) + 1 + right_flag) << L;
-        let next_block  = base_majorL + next_term;
+        let min_row = minor_index.wrapping_sub(L - 1);
+        let next_term = ((min_row << 1) + 1 + right_flag) << L;
+        let next_block = base_majorL + next_term;
 
         // --- Bump packed state: increments both minor level and major index on wrap ---
         let new_combined = combined_idx + 1;
@@ -182,7 +192,9 @@ pub fn calc_child_idx(
     is_right_child: bool,
 ) -> (u32, u32, usize) {
     DonnellyFullArithCombined::<3, 64, 4>::get_child_idx_pure(
-        combined_idx, minor_index, is_right_child,
+        combined_idx,
+        minor_index,
+        is_right_child,
     )
 }
 

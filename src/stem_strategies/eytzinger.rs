@@ -57,4 +57,3 @@ impl StemStrategy for Eytzinger {
 pub fn get_child_idx(is_right_child: bool, curr_idx: usize) -> usize {
     curr_idx << 1 | is_right_child as usize
 }
-

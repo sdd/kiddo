@@ -1,8 +1,8 @@
+use crate::donnelly_stem_layout::donnelly_get_idx_v2_branchless;
 use crate::traits::Axis;
 use crate::StemStrategy;
 use aligned_vec::AVec;
 use cmov::Cmov;
-use crate::donnelly_stem_layout::donnelly_get_idx_v2_branchless;
 
 /// Donnelly v2 Strategy
 ///
@@ -61,7 +61,6 @@ impl<const L: u32, const CL: u32, const VB: u32> StemStrategy for Donnelly<L, CL
         }
     }
 
-
     fn new_query() -> Self {
         // L must be in {3, 4, 5,...}. We rely on it being a small constant.
         debug_assert!(L >= 2 && L <= 8);
@@ -77,11 +76,7 @@ impl<const L: u32, const CL: u32, const VB: u32> StemStrategy for Donnelly<L, CL
 
     fn get_child_idx(&mut self, is_right_child: bool, curr_idx: usize) -> usize {
         let (curr_idx, minor_level) =
-            Self::step_pure(
-                self.curr_idx,
-                self.minor_level,
-                is_right_child
-            );
+            Self::step_pure(self.curr_idx, self.minor_level, is_right_child);
 
         self.minor_level = minor_level;
         self.curr_idx = curr_idx;
@@ -102,27 +97,35 @@ impl<const L: u32, const CL: u32, const VB: u32> StemStrategy for Donnelly<L, CL
         is_right_child: bool,
     ) -> (usize, usize) {
         let (l, r) = self.get_both_child_idx(curr_idx);
-        if is_right_child { (r, l) } else { (l, r) }
+        if is_right_child {
+            (r, l)
+        } else {
+            (l, r)
+        }
     }
 }
 
 impl<const L: u32, const CL: u32, const VB: u32> Donnelly<L, CL, VB> {
     // ---- layout helpers ----
     #[inline(always)]
-    const fn items_per_line() -> u32 { CL / VB }
+    const fn items_per_line() -> u32 {
+        CL / VB
+    }
     #[inline(always)]
-    const fn log2_items_per_line() -> u32 { Self::items_per_line().ilog2() }
+    const fn log2_items_per_line() -> u32 {
+        Self::items_per_line().ilog2()
+    }
     #[inline(always)]
-    const fn line_mask() -> u32 { Self::items_per_line() - 1 }
+    const fn line_mask() -> u32 {
+        Self::items_per_line() - 1
+    }
     #[inline(always)]
-    const fn line_mask_inv() -> u32 { !Self::line_mask() }
+    const fn line_mask_inv() -> u32 {
+        !Self::line_mask()
+    }
 
     #[inline(always)]
-    fn step_pure(
-        mut curr_idx: u32,
-        mut minor_level: u32,
-        is_right_child: bool,
-    ) -> (u32, u32) {
+    fn step_pure(mut curr_idx: u32, mut minor_level: u32, is_right_child: bool) -> (u32, u32) {
         debug_assert!(L >= 2 && L <= 8);
         let is_right_child = u32::from(is_right_child);
 
@@ -143,7 +146,8 @@ impl<const L: u32, const CL: u32, const VB: u32> Donnelly<L, CL, VB> {
         curr_idx = (curr_idx
             .wrapping_add(col_idx.wrapping_shl(1))
             .wrapping_shl(Self::log2_items_per_line())
-            & inc_major_level_mask) | (curr_idx.wrapping_add(min_idx.wrapping_shl(1)) & !inc_major_level_mask);
+            & inc_major_level_mask)
+            | (curr_idx.wrapping_add(min_idx.wrapping_shl(1)) & !inc_major_level_mask);
 
         minor_level += 1;
         minor_level = minor_level & !inc_major_level_mask;
@@ -156,60 +160,46 @@ impl<const L: u32, const CL: u32, const VB: u32> Donnelly<L, CL, VB> {
     #[inline(always)]
     fn both_children_pure(curr_idx: u32, minor_level: u32) -> (u32, u32) {
         // precompute pieces identical to step_pure
-        let line_mask      = Self::line_mask();
-        let line_mask_inv  = Self::line_mask_inv();
-        let l2_items       = Self::log2_items_per_line();
+        let line_mask = Self::line_mask();
+        let line_mask_inv = Self::line_mask_inv();
+        let l2_items = Self::log2_items_per_line();
 
-        let min_idx        = curr_idx & line_mask;
-        let min_row_idx    = min_idx.wrapping_sub(minor_level).wrapping_sub(1);
+        let min_idx = curr_idx & line_mask;
+        let min_row_idx = min_idx.wrapping_sub(minor_level).wrapping_sub(1);
 
-        let inc_major      = (minor_level.wrapping_add(1) == l2_items) as u32;
-        let inc_mask       = 0u32.wrapping_sub(inc_major);
+        let inc_major = (minor_level.wrapping_add(1) == l2_items) as u32;
+        let inc_mask = 0u32.wrapping_sub(inc_major);
 
-        let base_no_right  = (curr_idx & line_mask_inv).wrapping_add(1);
+        let base_no_right = (curr_idx & line_mask_inv).wrapping_add(1);
 
         // same-block left/right
-        let same_left      = base_no_right.wrapping_add(min_idx << 1);
-        let same_right     = same_left.wrapping_add(1);
+        let same_left = base_no_right.wrapping_add(min_idx << 1);
+        let same_right = same_left.wrapping_add(1);
 
         // next-block left/right (note: add right after shift by L)
-        let next_pre       = base_no_right.wrapping_add(min_row_idx << 1);
-        let next_left      = next_pre.wrapping_shl(l2_items);
-        let next_right     = next_left.wrapping_add(1 << l2_items);
+        let next_pre = base_no_right.wrapping_add(min_row_idx << 1);
+        let next_left = next_pre.wrapping_shl(l2_items);
+        let next_right = next_left.wrapping_add(1 << l2_items);
 
         // masked select between same/next for both children
-        let left  = (same_left  & !inc_mask) | (next_left  & inc_mask);
+        let left = (same_left & !inc_mask) | (next_left & inc_mask);
         let right = (same_right & !inc_mask) | (next_right & inc_mask);
 
         (left, right)
     }
-
-
 }
 
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
-pub fn calc_child_idx(
-    curr_idx: u32,
-    minor_index: u32,
-    is_right_child: bool,
-) -> (u32, u32) {
-    Donnelly::<3, 64, 8>::step_pure(
-        curr_idx, minor_index, is_right_child,
-    )
+pub fn calc_child_idx(curr_idx: u32, minor_index: u32, is_right_child: bool) -> (u32, u32) {
+    Donnelly::<3, 64, 8>::step_pure(curr_idx, minor_index, is_right_child)
 }
 
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
-pub fn calc_both_child_idx(
-    curr_idx: u32,
-    minor_index: u32,
-) -> (u32, u32) {
-    Donnelly::<3, 64, 8>::both_children_pure(
-        curr_idx, minor_index,
-    )
+pub fn calc_both_child_idx(curr_idx: u32, minor_index: u32) -> (u32, u32) {
+    Donnelly::<3, 64, 8>::both_children_pure(curr_idx, minor_index)
 }
-
 
 #[cfg(test)]
 mod tests {

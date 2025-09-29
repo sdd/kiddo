@@ -16,7 +16,13 @@ pub struct DonnellyFullArith<const L: u32, const CL: u32, const VB: u32> {
 impl<const L: u32, const CL: u32, const VB: u32> StemStrategy for DonnellyFullArith<L, CL, VB> {
     #[inline(always)]
     fn new_query() -> Self {
-        Self { minor: 0, min_idx: 0, maj_idx: 0, base_maj: 0, base_majL: 0 }
+        Self {
+            minor: 0,
+            min_idx: 0,
+            maj_idx: 0,
+            base_maj: 0,
+            base_majL: 0,
+        }
     }
 
     #[inline(always)]
@@ -93,19 +99,25 @@ impl<const L: u32, const CL: u32, const VB: u32> StemStrategy for DonnellyFullAr
 impl<const L: u32, const CL: u32, const VB: u32> DonnellyFullArith<L, CL, VB> {
     // Helpers derived from type-level params
     #[inline(always)]
-    const fn items_per_line() -> u32 { CL / VB }
+    const fn items_per_line() -> u32 {
+        CL / VB
+    }
     #[inline(always)]
-    const fn log2_items_per_line() -> u32 { Self::items_per_line().ilog2() }
+    const fn log2_items_per_line() -> u32 {
+        Self::items_per_line().ilog2()
+    }
     #[inline(always)]
-    const fn last_row_start() -> u32 { (1u32 << (L - 1)) - 1 } // 2^(L-1) - 1
+    const fn last_row_start() -> u32 {
+        (1u32 << (L - 1)) - 1
+    } // 2^(L-1) - 1
 
     /// The pure step: returns (result_index, minor_lvl', min_idx', maj_idx', base_maj', base_majL').
     #[inline(always)]
     fn step_pure(
         mut minor_lvl: u32, // 0..L-1
-        mut min_idx:   u32, // index within current minor triangle
-        mut maj_idx:   u32, // which minor triangle (block) we’re in
-        mut base_maj:  u32, // maj_idx << LOG2_ITEMS_PER_LINE
+        mut min_idx: u32,   // index within current minor triangle
+        mut maj_idx: u32,   // which minor triangle (block) we’re in
+        mut base_maj: u32,  // maj_idx << LOG2_ITEMS_PER_LINE
         mut base_majL: u32, // maj_idx << (LOG2_ITEMS_PER_LINE + L)  (kept for invariants)
         is_right: bool,
     ) -> (usize, u32, u32, u32, u32, u32) {
@@ -114,9 +126,9 @@ impl<const L: u32, const CL: u32, const VB: u32> DonnellyFullArith<L, CL, VB> {
         let right = is_right as u32;
 
         // ---- advance minor level and detect boundary ----
-        let t        = minor_lvl.wrapping_add(1);
-        let wrapped  = (t == L) as u32;                 // 1 at boundary, else 0
-        minor_lvl    = t.wrapping_sub(wrapped * L);     // wrap to 0 at boundary
+        let t = minor_lvl.wrapping_add(1);
+        let wrapped = (t == L) as u32; // 1 at boundary, else 0
+        minor_lvl = t.wrapping_sub(wrapped * L); // wrap to 0 at boundary
 
         // ---- candidate inside SAME minor triangle ----
         // child index within current triangle
@@ -130,21 +142,21 @@ impl<const L: u32, const CL: u32, const VB: u32> DonnellyFullArith<L, CL, VB> {
         let child_next = (r << 1).wrapping_add(1).wrapping_add(right);
 
         // next triangle’s base (advance by ITEMS_PER_LINE)
-        let base_step    = wrapped << Self::log2_items_per_line();
+        let base_step = wrapped << Self::log2_items_per_line();
         let base_maj_nxt = base_maj.wrapping_add(base_step);
-        let next         = base_maj_nxt.wrapping_add(child_next);
+        let next = base_maj_nxt.wrapping_add(child_next);
 
         // ---- branchless select between SAME and NEXT ----
-        let m   = 0u32.wrapping_sub(wrapped);           // 0xFFFF_FFFF if wrapped else 0
+        let m = 0u32.wrapping_sub(wrapped); // 0xFFFF_FFFF if wrapped else 0
         let res = ((same & !m) | (next & m)) as usize;
 
         // ---- state update ----
         // min_idx becomes child_same unless we wrapped, then it becomes child_next
-        min_idx   = (child_same & !m) | (child_next & m);
+        min_idx = (child_same & !m) | (child_next & m);
 
         // maj_idx/base increments only on boundary
-        maj_idx   = maj_idx.wrapping_add(wrapped);
-        base_maj  = base_maj_nxt;
+        maj_idx = maj_idx.wrapping_add(wrapped);
+        base_maj = base_maj_nxt;
 
         // keep base_majL consistent (it isn’t used by the step, but you store it in state)
         let base_step_L = wrapped << (Self::log2_items_per_line() + L);
@@ -163,13 +175,13 @@ impl<const L: u32, const CL: u32, const VB: u32> DonnellyFullArith<L, CL, VB> {
             self.base_majL,
             is_right,
         );
-        
+
         self.minor = minor;
         self.min_idx = min_idx;
         self.maj_idx = maj_idx;
         self.base_maj = base_maj;
         self.base_majL = base_majL;
-        
+
         child_idx
     }
 }
@@ -184,9 +196,7 @@ pub fn calc_child_idx(
     base_majL: u32,
     is_right: bool,
 ) -> (usize, u32, u32, u32, u32, u32) {
-    DonnellyFullArith::<3, 64, 4>::step_pure(
-        minor, min_idx, maj_idx, base_maj, base_majL, is_right,
-    )
+    DonnellyFullArith::<3, 64, 4>::step_pure(minor, min_idx, maj_idx, base_maj, base_majL, is_right)
 }
 
 #[cfg(test)]

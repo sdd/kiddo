@@ -1,9 +1,9 @@
 use crate::donnelly_stem_layout::donnelly_get_idx_v2_branchless;
+use crate::stem_strategies::donnelly_4::DonnellyFullArith;
 use crate::traits::Axis;
 use crate::StemStrategy;
 use aligned_vec::AVec;
 use cmov::Cmov;
-use crate::stem_strategies::donnelly_4::DonnellyFullArith;
 
 // x86, f64 (64B lines, 3 levels per block)
 pub type Donnelly3X86F64 = Donnelly<3, 64, 8>;
@@ -141,7 +141,6 @@ impl<const L: u32, const CL: u32, const VB: u32> StemStrategy for Donnelly<L, CL
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
