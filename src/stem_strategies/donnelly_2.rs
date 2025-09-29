@@ -260,4 +260,65 @@ mod tests {
 
         assert_eq!(result, expected);
     }
+
+    #[rstest]
+    #[case(vec![], (1, 2))]
+    #[case(vec![false], (3, 4))] // 1 Maj idx: 1
+    #[case(vec![true], (5, 6))] // 2
+    #[case(vec![false, false], (8, 16))] // 3
+    #[case(vec![false, true], (24, 32))] // 4
+    #[case(vec![true, false], (40, 48))] // 5
+    #[case(vec![true, true], (56, 64))] // 6
+    #[case(vec![false, false, false], (9, 10))] // 7
+    #[case(vec![false, false, true], (17, 18))] // 8
+    #[case(vec![false, true, false], (25, 26))] // 9
+    #[case(vec![false, true, true], (33, 34))] // 10
+    #[case(vec![true, false, false], (41, 42))] // 11
+    #[case(vec![true, false, true], (49, 50))] // 12
+    #[case(vec![true, true, false], (57, 58))] // 13
+    #[case(vec![true, true, true], (65, 66))] // 14
+    #[case(vec![false, false, false, false], (11, 12))] // 15 Maj idx: 2
+    #[case(vec![false, false, false, true], (13, 14))] // 16
+    #[case(vec![false, false, false, false, false], (72, 80))] // 17
+    #[case(vec![false, false, false, false, true], (88, 96))] // 18
+    #[case(vec![false, false, false, true, false], (104, 112))] // 19
+    #[case(vec![false, false, false, true, true], (120, 128))] // 20
+    #[case(vec![false, false, false, false, false, false], (73, 74))] // 21
+    #[case(vec![false, false, false, false, false, true], (81, 82))] // 22
+    #[case(vec![false, false, false, false, true, false], (89, 90))] // 23
+    #[case(vec![false, false, false, false, true, true], (97, 98))] // 24
+    #[case(vec![false, false, false, true, false, false], (105, 106))] // 25
+    #[case(vec![false, false, false, true, false, true], (113, 114))] // 26
+    #[case(vec![false, false, false, true, true, false], (121, 122))] // 27
+    #[case(vec![false, false, false, true, true, true], (129, 130))] // 28
+    #[case(vec![false, false, true, false], (19, 20))] // 29  Maj index: 3
+    #[case(vec![false, false, true, true], (21, 22))] // 30
+    #[case(vec![false, false, true, false, false], (136, 144))] // 31
+    #[case(vec![false, false, true, false, true], (152, 160))] // 32
+    #[case(vec![false, false, true, true, false], (168, 176))] // 33
+    #[case(vec![false, false, true, true, true], (184, 192))] // 34
+    #[case(vec![false, false, true, false, false, false], (137, 138))] // 35
+    #[case(vec![false, false, true, false, false, true], (145, 146))] // 36
+    #[case(vec![false, false, true, false, true, false], (153, 154))] // 37
+    #[case(vec![false, false, true, false, true, true], (161, 162))] // 38
+    #[case(vec![false, false, true, true, false, false], (169, 170))] // 39
+    #[case(vec![false, false, true, true, false, true], (177, 178))] // 40
+    #[case(vec![false, false, true, true, true, false], (185, 186))] // 41
+    #[case(vec![false, false, true, true, true, true], (193, 194))] // 42
+    fn donnelly_v2_get_both_child_idxs_produces_correct_values(
+        #[case] input: Vec<bool>,
+        #[case] expected: (usize, usize),
+    ) {
+        let mut stem_strat = Donnelly::<3, 64, 8>::new_query();
+        let mut curr_idx = 0;
+
+        // let last = input.last().unwrap();
+        input.iter().for_each(|selection| {
+            curr_idx = stem_strat.get_child_idx(*selection, curr_idx);
+        });
+
+        let result = stem_strat.get_both_child_idx(curr_idx);
+
+        assert_eq!(result, expected);
+    }
 }
