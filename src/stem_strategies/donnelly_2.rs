@@ -104,7 +104,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
     //  Instead, we just trim the stems afterwards by traversing right-child non-inf nodes
     //  till we hit max level to get the max used stem
     fn stem_node_padding_factor() -> usize {
-        5
+        50
     }
     fn trim_unneeded_stems<A: Axis>(stems: &mut AVec<A>, max_stem_level: usize) {
         if !stems.is_empty() {
