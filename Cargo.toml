@@ -215,6 +215,16 @@ path = "examples/immutable-large.rs"
 required-features = ["test_utils"]
 
 [[example]]
+name = "immutable-large-ann-donnelly"
+path = "examples/immutable-large-ann-donnelly.rs"
+required-features = ["test_utils"]
+
+[[example]]
+name = "immutable-large-ann-eytzinger"
+path = "examples/immutable-large-ann-eytzinger.rs"
+required-features = ["test_utils"]
+
+[[example]]
 name = "immutable-rkyv_08-serialize"
 path = "examples/immutable-rkyv_08-serialize.rs"
 required-features = ["rkyv_08"]
