@@ -123,13 +123,13 @@ where
     usize: Cast<T>,
 {
     /// Returns the current number of elements stored in the tree
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn size(&self) -> usize {
         self.leaf_items.len()
     }
 
     /// Returns a LeafSlice for a given leaf index
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub(crate) fn get_leaf_slice(&self, leaf_idx: usize) -> LeafSlice<'_, A, T, K> {
         let extents = unsafe { self.leaf_extents.get_unchecked(leaf_idx) };
         let start = Into::<u32>::into(extents.0) as usize;
@@ -178,7 +178,7 @@ where
     /// use kiddo::Eytzinger;
     ///
     /// let points: Vec<[f64; 3]> = vec!([1.0f64, 2.0f64, 3.0f64]);
-    /// let tree: ImmutableKdTree<f64, u32, Eytzinger, 3, 32> = (&*points).into();
+    /// let tree: ImmutableKdTree<f64, u32, Eytzinger<3>, 3, 32> = (&*points).into();
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
@@ -210,11 +210,11 @@ where
     /// use kiddo::Eytzinger;
     ///
     /// let points: Vec<[f64; 3]> = vec!([1.0f64, 2.0f64, 3.0f64]);
-    /// let tree: ImmutableKdTree<f64, u32, Eytzinger, 3, 32> = ImmutableKdTree::new_from_slice(&points);
+    /// let tree: ImmutableKdTree<f64, u32, Eytzinger<3>, 3, 32> = ImmutableKdTree::new_from_slice(&points);
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn new_from_slice(source: &[[A; K]]) -> Self
     where
         usize: Cast<T>,
@@ -247,18 +247,11 @@ where
                 leaf_items.push(sort_index[i].az::<T>())
             });
         } else {
-            let stem_ordering = SO::new_query();
-            let initial_stem_idx = SO::get_initial_idx();
-
             Self::populate_recursive(
                 &mut stems,
-                0,
                 source,
                 &mut sort_index,
-                initial_stem_idx,
-                stem_ordering,
-                0,
-                0,
+                SO::new(),
                 max_stem_level,
                 leaf_node_count * B,
                 &mut leaf_points,
@@ -284,31 +277,24 @@ where
     #[allow(clippy::too_many_arguments)]
     fn populate_recursive(
         stems: &mut AVec<A, ConstAlign<{ CACHELINE_ALIGN }>>,
-        dim: usize,
         source: &[[A; K]],
         sort_index: &mut [usize],
-        stem_index: usize,
         mut stem_ordering: SO,
-        mut level: i32,
-        mut minor_level: u64,
         max_stem_level: i32,
         capacity: usize,
         leaf_points: &mut [Vec<A>; K],
         leaf_items: &mut Vec<T>,
         leaf_extents: &mut Vec<(u32, u32)>,
     ) {
-        use cmov::Cmov;
-
         let chunk_length = sort_index.len();
+        let dim = stem_ordering.dim();
 
-        if level > max_stem_level {
-            let start =
-                u32::try_from(leaf_items.len()).expect("Too many points: index exceeds u32::MAX");
-            let end = u32::try_from(leaf_items.len() + chunk_length)
-                .expect("Too many points: index exceeds u32::MAX");
-
+        if stem_ordering.level() > max_stem_level {
             // Write leaf and terminate recursion
-            leaf_extents.push((start, end));
+            leaf_extents.push((
+                leaf_items.len() as u32,
+                (leaf_items.len() + chunk_length) as u32,
+            ));
 
             (0..chunk_length).for_each(|i| {
                 (0..K).for_each(|dim| leaf_points[dim].push(source[sort_index[i]][dim]));
@@ -318,10 +304,11 @@ where
             return;
         }
 
-        let levels_below = max_stem_level - level;
+        let levels_below = max_stem_level - stem_ordering.level();
         let left_capacity = (2usize.pow(levels_below as u32) * B).min(capacity);
         let right_capacity = capacity.saturating_sub(left_capacity);
 
+        let stem_index = stem_ordering.stem_idx();
         let mut pivot = Self::calc_pivot(chunk_length, stem_index, right_capacity);
 
         // only bother with this if we are putting at least one item in the right hand child
@@ -339,27 +326,14 @@ where
             stems[stem_index] = source[sort_index[pivot]][dim];
         }
 
-        let mut left_stem_ordering = stem_ordering.clone();
-        let left_child_idx = left_stem_ordering.get_child_idx(false, stem_index);
-        let right_child_idx = stem_ordering.get_child_idx(true, stem_index);
-
+        let right_stem_ordering = stem_ordering.branch();
         let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
-
-        level += 1;
-        minor_level += 1;
-        minor_level.cmovnz(&0, u8::from(minor_level == 3));
-
-        let next_dim = (dim + 1) % K;
 
         Self::populate_recursive(
             stems,
-            next_dim,
             source,
             lower_sort_index,
-            left_child_idx,
-            left_stem_ordering,
-            level,
-            minor_level,
+            stem_ordering,
             max_stem_level,
             left_capacity,
             leaf_points,
@@ -369,13 +343,9 @@ where
 
         Self::populate_recursive(
             stems,
-            next_dim,
             source,
             upper_sort_index,
-            right_child_idx,
-            stem_ordering,
-            level,
-            minor_level,
+            right_stem_ordering,
             max_stem_level,
             right_capacity,
             leaf_points,
@@ -385,7 +355,7 @@ where
     }
 
     #[cfg(not(feature = "unreliable_select_nth_unstable"))]
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     fn update_pivot(
         source: &[[A; K]],
         sort_index: &mut [usize],
@@ -422,11 +392,11 @@ where
     /// use kiddo::Eytzinger;
     ///
     /// let points: Vec<[f64; 3]> = vec!([1.0f64, 2.0f64, 3.0f64]);
-    /// let tree: ImmutableKdTree<f64, u32, Eytzinger, 3, 32> = ImmutableKdTree::new_from_slice(&points);
+    /// let tree: ImmutableKdTree<f64, u32, Eytzinger<3>, 3, 32> = ImmutableKdTree::new_from_slice(&points);
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
-    #[inline]
+    #[cfg_attr(not(feature = "no_inline"), inline)]
     pub fn size(&self) -> usize {
         self.leaf_items.len()
     }
@@ -466,7 +436,7 @@ mod tests {
 
     #[test]
     fn can_construct_an_empty_tree() {
-        let tree = ImmutableKdTree::<f64, u32, Eytzinger, 3, 32>::new_from_slice(&[]);
+        let tree = ImmutableKdTree::<f64, u32, Eytzinger<2>, 3, 32>::new_from_slice(&[]);
         let _result = tree.nearest_one::<SquaredEuclidean>(&[0.; 3]);
     }
 
@@ -491,7 +461,7 @@ mod tests {
             [15.0, 115.0],
         ];
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 2, 4> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<2>, 2, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         // assert_eq!(tree.leaf_extents[0].iter().count(), 3);
@@ -524,7 +494,7 @@ mod tests {
             [18.0, 118.0],
         ];
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 2, 4> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<2>, 2, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
@@ -557,7 +527,7 @@ mod tests {
         ];
         content_to_add.shuffle(&mut rng);
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 2, 4> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<2>, 2, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         // assert_eq!(tree.leaves[0].size, 3);
@@ -597,7 +567,7 @@ mod tests {
             ];
             content_to_add.shuffle(&mut rng);
 
-            let _tree: ImmutableKdTree<f32, usize, Eytzinger, 2, 8> =
+            let _tree: ImmutableKdTree<f32, usize, Eytzinger<2>, 2, 8> =
                 ImmutableKdTree::new_from_slice(&content_to_add);
         }
     }
@@ -611,7 +581,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..tree_size).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let tree: ImmutableKdTree<f32, usize, Eytzinger, 4, 4> =
+        let tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         println!("tree: {tree:?}");
@@ -626,7 +596,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..tree_size).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
@@ -639,7 +609,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..tree_size).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
@@ -652,7 +622,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..tree_size).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
@@ -665,7 +635,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..tree_size).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
@@ -678,7 +648,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..tree_size).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
@@ -691,7 +661,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..tree_size).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
@@ -704,7 +674,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..tree_size).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
@@ -717,7 +687,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..tree_size).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
@@ -730,7 +700,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..tree_size).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
@@ -743,7 +713,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..tree_size).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
@@ -756,7 +726,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..tree_size).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
@@ -776,7 +746,7 @@ mod tests {
             }
         }
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 4, 8> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, 8> =
             ImmutableKdTree::new_from_slice(&duped);
     }
 
@@ -799,7 +769,7 @@ mod tests {
 
         println!("dupes: {:?}", TREE_SIZE * 4 - num_uniq);
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 4, 4> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
     }
 
@@ -811,7 +781,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let _tree: ImmutableKdTree<f32, usize, Eytzinger, 4, 32> =
+        let _tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, 32> =
             ImmutableKdTree::new_from_slice(&content_to_add);
     }
 }

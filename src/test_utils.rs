@@ -157,7 +157,7 @@ where
 
     let mut points = Vec::with_capacity(size);
     for _ in 0..size {
-        points.push(rng.gen::<[A; K]>());
+        points.push(rng.random::<[A; K]>());
     }
 
     ImmutableKdTree::<A, T, SO, K, B>::new_from_slice(&points)
@@ -305,7 +305,7 @@ where
 {
     let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
-    (0..points_qty).map(|_| rng.gen::<[A; K]>()).collect()
+    (0..points_qty).map(|_| rng.random::<[A; K]>()).collect()
 }
 
 pub fn build_populated_tree_and_query_points_float<

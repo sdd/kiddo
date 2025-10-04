@@ -1,8 +1,6 @@
-use crate::donnelly_stem_layout::donnelly_get_idx_v2_branchless;
 use crate::traits::Axis;
 use crate::StemStrategy;
 use aligned_vec::AVec;
-use cmov::Cmov;
 
 /// Donnelly Strategy
 ///
@@ -11,16 +9,90 @@ use cmov::Cmov;
 /// - L:     levels per block
 /// - CL:    cache line width in bytes (64 or 128)
 /// - VB:    value width in bytes (4 or 8)
-#[derive(Copy, Clone)]
-pub struct Donnelly<const L: u32, const CL: u32, const VB: u32> {
+#[derive(Copy, Clone, Debug)]
+pub struct Donnelly<const L: u32, const CL: u32, const VB: u32, const K: usize> {
+    stem_idx: u32,
+    dim: usize,
+    level: i32,
     minor_level: u32,
-    curr_idx: u32,
+    leaf_idx: usize,
 }
 
-impl<const L: u32, const CL: u32, const VB: u32> StemStrategy for Donnelly<L, CL, VB> {
-    fn get_initial_idx() -> usize {
-        0
+impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
+    for Donnelly<L, CL, VB, K>
+{
+    #[inline]
+    fn new() -> Self {
+        debug_assert!(L >= 2 && L <= 8);
+        debug_assert!(CL > VB); // item wider than cache line would break layout
+
+        Self {
+            stem_idx: 0,
+            dim: 0,
+            level: 0,
+            minor_level: 0,
+            leaf_idx: 0,
+        }
     }
+
+    #[inline]
+    fn stem_idx(&self) -> usize {
+        self.stem_idx as usize
+    }
+
+    #[inline]
+    fn leaf_idx(&self) -> usize {
+        self.leaf_idx
+    }
+
+    #[inline]
+    fn dim(&self) -> usize {
+        self.dim
+    }
+
+    #[inline]
+    fn level(&self) -> i32 {
+        self.level
+    }
+
+    #[inline]
+    fn traverse(&mut self, is_right: bool) {
+        let (idx, lvl) = Self::step_pure(self.stem_idx, self.minor_level, is_right);
+        self.stem_idx = idx;
+        self.minor_level = lvl;
+
+        self.level = self.level.wrapping_add(1);
+
+        let wrap_dim_mask = 0usize.wrapping_sub((self.dim == (K - 1)) as usize);
+        self.dim = self.dim.wrapping_add(1) & !wrap_dim_mask;
+
+        self.leaf_idx = self.leaf_idx.wrapping_shl(1) | is_right as usize;
+    }
+
+    #[inline]
+    fn branch(&mut self) -> Self {
+        let (left, right) = Self::both_children_pure(self.stem_idx, self.minor_level);
+
+        // mutate self into left
+        self.stem_idx = left;
+        self.minor_level = (self.minor_level + 1)
+            & !(0u32.wrapping_sub((self.minor_level + 1 == Self::log2_items_per_line()) as u32));
+
+        self.level = self.level.wrapping_add(1);
+
+        let wrap_dim_mask = 0usize.wrapping_sub((self.dim == (K - 1)) as usize);
+        self.dim = self.dim.wrapping_add(1) & !wrap_dim_mask;
+
+        self.leaf_idx = self.leaf_idx.wrapping_shl(1);
+
+        // return right child as a new strategy
+        Self {
+            stem_idx: right,
+            leaf_idx: self.leaf_idx | 1,
+            ..*self
+        }
+    }
+
     fn get_stem_node_count_from_leaf_node_count(leaf_node_count: usize) -> usize {
         if leaf_node_count < 2 {
             0
@@ -28,7 +100,6 @@ impl<const L: u32, const CL: u32, const VB: u32> StemStrategy for Donnelly<L, CL
             leaf_node_count.next_power_of_two() - 1
         }
     }
-
     // TODO: It would be nice to be able to determine the exact required length up-front.
     //  Instead, we just trim the stems afterwards by traversing right-child non-inf nodes
     //  till we hit max level to get the max used stem
@@ -37,73 +108,22 @@ impl<const L: u32, const CL: u32, const VB: u32> StemStrategy for Donnelly<L, CL
     }
     fn trim_unneeded_stems<A: Axis>(stems: &mut AVec<A>, max_stem_level: usize) {
         if !stems.is_empty() {
-            let mut level: usize = 0;
-            let mut minor_level: u64 = 0;
-            let mut stem_idx = 0;
+            let mut so = Self::new();
             loop {
-                let val = &stems[stem_idx];
+                let val = &stems[so.stem_idx()];
                 let is_right_child = val.is_finite();
-                stem_idx = donnelly_get_idx_v2_branchless(
-                    stem_idx as u32,
-                    is_right_child,
-                    minor_level as u32,
-                ) as usize;
-                level += 1;
-                minor_level += 1;
-                minor_level.cmovnz(&0, u8::from(minor_level == 3));
-                if level == max_stem_level {
+                so.traverse(is_right_child);
+                if so.level() as usize == max_stem_level {
                     break;
                 }
             }
-            stems.truncate(stem_idx + 1);
-        }
-    }
 
-    fn new_query() -> Self {
-        // L must be in {3, 4, 5,...}. We rely on it being a small constant.
-        debug_assert!(L >= 2 && L <= 8);
-
-        // Won't work if we're using items wider than a cache line
-        debug_assert!(CL > VB);
-
-        Self {
-            minor_level: 0,
-            curr_idx: 0,
-        }
-    }
-
-    fn get_child_idx(&mut self, is_right_child: bool, curr_idx: usize) -> usize {
-        let (curr_idx, minor_level) =
-            Self::step_pure(self.curr_idx, self.minor_level, is_right_child);
-
-        self.minor_level = minor_level;
-        self.curr_idx = curr_idx;
-
-        curr_idx as usize
-    }
-
-    #[inline(always)]
-    fn get_both_child_idx(&mut self, _curr_idx: usize) -> (usize, usize) {
-        let (l, r) = Self::both_children_pure(self.curr_idx, self.minor_level);
-        (l as usize, r as usize)
-    }
-
-    #[inline(always)]
-    fn get_closer_and_further_child_idx(
-        &mut self,
-        curr_idx: usize,
-        is_right_child: bool,
-    ) -> (usize, usize) {
-        let (l, r) = self.get_both_child_idx(curr_idx);
-        if is_right_child {
-            (r, l)
-        } else {
-            (l, r)
+            stems.truncate(so.stem_idx() + 1);
         }
     }
 }
 
-impl<const L: u32, const CL: u32, const VB: u32> Donnelly<L, CL, VB> {
+impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL, VB, K> {
     // ---- layout helpers ----
     #[inline(always)]
     const fn items_per_line() -> u32 {
@@ -123,7 +143,7 @@ impl<const L: u32, const CL: u32, const VB: u32> Donnelly<L, CL, VB> {
     }
 
     #[inline(always)]
-    fn step_pure(mut curr_idx: u32, mut minor_level: u32, is_right_child: bool) -> (u32, u32) {
+    fn step_pure(curr_idx: u32, mut minor_level: u32, is_right_child: bool) -> (u32, u32) {
         debug_assert!(L >= 2 && L <= 8);
         let is_right_child = u32::from(is_right_child);
 
@@ -133,7 +153,7 @@ impl<const L: u32, const CL: u32, const VB: u32> Donnelly<L, CL, VB> {
         // row in current minor triangle
         let min_row_idx = min_idx.wrapping_sub(minor_level).wrapping_sub(1);
 
-        // boolean flag for cmov indicating if we're transitioning to the next minor triangle
+        // boolean flag for cmov indicating if we're         transitioning to the next minor triangle
         let inc_major_level = (minor_level.wrapping_add(1) == Self::log2_items_per_line()) as u32;
         let inc_major_level_mask = 0u32.wrapping_sub(inc_major_level);
 
@@ -147,8 +167,8 @@ impl<const L: u32, const CL: u32, const VB: u32> Donnelly<L, CL, VB> {
             & inc_major_level_mask)
             | (result.wrapping_add(min_idx.wrapping_shl(1)) & !inc_major_level_mask);
 
-        minor_level += 1;
-        minor_level = minor_level & !inc_major_level_mask;
+        minor_level = minor_level.wrapping_add(1);
+        minor_level &= !inc_major_level_mask;
 
         (result, minor_level)
     }
@@ -171,13 +191,13 @@ impl<const L: u32, const CL: u32, const VB: u32> Donnelly<L, CL, VB> {
         let base_no_right = (curr_idx & line_mask_inv).wrapping_add(1);
 
         // same-block left/right
-        let same_left = base_no_right.wrapping_add(min_idx << 1);
+        let same_left = base_no_right.wrapping_add(min_idx.wrapping_shl(1));
         let same_right = same_left.wrapping_add(1);
 
         // next-block left/right (note: add right after shift by L)
-        let next_pre = base_no_right.wrapping_add(min_row_idx << 1);
+        let next_pre = base_no_right.wrapping_add(min_row_idx.wrapping_shl(1));
         let next_left = next_pre.wrapping_shl(l2_items);
-        let next_right = next_left.wrapping_add(1 << l2_items);
+        let next_right = next_left.wrapping_add(1u32.wrapping_shl(l2_items));
 
         // masked select between same/next for both children
         let left = (same_left & !inc_mask) | (next_left & inc_mask);
@@ -190,13 +210,13 @@ impl<const L: u32, const CL: u32, const VB: u32> Donnelly<L, CL, VB> {
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
 pub fn calc_child_idx(curr_idx: u32, minor_index: u32, is_right_child: bool) -> (u32, u32) {
-    Donnelly::<3, 64, 8>::step_pure(curr_idx, minor_index, is_right_child)
+    Donnelly::<3, 64, 8, 3>::step_pure(curr_idx, minor_index, is_right_child)
 }
 
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
 pub fn calc_both_child_idx(curr_idx: u32, minor_index: u32) -> (u32, u32) {
-    Donnelly::<3, 64, 8>::both_children_pure(curr_idx, minor_index)
+    Donnelly::<3, 64, 8, 3>::both_children_pure(curr_idx, minor_index)
 }
 
 #[cfg(test)]
@@ -252,10 +272,11 @@ mod tests {
         #[case] input: Vec<bool>,
         #[case] expected: usize,
     ) {
-        let mut stem_strat = Donnelly::<3, 64, 8>::new_query();
+        let mut stem_strat = Donnelly::<3, 64, 8, 3>::new();
         let mut result = 0;
         input.iter().for_each(|selection| {
-            result = stem_strat.get_child_idx(*selection, result);
+            stem_strat.traverse(*selection);
+            result = stem_strat.stem_idx();
         });
 
         assert_eq!(result, expected);
@@ -309,15 +330,16 @@ mod tests {
         #[case] input: Vec<bool>,
         #[case] expected: (usize, usize),
     ) {
-        let mut stem_strat = Donnelly::<3, 64, 8>::new_query();
-        let mut curr_idx = 0;
+        let mut stem_strat = Donnelly::<3, 64, 8, 3>::new();
+        // let mut stem_strat = Donnelly::<3, 64, 4, 4>::new();
 
         // let last = input.last().unwrap();
         input.iter().for_each(|selection| {
-            curr_idx = stem_strat.get_child_idx(*selection, curr_idx);
+            stem_strat.branch_relative(*selection);
         });
 
-        let result = stem_strat.get_both_child_idx(curr_idx);
+        let results = stem_strat.split();
+        let result = (results.0.stem_idx(), results.1.stem_idx());
 
         assert_eq!(result, expected);
     }

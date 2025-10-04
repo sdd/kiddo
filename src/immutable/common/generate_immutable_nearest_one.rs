@@ -4,7 +4,8 @@ macro_rules! generate_immutable_nearest_one {
     ($comments:tt) => {
         doc_comment! {
             concat!$comments,
-            #[cfg_attr(not(feature = "no_inline"), inline)]
+            // #[cfg_attr(not(feature = "no_inline"), inline)]
+            #[inline(never)]
             pub fn nearest_one<D>(&self, query: &[A; K]) -> NearestNeighbour<A, T>
                 where
                     D: DistanceMetric<A, K>,
@@ -20,102 +21,75 @@ macro_rules! generate_immutable_nearest_one {
                     return result;
                 }
 
-                let stem_ordering = SO::new_query();
-                let initial_stem_idx: usize = SO::get_initial_idx();
+                // Add a marker for LLVM-MCA to mark the start of the block we want to analyze
+                unsafe {
+                    core::arch::asm!("# LLVM-MCA-BEGIN");
+                }
 
                 self.nearest_one_recurse::<D>(
                     query,
-                    initial_stem_idx,
-                    stem_ordering,
-                    0,
+                    SO::new(),
                     &mut result,
                     &mut off,
                     A::zero(),
-                    0,
-                    0,
-                    0,
                 );
+
+                // LLVM-MCA end marker
+                unsafe {
+                     core::arch::asm!("# LLVM-MCA-END");
+                }
 
                 result
             }
 
-            #[allow(clippy::too_many_arguments)]
-            #[cfg_attr(not(feature = "no_inline"), inline)]
-            fn nearest_one_recurse<D>(
+            // #[cfg_attr(not(feature = "no_inline"), inline)]
+            // #[inline(never)]
+            pub fn nearest_one_recurse<D>(
                 &self,
                 query: &[A; K],
-                stem_idx: usize,
                 mut stem_ordering: SO,
-                split_dim: u64,
                 nearest: &mut NearestNeighbour<A, T>,
                 off: &mut [A; K],
                 rd: A,
-                mut level: i32,
-                mut minor_level: u32,
-                mut leaf_idx: u32,
             )
                 where
                     D: DistanceMetric<A, K>,
             {
-                use cmov::Cmov;
-
-                if level > Into::<i32>::into(self.max_stem_level) || self.stems.is_empty() {
-                    self.search_leaf_for_nearest_one::<D>(query, nearest, leaf_idx as usize);
+                if stem_ordering.level() > Into::<i32>::into(self.max_stem_level) || self.stems.is_empty() {
+                    self.search_leaf_for_nearest_one::<D>(query, nearest, stem_ordering.leaf_idx());
                     return;
                 }
 
-                let val = *unsafe { self.stems.get_unchecked(stem_idx) };
-                let is_right_child: bool = *unsafe { query.get_unchecked(split_dim as usize) } >= val;
+                let dim = stem_ordering.dim();
+                let val = *unsafe { self.stems.get_unchecked(stem_ordering.stem_idx()) };
+                let is_right_child = *unsafe { query.get_unchecked(dim) } >= val;
 
-                let (closer_node_idx, further_node_idx) = stem_ordering.get_closer_and_further_child_idx(stem_idx, is_right_child);
-
-                leaf_idx <<= 1;
-                let is_right_child = u32::from(is_right_child);
-                let closer_leaf_idx = leaf_idx + is_right_child;
-                let farther_leaf_idx = leaf_idx + (1 - is_right_child);
-
+                let farther_so = stem_ordering.branch_relative(is_right_child);
 
                 let mut rd = rd;
-                let old_off = off[split_dim as usize];
-                let new_off = query[split_dim as usize].saturating_dist(val);
-
-                level += 1;
-                minor_level += 1;
-                minor_level.cmovnz(&0, u8::from(minor_level == 3));
-
-                let mut next_split_dim = split_dim + 1;
-                next_split_dim.cmovnz(&0, u8::from(next_split_dim == K as u64));
+                let old_off = off[dim];
+                let new_off = query[dim].saturating_dist(val);
 
                 self.nearest_one_recurse::<D>(
                     query,
-                    closer_node_idx,
-                    stem_ordering.clone(),
-                    next_split_dim,
+                    stem_ordering,
                     nearest,
                     off,
                     rd,
-                    level,
-                    minor_level,
-                    closer_leaf_idx,
                 );
 
                 rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
 
                 if rd <= nearest.distance {
-                    off[split_dim as usize] = new_off;
+                    off[dim] = new_off;
                     self.nearest_one_recurse::<D>(
                         query,
-                        further_node_idx,
-                        stem_ordering,
-                        next_split_dim,
+                        farther_so,
                         nearest,
                         off,
                         rd,
-                        level,
-                        minor_level,
-                        farther_leaf_idx,
                     );
-                    off[split_dim as usize] = old_off;
+                    off[dim] = old_off;
                 }
             }
 

@@ -2,7 +2,6 @@ use az::Cast;
 use sorted_vec::SortedVec;
 use std::collections::BinaryHeap;
 use std::num::NonZero;
-use std::ops::Rem;
 
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
@@ -116,7 +115,7 @@ mod tests {
             [0.11f32, 0.2f32, 0.11f32, 0.2f32],
         ];
 
-        let tree: ImmutableKdTree<AX, u32, Eytzinger, 4, 4> =
+        let tree: ImmutableKdTree<AX, u32, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), 16);
@@ -174,7 +173,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..TREE_SIZE).map(|_| rand::random::<[f32; 4]>()).collect();
 
-        let tree: ImmutableKdTree<AX, u32, Eytzinger, 4, 32> =
+        let tree: ImmutableKdTree<AX, u32, Eytzinger<4>, 4, 32> =
             ImmutableKdTree::new_from_slice(&content_to_add);
         assert_eq!(tree.size(), TREE_SIZE);
 

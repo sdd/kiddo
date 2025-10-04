@@ -110,7 +110,7 @@ mod tests {
             [0.11f32, 0.2f32, 0.11f32, 0.2f32],
         ];
 
-        let tree: ImmutableKdTree<f32, u32, Eytzinger, 4, 4> =
+        let tree: ImmutableKdTree<f32, u32, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), 16);
@@ -160,7 +160,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..TREE_SIZE).map(|_| rand::random::<[f32; 4]>()).collect();
 
-        let tree: ImmutableKdTree<f32, u32, Eytzinger, 4, 32> =
+        let tree: ImmutableKdTree<f32, u32, Eytzinger<4>, 4, 32> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), TREE_SIZE);
@@ -203,7 +203,7 @@ mod tests {
             [0.11f64, 0.2f64, 0.11f64, 0.2f64],
         ];
 
-        let tree: ImmutableKdTree<f64, u32, Eytzinger, 4, 4> =
+        let tree: ImmutableKdTree<f64, u32, Eytzinger<4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), 16);
@@ -256,7 +256,7 @@ mod tests {
         let content_to_add: Vec<[f64; 4]> =
             (0..TREE_SIZE).map(|_| rand::random::<[f64; 4]>()).collect();
 
-        let tree: ImmutableKdTree<f64, u32, Eytzinger, 4, 32> =
+        let tree: ImmutableKdTree<f64, u32, Eytzinger<4>, 4, 32> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), TREE_SIZE);

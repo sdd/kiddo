@@ -16,6 +16,7 @@ resolver = "2"
 all-features = true
 
 [features]
+cargo_asm = ["dep:rand", "dep:rand_chacha"]
 csv = ["dep:csv"]
 default = ["tracing", "fixed"]
 modified_van_emde_boas = []
@@ -123,7 +124,7 @@ optional = true
 [dev-dependencies]
 bincode = { version = "2", features = ["serde"] }
 codspeed-criterion-compat = "2.10"
-criterion = "0.6"
+criterion = "0.7"
 elapsed = "0.1.2"
 flate2 = { version = "1", features = ["zlib-ng-compat"], default-features = false }
 itertools = "0.14"

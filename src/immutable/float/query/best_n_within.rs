@@ -1,7 +1,6 @@
 use az::Cast;
 use std::collections::BinaryHeap;
 use std::num::NonZero;
-use std::ops::Rem;
 
 use crate::best_neighbour::BestNeighbour;
 use crate::immutable::float::kdtree::ImmutableKdTree;
@@ -97,7 +96,7 @@ mod tests {
     #[test]
     fn can_query_single_bucket_tree() {
         let content: Vec<[AX; 3]> = vec![[1.0, 2.0, 5.0], [2.0, 3.0, 6.0]];
-        let tree: ImmutableKdTree<AX, i32, Eytzinger, 3, 32> =
+        let tree: ImmutableKdTree<AX, i32, Eytzinger<3>, 3, 32> =
             ImmutableKdTree::new_from_slice(&content);
 
         let mut best_n_within = tree.best_n_within::<SquaredEuclidean>(
@@ -137,7 +136,7 @@ mod tests {
             [11f64, -200f64],
         ];
 
-        let tree: ImmutableKdTree<AX, i32, Eytzinger, 2, 4> =
+        let tree: ImmutableKdTree<AX, i32, Eytzinger<2>, 2, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), 16);
@@ -193,7 +192,7 @@ mod tests {
         let content_to_add: Vec<[AX; 2]> =
             (0..TREE_SIZE).map(|_| rand::random::<[AX; 2]>()).collect();
 
-        let tree: ImmutableKdTree<AX, i32, Eytzinger, 2, 32> =
+        let tree: ImmutableKdTree<AX, i32, Eytzinger<2>, 2, 32> =
             ImmutableKdTree::new_from_slice(&content_to_add);
         assert_eq!(tree.size(), TREE_SIZE);
 

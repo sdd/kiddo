@@ -170,32 +170,69 @@ pub trait DistanceMetricFixed<A, const K: usize, R = A> {
 /// Trait that needs to be implemented by any potential stem ordering
 /// algorithm used by a KdTree.
 pub trait StemStrategy: Clone + Sync + Send {
-    /// Create a new instance of this StemOrdering struct for a new query
-    fn new_query() -> Self;
+    /// Create a new instance of this strategy at the root.
+    fn new() -> Self;
 
-    /// Get the index of the child node based on the current node index and whether the next node is the right or left child
-    fn get_child_idx(&mut self, is_right_child: bool, curr_idx: usize) -> usize;
+    /// Get the current stem index this strategy points to.
+    fn stem_idx(&self) -> usize;
 
-    /// get the indices of both child nodes
-    fn get_both_child_idx(&mut self, curr_idx: usize) -> (usize, usize);
+    /// Get the current leaf index this strategy points to.
+    fn leaf_idx(&self) -> usize;
 
-    /// get the indices of the closer and further child nodes
-    fn get_closer_and_further_child_idx(
-        &mut self,
-        curr_idx: usize,
-        is_right_child: bool,
-    ) -> (usize, usize);
+    /// Get the current dimension
+    fn dim(&self) -> usize;
 
-    /// get the index of the root node under this ordering scheme
-    fn get_initial_idx() -> usize;
+    /// Get the current level
+    fn level(&self) -> i32;
 
-    /// calculate the stem node count for a given leaf node count
+    /// Advance `self` down to a child in-place.
+    fn traverse(&mut self, is_right: bool);
+
+    /// Advance `self` down to one child, returning the other.
+    /// - `self` mutates into the left child
+    /// - return value is the right child
+    fn branch(&mut self) -> Self;
+
+    /// Advance `self` to the "closer" child, returning the "further" one.
+    fn branch_relative(&mut self, is_right: bool) -> Self {
+        if is_right {
+            let mut right = self.branch();
+            std::mem::swap(self, &mut right);
+            right
+        } else {
+            self.branch()
+        }
+    }
+
+    /// Split `self` into two independent child strategies (left, right).
+    fn split(mut self) -> (Self, Self)
+    where
+        Self: Sized,
+    {
+        let right = self.branch();
+        (self, right)
+    }
+
+    /// Split `self` into (closer, further) given a direction.
+    fn split_relative(self, is_right: bool) -> (Self, Self)
+    where
+        Self: Sized,
+    {
+        let (l, r) = self.split();
+        if is_right {
+            (r, l)
+        } else {
+            (l, r)
+        }
+    }
+
+    /// Calculate the stem node count for a given leaf node count.
     fn get_stem_node_count_from_leaf_node_count(leaf_node_count: usize) -> usize;
 
-    // TODO: remove need for these by smarter construction
-    /// factor by which to pad the stem node allocation
+    /// Factor by which to pad the stem node allocation.
     fn stem_node_padding_factor() -> usize;
-    /// trim unneeded stem nodes
+
+    /// Trim unneeded stem nodes.
     fn trim_unneeded_stems<A: Axis>(stems: &mut AVec<A>, max_stem_level: usize);
 }
 

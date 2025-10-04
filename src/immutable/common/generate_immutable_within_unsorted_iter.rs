@@ -13,21 +13,15 @@ macro_rules! generate_immutable_within_unsorted_iter {
                 D: DistanceMetric<A, K>,
             {
                 let mut off = [A::zero(); K];
-                let mut stem_ordering = SO::new_query();
-                let mut initial_stem_idx: usize = SO::get_initial_idx();
 
                 let gen = Gn::new_scoped(move |gen_scope| {
                     self.within_unsorted_iter_recurse::<D>(
                         query,
                         dist,
-                        initial_stem_idx,
-                        stem_ordering,
-                        0,
+                        SO::new_query(),
                         gen_scope,
                         &mut off,
                         A::zero(),
-                        0,
-                        0,
                     );
 
                     done!();
@@ -41,69 +35,47 @@ macro_rules! generate_immutable_within_unsorted_iter {
                 &'a self,
                 query: &[A; K],
                 radius: A,
-                stem_idx: usize,
                 mut stem_ordering: SO,
-                split_dim: usize,
                 mut gen_scope: Scope<'scope, 'a, (), NearestNeighbour<A, T>>,
                 off: &mut [A; K],
                 rd: A,
-                mut level: usize,
-                mut leaf_idx: usize,
             ) -> Scope<'scope, 'a, (), NearestNeighbour<A, T>>
             where
                 D: DistanceMetric<A, K>,
             {
-                use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
+                if stem_ordering.level() <= self.max_stem_level as usize {
+                    let dim = stem_ordering.dim();
+                    let val = *unsafe { self.stems.get_unchecked(stem_ordering.stem_idx()) };
+                    let is_right_child: bool = *unsafe { query.get_unchecked(dim) } >= val;
 
-                if level <= self.max_stem_level as usize {
-                    let val = *unsafe { self.stems.get_unchecked(stem_idx as usize) };
-                    let is_right_child = usize::from(*unsafe { query.get_unchecked(split_dim as usize) } >= val);
-
-                    leaf_idx <<= 1;
-                    let closer_leaf_idx = leaf_idx + is_right_child;
-                    let further_leaf_idx = leaf_idx + (1 - is_right_child);
-
-                    let (closer_node_idx, further_node_idx) = stem_ordering.get_closer_and_further_child_idx(stem_idx, is_right_child);
+                    let farther_so = stem_ordering.branch_relative(is_right_child);
 
                     let mut rd = rd;
-                    let old_off = off[split_dim];
-                    let new_off = query[split_dim].saturating_dist(val);
-
-                    level += 1;
-                    let next_split_dim = (split_dim + 1).rem(K);
-                    // minor_level += 1;
-                    // minor_level.cmovnz(&0, u8::from(minor_level == 3));
+                    let old_off = off[dim];
+                    let new_off = query[dim].saturating_dist(val);
 
                     gen_scope = self.within_unsorted_iter_recurse::<D>(
                         query,
                         radius,
-                        closer_node_idx,
-                        stem_ordering.clone(),       
-                        next_split_dim,
+                        stem_ordering,       
                         gen_scope,
                         off,
                         rd,
-                        level,
-                        closer_leaf_idx,
                     );
 
                     rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
 
                     if rd <= radius {
-                        off[split_dim] = new_off;
+                        off[dim] = new_off;
                         gen_scope = self.within_unsorted_iter_recurse::<D>(
                             query,
                             radius,
-                            further_node_idx,
-                            stem_ordering,       
-                            next_split_dim,
+                            farther_so,       
                             gen_scope,
                             off,
                             rd,
-                            level,
-                            further_leaf_idx,
                         );
-                        off[split_dim] = old_off;
+                        off[dim] = old_off;
                     }
                 } else {
                     let leaf_slice = self.get_leaf_slice(leaf_idx);

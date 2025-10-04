@@ -6,7 +6,7 @@ use criterion::{
 use kiddo::distance::float::SquaredEuclidean;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
-use kiddo::stem_strategies::donnelly_4::DonnellyFullArith;
+// use kiddo::stem_strategies::donnelly_4::DonnellyFullArith;
 use kiddo::stem_strategies::Donnelly;
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_immutable_float, process_queries_immutable_float,
@@ -22,26 +22,26 @@ const L: u32 = 4;
 
 macro_rules! bench_float_all {
     ($group:ident, $a:ty, $t:ty, $k:tt, $idx:tt, $size:tt, $subtype:expr) => {{
-        bench_query_nearest_one::<$a, $t, Eytzinger, $k>(
-            &mut $group,
-            $size,
-            QUERY_POINTS_PER_LOOP,
-            &format!("Eytzinger/{}", $subtype),
-        );
+        // bench_query_nearest_one::<$a, $t, Eytzinger<$k>, $k>(
+        //     &mut $group,
+        //     $size,
+        //     QUERY_POINTS_PER_LOOP,
+        //     &format!("Eytzinger/{}", $subtype),
+        // );
 
-        bench_query_nearest_one::<$a, $t, Donnelly<L, 64, 4>, $k>(
+        bench_query_nearest_one::<$a, $t, Donnelly<L, 64, 4, $k>, $k>(
             &mut $group,
             $size,
             QUERY_POINTS_PER_LOOP,
             &format!("DonnellyOrig/{}", $subtype),
         );
 
-        bench_query_nearest_one::<$a, $t, DonnellyFullArith<L, 64, 4>, $k>(
-            &mut $group,
-            $size,
-            QUERY_POINTS_PER_LOOP,
-            &format!("DonnellyFullArith/{}", $subtype),
-        );
+        // bench_query_nearest_one::<$a, $t, DonnellyFullArith<L, 64, 4>, $k>(
+        //     &mut $group,
+        //     $size,
+        //     QUERY_POINTS_PER_LOOP,
+        //     &format!("DonnellyFullArith/{}", $subtype),
+        // );
     }};
 }
 

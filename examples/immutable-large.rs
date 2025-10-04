@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let start = Instant::now();
     println!("Building an optimized tree of {TREE_SIZE:?} items...");
-    let tree: ImmutableKdTree<f64, usize, Eytzinger, 4, 32> =
+    let tree: ImmutableKdTree<f64, usize, Eytzinger<4>, 4, 32> =
         ImmutableKdTree::new_from_slice(&content_to_add);
     println!(
         "Construction complete. ({})",

@@ -116,7 +116,7 @@ pub use traits::StemStrategy;
 pub mod within_unsorted_iter;
 
 pub mod distance;
-pub mod donnelly_stem_layout;
+mod donnelly_stem_layout;
 mod rkyv_utils;
 
 /// A floating-point k-d tree with default parameters.
@@ -136,7 +136,7 @@ pub type KdTree<A, const K: usize> = mutable::float::kdtree::KdTree<A, u64, K, 3
 /// To manually specify more advanced parameters, use [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) directly.
 /// To store positions using integer or fixed-point types, use [`mutable::fixed::kdtree::KdTree`].
 pub type ImmutableKdTree<A, const K: usize> =
-    immutable::float::kdtree::ImmutableKdTree<A, u64, Eytzinger, K, 32>;
+    immutable::float::kdtree::ImmutableKdTree<A, u64, Eytzinger<K>, K, 32>;
 
 pub use best_neighbour::BestNeighbour;
 pub use distance::float::Manhattan;

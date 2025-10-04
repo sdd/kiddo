@@ -80,7 +80,7 @@ mod tests {
     use crate::distance::float::Manhattan;
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use crate::nearest_neighbour::NearestNeighbour;
-    use crate::Eytzinger;
+    use crate::stem_strategies::{Donnelly, Eytzinger};
 
     type AX = f32;
 
@@ -105,7 +105,7 @@ mod tests {
             [0.11f32, 0.2f32, 0.11f32, 0.2f32],
         ];
 
-        let tree: ImmutableKdTree<AX, u32, Eytzinger, 4, 4> =
+        let tree: ImmutableKdTree<AX, u32, Donnelly<4, 64, 4, 4>, 4, 4> =
             ImmutableKdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), 16);

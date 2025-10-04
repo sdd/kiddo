@@ -10,32 +10,20 @@ macro_rules! generate_immutable_approx_nearest_one {
                 D: DistanceMetric<A, K>,
                 usize: Cast<T>,
             {
-                let mut stem_ordering = SO::new_query();
-                let mut curr_idx: usize = SO::get_initial_idx();
-
-                let mut dim: usize = 0;
+                let mut stem_ordering = SO::new();
                 let mut best_item = T::default();
                 let mut best_dist = A::max_value();
-                let mut level: i32 = 0;
-                let mut leaf_idx: usize = 0;
 
-                while level <= Into::<i32>::into(self.max_stem_level) {
-                    let val = *unsafe { self.stems.get_unchecked(curr_idx) };
-                    let is_right_child = *unsafe { query.get_unchecked(dim) } >= val;
-
-                    curr_idx = stem_ordering.get_child_idx(is_right_child, curr_idx);
-
-                    let is_right_child = usize::from(is_right_child);
-                    leaf_idx = (leaf_idx << 1) + is_right_child;
-
-                    level += 1;
-                    dim = (dim + 1) % K;
+                while stem_ordering.level() <= Into::<i32>::into(self.max_stem_level) {
+                    let val = *unsafe { self.stems.get_unchecked(stem_ordering.stem_idx()) };
+                    let is_right_child = *unsafe { query.get_unchecked(stem_ordering.dim()) } >= val;
+                    stem_ordering.traverse(is_right_child);
                 }
 
                 #[cfg(feature = "rkyv_08")]
                 #[allow(clippy::missing_transmute_annotations)]
                 let leaf_slice = {
-                    let leaf_extent = unsafe { self.leaf_extents.get_unchecked(leaf_idx) };
+                    let leaf_extent = unsafe { self.leaf_extents.get_unchecked(stem_ordering.leaf_idx()) };
                     let start = Into::<u32>::into(leaf_extent.0);
                     let end = Into::<u32>::into(leaf_extent.1);
 
@@ -53,7 +41,7 @@ macro_rules! generate_immutable_approx_nearest_one {
 
                 #[cfg(not(feature = "rkyv_08"))]
                 let leaf_slice = {
-                    let (start, end) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
+                    let (start, end) = unsafe { *self.leaf_extents.get_unchecked(stem_ordering.leaf_idx()) };
 
                     $crate::leaf_slice::float::LeafSlice::new(
                         array_init::array_init(|i|
