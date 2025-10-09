@@ -11,7 +11,8 @@ macro_rules! generate_immutable_approx_nearest_one {
                 D: DistanceMetric<A, K>,
                 usize: Cast<T>,
             {
-                let mut stem_ordering = SO::new();
+                let stems_ptr = std::ptr::NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
+                let mut stem_ordering = SO::new(stems_ptr);
                 let mut best_item = T::default();
                 let mut best_dist = A::max_value();
 

@@ -91,7 +91,6 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for DotProduct {
     }
 
     #[cfg_attr(not(feature = "no_inline"), inline)]
-    #[cfg_attr(feature = "no_inline", inline(Never))]
     fn dist1(a: A, b: A) -> A {
         a * b
     }

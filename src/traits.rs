@@ -7,6 +7,7 @@ use fixed::traits::Fixed;
 use num_traits::float::FloatCore;
 use num_traits::{PrimInt, Unsigned, Zero};
 use std::fmt::Debug;
+use std::ptr::NonNull;
 
 /// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
@@ -171,7 +172,7 @@ pub trait DistanceMetricFixed<A, const K: usize, R = A> {
 /// algorithm used by a KdTree.
 pub trait StemStrategy: Clone + Sync + Send {
     /// Create a new instance of this strategy at the root.
-    fn new() -> Self;
+    fn new(stems_ptr: NonNull<u8>) -> Self;
 
     /// Get the current stem index this strategy points to.
     fn stem_idx(&self) -> usize;

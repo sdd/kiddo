@@ -1,3 +1,4 @@
+use std::ptr::NonNull;
 use aligned_vec::AVec;
 
 use crate::StemStrategy;
@@ -11,7 +12,7 @@ pub struct Eytzinger<const K: usize> {
 }
 
 impl<const K: usize> StemStrategy for Eytzinger<K> {
-    fn new() -> Self {
+    fn new(_stems_ptr: NonNull<u8>) -> Self {
         Self {
             stem_idx: 1,
             dim: 0,

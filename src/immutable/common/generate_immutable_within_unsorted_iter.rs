@@ -14,12 +14,14 @@ macro_rules! generate_immutable_within_unsorted_iter {
                 D: DistanceMetric<A, K>,
             {
                 let mut off = [A::zero(); K];
+                let stems_ptr = std::ptr::NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
+                let stem_ordering = SO::new(stems_ptr);
 
                 let gen = Gn::new_scoped(move |gen_scope| {
                     self.within_unsorted_iter_recurse::<D>(
                         query,
                         dist,
-                        SO::new_query(),
+                        stem_ordering,
                         gen_scope,
                         &mut off,
                         A::zero(),

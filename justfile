@@ -27,21 +27,27 @@ asm-m4:
     @echo "Search for 'donnelly_get_idx_v2' in the file to find the function"
 
 build:
-    cargo build --release --example cg_donnelly --example cg_eytzinger
+    RUSTFLAGS="-C target-cpu=znver3 -C opt-level=3" cargo build --release --example immutable-large-ann-donnelly --example immutable-large-ann-eytzinger
 
 cg-donnelly: build
-    valgrind --tool=cachegrind --branch-sim=yes \
+    valgrind --tool=cachegrind --branch-sim=yes --cache-sim=yes \
              --cachegrind-out-file=cachegrind.out.donnelly \
-             target/release/cg_donnelly
+             target/release/examples/immutable-large-ann-donnelly
     cg_annotate cachegrind.out.donnelly > cachegrind.annot.donnelly
 
 cg-eytzinger: build
-    valgrind --tool=cachegrind --branch-sim=yes \
+    valgrind --tool=cachegrind --branch-sim=yes --cache-sim=yes \
              --cachegrind-out-file=cachegrind.out.eytzinger \
-             target/release/cg_eytzinger
+             target/release/examples/immutable-large-ann-eytzinger
     cg_annotate cachegrind.out.eytzinger > cachegrind.annot.eytzinger
 
 cg-diff: cg-donnelly cg-eytzinger
     cg_diff cachegrind.out.donnelly cachegrind.out.eytzinger \
       | cg_annotate > cachegrind.diff.txt
     @echo "Diff written to cachegrind.diff.txt"
+
+perf-donnelly:
+    perf stat -e cycles,instructions,L1-dcache-load-misses,LLC-load-misses,branch-misses ./target/release/examples/immutable-large-ann-donnelly
+
+perf-eytzinger:
+    perf stat -e cycles,instructions,L1-dcache-load-misses,LLC-load-misses,branch-misses ./target/release/examples/immutable-large-ann-eytzinger

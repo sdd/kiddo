@@ -21,6 +21,9 @@ macro_rules! generate_immutable_nearest_one {
                     return result;
                 }
 
+                let stems_ptr = std::ptr::NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
+                let stem_ordering = SO::new(stems_ptr);
+
                 // Add a marker for LLVM-MCA to mark the start of the block we want to analyze
                 unsafe {
                     core::arch::asm!("# LLVM-MCA-BEGIN");
@@ -28,7 +31,7 @@ macro_rules! generate_immutable_nearest_one {
 
                 self.nearest_one_recurse::<D>(
                     query,
-                    SO::new(),
+                    stem_ordering,
                     &mut result,
                     &mut off,
                     A::zero(),
@@ -43,7 +46,7 @@ macro_rules! generate_immutable_nearest_one {
             }
 
             // #[cfg_attr(not(feature = "no_inline"), inline)]
-            // #[inline(never)]
+            #[inline(never)]
             pub fn nearest_one_recurse<D>(
                 &self,
                 query: &[A; K],
@@ -93,7 +96,8 @@ macro_rules! generate_immutable_nearest_one {
                 }
             }
 
-            #[cfg_attr(not(feature = "no_inline"), inline)]
+            // #[cfg_attr(not(feature = "no_inline"), inline)]
+            #[inline(never)]
             fn search_leaf_for_nearest_one<D>(
                 &self,
                 query: &[A; K],

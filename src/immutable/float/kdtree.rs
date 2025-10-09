@@ -39,6 +39,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "rkyv_08")]
 use std::fmt::Formatter;
 use std::{cmp::PartialEq, fmt::Debug};
+use std::ptr::NonNull;
 
 /// Immutable floating point k-d tree
 ///
@@ -235,6 +236,7 @@ where
         let mut leaf_points: [Vec<A>; K] = array_init(|_| Vec::with_capacity(item_count));
         let mut leaf_items: Vec<T> = Vec::with_capacity(item_count);
         let mut leaf_extents: Vec<(u32, u32)> = Vec::with_capacity(item_count.div_ceil(B));
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
 
         let mut sort_index = Vec::from_iter(0..item_count);
 
@@ -251,7 +253,7 @@ where
                 &mut stems,
                 source,
                 &mut sort_index,
-                SO::new(),
+                SO::new(stems_ptr),
                 max_stem_level,
                 leaf_node_count * B,
                 &mut leaf_points,

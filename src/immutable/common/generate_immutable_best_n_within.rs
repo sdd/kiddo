@@ -19,11 +19,14 @@ macro_rules! generate_immutable_best_n_within {
                 let mut off = [A::zero(); K];
                 let mut best_items: BinaryHeap<BestNeighbour<A, T>> = BinaryHeap::with_capacity(max_qty.into());
 
+                let stems_ptr = std::ptr::NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
+                let stem_ordering = SO::new(stems_ptr);
+                
                 self.best_n_within_recurse::<D>(
                     query,
                     dist,
                     max_qty.into(),
-                    SO::new(),
+                    stem_ordering,
                     &mut best_items,
                     &mut off,
                     A::zero(),

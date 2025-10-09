@@ -25,6 +25,7 @@ macro_rules! bench_float_all {
             $size,
             QUERY_POINTS_PER_LOOP,
             &format!("Eytzinger/{}", $subtype),
+            if $size > 1_000_000 { 20 } else { 100 },
         );
 
         bench_query_approx_nearest_one::<$a, $t, Donnelly<4, 64, 4, $k>, $k>(
@@ -32,6 +33,7 @@ macro_rules! bench_float_all {
             $size,
             QUERY_POINTS_PER_LOOP,
             &format!("Donnelly/{}", $subtype),
+            if $size > 1_000_000 { 20 } else { 100 },
         );
     }};
 }
@@ -64,7 +66,6 @@ pub fn nearest_one_all_stems(c: &mut Criterion) {
             (2_097_152, u32, usize),
             (4_194_304, u32, usize),
             (8_388_608, u32, usize),
-            (16_777_216, u32, usize),
             (16_777_216, u32, usize)
         ]
     );
@@ -77,6 +78,7 @@ fn bench_query_approx_nearest_one<A, T, Stem, const K: usize>(
     initial_size: usize,
     query_point_qty: usize,
     label: &str,
+    sample_size: usize,
 ) where
     A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + 'static,
     T: Content + 'static,
@@ -85,6 +87,8 @@ fn bench_query_approx_nearest_one<A, T, Stem, const K: usize>(
     StandardUniform: Distribution<T>,
     StandardUniform: Distribution<[A; K]>,
 {
+    group.sample_size(sample_size); // Reduced from default 100
+
     group.bench_with_input(
         BenchmarkId::new(label, initial_size),
         &initial_size,

@@ -81,37 +81,11 @@ where
 pub mod cargo_asm {
     use crate::distance::float::SquaredEuclidean;
     use crate::immutable::float::kdtree::ImmutableKdTree;
-    use crate::stem_strategies::{Donnelly, Eytzinger};
+    use crate::stem_strategies::*;
     use rand::{Rng, SeedableRng};
 
     /// hook for cargo-asm to render a nearest-one call
-    pub fn nearest_one_donnelly() {
-        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(3);
-
-        const TREE_SIZE: usize = 100_000;
-        const NUM_QUERIES: usize = 1000;
-
-        let content_to_add: Vec<[f32; 4]> =
-            (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
-
-        let tree: ImmutableKdTree<f32, u32, Donnelly<5, 128, 4, 4>, 4, 32> =
-            ImmutableKdTree::new_from_slice(&content_to_add);
-
-        assert_eq!(tree.size(), TREE_SIZE);
-
-        let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)
-            .map(|_| rand::random::<[f32; 4]>())
-            .collect();
-
-        for (i, query_point) in query_points.iter().enumerate() {
-            println!("query #{i:?}");
-            let result = tree.nearest_one::<SquaredEuclidean>(query_point);
-            println!("Result: #{i:?}: {result:?}");
-        }
-    }
-
-    // /// hook for cargo-asm to render a nearest-one call
-    // pub fn nearest_one_eytzinger() {
+    // pub fn nearest_one_donnelly() {
     //     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(3);
     //
     //     const TREE_SIZE: usize = 100_000;
@@ -120,7 +94,7 @@ pub mod cargo_asm {
     //     let content_to_add: Vec<[f32; 4]> =
     //         (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
     //
-    //     let tree: ImmutableKdTree<f32, u32, Eytzinger<4>, 4, 32> =
+    //     let tree: ImmutableKdTree<f32, u32, Donnelly<5, 128, 4, 4>, 4, 32> =
     //         ImmutableKdTree::new_from_slice(&content_to_add);
     //
     //     assert_eq!(tree.size(), TREE_SIZE);
@@ -135,6 +109,32 @@ pub mod cargo_asm {
     //         println!("Result: #{i:?}: {result:?}");
     //     }
     // }
+
+    // /// hook for cargo-asm to render a nearest-one call
+    pub fn nearest_one_eytzinger() {
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(3);
+
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 1000;
+
+        let content_to_add: Vec<[f32; 4]> =
+            (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
+
+        let tree: ImmutableKdTree<f32, u32, Eytzinger<4>, 4, 32> =
+            ImmutableKdTree::new_from_slice(&content_to_add);
+
+        assert_eq!(tree.size(), TREE_SIZE);
+
+        let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)
+            .map(|_| rand::random::<[f32; 4]>())
+            .collect();
+
+        for (i, query_point) in query_points.iter().enumerate() {
+            println!("query #{i:?}");
+            let result = tree.nearest_one::<SquaredEuclidean>(query_point);
+            println!("Result: #{i:?}: {result:?}");
+        }
+    }
 }
 
 #[cfg(test)]
