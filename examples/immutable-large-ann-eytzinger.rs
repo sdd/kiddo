@@ -12,15 +12,15 @@ use kiddo::test_utils::build_query_points_float;
 
 const TREE_SIZE: usize = 2usize.pow(23);
 const BUCKET_SIZE: usize = 2;
-const QUERY_POINT_QTY: usize = 10_000;
+const QUERY_POINT_QTY: usize = 20_000_000;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut rng = rand_chacha::ChaCha8Rng::from_os_rng();
-    let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
+    let content_to_add: Vec<[f64; 4]> = (0..TREE_SIZE).map(|_| rng.random::<[f64; 4]>()).collect();
 
     let start = Instant::now();
     println!("Building an optimized tree of {TREE_SIZE:?} items...");
-    let tree: ImmutableKdTree<f32, usize, Eytzinger<4>, 4, BUCKET_SIZE> =
+    let tree: ImmutableKdTree<f64, usize, Eytzinger<4>, 4, BUCKET_SIZE> =
         ImmutableKdTree::new_from_slice(&content_to_add);
     println!(
         "Construction complete. ({})",

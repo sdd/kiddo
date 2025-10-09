@@ -87,7 +87,7 @@ mod tests {
     use crate::best_neighbour::BestNeighbour;
     use crate::distance::float::SquaredEuclidean;
     use crate::immutable::float::kdtree::ImmutableKdTree;
-    use crate::{traits::DistanceMetric, Eytzinger};
+    use crate::{traits::DistanceMetric, Eytzinger, stem_strategies::Donnelly};
     use rand::Rng;
     use std::num::NonZero;
 
@@ -97,6 +97,27 @@ mod tests {
     fn can_query_single_bucket_tree() {
         let content: Vec<[AX; 3]> = vec![[1.0, 2.0, 5.0], [2.0, 3.0, 6.0]];
         let tree: ImmutableKdTree<AX, i32, Eytzinger<3>, 3, 32> =
+            ImmutableKdTree::new_from_slice(&content);
+
+        let mut best_n_within = tree.best_n_within::<SquaredEuclidean>(
+            &[1.0, 2.0, 5.0],
+            10f64,
+            NonZero::new(1).unwrap(),
+        );
+        let first = best_n_within.next().unwrap();
+
+        assert_eq!(
+            first,
+            BestNeighbour {
+                distance: 0.0,
+                item: 0
+            }
+        );
+    }
+    #[test]
+    fn can_query_single_bucket_tree_donnelly() {
+        let content: Vec<[AX; 3]> = vec![[1.0, 2.0, 5.0], [2.0, 3.0, 6.0]];
+        let tree: ImmutableKdTree<AX, i32, Donnelly<3, 64, 8, 3>, 3, 32> =
             ImmutableKdTree::new_from_slice(&content);
 
         let mut best_n_within = tree.best_n_within::<SquaredEuclidean>(
@@ -184,6 +205,74 @@ mod tests {
     }
 
     #[test]
+    fn can_query_best_n_items_within_radius_donnelly() {
+        let content_to_add = [
+            [9f64, 0f64],
+            [4f64, 500f64],
+            [12f64, -300f64],
+            [7f64, 200f64],
+            [13f64, -400f64],
+            [6f64, 300f64],
+            [2f64, 700f64],
+            [14f64, -500f64],
+            [3f64, 600f64],
+            [10f64, -100f64],
+            [16f64, -700f64],
+            [1f64, 800f64],
+            [15f64, -600f64],
+            [5f64, 400f64],
+            [8f64, 100f64],
+            [11f64, -200f64],
+        ];
+
+        let tree: ImmutableKdTree<AX, i32, Donnelly<3, 64, 8, 2>, 2, 4> =
+            ImmutableKdTree::new_from_slice(&content_to_add);
+
+        assert_eq!(tree.size(), 16);
+
+        let query = [9f64, 0f64];
+        let radius = 20000f64;
+        let max_qty = NonZero::new(3).unwrap();
+        let expected = vec![
+            BestNeighbour {
+                distance: 10001.0,
+                item: 14,
+            },
+            BestNeighbour {
+                distance: 0.0,
+                item: 0,
+            },
+            BestNeighbour {
+                distance: 10001.0,
+                item: 9,
+            },
+        ];
+
+        let result: Vec<_> = tree
+            .best_n_within::<SquaredEuclidean>(&query, radius, max_qty)
+            .collect();
+        assert_eq!(result, expected);
+
+        let max_qty = NonZero::new(2).unwrap();
+
+        let mut rng = rand::rng();
+        for _i in 0..1000 {
+            let query = [
+                rng.random_range(-10f64..20f64),
+                rng.random_range(-1000f64..1000f64),
+            ];
+            let radius = 100000f64;
+            let expected = linear_search(&content_to_add, &query, radius, max_qty.into());
+            //println!("{}, {}", query[0].to_string(), query[1].to_string());
+
+            let result: Vec<_> = tree
+                .best_n_within::<SquaredEuclidean>(&query, radius, max_qty)
+                .collect();
+            assert_eq!(result, expected);
+        }
+    }
+
+    #[test]
     fn can_query_best_items_within_radius_large_scale() {
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
@@ -193,6 +282,34 @@ mod tests {
             (0..TREE_SIZE).map(|_| rand::random::<[AX; 2]>()).collect();
 
         let tree: ImmutableKdTree<AX, i32, Eytzinger<2>, 2, 32> =
+            ImmutableKdTree::new_from_slice(&content_to_add);
+        assert_eq!(tree.size(), TREE_SIZE);
+
+        let query_points: Vec<[AX; 2]> = (0..NUM_QUERIES)
+            .map(|_| rand::random::<[AX; 2]>())
+            .collect();
+
+        for query_point in query_points {
+            let radius = 100000f64;
+            let expected = linear_search(&content_to_add, &query_point, radius, max_qty.into());
+
+            let result: Vec<_> = tree
+                .best_n_within::<SquaredEuclidean>(&query_point, radius, max_qty)
+                .collect();
+            assert_eq!(result, expected);
+        }
+    }
+
+    #[test]
+    fn can_query_best_items_within_radius_large_scale_donnelly() {
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 100;
+        let max_qty = NonZero::new(2).unwrap();
+
+        let content_to_add: Vec<[AX; 2]> =
+            (0..TREE_SIZE).map(|_| rand::random::<[AX; 2]>()).collect();
+
+        let tree: ImmutableKdTree<AX, i32, Donnelly<3, 64, 8, 2>, 2, 32> =
             ImmutableKdTree::new_from_slice(&content_to_add);
         assert_eq!(tree.size(), TREE_SIZE);
 
