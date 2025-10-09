@@ -23,4 +23,5 @@
 //! [`half`](https://docs.rs/half/latest/half) crate
 #[doc(hidden)]
 pub(crate) mod common;
+// pub mod fixed;
 pub mod float;

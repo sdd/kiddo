@@ -87,7 +87,7 @@ mod tests {
     use crate::best_neighbour::BestNeighbour;
     use crate::distance::float::SquaredEuclidean;
     use crate::immutable::float::kdtree::ImmutableKdTree;
-    use crate::{traits::DistanceMetric, Eytzinger, stem_strategies::Donnelly};
+    use crate::{stem_strategies::Donnelly, traits::DistanceMetric, Eytzinger};
     use rand::Rng;
     use std::num::NonZero;
 

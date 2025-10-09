@@ -8,7 +8,6 @@ use rand::{Rng, SeedableRng};
 use rkyv_08::{rancor::Error as RkyvError, to_bytes};
 use ubyte::ToByteUnit;
 
-
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::stem_strategies::Donnelly;
 use kiddo::test_utils::build_query_points_float;
