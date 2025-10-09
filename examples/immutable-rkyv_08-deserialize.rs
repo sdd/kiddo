@@ -16,7 +16,7 @@ use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::stem_strategies::Eytzinger;
 use kiddo::SquaredEuclidean;
 
-type Tree = ImmutableKdTree<f64, u32, Eytzinger, 3, 256>;
+type Tree = ImmutableKdTree<f64, u32, Eytzinger<3>, 3, 256>;
 
 fn main() -> Result<(), Box<dyn Error>>
 where
@@ -115,9 +115,11 @@ where
         let start = Instant::now();
 
         // Get archived tree
-        let archived_tree =
-            access::<ArchivedR8ImmutableKdTree<f64, u32, Eytzinger, 3, 256>, RkyvError>(&buf[..])
-                .unwrap();
+        let archived_tree = access::<
+            ArchivedR8ImmutableKdTree<f64, u32, Eytzinger<3>, 3, 256>,
+            RkyvError,
+        >(&buf[..])
+        .unwrap();
         let loaded = Instant::now();
 
         // perform a query using the wrapper
@@ -198,7 +200,7 @@ where
 
         // Get archived tree using unsafe method
         let archived_tree = unsafe {
-            access_unchecked::<ArchivedR8ImmutableKdTree<f64, u32, Eytzinger, 3, 256>>(&buf)
+            access_unchecked::<ArchivedR8ImmutableKdTree<f64, u32, Eytzinger<3>, 3, 256>>(&buf)
         };
         let loaded = Instant::now();
 

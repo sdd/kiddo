@@ -4,14 +4,14 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use elapsed::ElapsedDuration;
-use memmap::MmapOptions;
 use kiddo::distance::float::SquaredEuclidean;
-use rkyv_08::access_unchecked;
-use rkyv_08::vec::ArchivedVec;
 use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::stem_strategies::Donnelly;
 use kiddo::test_utils::build_query_points_float;
+use memmap::MmapOptions;
+use rkyv_08::access_unchecked;
+use rkyv_08::vec::ArchivedVec;
 
 const TREE_SIZE: usize = 2usize.pow(23);
 const QUERY_POINT_QTY: usize = 20_000_000;
@@ -31,7 +31,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Get archived tree using unsafe method
     let tree = unsafe { access_unchecked::<ArchivedTree>(&tree_buf) };
 
-
     // memmap the tree file into a buffer
     let query_file = File::open("./examples/immutable-ann-test-points-rkyv_08.rkyv")?;
     let query_buf = unsafe { MmapOptions::new().map(&query_file)? };
@@ -44,7 +43,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         ElapsedDuration::new(start.elapsed())
     );
 
-   
     println!("Performing {QUERY_POINT_QTY:?} random NN queries...");
 
     let start = Instant::now();

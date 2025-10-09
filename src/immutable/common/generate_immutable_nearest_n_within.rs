@@ -27,7 +27,7 @@ macro_rules! generate_immutable_nearest_n_within {
             ) -> Vec<NearestNeighbour<A, T>> {
                 let mut matching_items = H::new_with_capacity(res_capacity);
                 let mut off = [A::zero(); K];
-                
+
                 let stems_ptr = std::ptr::NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
                 let stem_ordering = SO::new(stems_ptr);
 

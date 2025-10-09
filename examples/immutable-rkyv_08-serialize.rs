@@ -15,10 +15,11 @@ use ubyte::ToByteUnit;
 
 use kiddo::distance::float::SquaredEuclidean;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
+use kiddo::stem_strategies::Eytzinger;
 
 const NUM_ITEMS: usize = 50_000_000;
 
-type Tree = ImmutableKdTree<f64, u32, 3, 256>;
+type Tree = ImmutableKdTree<f64, u32, Eytzinger<3>, 3, 256>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "tracing")]

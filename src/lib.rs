@@ -1,3 +1,4 @@
+#![feature(stdarch_aarch64_prefetch)]
 #![warn(rustdoc::missing_crate_level_docs)]
 #![deny(rustdoc::invalid_codeblock_attributes)]
 #![warn(missing_docs)]

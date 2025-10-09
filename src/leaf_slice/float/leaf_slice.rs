@@ -52,11 +52,9 @@ where
     {
         // AVX512: 4 loops of 32 iterations, each 4x unrolled, 5 instructions per pre-unrolled iteration
         let mut acc = [A::zero(); C];
-        (0..K).step_by(1).for_each(|dim| {
-            let qd = [query[dim]; C];
-
-            (0..C).step_by(1).for_each(|idx| {
-                acc[idx] += D::dist1(self.content_points[dim][idx], qd[idx]);
+        (0..K).for_each(|dim| {
+            (0..C).for_each(|idx| {
+                acc[idx] += D::dist1(self.content_points[dim][idx], query[dim]);
             });
         });
 

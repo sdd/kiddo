@@ -21,7 +21,7 @@ macro_rules! generate_immutable_best_n_within {
 
                 let stems_ptr = std::ptr::NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
                 let stem_ordering = SO::new(stems_ptr);
-                
+
                 self.best_n_within_recurse::<D>(
                     query,
                     dist,

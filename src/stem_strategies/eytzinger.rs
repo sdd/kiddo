@@ -1,5 +1,5 @@
-use std::ptr::NonNull;
 use aligned_vec::AVec;
+use std::ptr::NonNull;
 
 use crate::StemStrategy;
 

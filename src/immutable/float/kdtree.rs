@@ -38,8 +38,8 @@ use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "rkyv_08")]
 use std::fmt::Formatter;
-use std::{cmp::PartialEq, fmt::Debug};
 use std::ptr::NonNull;
+use std::{cmp::PartialEq, fmt::Debug};
 
 /// Immutable floating point k-d tree
 ///

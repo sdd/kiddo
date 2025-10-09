@@ -7,6 +7,7 @@ use fixed::traits::Fixed;
 use num_traits::float::FloatCore;
 use num_traits::{PrimInt, Unsigned, Zero};
 use std::fmt::Debug;
+use std::iter::Sum;
 use std::ptr::NonNull;
 
 /// Axis trait represents the traits that must be implemented
@@ -14,7 +15,9 @@ use std::ptr::NonNull;
 /// on float `KdTree`s. This will be [`f64`] or [`f32`],
 /// or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if used with
 /// the [`half`](https://docs.rs/half/latest/half) crate
-pub trait Axis: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign {
+pub trait Axis:
+    FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign + Sum
+{
     /// returns absolute diff between two values of a type implementing this trait
     fn saturating_dist(self, other: Self) -> Self;
 
@@ -22,7 +25,7 @@ pub trait Axis: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::Add
     fn rd_update(rd: Self, delta: Self) -> Self;
 }
 
-impl<T: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign> Axis for T {
+impl<T: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign + Sum> Axis for T {
     fn saturating_dist(self, other: Self) -> Self {
         (self - other).abs()
     }

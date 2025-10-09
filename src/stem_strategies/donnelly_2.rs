@@ -1,8 +1,8 @@
-use std::arch::x86_64::{_MM_HINT_T0, _MM_HINT_T1};
-use std::ptr::NonNull;
 use crate::traits::Axis;
 use crate::StemStrategy;
 use aligned_vec::AVec;
+use std::arch::aarch64::{_PREFETCH_LOCALITY2, _PREFETCH_READ};
+use std::ptr::NonNull;
 
 /// Donnelly Strategy
 ///
@@ -24,9 +24,13 @@ pub struct Donnelly<const L: u32, const CL: u32, const VB: u32, const K: usize> 
 
 // FIXME: this is a hack to make the compiler happy. remove after testing
 unsafe impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Send
-for Donnelly<L, CL, VB, K> {}
+    for Donnelly<L, CL, VB, K>
+{
+}
 unsafe impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Sync
-for Donnelly<L, CL, VB, K> {}
+    for Donnelly<L, CL, VB, K>
+{
+}
 
 impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
     for Donnelly<L, CL, VB, K>
@@ -119,14 +123,14 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         // is_right==false -> near=left,  far=right
         // is_right==true  -> near=right, far=left
         let near_stem = (left & nm_r32) | (right & m_r32);
-        let far_stem  = (right & nm_r32) | (left  & m_r32);
+        let far_stem = (right & nm_r32) | (left & m_r32);
 
         // minor_level update (same rule for both children)
         let ml1 = self.minor_level.wrapping_add(1);
         let at_boundary = ml1 == Self::log2_items_per_line();
         let m_b32 = mask32(at_boundary);
         let near_minor = ml1 & !m_b32; // zero when crossing to next block
-        let far_minor  = near_minor;   // same progression for far side
+        let far_minor = near_minor; // same progression for far side
 
         // level increments (both advance one)
         let next_level = self.level.wrapping_add(1);
@@ -137,24 +141,24 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
 
         // leaf index: near takes bit 0, far takes bit 1
         let li2 = self.leaf_idx << 1;
-        let near_leaf = (li2        & nm_r64) | ((li2 | 1) & m_r64);       // if right -> OR 1
-        let far_leaf  = (li2        & m_r64)  | ((li2 | 1) & nm_r64);      // opposite bit
+        let near_leaf = (li2 & nm_r64) | ((li2 | 1) & m_r64); // if right -> OR 1
+        let far_leaf = (li2 & m_r64) | ((li2 | 1) & nm_r64); // opposite bit
 
         // mutate self -> NEAR child
-        self.stem_idx    = near_stem;
+        self.stem_idx = near_stem;
         self.minor_level = near_minor;
-        self.level       = next_level;
-        self.dim         = next_dim;
-        self.leaf_idx    = near_leaf as usize;
+        self.level = next_level;
+        self.dim = next_dim;
+        self.leaf_idx = near_leaf as usize;
 
         // return FAR child as a new strategy (copy of "self" with swapped fields)
         Self {
-            stem_idx:   far_stem,
+            stem_idx: far_stem,
             minor_level: far_minor,
-            level:       next_level,
-            dim:         next_dim,
-            leaf_idx:    far_leaf as usize,
-            stems_ptr:   self.stems_ptr,
+            level: next_level,
+            dim: next_dim,
+            leaf_idx: far_leaf as usize,
+            stems_ptr: self.stems_ptr,
         }
     }
 
@@ -190,9 +194,13 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
 }
 
 #[inline(always)]
-fn mask32(b: bool) -> u32 { 0u32.wrapping_sub(b as u32) }     // false->0x00000000, true->0xFFFFFFFF
+fn mask32(b: bool) -> u32 {
+    0u32.wrapping_sub(b as u32)
+} // false->0x00000000, true->0xFFFFFFFF
 #[inline(always)]
-fn maskusize(b: bool) -> usize { 0usize.wrapping_sub(b as usize) }
+fn maskusize(b: bool) -> usize {
+    0usize.wrapping_sub(b as usize)
+}
 
 impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL, VB, K> {
     // ---- layout helpers ----
@@ -214,7 +222,12 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL,
     }
 
     #[inline(always)]
-    fn step_pure(curr_idx: u32, mut minor_level: u32, is_right_child: bool, stems_ptr: NonNull<u8>) -> (u32, u32) {
+    fn step_pure(
+        curr_idx: u32,
+        mut minor_level: u32,
+        is_right_child: bool,
+        stems_ptr: NonNull<u8>,
+    ) -> (u32, u32) {
         debug_assert!(L >= 2 && L <= 8);
         let is_right_child = u32::from(is_right_child);
 
@@ -234,16 +247,22 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL,
         // }
 
         let base_with_side: u32 = base_no_right.wrapping_add(is_right_child);
-        let same_base  = base_with_side.wrapping_add(min_idx.wrapping_shl(1));
+        let same_base = base_with_side.wrapping_add(min_idx.wrapping_shl(1));
 
-        let next_result_base = next_prefetch_base.wrapping_add(is_right_child.wrapping_shl(Self::log2_items_per_line()));
+        // unsafe {
+        //     let nxt_ptr = stems_ptr.as_ptr().add((same_base as usize) * VB as usize);
+        //     prefetch_t0(nxt_ptr);
+        // }
+
+        let next_result_base = next_prefetch_base
+            .wrapping_add(is_right_child.wrapping_shl(Self::log2_items_per_line()));
 
         // boolean flag for cmov indicating if we're transitioning to the next minor triangle
         let inc_major_level = (minor_level.wrapping_add(1) == Self::log2_items_per_line()) as u32;
         let inc_major_level_mask = 0u32.wrapping_sub(inc_major_level);
 
-        let result = (next_result_base & inc_major_level_mask)
-            | (same_base & !inc_major_level_mask);
+        let result =
+            (next_result_base & inc_major_level_mask) | (same_base & !inc_major_level_mask);
 
         minor_level = minor_level.wrapping_add(1);
         minor_level &= !inc_major_level_mask;
@@ -255,30 +274,60 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL,
     fn prefetch_next_base(stems_ptr: NonNull<u8>, next_base: u32) {
         #[cfg(target_arch = "x86_64")]
         unsafe {
-            const BYTES_PER_LINE: usize = 64; // hard coded for now, should be CL as usize;
+            use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
 
+            const BYTES_PER_LINE: usize = 64;
             let base_ptr = stems_ptr.as_ptr().add((next_base as usize) * VB as usize);
 
-            let ptr_1 = base_ptr.add(1 * BYTES_PER_LINE); // hard coded, assumes Donnelly 3
-            let ptr_2   = base_ptr.add(2 * BYTES_PER_LINE); // hard coded, assumes Donnelly 3
-            let ptr_3 = base_ptr.add(3 * BYTES_PER_LINE); // hard coded, assumes Donnelly 3
-            let ptr_4 = base_ptr.add(4 * BYTES_PER_LINE); // hard coded, assumes Donnelly 3
-            let ptr_5 = base_ptr.add(5 * BYTES_PER_LINE); // hard coded, assumes Donnelly 3
-            let ptr_6 = base_ptr.add(6 * BYTES_PER_LINE); // hard coded, assumes Donnelly 3
-            let ptr_7 = base_ptr.add(7 * BYTES_PER_LINE); // hard coded, assumes Donnelly 3
+            let ptr_1 = base_ptr.add(1 * BYTES_PER_LINE);
+            let ptr_2 = base_ptr.add(2 * BYTES_PER_LINE);
+            let ptr_3 = base_ptr.add(3 * BYTES_PER_LINE);
+            let ptr_4 = base_ptr.add(4 * BYTES_PER_LINE);
+            let ptr_5 = base_ptr.add(5 * BYTES_PER_LINE);
+            let ptr_6 = base_ptr.add(6 * BYTES_PER_LINE);
+            let ptr_7 = base_ptr.add(7 * BYTES_PER_LINE);
 
-            // prevent LLVM from “helpfully” removing redundant prefetches
+            // prevent LLVM from "helpfully" removing redundant prefetches
             core::arch::asm!("", in("rax") base_ptr, options(nomem, nostack, preserves_flags));
 
-            core::arch::x86_64::_mm_prefetch::<{ _MM_HINT_T0 }>(base_ptr as *const i8);
-            core::arch::x86_64::_mm_prefetch::<{ _MM_HINT_T0 }>(ptr_1 as *const i8);
-            core::arch::x86_64::_mm_prefetch::<{ _MM_HINT_T0 }>(ptr_2 as *const i8);
-            core::arch::x86_64::_mm_prefetch::<{ _MM_HINT_T0 }>(ptr_3 as *const i8);
-            core::arch::x86_64::_mm_prefetch::<{ _MM_HINT_T0 }>(ptr_4 as *const i8);
-            core::arch::x86_64::_mm_prefetch::<{ _MM_HINT_T0 }>(ptr_5 as *const i8);
-            core::arch::x86_64::_mm_prefetch::<{ _MM_HINT_T0 }>(ptr_6 as *const i8);
-            core::arch::x86_64::_mm_prefetch::<{ _MM_HINT_T0 }>(ptr_7 as *const i8);
-            
+            _mm_prefetch::<{ _MM_HINT_T0 }>(base_ptr as *const i8);
+            _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_1 as *const i8);
+            _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_2 as *const i8);
+            _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_3 as *const i8);
+            _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_4 as *const i8);
+            _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_5 as *const i8);
+            _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_6 as *const i8);
+            _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_7 as *const i8);
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        unsafe {
+            use core::arch::aarch64::{
+                _prefetch, _PREFETCH_LOCALITY2, _PREFETCH_LOCALITY3, _PREFETCH_READ,
+            };
+
+            const BYTES_PER_LINE: usize = 64; // 64 for most ARM, 128 for Apple M-series
+            let base_ptr = stems_ptr.as_ptr().add((next_base as usize) * VB as usize);
+
+            let ptr_1 = base_ptr.add(1 * BYTES_PER_LINE);
+            let ptr_2 = base_ptr.add(2 * BYTES_PER_LINE);
+            let ptr_3 = base_ptr.add(3 * BYTES_PER_LINE);
+            let ptr_4 = base_ptr.add(4 * BYTES_PER_LINE);
+            let ptr_5 = base_ptr.add(5 * BYTES_PER_LINE);
+            let ptr_6 = base_ptr.add(6 * BYTES_PER_LINE);
+            let ptr_7 = base_ptr.add(7 * BYTES_PER_LINE);
+
+            // prevent LLVM from "helpfully" removing redundant prefetches
+            core::arch::asm!("", in("x0") base_ptr, options(nomem, nostack, preserves_flags));
+
+            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(base_ptr as *const i8);
+            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_1 as *const i8);
+            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_2 as *const i8);
+            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_3 as *const i8);
+            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_4 as *const i8);
+            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_5 as *const i8);
+            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_6 as *const i8);
+            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_7 as *const i8);
         }
     }
 
@@ -323,6 +372,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL,
             let curr_line = line_base_f32(self.stem_idx);
             let next_line = curr_line + 16 * 8; // 8 lines * 16 f32/line
 
+            #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
             unsafe {
                 prefetch_8_lines_f32(stems_ptr, next_line);
             }
@@ -332,7 +382,12 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL,
 
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
-pub fn calc_child_idx(curr_idx: u32, minor_index: u32, is_right_child: bool, stems_ptr: NonNull<u8>) -> (u32, u32) {
+pub fn calc_child_idx(
+    curr_idx: u32,
+    minor_index: u32,
+    is_right_child: bool,
+    stems_ptr: NonNull<u8>,
+) -> (u32, u32) {
     Donnelly::<3, 64, 8, 3>::step_pure(curr_idx, minor_index, is_right_child, stems_ptr)
 }
 
@@ -340,6 +395,20 @@ pub fn calc_child_idx(curr_idx: u32, minor_index: u32, is_right_child: bool, ste
 #[inline(never)]
 pub fn both_children_pure(curr_idx: u32, minor_index: u32) -> (u32, u32) {
     Donnelly::<3, 64, 8, 3>::both_children_pure(curr_idx, minor_index)
+}
+
+#[cfg(target_arch = "aarch64")]
+#[inline(always)]
+unsafe fn prefetch_t0(ptr: *const u8) {
+    use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY3, _PREFETCH_READ};
+    _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY3>(ptr as *const i8);
+}
+
+#[cfg(target_arch = "aarch64")]
+#[inline(always)]
+unsafe fn prefetch_t1(ptr: *const u8) {
+    use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY2, _PREFETCH_READ};
+    _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr as *const i8);
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -358,17 +427,34 @@ unsafe fn prefetch_t1(ptr: *const u8) {
 
 // helper: line base (16 f32 per 64B line)
 #[inline(always)]
-fn line_base_f32(idx: u32) -> u32 { idx & !15 }
+fn line_base_f32(idx: u32) -> u32 {
+    idx & !15
+}
 
 // prefetch an 8-line run starting at base_line (in f32 indices)
+#[cfg(target_arch = "aarch64")]
+#[inline(always)]
+unsafe fn prefetch_8_lines_f32(stems_ptr: *const f32, base_line: u32) {
+    let p0 = stems_ptr.add(base_line as usize) as *const u8;
+
+    prefetch_t0(p0);
+
+    // Optionally prefetch additional lines:
+    // let p1 = stems_ptr.add((base_line + 16) as usize) as *const u8;
+    // prefetch_t0(p1);
+}
+
 #[cfg(target_arch = "x86_64")]
 #[inline(always)]
 unsafe fn prefetch_8_lines_f32(stems_ptr: *const f32, base_line: u32) {
     let p0 = stems_ptr.add(base_line as usize) as *const u8;
+
     // Usually one is enough; try uncommenting p1 if needed.
     prefetch_t0(p0);
+
     // let p1 = stems_ptr.add((base_line + 16) as usize) as *const u8;
     // prefetch_t0(p1);
+
     // If A isn’t enough, at L1 also prefetch the tail:
     // let plast = stems_ptr.add((base_line + 16*7) as usize) as *const u8;
     // prefetch_t1(plast);
@@ -376,8 +462,8 @@ unsafe fn prefetch_8_lines_f32(stems_ptr: *const f32, base_line: u32) {
 
 #[cfg(test)]
 mod tests {
-    use aligned_vec::avec;
     use super::*;
+    use aligned_vec::avec;
     use rstest::rstest;
 
     #[rstest]

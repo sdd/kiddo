@@ -84,14 +84,15 @@ pub struct DotProduct {}
 impl<A: Axis, const K: usize> DistanceMetric<A, K> for DotProduct {
     #[cfg_attr(not(feature = "no_inline"), inline)]
     fn dist(a: &[A; K], b: &[A; K]) -> A {
-        a.iter()
+        -(a.iter()
             .zip(b.iter())
             .map(|(&a_val, &b_val)| a_val * b_val)
-            .fold(A::zero(), std::ops::Sub::sub)
+            .sum::<A>()) // probably better for LLVM's autovec than below
+                         // .fold(A::zero(), std::ops::Add::add))
     }
 
     #[cfg_attr(not(feature = "no_inline"), inline)]
     fn dist1(a: A, b: A) -> A {
-        a * b
+        -(a * b)
     }
 }
