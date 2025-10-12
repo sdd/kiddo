@@ -31,6 +31,7 @@ serde = [
     "aligned-vec/serde",
 ]
 simd = []
+simulator = []
 rkyv_08 = ["dep:rkyv_08"]
 test_utils = ["dep:rand", "dep:rand_chacha", "dep:rayon", "dep:fixed"]
 tracing = ["dep:tracing", "dep:tracing-subscriber"]
@@ -235,13 +236,28 @@ path = "examples/immutable-large-ann-donnelly-deserialize-and-query.rs"
 required-features = ["test_utils"]
 
 [[example]]
-name = "immutable-large-ann-donnelly-deserialize-and-query-logged"
-path = "examples/immutable-large-ann-donnelly-deserialize-and-query-logged.rs"
-required-features = ["test_utils"]
+name = "immutable-large-donnelly-simulate-traverse-f32"
+path = "examples/immutable-large-donnelly-simulate-traverse-f32.rs"
+required-features = ["test_utils", "rkyv_08", "simulator"]
+
+[[example]]
+name = "immutable-large-donnelly-simulate-traverse-f64"
+path = "examples/immutable-large-donnelly-simulate-traverse-f64.rs"
+required-features = ["test_utils", "rkyv_08", "simulator"]
 
 [[example]]
 name = "immutable-large-ann-donnelly-build-and-serialize"
 path = "examples/immutable-large-ann-donnelly-build-and-serialize.rs"
+required-features = ["test_utils"]
+
+[[example]]
+name = "immutable-large-eytz-simulate-traverse-f64"
+path = "examples/immutable-large-eytz-simulate-traverse-f64.rs"
+required-features = ["test_utils", "rkyv_08", "simulator"]
+
+[[example]]
+name = "immutable-large-ann-eytz-build-and-serialize"
+path = "examples/immutable-large-ann-eytz-build-and-serialize.rs"
 required-features = ["test_utils"]
 
 [[example]]

@@ -1,8 +1,9 @@
 use crate::traits::Axis;
 use crate::StemStrategy;
-use aligned_vec::AVec;
+use aligned_vec::{avec, AVec};
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0, _MM_HINT_T1};
+use rkyv_08::util::AlignedVec;
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::{_PREFETCH_LOCALITY2, _PREFETCH_READ};
 use std::ptr::NonNull;
@@ -85,6 +86,26 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         self.dim = self.dim.wrapping_add(1) & !wrap_dim_mask;
 
         self.leaf_idx = self.leaf_idx.wrapping_shl(1) | is_right as usize;
+    }
+
+    #[cfg(feature = "simulator")]
+    fn simulate_traverse(
+        &mut self,
+        is_right: bool,
+        event_tx: &std::sync::mpsc::Sender<crate::cache_simulator::Event>,
+    ) {
+        use crate::cache_simulator::Event;
+
+        // Execute the real traversal logic
+        self.traverse(is_right);
+
+        // Emit synthetic "work" delay representing ~5 cycles of integer ops
+
+        // ~5 ops estimate is slightly pessimistic rounding of 4.5 cycles coming from
+        // MCA analysis of step_pure giving ~3.6 cycles, plus 1 cycle estimate for
+        // level / dim / leaf_level update
+
+        let _ = event_tx.send(Event::Working(5));
     }
 
     #[inline]
@@ -200,6 +221,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
 fn mask32(b: bool) -> u32 {
     0u32.wrapping_sub(b as u32)
 } // false->0x00000000, true->0xFFFFFFFF
+
 #[inline(always)]
 fn maskusize(b: bool) -> usize {
     0usize.wrapping_sub(b as usize)
@@ -396,6 +418,20 @@ pub fn calc_child_idx(
 #[inline(never)]
 pub fn both_children_pure(curr_idx: u32, minor_index: u32) -> (u32, u32) {
     Donnelly::<3, 64, 8, 3>::both_children_pure(curr_idx, minor_index)
+}
+
+/// Exposed pure function for use with cargo-asm
+#[inline(never)]
+pub fn test_traverse(is_right_child: bool, stems: AlignedVec) -> usize {
+    let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+
+    let mut stem_strat = Donnelly::<3, 64, 8, 3>::new(stems_ptr);
+
+    stem_strat.traverse(is_right_child);
+    stem_strat.traverse(!is_right_child);
+    stem_strat.traverse(is_right_child);
+
+    stem_strat.stem_idx()
 }
 
 #[cfg(target_arch = "aarch64")]

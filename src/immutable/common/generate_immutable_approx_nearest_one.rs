@@ -14,7 +14,7 @@ macro_rules! generate_immutable_approx_nearest_one {
                 let mut best_item = T::default();
                 let mut best_dist = A::max_value();
 
-                let leaf_idx = self.get_leaf_node_idx(query, None);
+                let leaf_idx = self.get_leaf_node_idx(query);
 
                 #[cfg(feature = "rkyv_08")]
                 #[allow(clippy::missing_transmute_annotations)]

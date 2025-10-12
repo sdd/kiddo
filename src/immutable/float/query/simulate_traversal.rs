@@ -1,4 +1,6 @@
-use crate::generate_immutable_get_leaf_node_idx;
+use std::sync::mpsc::Sender;
+
+use crate::generate_immutable_simulate_traversal;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 #[allow(unused_imports)]
 use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
@@ -6,9 +8,9 @@ use crate::traits::StemStrategy;
 use crate::traits::{Axis, Content};
 use az::Cast;
 
-macro_rules! generate_immutable_float_get_leaf_node_idx {
+macro_rules! generate_immutable_float_simulate_traversal {
     ($doctest_build_tree:tt) => {
-        generate_immutable_get_leaf_node_idx!((
+        generate_immutable_simulate_traversal!((
             "Queries the tree to find the index of the leaf node matching the query.
 
 # Examples
@@ -21,7 +23,7 @@ macro_rules! generate_immutable_float_get_leaf_node_idx {
             $doctest_build_tree,
             "
 
-    let leaf_node_idx = tree.get_leaf_node_idx(&[1.0, 2.0, 5.1]);
+    let leaf_node_idx = tree.simulate_traversal(&[1.0, 2.0, 5.1]);
 
     assert_eq!(leaf_node_idx, 0);
 ```"
@@ -32,7 +34,7 @@ macro_rules! generate_immutable_float_get_leaf_node_idx {
 impl<A: Axis, T: Content, SO: StemStrategy, const K: usize, const B: usize>
     ImmutableKdTree<A, T, SO, K, B>
 {
-    generate_immutable_float_get_leaf_node_idx!(
+    generate_immutable_float_simulate_traversal!(
         "let content: Vec<[f64; 3]> = vec!(
             [1.0, 2.0, 5.0],
             [2.0, 3.0, 6.0]
@@ -57,7 +59,7 @@ where
     SO: StemStrategy,
     usize: Cast<T>,
 {
-    generate_immutable_float_get_leaf_node_idx!(
+    generate_immutable_float_simulate_traversal!(
         "use std::fs::File;
     use memmap::MmapOptions;
     use rkyv_08::{access_unchecked, Archived};
