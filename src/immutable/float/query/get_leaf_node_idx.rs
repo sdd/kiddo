@@ -1,3 +1,5 @@
+use std::sync::mpsc::Sender;
+
 use crate::generate_immutable_get_leaf_node_idx;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 #[allow(unused_imports)]
