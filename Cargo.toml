@@ -235,6 +235,11 @@ path = "examples/immutable-large-ann-donnelly-deserialize-and-query.rs"
 required-features = ["test_utils"]
 
 [[example]]
+name = "immutable-large-ann-donnelly-deserialize-and-query-logged"
+path = "examples/immutable-large-ann-donnelly-deserialize-and-query-logged.rs"
+required-features = ["test_utils"]
+
+[[example]]
 name = "immutable-large-ann-donnelly-build-and-serialize"
 path = "examples/immutable-large-ann-donnelly-build-and-serialize.rs"
 required-features = ["test_utils"]

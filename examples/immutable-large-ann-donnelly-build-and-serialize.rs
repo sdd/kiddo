@@ -13,7 +13,8 @@ use kiddo::stem_strategies::Donnelly;
 use kiddo::test_utils::build_query_points_float;
 
 const TREE_SIZE: usize = 2usize.pow(23);
-const QUERY_POINT_QTY: usize = 20_000_000;
+// const QUERY_POINT_QTY: usize = 20_000_000;
+const QUERY_POINT_QTY: usize = 20_000;
 const BUCKET_SIZE: usize = 2;
 
 type Tree = ImmutableKdTree<f64, usize, Donnelly<3, 64, 8, 4>, 4, BUCKET_SIZE>;

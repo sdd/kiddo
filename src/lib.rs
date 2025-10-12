@@ -118,6 +118,7 @@ pub use traits::StemStrategy;
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 pub mod within_unsorted_iter;
 
+pub mod cache_simulator;
 pub mod distance;
 mod donnelly_stem_layout;
 mod rkyv_utils;

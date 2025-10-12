@@ -96,7 +96,7 @@ fn bench_query_leaf_idx<A, T, Stem, const K: usize>(
                 },
                 process_queries_immutable_float(
                     |tree: &ImmutableKdTree<A, T, Stem, K, BUCKET_SIZE>, point: &[A; K]| {
-                        tree.get_leaf_node_idx(point);
+                        tree.get_leaf_node_idx(point, None);
                     },
                 ),
                 BatchSize::SmallInput,

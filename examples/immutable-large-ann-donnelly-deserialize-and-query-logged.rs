@@ -4,15 +4,16 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use elapsed::ElapsedDuration;
-use kiddo::distance::float::SquaredEuclidean;
-use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
-use kiddo::immutable::float::kdtree::ImmutableKdTree;
-use kiddo::stem_strategies::Donnelly;
 use memmap::MmapOptions;
 use rkyv_08::access_unchecked;
 use rkyv_08::vec::ArchivedVec;
 
-const QUERY_POINT_QTY: usize = 20_000_000;
+use kiddo::cache_simulator::{profiles, AccessKind};
+use kiddo::distance::float::SquaredEuclidean;
+use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
+use kiddo::immutable::float::kdtree::ImmutableKdTree;
+use kiddo::stem_strategies::Donnelly;
+
 const BUCKET_SIZE: usize = 2;
 
 type Tree = ImmutableKdTree<f64, usize, Donnelly<3, 64, 8, 4>, 4, BUCKET_SIZE>;
@@ -41,16 +42,55 @@ fn main() -> Result<(), Box<dyn Error>> {
         ElapsedDuration::new(start.elapsed())
     );
 
-    println!("Performing {QUERY_POINT_QTY:?} random NN queries...");
+    println!("Performing {:?} random NN queries...", query_points.len());
 
+    let (tx, rx) = std::sync::mpsc::channel::<usize>();
+
+    let simulator_thread = std::thread::spawn(move || {
+        let mut sim = profiles::zen3();
+        let mut count = 0;
+
+        while let Ok(idx) = rx.recv() {
+            sim.step(idx);
+            count += 1;
+            if count % 10000 == 0 {
+                println!("{:?} steps complete.", count);
+            }
+        }
+        println!("{:?} steps complete.", count);
+
+        let s = sim.snapshot_stats();
+        println!(
+            "L1: {} hits, {} misses | L2: {} hits, {} misses | L3: {} hits, {} misses | MEM: {}",
+            s.l1.hits,
+            s.l1.misses,
+            s.l2.hits,
+            s.l2.misses,
+            s.l3.hits,
+            s.l3.misses,
+            s.memory_accesses
+        );
+
+        // per-set heatmap
+        let (_h, m, e, _) = sim.l1.per_set_stats();
+        for (i, &misses) in m.iter().enumerate() {
+            println!("set {:4} : {:6} misses, {:6} evictions", i, misses, e[i]);
+        }
+    });
+
+    let tx = Some(tx);
     let start = Instant::now();
     query_points.iter().for_each(|point| {
-        black_box(tree.get_leaf_node_idx(point, None));
+        black_box(tree.get_leaf_node_idx(point, tx.as_ref()));
     });
     println!(
         "Queries complete. ({})",
         ElapsedDuration::new(start.elapsed())
     );
+
+    drop(tx);
+
+    simulator_thread.join().unwrap();
 
     Ok(())
 }
