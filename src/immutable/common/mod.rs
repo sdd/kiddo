@@ -7,3 +7,6 @@ pub(crate) mod generate_immutable_nearest_one;
 pub(crate) mod generate_immutable_within;
 pub(crate) mod generate_immutable_within_unsorted;
 // pub(crate) mod generate_immutable_within_unsorted_iter;
+
+#[cfg(feature = "simulator")]
+pub(crate) mod generate_immutable_simulate_traversal;

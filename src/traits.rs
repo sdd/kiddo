@@ -238,6 +238,15 @@ pub trait StemStrategy: Clone + Sync + Send {
 
     /// Trim unneeded stem nodes.
     fn trim_unneeded_stems<A: Axis>(stems: &mut AVec<A>, max_stem_level: usize);
+
+    #[cfg(feature = "simulator")]
+    fn simulate_traverse(
+        &mut self,
+        is_right: bool,
+        event_tx: &std::sync::mpsc::Sender<crate::cache_simulator::Event>,
+    ) {
+        unimplemented!();
+    }
 }
 
 #[cfg(test)]

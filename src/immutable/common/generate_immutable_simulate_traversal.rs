@@ -1,11 +1,13 @@
+use std::sync::mpsc::Sender;
+
 #[doc(hidden)]
 #[macro_export]
-macro_rules! generate_immutable_get_leaf_node_idx {
+macro_rules! generate_immutable_simulate_traversal {
     ($comments:tt) => {
         doc_comment! {
             concat!$comments,
             #[cfg_attr(not(feature = "no_inline"), inline)]
-            pub fn get_leaf_node_idx(&self, query: &[A; K]) -> usize
+            pub fn simulate_traversal(&self, query: &[A; K], event_tx: &Sender<$crate::cache_simulator::Event>) -> usize
             where
                 A: $crate::leaf_slice::float::LeafSliceFloat<T> + $crate::leaf_slice::float::LeafSliceFloatChunk<T, K>,
                 usize: Cast<T>,
@@ -16,9 +18,12 @@ macro_rules! generate_immutable_get_leaf_node_idx {
                 while stem_ordering.level() <= Into::<i32>::into(self.max_stem_level) {
                     let stem_idx = stem_ordering.stem_idx();
 
+                    let ptr = unsafe { stems_ptr.as_ptr().add((stem_idx as usize) * 4 as usize) as usize };
+                    event_tx.send($crate::cache_simulator::Event::Access(ptr));
+
                     let val = *unsafe { self.stems.get_unchecked(stem_idx) };
                     let is_right_child = *unsafe { query.get_unchecked(stem_ordering.dim()) } >= val;
-                    stem_ordering.traverse(is_right_child);
+                    stem_ordering.simulate_traverse(is_right_child, event_tx);
                 }
 
                 stem_ordering.leaf_idx()
