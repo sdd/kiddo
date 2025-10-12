@@ -27,7 +27,7 @@ macro_rules! bench_float_all {
             &format!("Eytzinger/{}", $subtype),
         );
 
-        bench_query_leaf_idx::<$a, $t, Donnelly<5, 128, 4, $k>, $k>(
+        bench_query_leaf_idx::<$a, $t, Donnelly<4, 64, 4, $k>, $k>(
             &mut $group,
             $size,
             QUERY_POINTS_PER_LOOP,

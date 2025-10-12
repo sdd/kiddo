@@ -1,6 +1,9 @@
 use crate::traits::Axis;
 use crate::StemStrategy;
 use aligned_vec::AVec;
+#[cfg(target_arch = "x86_64")]
+use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0, _MM_HINT_T1};
+#[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::{_PREFETCH_LOCALITY2, _PREFETCH_READ};
 use std::ptr::NonNull;
 
@@ -274,8 +277,6 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL,
     fn prefetch_next_base(stems_ptr: NonNull<u8>, next_base: u32) {
         #[cfg(target_arch = "x86_64")]
         unsafe {
-            use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
-
             const BYTES_PER_LINE: usize = 64;
             let base_ptr = stems_ptr.as_ptr().add((next_base as usize) * VB as usize);
 
