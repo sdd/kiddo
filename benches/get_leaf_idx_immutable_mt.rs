@@ -27,7 +27,7 @@ macro_rules! bench_float_all {
             &format!("Eytzinger/{}", $subtype),
         );
 
-        bench_query_leaf_idx::<$a, $t, Donnelly<5, 128, 4, $k>, $k>(
+        bench_query_leaf_idx::<$a, $t, Donnelly<4, 64, 4, $k>, $k>(
             &mut $group,
             $size,
             QUERY_POINTS_PER_LOOP,
@@ -59,7 +59,8 @@ pub fn get_leaf_idx_all_stems(c: &mut Criterion) {
             (2_097_152, u32, usize),
             (4_194_304, u32, usize),
             (8_388_608, u32, usize),
-            (16_777_216, u32, usize)
+            (16_777_216, u32, usize) // (33_554_432, u32, usize),
+                                     // (67_108_864, u32, usize)
         ]
     );
 

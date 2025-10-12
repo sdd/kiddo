@@ -1,4 +1,4 @@
-#![feature(stdarch_aarch64_prefetch)]
+#![cfg_attr(target_arch = "aarch64", feature(stdarch_aarch64_prefetch))]
 #![warn(rustdoc::missing_crate_level_docs)]
 #![deny(rustdoc::invalid_codeblock_attributes)]
 #![warn(missing_docs)]
