@@ -129,6 +129,12 @@ where
         self.leaf_items.len()
     }
 
+    /// Returns the number of stem levels in the tree
+    #[cfg_attr(not(feature = "no_inline"), inline)]
+    pub fn max_stem_level(&self) -> i32 {
+        Into::<i32>::into(self.max_stem_level)
+    }
+
     /// Returns a LeafSlice for a given leaf index
     #[cfg_attr(not(feature = "no_inline"), inline)]
     pub(crate) fn get_leaf_slice(&self, leaf_idx: usize) -> LeafSlice<'_, A, T, K> {
@@ -426,6 +432,12 @@ where
             array_init::array_init(|i| &self.leaf_points[i][start as usize..end as usize]),
             &self.leaf_items[start as usize..end as usize],
         )
+    }
+
+    /// Returns the number of stem levels in the tree
+    #[cfg_attr(not(feature = "no_inline"), inline)]
+    pub fn max_stem_level(&self) -> i32 {
+        self.max_stem_level
     }
 }
 

@@ -31,7 +31,6 @@ pub fn donnelly_get_idx_v2(curr_idx: u32, is_right_child: bool, level: u32) -> u
 #[allow(dead_code)]
 // #[cfg_attr(not(feature = "no_inline"), inline)]
 #[cfg_attr(feature = "no_inline", inline(never))]
-#[inline(never)]
 pub fn donnelly_get_idx_v2_branchless(
     curr_idx: u32,
     is_right_child: bool,

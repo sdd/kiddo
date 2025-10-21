@@ -4,7 +4,6 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use elapsed::ElapsedDuration;
-use kiddo::distance::float::SquaredEuclidean;
 use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::stem_strategies::Donnelly;

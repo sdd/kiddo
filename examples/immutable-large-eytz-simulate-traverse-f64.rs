@@ -89,6 +89,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             "L1 prefetch useful: {}, late: {}",
             sim.pf_stats_l1.useful_lead_cycles_sum, sim.pf_stats_l1.late
         );
+
+        println!("{}", sim.stride_analyzer.render_histogram(60));
+        println!("{}", sim.stride_analyzer.render_markov(100));
+        sim.print_top_addresses(100);
     });
 
     let start = Instant::now();

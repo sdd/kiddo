@@ -1,10 +1,11 @@
+use crate::stem_strategies::prefetch::{prefetch_t0, prefetch_t1};
 use crate::StemStrategy;
 use aligned_vec::AVec;
 use std::ptr::NonNull;
 
 /// Eytzinger Stem Ordering
 #[derive(Clone, Debug)]
-pub struct Eytzinger<const K: usize> {
+pub struct EytzingerPf<const K: usize, const VB: usize> {
     stem_idx: u32,
     dim: usize,
     level: i32,
@@ -13,10 +14,10 @@ pub struct Eytzinger<const K: usize> {
 }
 
 // FIXME: this is a hack to make the compiler happy. remove after testing
-unsafe impl<const K: usize> Send for Eytzinger<K> {}
-unsafe impl<const K: usize> Sync for Eytzinger<K> {}
+unsafe impl<const K: usize, const VB: usize> Send for EytzingerPf<K, VB> {}
+unsafe impl<const K: usize, const VB: usize> Sync for EytzingerPf<K, VB> {}
 
-impl<const K: usize> StemStrategy for Eytzinger<K> {
+impl<const K: usize, const VB: usize> StemStrategy for EytzingerPf<K, VB> {
     fn new(stems_ptr: NonNull<u8>) -> Self {
         Self {
             stem_idx: 1,
@@ -91,16 +92,30 @@ impl<const K: usize> StemStrategy for Eytzinger<K> {
     fn trim_unneeded_stems<A>(_stems: &mut AVec<A>, _max_stem_level: usize) {}
 }
 
-impl<const K: usize> Eytzinger<K> {
+impl<const K: usize, const VB: usize> EytzingerPf<K, VB> {
     #[allow(missing_docs)]
     #[inline(always)]
-    pub fn step_pure(stem_idx: u32, is_right_child: bool, _stems_ptr: NonNull<u8>) -> u32 {
-        stem_idx.wrapping_shl(1) | is_right_child as u32
+    pub fn step_pure(stem_idx: u32, is_right_child: bool, stems_ptr: NonNull<u8>) -> u32 {
+        let result = stem_idx.wrapping_shl(1) | is_right_child as u32;
+
+        unsafe {
+            let nxt_ptr = stems_ptr
+                .as_ptr()
+                .add((result.wrapping_shl(1) as usize) * VB);
+            prefetch_t0(nxt_ptr);
+
+            let far_ptr = stems_ptr
+                .as_ptr()
+                .add((result.wrapping_shl(4) as usize) * VB);
+            prefetch_t1(far_ptr);
+        }
+
+        result
     }
 }
 
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
 pub fn calc_child_idx(curr_idx: u32, is_right_child: bool, stems_ptr: NonNull<u8>) -> u32 {
-    Eytzinger::<3>::step_pure(curr_idx, is_right_child, stems_ptr)
+    EytzingerPf::<3, 8>::step_pure(curr_idx, is_right_child, stems_ptr)
 }
