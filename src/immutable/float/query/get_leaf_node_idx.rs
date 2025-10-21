@@ -65,6 +65,6 @@ where
     use kiddo::Eytzinger;
 
     let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree_rkyv08.rkyv\").expect(\"./examples/immutable-doctest-tree_rkyv08.rkyv missing\")).unwrap() };
-    let tree = unsafe { access_unchecked::<ArchivedR8ImmutableKdTree<f64, u32, Eytzinger, 3, 256>>(&mmap) };"
+    let tree = unsafe { access_unchecked::<ArchivedR8ImmutableKdTree<f64, u32, Eytzinger<3>, 3, 256>>(&mmap) };"
     );
 }

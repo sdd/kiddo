@@ -8,34 +8,33 @@ use memmap::MmapOptions;
 use rkyv_08::access_unchecked;
 use rkyv_08::vec::ArchivedVec;
 
-use kiddo::cache_simulator::{profiles, AccessKind};
-use kiddo::distance::float::SquaredEuclidean;
+use kiddo::cache_simulator::profiles;
 use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
-use kiddo::stem_strategies::Donnelly;
+use kiddo::stem_strategies::Eytzinger;
 
 const BUCKET_SIZE: usize = 2;
 
-type Tree = ImmutableKdTree<f64, usize, Donnelly<3, 64, 8, 4>, 4, BUCKET_SIZE>;
-type ArchivedTree = ArchivedR8ImmutableKdTree<f64, usize, Donnelly<3, 64, 8, 4>, 4, BUCKET_SIZE>;
+type Tree = ImmutableKdTree<f32, usize, Eytzinger<4>, 4, BUCKET_SIZE>;
+type ArchivedTree = ArchivedR8ImmutableKdTree<f32, usize, Eytzinger<4>, 4, BUCKET_SIZE>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // faster unsafe ZC Deserialize API
     let start = Instant::now();
 
     // memmap the tree file into a buffer
-    let tree_file = File::open("./examples/immutable-ann-test-tree-dy-f64-rkyv_08.rkyv")?;
+    let tree_file = File::open("./examples/immutable-test-tree-eytz-f32-rkyv_08.rkyv")?;
     let tree_buf = unsafe { MmapOptions::new().map(&tree_file)? };
 
     // Get archived tree using unsafe method
     let tree = unsafe { access_unchecked::<ArchivedTree>(&tree_buf) };
 
     // memmap the tree file into a buffer
-    let query_file = File::open("./examples/immutable-ann-test-points-rkyv_08.rkyv")?;
+    let query_file = File::open("./examples/immutable-test-points-f32-rkyv_08.rkyv")?;
     let query_buf = unsafe { MmapOptions::new().map(&query_file)? };
 
     // Get archived tree using unsafe method
-    let query_points = unsafe { access_unchecked::<ArchivedVec<[f64; 4]>>(&query_buf) };
+    let query_points = unsafe { access_unchecked::<ArchivedVec<[f32; 4]>>(&query_buf) };
     let total_queries = query_points.len();
 
     println!(
@@ -43,7 +42,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         ElapsedDuration::new(start.elapsed())
     );
 
-    println!("Performing {:?} random NN queries...", query_points.len());
+    println!(
+        "Performing {:?} random stem traversals...",
+        query_points.len()
+    );
 
     let (tx, rx) = std::sync::mpsc::channel::<kiddo::cache_simulator::Event>();
 
@@ -55,7 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             sim.step_event(event);
 
             count += 1;
-            if count % 10_000 == 0 {
+            if count.is_multiple_of(10_000) {
                 println!("{count} events processed...");
             }
         }

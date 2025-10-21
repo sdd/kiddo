@@ -10,5 +10,9 @@ pub mod within_unsorted;
 // #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 // pub mod within_unsorted_iter;
 
+#[cfg(feature = "rkyv_08")]
+pub mod get_leaf_node_idx_unrolled_d4_f32;
 #[cfg(feature = "simulator")]
 pub mod simulate_traversal;
+#[cfg(feature = "simulator")]
+pub mod simulate_traversal_unrolled_d4_f32;

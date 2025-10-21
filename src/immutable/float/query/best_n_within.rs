@@ -76,9 +76,10 @@ where
         "use std::fs::File;
     use memmap::MmapOptions;
     use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
+    use kiddo::Eytzinger;
 
     let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree_rkyv08.rkyv\").expect(\"./examples/immutable-doctest-tree_rkyv08.rkyv missing\")).unwrap() };
-    let tree = unsafe { rkyv_08::access_unchecked::<ArchivedR8ImmutableKdTree<f64, u32, 3, 256>>(&mmap) };"
+    let tree = unsafe { rkyv_08::access_unchecked::<ArchivedR8ImmutableKdTree<f64, u32, Eytzinger<3>, 3, 256>>(&mmap) };"
     );
 }
 

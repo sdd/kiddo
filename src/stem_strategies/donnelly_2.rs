@@ -1,11 +1,9 @@
+use crate::stem_strategies::prefetch::prefetch_t0;
 use crate::traits::Axis;
 use crate::StemStrategy;
-use aligned_vec::{avec, AVec};
+use aligned_vec::AVec;
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0, _MM_HINT_T1};
-use rkyv_08::util::AlignedVec;
-#[cfg(target_arch = "aarch64")]
-use std::arch::aarch64::{_PREFETCH_LOCALITY2, _PREFETCH_READ};
 use std::ptr::NonNull;
 
 /// Donnelly Strategy
@@ -173,7 +171,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         self.minor_level = near_minor;
         self.level = next_level;
         self.dim = next_dim;
-        self.leaf_idx = near_leaf as usize;
+        self.leaf_idx = near_leaf;
 
         // return FAR child as a new strategy (copy of "self" with swapped fields)
         Self {
@@ -181,7 +179,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
             minor_level: far_minor,
             level: next_level,
             dim: next_dim,
-            leaf_idx: far_leaf as usize,
+            leaf_idx: far_leaf,
             stems_ptr: self.stems_ptr,
         }
     }
@@ -251,7 +249,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL,
         curr_idx: u32,
         mut minor_level: u32,
         is_right_child: bool,
-        stems_ptr: NonNull<u8>,
+        _stems_ptr: NonNull<u8>,
     ) -> (u32, u32) {
         debug_assert!(L >= 2 && L <= 8);
         let is_right_child = u32::from(is_right_child);
@@ -295,6 +293,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL,
         (result, minor_level)
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     fn prefetch_next_base(stems_ptr: NonNull<u8>, next_base: u32) {
         #[cfg(target_arch = "x86_64")]
@@ -325,14 +324,12 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL,
 
         #[cfg(target_arch = "aarch64")]
         unsafe {
-            use core::arch::aarch64::{
-                _prefetch, _PREFETCH_LOCALITY2, _PREFETCH_LOCALITY3, _PREFETCH_READ,
-            };
+            use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY2, _PREFETCH_READ};
 
             const BYTES_PER_LINE: usize = 64; // 64 for most ARM, 128 for Apple M-series
             let base_ptr = stems_ptr.as_ptr().add((next_base as usize) * VB as usize);
 
-            let ptr_1 = base_ptr.add(1 * BYTES_PER_LINE);
+            let ptr_1 = base_ptr.add(BYTES_PER_LINE);
             let ptr_2 = base_ptr.add(2 * BYTES_PER_LINE);
             let ptr_3 = base_ptr.add(3 * BYTES_PER_LINE);
             let ptr_4 = base_ptr.add(4 * BYTES_PER_LINE);
@@ -341,7 +338,10 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL,
             let ptr_7 = base_ptr.add(7 * BYTES_PER_LINE);
 
             // prevent LLVM from "helpfully" removing redundant prefetches
-            core::arch::asm!("", in("x0") base_ptr, options(nomem, nostack, preserves_flags));
+            #[allow(clippy::pointers_in_nomem_asm_block)]
+            {
+                core::arch::asm!("", in("x0") base_ptr, options(nomem, nostack, preserves_flags));
+            }
 
             _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(base_ptr as *const i8);
             _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_1 as *const i8);
@@ -387,6 +387,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL,
         (left, right)
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     fn prefetch_next_minor_tri(&self, stems_ptr: *const f32) {
         // Only act on the first level of each minor triangle
@@ -422,8 +423,8 @@ pub fn both_children_pure(curr_idx: u32, minor_index: u32) -> (u32, u32) {
 
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
-pub fn test_traverse(is_right_child: bool, stems: AlignedVec) -> usize {
-    let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+pub fn test_traverse(is_right_child: bool, stems: *mut u8) -> usize {
+    let stems_ptr = NonNull::new(stems).unwrap();
 
     let mut stem_strat = Donnelly::<3, 64, 8, 3>::new(stems_ptr);
 
@@ -432,34 +433,6 @@ pub fn test_traverse(is_right_child: bool, stems: AlignedVec) -> usize {
     stem_strat.traverse(is_right_child);
 
     stem_strat.stem_idx()
-}
-
-#[cfg(target_arch = "aarch64")]
-#[inline(always)]
-unsafe fn prefetch_t0(ptr: *const u8) {
-    use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY3, _PREFETCH_READ};
-    _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY3>(ptr as *const i8);
-}
-
-#[cfg(target_arch = "aarch64")]
-#[inline(always)]
-unsafe fn prefetch_t1(ptr: *const u8) {
-    use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY2, _PREFETCH_READ};
-    _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr as *const i8);
-}
-
-#[cfg(target_arch = "x86_64")]
-#[inline(always)]
-unsafe fn prefetch_t0(ptr: *const u8) {
-    use core::arch::x86_64::_mm_prefetch;
-    _mm_prefetch::<_MM_HINT_T0>(ptr as *const i8);
-}
-
-#[cfg(target_arch = "x86_64")]
-#[inline(always)]
-unsafe fn prefetch_t1(ptr: *const u8) {
-    use core::arch::x86_64::_mm_prefetch;
-    _mm_prefetch::<_MM_HINT_T1>(ptr as *const i8);
 }
 
 // helper: line base (16 f32 per 64B line)
@@ -551,7 +524,7 @@ mod tests {
         #[case] input: Vec<bool>,
         #[case] expected: usize,
     ) {
-        let mut stems = avec![f64::INFINITY; 9];
+        let stems = avec![f64::INFINITY; 9];
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
 
         let mut stem_strat = Donnelly::<3, 64, 8, 3>::new(stems_ptr);
@@ -612,7 +585,7 @@ mod tests {
         #[case] input: Vec<bool>,
         #[case] expected: (usize, usize),
     ) {
-        let mut stems = avec![f64::INFINITY; 9];
+        let stems = avec![f64::INFINITY; 9];
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
 
         let mut stem_strat = Donnelly::<3, 64, 8, 3>::new(stems_ptr);

@@ -8,5 +8,10 @@ pub mod donnelly_2;
 /// Eytzinger Stem Ordering
 pub mod eytzinger;
 
+/// Eytzinger Stem Ordering with Prefetching
+pub mod eytzinger_pf;
+mod prefetch;
+
 pub use donnelly_2::Donnelly;
 pub use eytzinger::Eytzinger;
+pub use eytzinger_pf::EytzingerPf;

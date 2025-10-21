@@ -1,20 +1,30 @@
 // src/cache_sim.rs
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt::Write;
 
+/// Cache replacement policy to use when evicting lines.
 #[derive(Clone, Copy, Debug)]
 pub enum ReplacementPolicy {
+    /// Least Recently Used replacement policy.
     Lru,
 }
 
+/// Configuration parameters for a cache level.
 #[derive(Clone, Debug)]
 pub struct CacheConfig {
+    /// Human-readable name for this cache level (e.g., "L1D", "L2").
     pub level_name: &'static str,
+    /// Total size of the cache in bytes.
     pub size_bytes: usize,
+    /// Size of each cache line in bytes (must be power of two).
     pub line_bytes: usize,
+    /// Number of ways per set (associativity).
     pub associativity: usize,
+    /// Replacement policy to use when evicting lines.
     pub policy: ReplacementPolicy,
 }
 
+/// Timing configuration for a single cache level.
 #[derive(Clone, Copy, Debug)]
 pub struct LevelTiming {
     /// Hit latency (cycles) for this level when data is resident.
@@ -25,10 +35,14 @@ pub struct LevelTiming {
     pub reserve_for_demand: usize,
 }
 
+/// Timing configuration for the entire memory hierarchy.
 #[derive(Clone, Copy, Debug)]
 pub struct TimingConfig {
+    /// L1 cache timing parameters.
     pub l1: LevelTiming,
+    /// L2 cache timing parameters.
     pub l2: LevelTiming,
+    /// L3 cache timing parameters.
     pub l3: LevelTiming,
     /// DRAM service latency (cycles) for a single cache line (end-to-end to the core).
     pub mem_latency: u32,
@@ -37,22 +51,227 @@ pub struct TimingConfig {
     pub mem_token_interval: u32,
 }
 
+/// Statistics for cache hit/miss behavior.
 #[derive(Default, Debug, Clone)]
 pub struct CacheStats {
+    /// Number of cache hits.
     pub hits: u64,
+    /// Number of cache misses.
     pub misses: u64,
 }
 
+/// Statistics for prefetch behavior and effectiveness.
 #[derive(Default, Debug, Clone)]
 pub struct PrefetchStats {
+    /// Number of prefetch requests issued.
     pub issued: u64,
+    /// Number of prefetches that completed (filled into cache).
     pub filled: u64,
+    /// Number of prefetches that were later used by demand accesses.
     pub useful: u64,
+    /// Number of prefetches that were evicted before being used.
     pub useless: u64,
+    /// Number of prefetch requests for lines already in cache.
     pub redundant: u64,
+    /// Number of prefetches that arrived after the demand access.
     pub late: u64,
     /// Sum of (demand_complete_cycle - prefetch_issue_cycle) for useful prefetches.
     pub useful_lead_cycles_sum: u64,
+}
+
+/// Configuration for stride analysis.
+pub struct StrideCfg {
+    /// Cache line size used to quantize addresses into "lines".
+    pub line_size: u64,
+    /// Keep Markov states only in [-clamp, +clamp]; larger magnitudes are clamped.
+    pub clamp: i16,
+    /// Whether to ignore stride==0 in the Markov chain (recommended).
+    pub ignore_zero_in_markov: bool,
+}
+
+impl Default for StrideCfg {
+    fn default() -> Self {
+        Self {
+            line_size: 64,
+            clamp: 1024,
+            ignore_zero_in_markov: true,
+        }
+    }
+}
+
+/// Analyzer for memory access stride patterns and Markov chain transitions.
+#[derive(Default)]
+pub struct StrideAnalyzer {
+    cfg: StrideCfg,
+    // histogram: stride -> count
+    hist: HashMap<i16, u64>,
+    // markov: prev_stride -> (next_stride -> count)
+    trans: HashMap<i16, HashMap<i16, u64>>,
+    // rolling state
+    last_addr: Option<u64>,
+    last_stride: Option<i16>, // only used for Markov
+}
+
+impl StrideAnalyzer {
+    /// Create a new stride analyzer with the given configuration.
+    pub fn new(cfg: StrideCfg) -> Self {
+        Self {
+            cfg,
+            ..Default::default()
+        }
+    }
+
+    /// Call this at the start of each query (or any place you want to cut the chain).
+    pub fn reset_chain(&mut self) {
+        self.last_addr = None;
+        self.last_stride = None;
+    }
+
+    /// Record one memory access. Pass `true` when this access begins a new query.
+    pub fn record(&mut self, addr: u64, print: bool) {
+        // If this isn’t the very first address, compute a stride
+        if let Some(prev) = self.last_addr {
+            // --- 1. Compute a signed stride in cache-line units ---
+            let raw_delta = (addr as i128 - prev as i128) / self.cfg.line_size as i128;
+            let stride = raw_delta.clamp(-self.cfg.clamp as i128, self.cfg.clamp as i128) as i16;
+
+            if print {
+                println!("Access Delta: {raw_delta}");
+            }
+
+            // --- 2. Guardrails for debugging ---
+            if addr < prev && stride >= 0 {
+                eprintln!(
+                    "BUG: addr < prev but stride >= 0 (addr={:#x}, prev={:#x}, stride={})",
+                    addr, prev, stride
+                );
+            }
+            if self.cfg.ignore_zero_in_markov {
+                debug_assert!(self.last_stride != Some(0));
+            }
+
+            // --- 3. Always update the histogram ---
+            *self.hist.entry(stride).or_insert(0) += 1;
+
+            // --- 5. Handle stride == 0 if we’re ignoring zero in Markov ---
+            if self.cfg.ignore_zero_in_markov && stride == 0 {
+                self.last_stride = None; // break the chain on intra-line reuse
+                self.last_addr = Some(addr);
+                return;
+            }
+
+            // --- 6. Normal Markov update (only non-zero, non-reset strides reach here) ---
+            if let Some(prev_s) = self.last_stride {
+                let row = self.trans.entry(prev_s).or_default();
+                *row.entry(stride).or_insert(0) += 1;
+            }
+            self.last_stride = Some(stride);
+        }
+
+        // --- 7. Update last_addr for the next call ---
+        self.last_addr = Some(addr);
+    }
+
+    #[inline]
+    fn quantize_stride(addr: u64, prev: u64, line_size: u64, clamp: i16) -> i16 {
+        // SIGNED delta first. Never do (addr - prev) as u64.
+        let delta_lines = ((addr as i128 - prev as i128) / line_size as i128) as i64;
+        let c = clamp as i64;
+        delta_lines.clamp(-c, c) as i16
+    }
+
+    /// Render a simple bar chart for the histogram.
+    /// Render a simple bar chart for the histogram.
+    pub fn render_histogram(&self, width: usize) -> String {
+        let mut s = String::new();
+        let mut items: Vec<(i16, u64)> = self.hist.iter().map(|(k, v)| (*k, *v)).collect();
+        items.sort_by_key(|(d, _)| *d);
+        let maxc = items.iter().map(|(_, c)| *c).max().unwrap_or(1);
+
+        writeln!(
+            s,
+            "Stride histogram (cache-line deltas; clamped to ±{}):",
+            self.cfg.clamp
+        )
+        .unwrap();
+        for (d, c) in items {
+            let bar = ((c as f64 / maxc as f64) * width as f64).round() as usize;
+            let _ = writeln!(s, "{:>6}: {:<w$} {}", d, "█".repeat(bar), c, w = width);
+        }
+        s
+    }
+
+    /// Render a compact Markov matrix for the top-K most frequent strides.
+    /// Render a compact Markov matrix for the top-K most frequent strides.
+    pub fn render_markov(&self, top_k: usize) -> String {
+        let mut s = String::new();
+
+        // Rank strides by their total outgoing counts.
+        let mut ranks: Vec<(i16, u64)> = self
+            .trans
+            .iter()
+            .map(|(k, row)| (*k, row.values().copied().sum()))
+            .collect();
+        ranks.sort_by(|a, b| b.1.cmp(&a.1)); // desc
+        if ranks.is_empty() {
+            return "\nStride transition matrix: (empty after filtering; try allow zeros)"
+                .to_string();
+        }
+        let keys: Vec<i16> = ranks.into_iter().take(top_k).map(|(k, _)| k).collect();
+
+        if keys.len() <= 64 {
+            writeln!(
+                s,
+                "\nStride transition matrix (counts, ignoring zeros: {}):",
+                self.cfg.ignore_zero_in_markov
+            )
+            .unwrap();
+
+            // Header
+            write!(s, "{:>7}", "").unwrap();
+            for &k in &keys {
+                write!(s, "{:>7}", k).unwrap();
+            }
+            writeln!(s).unwrap();
+
+            // Rows
+            for &i in &keys {
+                write!(s, "{:>7}", i).unwrap();
+                for &j in &keys {
+                    let v = self
+                        .trans
+                        .get(&i)
+                        .and_then(|row| row.get(&j))
+                        .copied()
+                        .unwrap_or(0);
+                    if v == 0 {
+                        write!(s, "{:>7}", ".").unwrap();
+                    } else {
+                        write!(s, "{:>7}", v).unwrap();
+                    }
+                }
+                writeln!(s).unwrap();
+            }
+        }
+
+        // Optional: show top transitions per state (easier to read than a big grid)
+        writeln!(s, "\nTop transitions per state:").unwrap();
+        for &i in &keys {
+            if let Some(row) = self.trans.get(&i) {
+                let mut v: Vec<(i16, u64)> = row.iter().map(|(k, c)| (*k, *c)).collect();
+                v.sort_by(|a, b| b.1.cmp(&a.1));
+                let head = v
+                    .into_iter()
+                    .take(5)
+                    .map(|(k, c)| format!("{}:{}", k, c))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                writeln!(s, "{:>5} → {}", i, head).unwrap();
+            }
+        }
+
+        s
+    }
 }
 
 #[derive(Debug)]
@@ -114,6 +333,7 @@ impl Set {
     }
 }
 
+/// A single level of cache in the memory hierarchy.
 #[derive(Debug)]
 pub struct CacheLevel {
     cfg: CacheConfig,
@@ -122,6 +342,7 @@ pub struct CacheLevel {
     line_offset_bits: u32,
     set_bits: u32,
     sets: Vec<Set>,
+    /// Cache hit/miss statistics for this level.
     pub stats: CacheStats,
 
     // per-set stats
@@ -139,6 +360,7 @@ pub struct CacheLevel {
 }
 
 impl CacheLevel {
+    /// Create a new cache level with the given configuration.
     pub fn new(cfg: CacheConfig) -> Self {
         assert!(cfg.size_bytes > 0);
         assert!(cfg.line_bytes.is_power_of_two());
@@ -177,8 +399,14 @@ impl CacheLevel {
         }
     }
 
+    /// Set the timing parameters for this cache level.
     pub fn set_timing(&mut self, t: LevelTiming) {
         self.timing = t;
+    }
+
+    /// Get the line size in bytes for this cache level.
+    pub fn line_bytes(&self) -> usize {
+        self.cfg.line_bytes
     }
 
     #[inline]
@@ -237,11 +465,14 @@ impl CacheLevel {
         }
     }
 
+    /// Check if a cache line containing the given address is present in this level.
     pub fn has_line(&self, addr: usize) -> bool {
         let (tag, set_idx) = self.addr_to_tag_index(addr);
         self.sets[set_idx].contains(tag)
     }
 
+    /// Probe the cache for a demand access and return hit/miss status and completion time.
+    /// Updates prefetch statistics if the line was prefetched.
     pub fn demand_probe_and_time(
         &mut self,
         addr: usize,
@@ -275,6 +506,7 @@ impl CacheLevel {
         (false, now + self.timing.hit_latency as u64) // caller will schedule deeper service
     }
 
+    /// Get per-set statistics: (hits, misses, evictions, peak_occupancy).
     pub fn per_set_stats(&self) -> (&[u64], &[u64], &[u64], &[usize]) {
         (
             &self.per_set_hits,
@@ -284,35 +516,49 @@ impl CacheLevel {
         )
     }
 
+    /// Get the total number of sets in this cache level.
     pub fn set_count(&self) -> usize {
         self.num_sets
     }
 }
 
+/// Statistics for the entire memory hierarchy.
 #[derive(Default, Debug, Clone)]
 pub struct HierarchyStats {
+    /// L1 cache statistics.
     pub l1: CacheStats,
+    /// L2 cache statistics.
     pub l2: CacheStats,
+    /// L3 cache statistics.
     pub l3: CacheStats,
+    /// Number of accesses that went to main memory.
     pub memory_accesses: u64,
     /// Sum of stall cycles experienced by demands (timing-lite).
     pub demand_stall_cycles: u64,
 }
 
+/// Configuration for next-line prefetching.
 #[derive(Clone, Copy, Debug)]
 pub struct NextLinePrefetch {
+    /// Number of cache lines to prefetch ahead.
     pub degree: u32,
+    /// Stride between prefetched lines (in cache line units).
     pub stride_lines: u32,
 }
 
+/// Type of memory access operation.
 pub enum AccessKind {
+    /// Read operation.
     Read,
+    /// Write operation.
     Write,
 }
 
+/// Trait for iterating over memory address traces.
 pub trait AddressTrace: Iterator<Item = (usize, AccessKind)> {}
 impl<I: Iterator<Item = (usize, AccessKind)>> AddressTrace for I {}
 
+/// Events that can be processed by the memory hierarchy simulator.
 #[derive(Clone, Copy, Debug)]
 pub enum Event {
     /// Demand access of 'addr'.
@@ -321,6 +567,9 @@ pub enum Event {
     Prefetch(usize),
     /// Advance simulated time by these cycles.
     Working(u32),
+    /// Inform the simulator that a new query has started.
+    /// For bookkeeping purposes rather than affecting the sim itself
+    NewQuery,
 }
 
 struct MemPort {
@@ -348,24 +597,45 @@ impl MemPort {
     }
 }
 
+/// Complete memory hierarchy simulator with L1/L2/L3 caches and main memory.
 pub struct MemoryHierarchy {
+    /// L1 cache level (always present).
     pub l1: CacheLevel,
+    /// L2 cache level (optional).
     pub l2: Option<CacheLevel>,
+    /// L3 cache level (optional).
     pub l3: Option<CacheLevel>,
+    /// Aggregate statistics across all levels.
     pub stats: HierarchyStats,
 
     // timing config
     timing: TimingConfig,
+    /// Current simulation time in cycles.
     pub cycle: u64,
     mem: MemPort,
 
     // prefetch accounting
+    /// Prefetch statistics for L1 cache.
     pub pf_stats_l1: PrefetchStats,
     /// For timeliness: record prefetch issue time per line (L1 line address)
     prefetch_issue_time: HashMap<u64 /*line*/, u64 /*issue_cycle*/>,
+
+    // Stride Tracking
+    /// Stride pattern analyzer for memory accesses.
+    pub stride_analyzer: StrideAnalyzer,
+    /// Cache line size in bytes.
+    pub line_size: usize,
+
+    // Query counter
+    /// Number of queries processed so far.
+    pub query_counter: u64,
+
+    // Global per-address access counts (by byte address as seen in Access events)
+    addr_access_counts: HashMap<u64, u64>,
 }
 
 impl MemoryHierarchy {
+    /// Create a new memory hierarchy with the given cache levels.
     pub fn new(l1: CacheLevel, l2: Option<CacheLevel>, l3: Option<CacheLevel>) -> Self {
         // sensible defaults; override with set_timing()
         let tc = TimingConfig {
@@ -388,6 +658,15 @@ impl MemoryHierarchy {
             mem_token_interval: 5,
         };
 
+        let line_size = l1.line_bytes();
+
+        let cfg = StrideCfg {
+            line_size: line_size as u64,
+            clamp: 1024,
+            ignore_zero_in_markov: false,
+        };
+        let stride_analyzer = StrideAnalyzer::new(cfg);
+
         let mut mh = Self {
             l1,
             l2,
@@ -398,6 +677,12 @@ impl MemoryHierarchy {
             mem: MemPort::new(220, 5),
             pf_stats_l1: PrefetchStats::default(),
             prefetch_issue_time: HashMap::new(),
+
+            stride_analyzer,
+            line_size,
+
+            query_counter: 0,
+            addr_access_counts: HashMap::new(),
         };
         // propagate timing into levels
         mh.apply_level_timing();
@@ -415,6 +700,7 @@ impl MemoryHierarchy {
         self.mem = MemPort::new(self.timing.mem_latency, self.timing.mem_token_interval);
     }
 
+    /// Set timing configuration for the entire hierarchy.
     pub fn set_timing(&mut self, t: TimingConfig) {
         self.timing = t;
         self.apply_level_timing();
@@ -427,7 +713,13 @@ impl MemoryHierarchy {
 
     /// Direct demand access (no timing realism besides per-level latencies + DRAM port).
     /// Returns which level hit or None (memory), and advances self.cycle by the stall observed.
+    /// Process a demand memory access and return which cache level hit (or None for memory).
+    /// Advances simulation time based on access latency.
     pub fn step_demand(&mut self, addr: usize) -> Option<&'static str> {
+        // track stride
+        self.stride_analyzer
+            .record(addr as u64, self.query_counter < 3);
+
         let start = self.cycle;
 
         // L1
@@ -516,6 +808,8 @@ impl MemoryHierarchy {
     }
 
     /// Software prefetch: schedules memory service if line not already present; installs at L2/L1 with low priority at the ready time.
+    /// Issue a software prefetch for the given address.
+    /// Installs the line at low priority if not already present.
     pub fn step_prefetch(&mut self, addr: usize) {
         self.pf_stats_l1.issued += 1;
 
@@ -564,14 +858,29 @@ impl MemoryHierarchy {
     }
 
     /// Advance simulated time by N cycles (e.g., work between accesses).
+    /// Advance simulated time by N cycles (e.g., work between accesses).
     pub fn step_work(&mut self, cycles: u32) {
         self.cycle += cycles as u64;
     }
 
     /// Unified event API
+    /// Process a simulation event and return which cache level hit (if applicable).
     pub fn step_event(&mut self, ev: Event) -> Option<&'static str> {
         match ev {
+            Event::NewQuery => {
+                self.query_counter += 1;
+                self.stride_analyzer.reset_chain();
+
+                if self.query_counter <= 3 {
+                    println!("New Query");
+                }
+
+                None
+            }
+
             Event::Access(addr) => {
+                *self.addr_access_counts.entry(addr as u64).or_insert(0) += 1;
+
                 let before = self.cycle;
                 let hitlvl = self.step_demand(addr);
 
@@ -596,12 +905,14 @@ impl MemoryHierarchy {
         }
     }
 
+    /// Run a complete address trace through the memory hierarchy.
     pub fn run_trace<T: AddressTrace>(&mut self, trace: &mut T) {
         for (addr, _kind) in trace {
             self.step_demand(addr);
         }
     }
 
+    /// Take a snapshot of current hierarchy statistics.
     pub fn snapshot_stats(&self) -> HierarchyStats {
         HierarchyStats {
             l1: self.l1.stats.clone(),
@@ -620,6 +931,7 @@ impl MemoryHierarchy {
         }
     }
 
+    /// Reset all statistics and simulation state to initial values.
     pub fn reset(&mut self) {
         self.l1.stats = CacheStats::default();
         if let Some(l2) = &mut self.l2 {
@@ -633,13 +945,45 @@ impl MemoryHierarchy {
         self.mem.next_ready = 0;
         self.pf_stats_l1 = PrefetchStats::default();
         self.prefetch_issue_time.clear();
+        self.addr_access_counts.clear();
+    }
+
+    /// Print top-K most frequently accessed byte addresses across the whole run.
+    /// If quantization by line is desired, call with addresses already masked/shifted by the caller.
+    /// Print the top-K most frequently accessed addresses with access counts.
+    pub fn print_top_addresses(&self, top_k: usize) {
+        let mut items: Vec<(u64, u64)> = self
+            .addr_access_counts
+            .iter()
+            .map(|(&a, &c)| (a, c))
+            .collect();
+        if items.is_empty() {
+            println!("Top {} most frequently accessed addresses: (none)", top_k);
+            return;
+        }
+        items.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+
+        let take_n = top_k.min(items.len());
+        let maxc = items
+            .iter()
+            .take(take_n)
+            .map(|&(_, c)| c)
+            .max()
+            .unwrap_or(1);
+
+        println!("Top {} most frequently accessed addresses:", take_n);
+        for &(addr, cnt) in items.iter().take(take_n) {
+            let bar_len = ((cnt as f64 / maxc as f64) * 50.0).round() as usize;
+            println!("{:>5}: {:<50} {}", addr, "█".repeat(bar_len), cnt);
+        }
     }
 }
 
-// Ready-made CPU profiles + timing defaults
+/// Ready-made CPU profiles with realistic cache configurations and timing defaults.
 pub mod profiles {
     use super::*;
 
+    /// Create a memory hierarchy approximating AMD Zen 3 architecture.
     pub fn zen3() -> MemoryHierarchy {
         let mut l1 = CacheLevel::new(CacheConfig {
             level_name: "L1D",
@@ -703,6 +1047,7 @@ pub mod profiles {
         mh
     }
 
+    /// Create a memory hierarchy approximating Apple M1 architecture.
     pub fn m1() -> MemoryHierarchy {
         let mut l1 = CacheLevel::new(CacheConfig {
             level_name: "L1D",
