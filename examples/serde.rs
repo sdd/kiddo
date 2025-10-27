@@ -20,6 +20,7 @@ use serde::Deserialize;
 
 use cities::{degrees_lat_lng_to_unit_sphere, parse_csv_file};
 use kiddo::distance::float::SquaredEuclidean;
+use kiddo::Eytzinger;
 
 /// Each `CityCsvRecord` corresponds to 1 row in our city source data CSV.
 ///
@@ -106,7 +107,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Building an ImmutableKdTree...");
     // Build an ImmutableKdTree
     let start = Instant::now();
-    let kdtree: ImmutableKdTree<f32, u32, 3, 32> = ImmutableKdTree::new_from_slice(&city_points);
+    let kdtree: ImmutableKdTree<f32, u32, Eytzinger<3>, 3, 32> = ImmutableKdTree::new_from_slice(&city_points);
     println!(
         "Built an ImmutableKdTree ({})",
         ElapsedDuration::new(start.elapsed())
@@ -124,7 +125,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     let file = File::open("./examples/geonames-immutable-tree.bincode.gz")?;
     let mut decompressor = GzDecoder::new(file);
-    let deserialized_tree: ImmutableKdTree<f32, u32, 3, 32> =
+    let deserialized_tree: ImmutableKdTree<f32, u32, Eytzinger<3>, 3, 32> =
         bincode::serde::decode_from_std_read(&mut decompressor, bincode::config::standard())?;
     println!(
         "Deserialized gzipped bincode file back into a k-d tree ({})",
