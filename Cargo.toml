@@ -233,7 +233,7 @@ required-features = ["test_utils"]
 [[example]]
 name = "immutable-large-ann-donnelly-deserialize-and-query"
 path = "examples/immutable-large-ann-donnelly-deserialize-and-query.rs"
-required-features = ["test_utils"]
+required-features = ["test_utils", "rkyv_08"]
 
 [[example]]
 name = "immutable-large-donnelly-simulate-traverse-f32"
@@ -248,37 +248,37 @@ required-features = ["test_utils", "rkyv_08", "simulator"]
 [[example]]
 name = "immutable-large-ann-donnelly-build-and-serialize"
 path = "examples/immutable-large-ann-donnelly-build-and-serialize.rs"
-required-features = ["test_utils"]
+required-features = ["test_utils", "rkyv_08"]
 
 [[example]]
 name = "immutable-large-donnelly-build-and-serialize-d4-f32"
 path = "examples/immutable-large-donnelly-build-and-serialize-d4-f32.rs"
-required-features = ["test_utils"]
+required-features = ["test_utils", "rkyv_08"]
 
 [[example]]
 name = "immutable-large-donnelly-simulate-traverse-f32-unrolled"
 path = "examples/immutable-large-donnelly-simulate-traverse-f32-unrolled.rs"
-required-features = ["test_utils"]
+required-features = ["test_utils", "simulator"]
 
 [[example]]
 name = "immutable-large-donnelly-deserialize-and-traverse-f32-unrolled"
 path = "examples/immutable-large-donnelly-deserialize-and-traverse-f32-unrolled.rs"
-required-features = ["test_utils"]
+required-features = ["test_utils", "rkyv_08"]
 
 [[example]]
 name = "immutable-large-eytz-build-and-serialize-f32"
 path = "examples/immutable-large-eytz-build-and-serialize-f32.rs"
-required-features = ["test_utils"]
+required-features = ["test_utils", "rkyv_08"]
 
 [[example]]
 name = "immutable-large-eytz-simulate-traverse-f32"
 path = "examples/immutable-large-eytz-simulate-traverse-f32.rs"
-required-features = ["test_utils"]
+required-features = ["test_utils", "simulator"]
 
 [[example]]
 name = "immutable-large-eytz-deserialize-and-traverse-f32"
 path = "examples/immutable-large-eytz-deserialize-and-traverse-f32.rs"
-required-features = ["test_utils"]
+required-features = ["test_utils", "rkyv_08"]
 
 [[example]]
 name = "immutable-large-eytz-simulate-traverse-f64"
@@ -288,7 +288,7 @@ required-features = ["test_utils", "rkyv_08", "simulator"]
 [[example]]
 name = "immutable-large-ann-eytz-build-and-serialize"
 path = "examples/immutable-large-ann-eytz-build-and-serialize.rs"
-required-features = ["test_utils"]
+required-features = ["test_utils", "rkyv_08"]
 
 [[example]]
 name = "immutable-large-ann-eytzinger"
@@ -300,11 +300,10 @@ name = "immutable-rkyv_08-serialize"
 path = "examples/immutable-rkyv_08-serialize.rs"
 required-features = ["rkyv_08"]
 
-# TODO: strange bug here
-#[[example]]
-#name = "immutable-rkyv_08-deserialize"
-#path = "examples/immutable-rkyv_08-deserialize.rs"
-#required-features = ["rkyv_08"]
+[[example]]
+name = "immutable-rkyv_08-deserialize"
+path = "examples/immutable-rkyv_08-deserialize.rs"
+required-features = ["rkyv_08"]
 
 [[example]]
 name = "pointcloud-las"

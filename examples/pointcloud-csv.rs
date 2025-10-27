@@ -11,7 +11,7 @@ use std::time::Instant;
 
 use csv::Reader;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
-use kiddo::SquaredEuclidean;
+use kiddo::{Eytzinger, SquaredEuclidean};
 use rkyv_08::{rancor::Error as RkyvError, to_bytes};
 use serde::Deserialize;
 use tracing::Level;
@@ -24,7 +24,7 @@ struct Point {
     z: f64,
 }
 
-type Tree = ImmutableKdTree<f64, u32, 3, 64>;
+type Tree = ImmutableKdTree<f64, u32, Eytzinger<3>, 3, 64>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "tracing")]

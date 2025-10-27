@@ -10,13 +10,13 @@ use std::io::Write;
 use std::time::Instant;
 
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
-use kiddo::SquaredEuclidean;
+use kiddo::{Eytzinger, SquaredEuclidean};
 use las::Reader;
 use rkyv_08::{rancor::Error as RkyvError, to_bytes};
 use tracing::Level;
 use tracing_subscriber::fmt;
 
-type Tree = ImmutableKdTree<f32, u32, 3, 64>;
+type Tree = ImmutableKdTree<f32, u32, Eytzinger<3>, 3, 64>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "tracing")]

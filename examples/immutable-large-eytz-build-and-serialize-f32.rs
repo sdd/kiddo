@@ -10,7 +10,6 @@ use ubyte::ToByteUnit;
 
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::stem_strategies::Eytzinger;
-use kiddo::test_utils::build_query_points_float;
 
 const TREE_SIZE: usize = 2usize.pow(22);
 // const QUERY_POINT_QTY: usize = 20_000_000;
