@@ -192,6 +192,18 @@ pub trait StemStrategy: Clone + Sync + Send {
     /// Advance `self` down to a child in-place.
     fn traverse(&mut self, is_right: bool);
 
+    /// Advance `self` down to a child in-place. Specialized for use as one
+    /// of the non-final stages when loop-unrolling to the level of a minor tri height
+    fn traverse_head(&mut self, is_right: bool) {
+        self.traverse(is_right);
+    }
+
+    /// Advance `self` down to a child in-place. Specialized for use as the
+    /// last stage when loop-unrolled to the level of a minor tri height
+    fn traverse_tail(&mut self, is_right: bool) {
+        self.traverse(is_right);
+    }
+
     /// Advance `self` down to one child, returning the other.
     /// - `self` mutates into the left child
     /// - return value is the right child

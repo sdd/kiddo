@@ -2,8 +2,8 @@ use crate::generate_immutable_get_leaf_node_idx;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 #[allow(unused_imports)]
 use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
-use crate::traits::StemStrategy;
-use crate::traits::{Axis, Content};
+use crate::stem_strategies::Donnelly;
+use crate::traits::{Axis, Content, StemStrategy};
 use az::Cast;
 
 macro_rules! generate_immutable_float_get_leaf_node_idx {
@@ -67,4 +67,19 @@ where
     let mmap = unsafe { MmapOptions::new().map(&File::open(\"./examples/immutable-doctest-tree_rkyv08.rkyv\").expect(\"./examples/immutable-doctest-tree_rkyv08.rkyv missing\")).unwrap() };
     let tree = unsafe { access_unchecked::<ArchivedR8ImmutableKdTree<f64, u32, Eytzinger<3>, 3, 256>>(&mmap) };"
     );
+}
+
+#[cfg(feature = "rkyv_08")]
+impl
+    crate::immutable::float::kdtree::ArchivedR8ImmutableKdTree<
+        f32,
+        usize,
+        Donnelly<4, 64, 4, 4>,
+        4,
+        2,
+    >
+{
+    pub fn get_leaf_node_idx_rolled(&self, query: &[f32; 4]) -> usize {
+        self.get_leaf_node_idx(query)
+    }
 }
