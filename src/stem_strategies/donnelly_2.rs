@@ -3,7 +3,7 @@ use crate::traits::Axis;
 use crate::StemStrategy;
 use aligned_vec::AVec;
 #[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0, _MM_HINT_T1};
+use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
 use std::ptr::NonNull;
 
 /// Donnelly Strategy
@@ -75,6 +75,40 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
     #[inline]
     fn traverse(&mut self, is_right: bool) {
         let (idx, lvl) = Self::step_pure(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
+        self.stem_idx = idx;
+        self.minor_level = lvl;
+
+        self.level = self.level.wrapping_add(1);
+
+        let wrap_dim_mask = 0usize.wrapping_sub((self.dim == (K - 1)) as usize);
+        self.dim = self.dim.wrapping_add(1) & !wrap_dim_mask;
+
+        self.leaf_idx = self.leaf_idx.wrapping_shl(1) | is_right as usize;
+    }
+
+    /// When running loop-unrolled, traverse_head operates under the assumption that
+    /// we stay within a minor triangle and don't hit the bottom level of the tree as a whole
+    #[inline]
+    fn traverse_head(&mut self, is_right: bool) {
+        let (idx, lvl) =
+            Self::step_pure_head(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
+        self.stem_idx = idx;
+        self.minor_level = lvl;
+
+        // self.level = self.level.wrapping_add(1);
+
+        let wrap_dim_mask = 0usize.wrapping_sub((self.dim == (K - 1)) as usize);
+        self.dim = self.dim.wrapping_add(1) & !wrap_dim_mask;
+
+        self.leaf_idx = self.leaf_idx.wrapping_shl(1) | is_right as usize;
+    }
+
+    /// When running loop-unrolled, traverse_head operates under the assumption that
+    /// we are on the bottom level of a minor triangle
+    #[inline]
+    fn traverse_tail(&mut self, is_right: bool) {
+        let (idx, lvl) =
+            Self::step_pure_tail(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
         self.stem_idx = idx;
         self.minor_level = lvl;
 
@@ -289,6 +323,63 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL,
 
         minor_level = minor_level.wrapping_add(1);
         minor_level &= !inc_major_level_mask;
+
+        (result, minor_level)
+    }
+
+    #[inline(always)]
+    fn step_pure_head(
+        curr_idx: u32,
+        mut minor_level: u32,
+        is_right_child: bool,
+        _stems_ptr: NonNull<u8>,
+    ) -> (u32, u32) {
+        debug_assert!(L >= 2 && L <= 8);
+        let is_right_child = u32::from(is_right_child);
+
+        // index into current minor triangle / cache line
+        let minor_idx = curr_idx & Self::line_mask();
+
+        let base_no_right = (curr_idx & Self::line_mask_inv()).wrapping_add(1);
+
+        let base_with_side: u32 = base_no_right.wrapping_add(is_right_child);
+        let result = base_with_side.wrapping_add(minor_idx.wrapping_shl(1));
+
+        minor_level = minor_level.wrapping_add(1);
+
+        (result, minor_level)
+    }
+
+    #[inline(always)]
+    fn step_pure_tail(
+        curr_idx: u32,
+        mut minor_level: u32,
+        is_right_child: bool,
+        _stems_ptr: NonNull<u8>,
+    ) -> (u32, u32) {
+        debug_assert!(L >= 2 && L <= 8);
+        let is_right_child = u32::from(is_right_child);
+
+        // index into current minor triangle / cache line
+        let min_idx = curr_idx & Self::line_mask();
+
+        // row in current minor triangle
+        let min_row_idx = min_idx.wrapping_sub(minor_level).wrapping_sub(1);
+
+        let base_no_right = (curr_idx & Self::line_mask_inv()).wrapping_add(1);
+        let next_prefetch_base = base_no_right
+            .wrapping_add(min_row_idx.wrapping_shl(1))
+            .wrapping_shl(Self::log2_items_per_line());
+
+        let result = next_prefetch_base
+            .wrapping_add(is_right_child.wrapping_shl(Self::log2_items_per_line()));
+
+        // Prefetch result? Not much point, it's likely gonna be requested within 1 cycle
+
+        // TODO: Prefetch next 8 base ptrs to L2
+        // Self::prefetch_next_base(stems_ptr, next_prefetch_base);
+
+        minor_level = 0;
 
         (result, minor_level)
     }
@@ -598,6 +689,75 @@ mod tests {
 
         let results = stem_strat.split();
         let result = (results.0.stem_idx(), results.1.stem_idx());
+
+        assert_eq!(result, expected);
+    }
+
+    #[rstest]
+    #[case(vec![], 0)]
+    #[case(vec![false], 1)] // 1 Maj idx: 1
+    #[case(vec![true], 2)] // 2
+    #[case(vec![false, false], 3)] // 3
+    #[case(vec![false, true], 4)] // 4
+    #[case(vec![true, false], 5)] // 5
+    #[case(vec![true, true], 6)] // 6
+    #[case(vec![false, false, false], 8)] // 7
+    #[case(vec![false, false, true], 16)] // 8
+    #[case(vec![false, true, false], 24)] // 9
+    #[case(vec![false, true, true], 32)] // 10
+    #[case(vec![true, false, false], 40)] // 11
+    #[case(vec![true, false, true], 48)] // 12
+    #[case(vec![true, true, false], 56)] // 13
+    #[case(vec![true, true, true], 64)] // 14
+    #[case(vec![false, false, false, false], 9)] // 15 Maj idx: 2
+    #[case(vec![false, false, false, true], 10)] // 16
+    #[case(vec![false, false, false, false, false], 11)] // 17
+    #[case(vec![false, false, false, false, true], 12)] // 18
+    #[case(vec![false, false, false, true, false], 13)] // 19
+    #[case(vec![false, false, false, true, true], 14)] // 20
+    #[case(vec![false, false, false, false, false, false], 72)] // 21
+    #[case(vec![false, false, false, false, false, true], 80)] // 22
+    #[case(vec![false, false, false, false, true, false], 88)] // 23
+    #[case(vec![false, false, false, false, true, true], 96)] // 24
+    #[case(vec![false, false, false, true, false, false], 104)] // 25
+    #[case(vec![false, false, false, true, false, true], 112)] // 26
+    #[case(vec![false, false, false, true, true, false], 120)] // 27
+    #[case(vec![false, false, false, true, true, true], 128)] // 28
+    #[case(vec![false, false, true, false], 17)] // 29  Maj index: 3
+    #[case(vec![false, false, true, true], 18)] // 30
+    #[case(vec![false, false, true, false, false], 19)] // 31
+    #[case(vec![false, false, true, false, true], 20)] // 32
+    #[case(vec![false, false, true, true, false], 21)] // 33
+    #[case(vec![false, false, true, true, true], 22)] // 34
+    #[case(vec![false, false, true, false, false, false], 136)] // 35
+    #[case(vec![false, false, true, false, false, true], 144)] // 36
+    #[case(vec![false, false, true, false, true, false], 152)] // 37
+    #[case(vec![false, false, true, false, true, true], 160)] // 38
+    #[case(vec![false, false, true, true, false, false], 168)] // 39
+    #[case(vec![false, false, true, true, false, true], 176)] // 40
+    #[case(vec![false, false, true, true, true, false], 184)] // 41
+    #[case(vec![false, false, true, true, true, true], 192)] // 42
+    fn donnelly_v2_get_child_idx_unrolled_produces_correct_values(
+        #[case] input: Vec<bool>,
+        #[case] expected: usize,
+    ) {
+        let stems = avec![f64::INFINITY; 9];
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+
+        let mut stem_strat = Donnelly::<3, 64, 8, 3>::new(stems_ptr);
+        let mut result = 0;
+        let mut minor_tri_idx = 0;
+        input.iter().for_each(|selection| {
+            if minor_tri_idx == 2 {
+                stem_strat.traverse_tail(*selection);
+                minor_tri_idx = 0;
+            } else {
+                minor_tri_idx += 1;
+                stem_strat.traverse_head(*selection);
+            }
+
+            result = stem_strat.stem_idx();
+        });
 
         assert_eq!(result, expected);
     }
