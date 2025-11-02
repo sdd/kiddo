@@ -1,11 +1,10 @@
+use crate::stem_strategies::prefetch::prefetch_t0;
 use crate::traits::Axis;
 use crate::StemStrategy;
-use aligned_vec::{avec, AVec};
+use aligned_vec::AVec;
 #[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0, _MM_HINT_T1};
-use rkyv_08::util::AlignedVec;
-#[cfg(target_arch = "aarch64")]
-use std::arch::aarch64::{_PREFETCH_LOCALITY2, _PREFETCH_READ};
+use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
+use std::arch::x86_64::_MM_HINT_T1;
 use std::ptr::NonNull;
 
 /// Donnelly Strategy
@@ -16,7 +15,7 @@ use std::ptr::NonNull;
 /// - CL:    cache line width in bytes (64 or 128)
 /// - VB:    value width in bytes (4 or 8)
 #[derive(Copy, Clone, Debug)]
-pub struct DonnellySwPre<const L: u32, const CL: u32, const VB: u32, const K: usize> {
+pub struct DonnellyPf<const L: u32, const CL: u32, const VB: u32, const K: usize> {
     stem_idx: u32,
     dim: usize,
     level: i32,
@@ -28,16 +27,16 @@ pub struct DonnellySwPre<const L: u32, const CL: u32, const VB: u32, const K: us
 
 // FIXME: this is a hack to make the compiler happy. remove after testing
 unsafe impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Send
-    for DonnellySwPre<L, CL, VB, K>
+    for DonnellyPf<L, CL, VB, K>
 {
 }
 unsafe impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Sync
-    for DonnellySwPre<L, CL, VB, K>
+    for DonnellyPf<L, CL, VB, K>
 {
 }
 
 impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
-    for DonnellySwPre<L, CL, VB, K>
+    for DonnellyPf<L, CL, VB, K>
 {
     #[inline]
     fn new(stems_ptr: NonNull<u8>) -> Self {
@@ -88,23 +87,47 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         self.leaf_idx = self.leaf_idx.wrapping_shl(1) | is_right as usize;
     }
 
+    /// When running loop-unrolled, traverse_head operates under the assumption that
+    /// we stay within a minor triangle and don't hit the bottom level of the tree as a whole
+    #[inline]
+    fn traverse_head(&mut self, is_right: bool) {
+        let (idx, lvl) =
+            Self::step_pure_head(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
+        self.stem_idx = idx;
+        self.minor_level = lvl;
+
+        // self.level = self.level.wrapping_add(1);
+
+        let wrap_dim_mask = 0usize.wrapping_sub((self.dim == (K - 1)) as usize);
+        self.dim = self.dim.wrapping_add(1) & !wrap_dim_mask;
+
+        self.leaf_idx = self.leaf_idx.wrapping_shl(1) | is_right as usize;
+    }
+
+    /// When running loop-unrolled, traverse_head operates under the assumption that
+    /// we are on the bottom level of a minor triangle
+    #[inline]
+    fn traverse_tail(&mut self, is_right: bool) {
+        let (idx, lvl) =
+            Self::step_pure_tail(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
+        self.stem_idx = idx;
+        self.minor_level = lvl;
+
+        self.level = self.level.wrapping_add(1);
+
+        let wrap_dim_mask = 0usize.wrapping_sub((self.dim == (K - 1)) as usize);
+        self.dim = self.dim.wrapping_add(1) & !wrap_dim_mask;
+
+        self.leaf_idx = self.leaf_idx.wrapping_shl(1) | is_right as usize;
+    }
+
     #[cfg(feature = "simulator")]
     fn simulate_traverse(
         &mut self,
         is_right: bool,
         event_tx: &std::sync::mpsc::Sender<crate::cache_simulator::Event>,
     ) {
-        use crate::cache_simulator::{Event, PrefetchLevel};
-
-        let min_idx = self.stem_idx & Self::line_mask();
-        let min_row_idx = min_idx.wrapping_sub(self.minor_level).wrapping_sub(1);
-        let base_no_right = (self.stem_idx & Self::line_mask_inv()).wrapping_add(1);
-        let next_prefetch_base = base_no_right
-            .wrapping_add(min_row_idx.wrapping_shl(1))
-            .wrapping_shl(Self::log2_items_per_line());
-        let prefetch_idx = next_prefetch_base.wrapping_add(self.minor_level.wrapping_shl(4));
-
-        let prefetch_ptr = self.stems_ptr.as_ptr().wrapping_add(prefetch_idx as usize);
+        use crate::cache_simulator::Event;
 
         // Execute the real traversal logic
         self.traverse(is_right);
@@ -115,9 +138,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         // MCA analysis of step_pure giving ~3.6 cycles, plus 1 cycle estimate for
         // level / dim / leaf_level update
 
-        let _ = event_tx.send(Event::Working(2));
-        let _ = event_tx.send(Event::PrefetchTo(prefetch_ptr as usize, PrefetchLevel::L2));
-        let _ = event_tx.send(Event::Working(3));
+        let _ = event_tx.send(Event::Working(5));
     }
 
     #[inline]
@@ -185,7 +206,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         self.minor_level = near_minor;
         self.level = next_level;
         self.dim = next_dim;
-        self.leaf_idx = near_leaf as usize;
+        self.leaf_idx = near_leaf;
 
         // return FAR child as a new strategy (copy of "self" with swapped fields)
         Self {
@@ -193,7 +214,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
             minor_level: far_minor,
             level: next_level,
             dim: next_dim,
-            leaf_idx: far_leaf as usize,
+            leaf_idx: far_leaf,
             stems_ptr: self.stems_ptr,
         }
     }
@@ -239,7 +260,7 @@ fn maskusize(b: bool) -> usize {
     0usize.wrapping_sub(b as usize)
 }
 
-impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellySwPre<L, CL, VB, K> {
+impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellyPf<L, CL, VB, K> {
     // ---- layout helpers ----
     #[inline(always)]
     const fn items_per_line() -> u32 {
@@ -263,7 +284,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellySwPre<L
         curr_idx: u32,
         mut minor_level: u32,
         is_right_child: bool,
-        stems_ptr: NonNull<u8>,
+        _stems_ptr: NonNull<u8>,
     ) -> (u32, u32) {
         debug_assert!(L >= 2 && L <= 8);
         let is_right_child = u32::from(is_right_child);
@@ -273,45 +294,15 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellySwPre<L
 
         // row in current minor triangle
         let min_row_idx = min_idx.wrapping_sub(minor_level).wrapping_sub(1);
-        // let min_row_idx = min_idx.saturating_sub(minor_level).saturating_sub(1);
 
         let base_no_right = (curr_idx & Self::line_mask_inv()).wrapping_add(1);
         let next_prefetch_base = base_no_right
             .wrapping_add(min_row_idx.wrapping_shl(1))
             .wrapping_shl(Self::log2_items_per_line());
 
-        if minor_level == 0 {
-            // Self::prefetch_next_base(stems_ptr, next_prefetch_base);
-            let ptr = stems_ptr.as_ptr().wrapping_add(next_prefetch_base as usize);
-            unsafe { prefetch_t0(ptr) };
-
-            // let ptr = stems_ptr.as_ptr().wrapping_add(next_prefetch_base.wrapping_add(8) as usize);
-            // unsafe { prefetch_t0(ptr) };
-
-            let ptr = stems_ptr
-                .as_ptr()
-                .wrapping_add(next_prefetch_base.wrapping_add(16) as usize);
-            unsafe { prefetch_t0(ptr) };
-
-            // let ptr = stems_ptr.as_ptr().wrapping_add(next_prefetch_base.wrapping_add(24) as usize);
-            // unsafe { prefetch_t0(ptr) };
-            //
-            let ptr = stems_ptr
-                .as_ptr()
-                .wrapping_add(next_prefetch_base.wrapping_add(32) as usize);
-            unsafe { prefetch_t0(ptr) };
-            //
-            // let ptr = stems_ptr.as_ptr().wrapping_add(next_prefetch_base.wrapping_add(40) as usize);
-            // unsafe { prefetch_t0(ptr) };
-            //
-            let ptr = stems_ptr
-                .as_ptr()
-                .wrapping_add(next_prefetch_base.wrapping_add(48) as usize);
-            unsafe { prefetch_t0(ptr) };
-            //
-            // let ptr = stems_ptr.as_ptr().wrapping_add(next_prefetch_base.wrapping_add(56) as usize);
-            // unsafe { prefetch_t0(ptr) };
-        }
+        // if minor_level == 0 {
+        //     Self::prefetch_next_base(stems_ptr, next_prefetch_base);
+        // }
 
         let base_with_side: u32 = base_no_right.wrapping_add(is_right_child);
         let same_base = base_with_side.wrapping_add(min_idx.wrapping_shl(1));
@@ -338,6 +329,76 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellySwPre<L
     }
 
     #[inline(always)]
+    fn step_pure_head(
+        curr_idx: u32,
+        mut minor_level: u32,
+        is_right_child: bool,
+        _stems_ptr: NonNull<u8>,
+    ) -> (u32, u32) {
+        debug_assert!(L >= 2 && L <= 8);
+        let is_right_child = u32::from(is_right_child);
+
+        // index into current minor triangle / cache line
+        let minor_idx = curr_idx & Self::line_mask();
+
+        let base_no_right = (curr_idx & Self::line_mask_inv()).wrapping_add(1);
+
+        let base_with_side: u32 = base_no_right.wrapping_add(is_right_child);
+        let result = base_with_side.wrapping_add(minor_idx.wrapping_shl(1));
+
+        minor_level = minor_level.wrapping_add(1);
+        // println!("is_right_child: {is_right_child}, min_idx: {minor_idx}, base_no_right: {base_no_right}, base_with_side: {base_with_side}, next stem_idx: {result}");
+
+        (result, minor_level)
+    }
+
+    #[inline(always)]
+    fn step_pure_tail(
+        curr_idx: u32,
+        mut minor_level: u32,
+        is_right_child: bool,
+        stems_ptr: NonNull<u8>,
+    ) -> (u32, u32) {
+        debug_assert!(L >= 2 && L <= 8);
+        let is_right_child = u32::from(is_right_child);
+
+        // index into current minor triangle / cache line
+        let min_idx = curr_idx & Self::line_mask();
+
+        // row in current minor triangle
+        let min_row_idx = min_idx.wrapping_sub(minor_level).wrapping_sub(1);
+
+        let base_no_right = (curr_idx & Self::line_mask_inv()).wrapping_add(1);
+        let next_prefetch_base = base_no_right
+            .wrapping_add(min_row_idx.wrapping_shl(1))
+            .wrapping_shl(Self::log2_items_per_line());
+
+        let result = next_prefetch_base
+            .wrapping_add(is_right_child.wrapping_shl(Self::log2_items_per_line()));
+
+        // Prefetch result? Not much point, it's likely gonna be requested within 1 cycle
+        // unsafe {
+        //     let nxt_ptr = stems_ptr
+        //         .as_ptr()
+        //         .add((result * VB) as usize);
+        //     prefetch_t0(nxt_ptr);
+        // }
+
+        // Prefetch deeper-level 8 base ptrs to L2
+        let next_base_no_right = (result & Self::line_mask_inv()).wrapping_add(7);
+        let next_next_prefetch_base = next_base_no_right.wrapping_shl(Self::log2_items_per_line());
+        Self::prefetch_next_base(stems_ptr, next_next_prefetch_base);
+
+        // println!("is_right_child: {is_right_child}, min_idx: {min_idx}, min_row_idx: {min_row_idx}, base_no_right: {base_no_right}, next_prefetch_base: {next_prefetch_base}, next stem_idx: {result}");
+        // println!("next_next_prefetch_base: {next_next_prefetch_base} -> {}", next_next_prefetch_base + 128);
+
+        minor_level = 0;
+
+        (result, minor_level)
+    }
+
+    #[allow(dead_code)]
+    #[inline(always)]
     fn prefetch_next_base(stems_ptr: NonNull<u8>, next_base: u32) {
         #[cfg(target_arch = "x86_64")]
         unsafe {
@@ -355,26 +416,24 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellySwPre<L
             // prevent LLVM from "helpfully" removing redundant prefetches
             core::arch::asm!("", in("rax") base_ptr, options(nomem, nostack, preserves_flags));
 
-            _mm_prefetch::<{ _MM_HINT_T0 }>(base_ptr as *const i8);
-            _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_1 as *const i8);
-            _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_2 as *const i8);
-            _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_3 as *const i8);
-            _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_4 as *const i8);
-            _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_5 as *const i8);
-            _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_6 as *const i8);
-            _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_7 as *const i8);
+            _mm_prefetch::<{ _MM_HINT_T1 }>(base_ptr as *const i8);
+            _mm_prefetch::<{ _MM_HINT_T1 }>(ptr_1 as *const i8);
+            _mm_prefetch::<{ _MM_HINT_T1 }>(ptr_2 as *const i8);
+            _mm_prefetch::<{ _MM_HINT_T1 }>(ptr_3 as *const i8);
+            _mm_prefetch::<{ _MM_HINT_T1 }>(ptr_4 as *const i8);
+            _mm_prefetch::<{ _MM_HINT_T1 }>(ptr_5 as *const i8);
+            _mm_prefetch::<{ _MM_HINT_T1 }>(ptr_6 as *const i8);
+            _mm_prefetch::<{ _MM_HINT_T1 }>(ptr_7 as *const i8);
         }
 
         #[cfg(target_arch = "aarch64")]
         unsafe {
-            use core::arch::aarch64::{
-                _prefetch, _PREFETCH_LOCALITY2, _PREFETCH_LOCALITY3, _PREFETCH_READ,
-            };
+            use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY2, _PREFETCH_READ};
 
             const BYTES_PER_LINE: usize = 64; // 64 for most ARM, 128 for Apple M-series
             let base_ptr = stems_ptr.as_ptr().add((next_base as usize) * VB as usize);
 
-            let ptr_1 = base_ptr.add(1 * BYTES_PER_LINE);
+            let ptr_1 = base_ptr.add(BYTES_PER_LINE);
             let ptr_2 = base_ptr.add(2 * BYTES_PER_LINE);
             let ptr_3 = base_ptr.add(3 * BYTES_PER_LINE);
             let ptr_4 = base_ptr.add(4 * BYTES_PER_LINE);
@@ -383,7 +442,10 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellySwPre<L
             let ptr_7 = base_ptr.add(7 * BYTES_PER_LINE);
 
             // prevent LLVM from "helpfully" removing redundant prefetches
-            core::arch::asm!("", in("x0") base_ptr, options(nomem, nostack, preserves_flags));
+            #[allow(clippy::pointers_in_nomem_asm_block)]
+            {
+                core::arch::asm!("", in("x0") base_ptr, options(nomem, nostack, preserves_flags));
+            }
 
             _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(base_ptr as *const i8);
             _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_1 as *const i8);
@@ -429,6 +491,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellySwPre<L
         (left, right)
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     fn prefetch_next_minor_tri(&self, stems_ptr: *const f32) {
         // Only act on the first level of each minor triangle
@@ -453,55 +516,27 @@ pub fn calc_child_idx(
     is_right_child: bool,
     stems_ptr: NonNull<u8>,
 ) -> (u32, u32) {
-    DonnellySwPre::<3, 64, 8, 3>::step_pure(curr_idx, minor_index, is_right_child, stems_ptr)
+    DonnellyPf::<3, 64, 8, 3>::step_pure(curr_idx, minor_index, is_right_child, stems_ptr)
 }
 
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
 pub fn both_children_pure(curr_idx: u32, minor_index: u32) -> (u32, u32) {
-    DonnellySwPre::<3, 64, 8, 3>::both_children_pure(curr_idx, minor_index)
+    DonnellyPf::<3, 64, 8, 3>::both_children_pure(curr_idx, minor_index)
 }
 
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
-pub fn test_traverse(is_right_child: bool, stems: AlignedVec) -> usize {
-    let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+pub fn test_traverse(is_right_child: bool, stems: *mut u8) -> usize {
+    let stems_ptr = NonNull::new(stems).unwrap();
 
-    let mut stem_strat = DonnellySwPre::<3, 64, 8, 3>::new(stems_ptr);
+    let mut stem_strat = DonnellyPf::<3, 64, 8, 3>::new(stems_ptr);
 
     stem_strat.traverse(is_right_child);
     stem_strat.traverse(!is_right_child);
     stem_strat.traverse(is_right_child);
 
     stem_strat.stem_idx()
-}
-
-#[cfg(target_arch = "aarch64")]
-#[inline(always)]
-unsafe fn prefetch_t0(ptr: *const u8) {
-    use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY3, _PREFETCH_READ};
-    _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY3>(ptr as *const i8);
-}
-
-#[cfg(target_arch = "aarch64")]
-#[inline(always)]
-unsafe fn prefetch_t1(ptr: *const u8) {
-    use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY2, _PREFETCH_READ};
-    _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr as *const i8);
-}
-
-#[cfg(target_arch = "x86_64")]
-#[inline(always)]
-unsafe fn prefetch_t0(ptr: *const u8) {
-    use core::arch::x86_64::_mm_prefetch;
-    _mm_prefetch::<_MM_HINT_T0>(ptr as *const i8);
-}
-
-#[cfg(target_arch = "x86_64")]
-#[inline(always)]
-unsafe fn prefetch_t1(ptr: *const u8) {
-    use core::arch::x86_64::_mm_prefetch;
-    _mm_prefetch::<_MM_HINT_T1>(ptr as *const i8);
 }
 
 // helper: line base (16 f32 per 64B line)
@@ -593,10 +628,10 @@ mod tests {
         #[case] input: Vec<bool>,
         #[case] expected: usize,
     ) {
-        let mut stems = avec![f64::INFINITY; 9];
+        let stems = avec![f64::INFINITY; 9];
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
 
-        let mut stem_strat = DonnellySwPre::<3, 64, 8, 3>::new(stems_ptr);
+        let mut stem_strat = DonnellyPf::<3, 64, 8, 3>::new(stems_ptr);
         let mut result = 0;
         input.iter().for_each(|selection| {
             stem_strat.traverse(*selection);
@@ -654,10 +689,10 @@ mod tests {
         #[case] input: Vec<bool>,
         #[case] expected: (usize, usize),
     ) {
-        let mut stems = avec![f64::INFINITY; 9];
+        let stems = avec![f64::INFINITY; 9];
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
 
-        let mut stem_strat = DonnellySwPre::<3, 64, 8, 3>::new(stems_ptr);
+        let mut stem_strat = DonnellyPf::<3, 64, 8, 3>::new(stems_ptr);
         // let mut stem_strat = Donnelly::<3, 64, 4, 4>::new();
 
         // let last = input.last().unwrap();
@@ -667,6 +702,75 @@ mod tests {
 
         let results = stem_strat.split();
         let result = (results.0.stem_idx(), results.1.stem_idx());
+
+        assert_eq!(result, expected);
+    }
+
+    #[rstest]
+    #[case(vec![], 0)]
+    #[case(vec![false], 1)] // 1 Maj idx: 1
+    #[case(vec![true], 2)] // 2
+    #[case(vec![false, false], 3)] // 3
+    #[case(vec![false, true], 4)] // 4
+    #[case(vec![true, false], 5)] // 5
+    #[case(vec![true, true], 6)] // 6
+    #[case(vec![false, false, false], 8)] // 7
+    #[case(vec![false, false, true], 16)] // 8
+    #[case(vec![false, true, false], 24)] // 9
+    #[case(vec![false, true, true], 32)] // 10
+    #[case(vec![true, false, false], 40)] // 11
+    #[case(vec![true, false, true], 48)] // 12
+    #[case(vec![true, true, false], 56)] // 13
+    #[case(vec![true, true, true], 64)] // 14
+    #[case(vec![false, false, false, false], 9)] // 15 Maj idx: 2
+    #[case(vec![false, false, false, true], 10)] // 16
+    #[case(vec![false, false, false, false, false], 11)] // 17
+    #[case(vec![false, false, false, false, true], 12)] // 18
+    #[case(vec![false, false, false, true, false], 13)] // 19
+    #[case(vec![false, false, false, true, true], 14)] // 20
+    #[case(vec![false, false, false, false, false, false], 72)] // 21
+    #[case(vec![false, false, false, false, false, true], 80)] // 22
+    #[case(vec![false, false, false, false, true, false], 88)] // 23
+    #[case(vec![false, false, false, false, true, true], 96)] // 24
+    #[case(vec![false, false, false, true, false, false], 104)] // 25
+    #[case(vec![false, false, false, true, false, true], 112)] // 26
+    #[case(vec![false, false, false, true, true, false], 120)] // 27
+    #[case(vec![false, false, false, true, true, true], 128)] // 28
+    #[case(vec![false, false, true, false], 17)] // 29  Maj index: 3
+    #[case(vec![false, false, true, true], 18)] // 30
+    #[case(vec![false, false, true, false, false], 19)] // 31
+    #[case(vec![false, false, true, false, true], 20)] // 32
+    #[case(vec![false, false, true, true, false], 21)] // 33
+    #[case(vec![false, false, true, true, true], 22)] // 34
+    #[case(vec![false, false, true, false, false, false], 136)] // 35
+    #[case(vec![false, false, true, false, false, true], 144)] // 36
+    #[case(vec![false, false, true, false, true, false], 152)] // 37
+    #[case(vec![false, false, true, false, true, true], 160)] // 38
+    #[case(vec![false, false, true, true, false, false], 168)] // 39
+    #[case(vec![false, false, true, true, false, true], 176)] // 40
+    #[case(vec![false, false, true, true, true, false], 184)] // 41
+    #[case(vec![false, false, true, true, true, true], 192)] // 42
+    fn donnelly_v2_get_child_idx_unrolled_produces_correct_values(
+        #[case] input: Vec<bool>,
+        #[case] expected: usize,
+    ) {
+        let stems = avec![f64::INFINITY; 9];
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+
+        let mut stem_strat = DonnellyPf::<3, 64, 8, 3>::new(stems_ptr);
+        let mut result = 0;
+        let mut minor_tri_idx = 0;
+        input.iter().for_each(|selection| {
+            if minor_tri_idx == 2 {
+                stem_strat.traverse_tail(*selection);
+                minor_tri_idx = 0;
+            } else {
+                minor_tri_idx += 1;
+                stem_strat.traverse_head(*selection);
+            }
+
+            result = stem_strat.stem_idx();
+        });
 
         assert_eq!(result, expected);
     }

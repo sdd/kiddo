@@ -51,3 +51,23 @@ perf-donnelly:
 
 perf-eytzinger:
     perf stat -e cycles,instructions,L1-dcache-load-misses,LLC-load-misses,branch-misses ./target/release/examples/immutable-large-ann-eytzinger
+
+
+uprof-eytzinger:
+    /opt/AMD/AMDuProf_Linux_x64_5.1.701/bin/AMDuProfCLI collect \
+        --config ibs \
+        --interval 10000 \
+        --format csv \
+        -w /home/scotty/projects/kiddo \
+        -o ./uprof-output-eytz \
+        target/release/examples/immutable-large-ann-eytzinger-deserialize-and-query
+
+
+uprof-donnelly:
+    /opt/AMD/AMDuProf_Linux_x64_5.1.701/bin/AMDuProfCLI collect \
+        --config ibs \
+        --interval 10000 \
+        --format csv \
+        -w /home/scotty/projects/kiddo \
+        -o ./uprof-output-eytz \
+        target/release/examples/immutable-large-ann-donnelly-deserialize-and-query

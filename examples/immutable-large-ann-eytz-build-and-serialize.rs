@@ -12,15 +12,15 @@ use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::stem_strategies::Eytzinger;
 use kiddo::test_utils::build_query_points_float;
 
-const TREE_SIZE: usize = 2usize.pow(23);
-// const QUERY_POINT_QTY: usize = 20_000_000;
-const QUERY_POINT_QTY: usize = 20_000;
+const TREE_SIZE: usize = 2usize.pow(25);
+const QUERY_POINT_QTY: usize = 20_000_000;
+// const QUERY_POINT_QTY: usize = 20_000;
 const BUCKET_SIZE: usize = 2;
 
 type Tree = ImmutableKdTree<f64, usize, Eytzinger<4>, 4, BUCKET_SIZE>;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut rng = rand_chacha::ChaCha8Rng::from_os_rng();
+    let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(1);
     let content_to_add: Vec<[f64; 4]> = (0..TREE_SIZE).map(|_| rng.random::<[f64; 4]>()).collect();
 
     let start = Instant::now();

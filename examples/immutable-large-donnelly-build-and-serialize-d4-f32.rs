@@ -12,14 +12,15 @@ use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::stem_strategies::Donnelly;
 use kiddo::test_utils::build_query_points_float;
 
-const TREE_SIZE: usize = 2usize.pow(22);
-const QUERY_POINT_QTY: usize = 20_000;
+const TREE_SIZE: usize = 2usize.pow(25);
+const QUERY_POINT_QTY: usize = 20_000_000;
+// const QUERY_POINT_QTY: usize = 20_000;
 const BUCKET_SIZE: usize = 2;
 
 type Tree = ImmutableKdTree<f32, usize, Donnelly<4, 64, 4, 4>, 4, BUCKET_SIZE>;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut rng = rand_chacha::ChaCha8Rng::from_os_rng();
+    let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(1);
     let content_to_add: Vec<[f32; 4]> = (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
     let start = Instant::now();
@@ -28,8 +29,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     assert_eq!(
         tree.max_stem_level() % 4,
-        0,
-        "Tree max stem level should be a multiple of 4"
+        3,
+        "Tree max stem level should be one less than a multiple of 4"
     );
 
     println!(

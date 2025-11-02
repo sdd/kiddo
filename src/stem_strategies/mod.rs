@@ -1,17 +1,19 @@
 /// Donnelly Stem Ordering
 // pub mod donnelly_1;
 pub mod donnelly_2;
-// pub mod donnelly_3;
+pub mod donnelly_2_pf;
+pub mod donnelly_3;
 // pub mod donnelly_4;
 // pub mod donnelly_5;
 
 /// Eytzinger Stem Ordering
 pub mod eytzinger;
-
-/// Eytzinger Stem Ordering with Prefetching
 pub mod eytzinger_pf;
+pub mod eytzinger_pf_far;
+
 mod prefetch;
 
 pub use donnelly_2::Donnelly;
+pub use donnelly_3::DonnellySwPre;
 pub use eytzinger::Eytzinger;
 pub use eytzinger_pf::EytzingerPf;

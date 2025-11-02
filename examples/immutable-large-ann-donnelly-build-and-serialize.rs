@@ -14,7 +14,7 @@ use kiddo::test_utils::build_query_points_float;
 
 const TREE_SIZE: usize = 2usize.pow(23);
 // const QUERY_POINT_QTY: usize = 20_000_000;
-const QUERY_POINT_QTY: usize = 20_000;
+const QUERY_POINT_QTY: usize = 20_000_000;
 const BUCKET_SIZE: usize = 2;
 
 type Tree = ImmutableKdTree<f64, usize, Donnelly<3, 64, 8, 4>, 4, BUCKET_SIZE>;
@@ -51,14 +51,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         ElapsedDuration::new(start.elapsed())
     );
 
-    // println!("Generating {QUERY_POINT_QTY:?} random NN queries...");
-    // let query_points: Vec<[f64; 4]> = build_query_points_float(QUERY_POINT_QTY);
-    //
-    // let buf = to_bytes::<RkyvError>(&query_points)?;
-    //
-    // let mut file = File::create("./examples/immutable-ann-test-points-f64-rkyv_08.rkyv")?;
-    // file.write_all(&buf)
-    //     .expect("Could not write serialized rkyv to file");
+    println!("Generating {QUERY_POINT_QTY:?} random NN queries...");
+    let query_points: Vec<[f64; 4]> = build_query_points_float(QUERY_POINT_QTY);
+
+    let buf = to_bytes::<RkyvError>(&query_points)?;
+
+    let mut file = File::create("./examples/immutable-ann-test-points-f64-rkyv_08.rkyv")?;
+    file.write_all(&buf)
+        .expect("Could not write serialized rkyv to file");
 
     Ok(())
 }
