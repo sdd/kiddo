@@ -1,0 +1,26 @@
+STAT                                    EYTZ        DY R        DY UNR
+
+L2_cache_misses_from_dc_misses          223M        62M         62M
+
+l2_latency.l2_cycles_waiting_on_fills   5.75B       2.19B       2.12B
+
+l2_cache_hits_from_l2_hwpf              34.1M       14.0M       14.0M
+
+l2_pf_miss_l2_hit_l3                    154M        38.5M       38.4M
+
+l2_pf_miss_l2_l3                        36.3M       18.1M       17.9M
+
+l2_request_g1.l2_hw_pf                  217M        64.4M       63.0M
+
+l2_request_g1.prefetch_l2_cmd           1.32M       733k        1.76M
+
+ls_pref_instr_disp.prefetch             0           0           0
+
+
+ls_sw_pf_dc_fills.mem_io_local
+ls_sw_pf_dc_fills.int_cache
+ls_sw_pf_dc_fills.lcl_l2
+
+l2_cache_accesses_from_dc_misses
+l2_cache_hits_from_dc_misses
+l2_cache_hits_from_l2_hwpf

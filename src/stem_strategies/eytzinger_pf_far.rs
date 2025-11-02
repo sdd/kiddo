@@ -5,7 +5,7 @@ use std::ptr::NonNull;
 
 /// Eytzinger Stem Ordering
 #[derive(Clone, Debug)]
-pub struct EytzingerPf<const K: usize, const VB: usize> {
+pub struct EytzingerPfFar<const K: usize, const VB: usize> {
     stem_idx: u32,
     dim: usize,
     level: i32,
@@ -14,10 +14,10 @@ pub struct EytzingerPf<const K: usize, const VB: usize> {
 }
 
 // FIXME: this is a hack to make the compiler happy. remove after testing
-unsafe impl<const K: usize, const VB: usize> Send for EytzingerPf<K, VB> {}
-unsafe impl<const K: usize, const VB: usize> Sync for EytzingerPf<K, VB> {}
+unsafe impl<const K: usize, const VB: usize> Send for EytzingerPfFar<K, VB> {}
+unsafe impl<const K: usize, const VB: usize> Sync for EytzingerPfFar<K, VB> {}
 
-impl<const K: usize, const VB: usize> StemStrategy for EytzingerPf<K, VB> {
+impl<const K: usize, const VB: usize> StemStrategy for EytzingerPfFar<K, VB> {
     fn new(stems_ptr: NonNull<u8>) -> Self {
         Self {
             stem_idx: 1,
@@ -92,7 +92,7 @@ impl<const K: usize, const VB: usize> StemStrategy for EytzingerPf<K, VB> {
     fn trim_unneeded_stems<A>(_stems: &mut AVec<A>, _max_stem_level: usize) {}
 }
 
-impl<const K: usize, const VB: usize> EytzingerPf<K, VB> {
+impl<const K: usize, const VB: usize> EytzingerPfFar<K, VB> {
     #[allow(missing_docs)]
     #[inline(always)]
     pub fn step_pure(stem_idx: u32, is_right_child: bool, stems_ptr: NonNull<u8>) -> u32 {
@@ -103,6 +103,11 @@ impl<const K: usize, const VB: usize> EytzingerPf<K, VB> {
                 .as_ptr()
                 .add((result.wrapping_shl(1) as usize) * VB);
             prefetch_t0(nxt_ptr);
+
+            let far_ptr = stems_ptr
+                .as_ptr()
+                .add((result.wrapping_shl(4) as usize) * VB);
+            prefetch_t1(far_ptr);
         }
 
         result
@@ -112,5 +117,5 @@ impl<const K: usize, const VB: usize> EytzingerPf<K, VB> {
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
 pub fn calc_child_idx(curr_idx: u32, is_right_child: bool, stems_ptr: NonNull<u8>) -> u32 {
-    EytzingerPf::<3, 8>::step_pure(curr_idx, is_right_child, stems_ptr)
+    EytzingerPfFar::<3, 8>::step_pure(curr_idx, is_right_child, stems_ptr)
 }

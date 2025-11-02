@@ -1,6 +1,6 @@
 use std::sync::mpsc::Sender;
 
-use crate::cache_simulator::Event;
+use crate::cache_simulator::{Event, PrefetchLevel};
 use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::stem_strategies::Donnelly;
 use crate::traits::StemStrategy;
@@ -57,7 +57,10 @@ impl ImmutableKdTree<f32, u32, Donnelly<4, 64, 4, 4>, 4, 32> {
             // stem_ordering.simulate_traverse(is_right_child, event_tx);
 
             let _ = event_tx.send(Event::Working(2));
-            let _ = event_tx.send(Event::Prefetch(stem_ordering.stem_idx() * 4usize));
+            let _ = event_tx.send(Event::PrefetchTo(
+                stem_ordering.stem_idx() * 4usize,
+                PrefetchLevel::L2,
+            ));
             let _ = event_tx.send(Event::Working(3));
         }
 

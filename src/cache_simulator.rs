@@ -60,6 +60,21 @@ pub struct CacheStats {
     pub misses: u64,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum PrefetchLevel {
+    L1,
+    L2,
+    L3,
+}
+
+/// Extend prefetch stats to hierarchy
+#[derive(Default, Debug, Clone)]
+pub struct HierarchyPrefetchStats {
+    pub l1: PrefetchStats,
+    pub l2: PrefetchStats,
+    pub l3: PrefetchStats,
+}
+
 /// Statistics for prefetch behavior and effectiveness.
 #[derive(Default, Debug, Clone)]
 pub struct PrefetchStats {
@@ -564,7 +579,7 @@ pub enum Event {
     /// Demand access of 'addr'.
     Access(usize),
     /// Software prefetch request for 'addr'.
-    Prefetch(usize),
+    PrefetchTo(usize, PrefetchLevel),
     /// Advance simulated time by these cycles.
     Working(u32),
     /// Inform the simulator that a new query has started.
@@ -615,10 +630,10 @@ pub struct MemoryHierarchy {
     mem: MemPort,
 
     // prefetch accounting
-    /// Prefetch statistics for L1 cache.
-    pub pf_stats_l1: PrefetchStats,
+    pub pf_stats: HierarchyPrefetchStats,
+
     /// For timeliness: record prefetch issue time per line (L1 line address)
-    prefetch_issue_time: HashMap<u64 /*line*/, u64 /*issue_cycle*/>,
+    prefetch_issue_time: HashMap<u64 /*line*/, (PrefetchLevel, u64 /*issue_cycle*/)>,
 
     // Stride Tracking
     /// Stride pattern analyzer for memory accesses.
@@ -675,7 +690,7 @@ impl MemoryHierarchy {
             timing: tc,
             cycle: 0,
             mem: MemPort::new(220, 5),
-            pf_stats_l1: PrefetchStats::default(),
+            pf_stats: HierarchyPrefetchStats::default(),
             prefetch_issue_time: HashMap::new(),
 
             stride_analyzer,
@@ -711,6 +726,15 @@ impl MemoryHierarchy {
         (addr as u64) >> self.l1.line_offset_bits
     }
 
+    #[inline]
+    fn pf_stats_for_level_mut(&mut self, level: PrefetchLevel) -> &mut PrefetchStats {
+        match level {
+            PrefetchLevel::L1 => &mut self.pf_stats.l1,
+            PrefetchLevel::L2 => &mut self.pf_stats.l2,
+            PrefetchLevel::L3 => &mut self.pf_stats.l3,
+        }
+    }
+
     /// Direct demand access (no timing realism besides per-level latencies + DRAM port).
     /// Returns which level hit or None (memory), and advances self.cycle by the stall observed.
     /// Process a demand memory access and return which cache level hit (or None for memory).
@@ -722,10 +746,10 @@ impl MemoryHierarchy {
 
         let start = self.cycle;
 
-        // L1
+        // --- L1 ---
         let (hit_l1, t1) = self
             .l1
-            .demand_probe_and_time(addr, self.cycle, &mut self.pf_stats_l1);
+            .demand_probe_and_time(addr, self.cycle, &mut self.pf_stats.l1);
         if hit_l1 {
             self.cycle = t1;
             self.stats.demand_stall_cycles += self.cycle - start;
@@ -736,14 +760,21 @@ impl MemoryHierarchy {
             if let Some(l3) = &self.l3 {
                 self.stats.l3 = l3.stats.clone();
             }
+
+            // mark lead distance if prefetched
+            let line = self.line_of_l1(addr);
+            if let Some((lvl, issue_cycle)) = self.prefetch_issue_time.remove(&line) {
+                let lead = self.cycle.saturating_sub(issue_cycle);
+                self.pf_stats_for_level_mut(lvl).useful_lead_cycles_sum += lead;
+            }
             return Some("L1");
         }
 
-        // L2
+        // --- L2 ---
         if let Some(l2) = &mut self.l2 {
-            let (hit_l2, t2) = l2.demand_probe_and_time(addr, self.cycle, &mut self.pf_stats_l1);
+            let (hit_l2, t2) = l2.demand_probe_and_time(addr, self.cycle, &mut self.pf_stats.l2);
             if hit_l2 {
-                // Promote to L1 (inclusive) at t2
+                // promote to L1
                 self.l1.mark_ready(addr, t2);
                 self.cycle = t2 + self.l1.timing.hit_latency as u64;
                 self.stats.demand_stall_cycles += self.cycle - start;
@@ -752,15 +783,21 @@ impl MemoryHierarchy {
                 if let Some(l3) = &self.l3 {
                     self.stats.l3 = l3.stats.clone();
                 }
+
+                // if it had been prefetched earlier
+                let line = self.line_of_l1(addr);
+                if let Some((lvl, issue_cycle)) = self.prefetch_issue_time.remove(&line) {
+                    let lead = self.cycle.saturating_sub(issue_cycle);
+                    self.pf_stats_for_level_mut(lvl).useful_lead_cycles_sum += lead;
+                }
                 return Some("L2");
             }
         }
 
-        // L3
+        // --- L3 ---
         if let Some(l3) = &mut self.l3 {
-            let (hit_l3, t3) = l3.demand_probe_and_time(addr, self.cycle, &mut self.pf_stats_l1);
+            let (hit_l3, t3) = l3.demand_probe_and_time(addr, self.cycle, &mut self.pf_stats.l3);
             if hit_l3 {
-                // Promote up at t3
                 if let Some(l2) = &mut self.l2 {
                     l2.mark_ready(addr, t3);
                 }
@@ -772,14 +809,21 @@ impl MemoryHierarchy {
                     self.stats.l2 = l2.stats.clone();
                 }
                 self.stats.l3 = l3.stats.clone();
+
+                let line = self.line_of_l1(addr);
+                if let Some((lvl, issue_cycle)) = self.prefetch_issue_time.remove(&line) {
+                    let lead = self.cycle.saturating_sub(issue_cycle);
+                    self.pf_stats_for_level_mut(lvl).useful_lead_cycles_sum += lead;
+                }
                 return Some("L3");
             }
         }
 
-        // Memory miss
+        // --- Memory miss ---
         self.stats.memory_accesses += 1;
         let ret = self.mem.schedule(self.cycle);
-        // Install everywhere inclusively at 'ret'
+
+        // install inclusively
         if let Some(l3) = &mut self.l3 {
             l3.mark_ready(addr, ret);
         }
@@ -788,13 +832,13 @@ impl MemoryHierarchy {
         }
         self.l1.mark_ready(addr, ret);
 
-        // If a prefetch was issued for this line earlier, count 'late'
+        // Late prefetch: whichever level’s issue time exists
         let line = self.line_of_l1(addr);
         if self.prefetch_issue_time.remove(&line).is_some() {
-            self.pf_stats_l1.late += 1;
+            // We don't know which level it targeted, but usually L1
+            self.pf_stats.l1.late += 1;
         }
 
-        // Demand completes after L1 latency
         self.cycle = ret + self.l1.timing.hit_latency as u64;
         self.stats.demand_stall_cycles += self.cycle - start;
         self.stats.l1 = self.l1.stats.clone();
@@ -808,53 +852,109 @@ impl MemoryHierarchy {
     }
 
     /// Software prefetch: schedules memory service if line not already present; installs at L2/L1 with low priority at the ready time.
-    /// Issue a software prefetch for the given address.
-    /// Installs the line at low priority if not already present.
-    pub fn step_prefetch(&mut self, addr: usize) {
-        self.pf_stats_l1.issued += 1;
+    pub fn step_prefetch_to(&mut self, addr: usize, level: PrefetchLevel) {
+        let stats = match level {
+            PrefetchLevel::L1 => &mut self.pf_stats.l1,
+            PrefetchLevel::L2 => &mut self.pf_stats.l2,
+            PrefetchLevel::L3 => &mut self.pf_stats.l3,
+        };
+        stats.issued += 1;
 
-        // Redundant if already in L1
-        if self.l1.has_line(addr) {
-            self.pf_stats_l1.redundant += 1;
-            return;
-        }
-        // If present in L2/L3, we can just mark low-priority install to L1 at 'now + hit_latency'.
-        if let Some(l2) = &mut self.l2 {
-            if l2.has_line(addr) {
-                let t = self.cycle + l2.timing.hit_latency as u64;
-                self.l1.prefetch_install_lowprio(addr, t);
-                self.pf_stats_l1.filled += 1;
+        // Helper closures for convenience
+        let schedule_mem = |mem: &mut MemPort, now: u64| mem.schedule(now);
+
+        match level {
+            PrefetchLevel::L1 => {
+                // same behaviour as before
+                if self.l1.has_line(addr) {
+                    stats.redundant += 1;
+                    return;
+                }
+                if let Some(l2) = &mut self.l2 {
+                    if l2.has_line(addr) {
+                        let t = self.cycle + l2.timing.hit_latency as u64;
+                        self.l1.prefetch_install_lowprio(addr, t);
+                        stats.filled += 1;
+                        self.prefetch_issue_time
+                            .entry(self.line_of_l1(addr))
+                            .or_insert((PrefetchLevel::L1, self.cycle));
+                        return;
+                    }
+                }
+                if let Some(l3) = &mut self.l3 {
+                    if l3.has_line(addr) {
+                        let t = self.cycle + l3.timing.hit_latency as u64;
+                        self.l1.prefetch_install_lowprio(addr, t);
+                        stats.filled += 1;
+                        self.prefetch_issue_time
+                            .entry(self.line_of_l1(addr))
+                            .or_insert((PrefetchLevel::L1, self.cycle));
+                        return;
+                    }
+                }
+                // memory
+                let ret = schedule_mem(&mut self.mem, self.cycle);
+                if let Some(l3) = &mut self.l3 {
+                    l3.prefetch_install_lowprio(addr, ret);
+                }
+                if let Some(l2) = &mut self.l2 {
+                    l2.prefetch_install_lowprio(addr, ret);
+                }
+                self.l1.prefetch_install_lowprio(addr, ret);
+                stats.filled += 1;
                 self.prefetch_issue_time
                     .entry(self.line_of_l1(addr))
-                    .or_insert(self.cycle);
-                return;
+                    .or_insert((PrefetchLevel::L1, self.cycle));
             }
-        }
-        if let Some(l3) = &mut self.l3 {
-            if l3.has_line(addr) {
-                let t = self.cycle + l3.timing.hit_latency as u64;
-                self.l1.prefetch_install_lowprio(addr, t);
-                self.pf_stats_l1.filled += 1;
-                self.prefetch_issue_time
-                    .entry(self.line_of_l1(addr))
-                    .or_insert(self.cycle);
-                return;
-            }
-        }
 
-        // Need memory: schedule via DRAM port, install low-priority at return
-        let ret = self.mem.schedule(self.cycle);
-        if let Some(l3) = &mut self.l3 {
-            l3.prefetch_install_lowprio(addr, ret);
+            PrefetchLevel::L2 => {
+                // Only up to L2 (doesn't touch L1 until demand)
+                if let Some(l2) = &mut self.l2 {
+                    if l2.has_line(addr) {
+                        stats.redundant += 1;
+                        return;
+                    }
+                    if let Some(l3) = &mut self.l3 {
+                        if l3.has_line(addr) {
+                            let t = self.cycle + l3.timing.hit_latency as u64;
+                            l2.prefetch_install_lowprio(addr, t);
+                            stats.filled += 1;
+
+                            self.prefetch_issue_time
+                                .entry(self.line_of_l1(addr))
+                                .or_insert((PrefetchLevel::L2, self.cycle));
+                            return;
+                        }
+                    }
+                    let ret = schedule_mem(&mut self.mem, self.cycle);
+                    if let Some(l3) = &mut self.l3 {
+                        l3.prefetch_install_lowprio(addr, ret);
+                    }
+                    l2.prefetch_install_lowprio(addr, ret);
+                    stats.filled += 1;
+
+                    self.prefetch_issue_time
+                        .entry(self.line_of_l1(addr))
+                        .or_insert((PrefetchLevel::L2, self.cycle));
+                }
+            }
+
+            PrefetchLevel::L3 => {
+                if let Some(l3) = &mut self.l3 {
+                    if l3.has_line(addr) {
+                        stats.redundant += 1;
+                        return;
+                    }
+                    let ret = schedule_mem(&mut self.mem, self.cycle);
+                    l3.prefetch_install_lowprio(addr, ret);
+                    stats.filled += 1;
+
+                    self.prefetch_issue_time
+                        .entry(self.line_of_l1(addr))
+                        .or_insert((PrefetchLevel::L3, self.cycle));
+                }
+            }
         }
-        if let Some(l2) = &mut self.l2 {
-            l2.prefetch_install_lowprio(addr, ret);
-        }
-        self.l1.prefetch_install_lowprio(addr, ret);
-        self.pf_stats_l1.filled += 1;
-        self.prefetch_issue_time
-            .entry(self.line_of_l1(addr))
-            .or_insert(self.cycle);
     }
 
     /// Advance simulated time by N cycles (e.g., work between accesses).
@@ -884,18 +984,23 @@ impl MemoryHierarchy {
                 let before = self.cycle;
                 let hitlvl = self.step_demand(addr);
 
-                // If this access hit a prefetched line, add lead distance (now - issue) to stats
+                // If this access hit a prefetched line, record lead distance
                 let line = self.line_of_l1(addr);
-                if let Some(issue) = self.prefetch_issue_time.remove(&line) {
-                    // If it was late, 'late' counter already incremented in step_demand; only add lead for useful
-                    if self.l1.has_line(addr) {
-                        self.pf_stats_l1.useful_lead_cycles_sum += (before.max(self.cycle)) - issue;
+                if let Some((lvl, issue_cycle)) = self.prefetch_issue_time.remove(&line) {
+                    // Add lead cycles only if the prefetch arrived in time
+                    if self.l1.has_line(addr)
+                        || self.l2.as_ref().map_or(false, |l2| l2.has_line(addr))
+                        || self.l3.as_ref().map_or(false, |l3| l3.has_line(addr))
+                    {
+                        let lead = (before.max(self.cycle)) - issue_cycle;
+                        self.pf_stats_for_level_mut(lvl).useful_lead_cycles_sum += lead;
                     }
                 }
+
                 hitlvl
             }
-            Event::Prefetch(addr) => {
-                self.step_prefetch(addr);
+            Event::PrefetchTo(addr, lvl) => {
+                self.step_prefetch_to(addr, lvl);
                 None
             }
             Event::Working(c) => {
@@ -943,7 +1048,7 @@ impl MemoryHierarchy {
         self.stats = HierarchyStats::default();
         self.cycle = 0;
         self.mem.next_ready = 0;
-        self.pf_stats_l1 = PrefetchStats::default();
+        self.pf_stats = HierarchyPrefetchStats::default();
         self.prefetch_issue_time.clear();
         self.addr_access_counts.clear();
     }

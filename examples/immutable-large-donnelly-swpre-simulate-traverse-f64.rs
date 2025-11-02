@@ -12,12 +12,13 @@ use kiddo::cache_simulator::{profiles, AccessKind};
 use kiddo::distance::float::SquaredEuclidean;
 use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
-use kiddo::stem_strategies::Donnelly;
+use kiddo::stem_strategies::DonnellySwPre;
 
 const BUCKET_SIZE: usize = 2;
 
-type Tree = ImmutableKdTree<f64, usize, Donnelly<3, 64, 8, 4>, 4, BUCKET_SIZE>;
-type ArchivedTree = ArchivedR8ImmutableKdTree<f64, usize, Donnelly<3, 64, 8, 4>, 4, BUCKET_SIZE>;
+type Tree = ImmutableKdTree<f64, usize, DonnellySwPre<3, 64, 8, 4>, 4, BUCKET_SIZE>;
+type ArchivedTree =
+    ArchivedR8ImmutableKdTree<f64, usize, DonnellySwPre<3, 64, 8, 4>, 4, BUCKET_SIZE>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // faster unsafe ZC Deserialize API
@@ -49,7 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let simulator_thread = std::thread::spawn(move || {
         let mut sim = profiles::zen3();
-        let mut count = 0u64;
+        let mut count = 0;
 
         while let Ok(event) = rx.recv() {
             sim.step_event(event);
@@ -60,7 +61,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
-        println!("{count} events processed total.");
+        println!("{:?} steps complete.", count);
 
         let s = sim.snapshot_stats();
         println!(
@@ -99,10 +100,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             "L3 prefetch useful: {}, late: {}",
             sim.pf_stats.l3.useful_lead_cycles_sum, sim.pf_stats.l3.late
         );
-
-        println!("{}", sim.stride_analyzer.render_histogram(60));
-        println!("{}", sim.stride_analyzer.render_markov(1000));
-        sim.print_top_addresses(100);
     });
 
     let start = Instant::now();
