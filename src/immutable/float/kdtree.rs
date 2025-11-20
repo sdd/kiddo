@@ -492,11 +492,13 @@ where
         let chunk_length = sort_index.len();
 
         if level > max_stem_level {
+            let start =
+                u32::try_from(leaf_items.len()).expect("Too many points: index exceeds u32::MAX");
+            let end = u32::try_from(leaf_items.len() + chunk_length)
+                .expect("Too many points: index exceeds u32::MAX");
+
             // Write leaf and terminate recursion
-            leaf_extents.push((
-                leaf_items.len() as u32,
-                (leaf_items.len() + chunk_length) as u32,
-            ));
+            leaf_extents.push((start, end));
 
             (0..chunk_length).for_each(|i| {
                 (0..K).for_each(|dim| leaf_points[dim].push(source[sort_index[i]][dim]));
