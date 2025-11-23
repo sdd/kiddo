@@ -12,7 +12,12 @@ pub mod within_unsorted;
 
 #[cfg(feature = "rkyv_08")]
 pub mod get_leaf_node_idx_unrolled_d4_f32;
+
 #[cfg(feature = "simulator")]
 pub mod simulate_traversal;
+
 #[cfg(feature = "simulator")]
 pub mod simulate_traversal_unrolled_d4_f32;
+
+// #[cfg(feature = "rkyv_08")]
+// pub mod get_leaf_node_idx_kdb_d4_f32;

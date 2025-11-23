@@ -1,11 +1,11 @@
 use crate::traits::Axis;
 use crate::StemStrategy;
-use aligned_vec::{avec, AVec};
+use aligned_vec::AVec;
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0, _MM_HINT_T1};
+
+#[cfg(feature = "rkyv_08")]
 use rkyv_08::util::AlignedVec;
-#[cfg(target_arch = "aarch64")]
-use std::arch::aarch64::{_PREFETCH_LOCALITY2, _PREFETCH_READ};
 use std::ptr::NonNull;
 
 /// Donnelly Strategy
@@ -185,7 +185,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         self.minor_level = near_minor;
         self.level = next_level;
         self.dim = next_dim;
-        self.leaf_idx = near_leaf as usize;
+        self.leaf_idx = near_leaf;
 
         // return FAR child as a new strategy (copy of "self" with swapped fields)
         Self {
@@ -193,7 +193,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
             minor_level: far_minor,
             level: next_level,
             dim: next_dim,
-            leaf_idx: far_leaf as usize,
+            leaf_idx: far_leaf,
             stems_ptr: self.stems_ptr,
         }
     }
@@ -367,14 +367,12 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellySwPre<L
 
         #[cfg(target_arch = "aarch64")]
         unsafe {
-            use core::arch::aarch64::{
-                _prefetch, _PREFETCH_LOCALITY2, _PREFETCH_LOCALITY3, _PREFETCH_READ,
-            };
+            use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY2, _PREFETCH_READ};
 
             const BYTES_PER_LINE: usize = 64; // 64 for most ARM, 128 for Apple M-series
             let base_ptr = stems_ptr.as_ptr().add((next_base as usize) * VB as usize);
 
-            let ptr_1 = base_ptr.add(1 * BYTES_PER_LINE);
+            let ptr_1 = base_ptr.add(BYTES_PER_LINE);
             let ptr_2 = base_ptr.add(2 * BYTES_PER_LINE);
             let ptr_3 = base_ptr.add(3 * BYTES_PER_LINE);
             let ptr_4 = base_ptr.add(4 * BYTES_PER_LINE);
@@ -463,6 +461,7 @@ pub fn both_children_pure(curr_idx: u32, minor_index: u32) -> (u32, u32) {
 }
 
 /// Exposed pure function for use with cargo-asm
+#[cfg(feature = "rkyv_08")]
 #[inline(never)]
 pub fn test_traverse(is_right_child: bool, stems: AlignedVec) -> usize {
     let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
