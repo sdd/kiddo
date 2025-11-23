@@ -1,10 +1,7 @@
-use crate::stem_strategies::prefetch::prefetch_t0;
+use crate::stem_strategies::prefetch::{prefetch_t0, prefetch_t1};
 use crate::traits::Axis;
 use crate::StemStrategy;
 use aligned_vec::AVec;
-#[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
-use std::arch::x86_64::_MM_HINT_T1;
 use std::ptr::NonNull;
 
 /// Donnelly Strategy
@@ -387,7 +384,8 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellyPf<L, C
         // Prefetch deeper-level 8 base ptrs to L2
         let next_base_no_right = (result & Self::line_mask_inv()).wrapping_add(7);
         let next_next_prefetch_base = next_base_no_right.wrapping_shl(Self::log2_items_per_line());
-        Self::prefetch_next_base(stems_ptr, next_next_prefetch_base);
+
+        Self::prefetch_next_base(stems_ptr, next_next_prefetch_base, 2u32.pow(L) as usize);
 
         // println!("is_right_child: {is_right_child}, min_idx: {min_idx}, min_row_idx: {min_row_idx}, base_no_right: {base_no_right}, next_prefetch_base: {next_prefetch_base}, next stem_idx: {result}");
         // println!("next_next_prefetch_base: {next_next_prefetch_base} -> {}", next_next_prefetch_base + 128);
@@ -399,62 +397,18 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellyPf<L, C
 
     #[allow(dead_code)]
     #[inline(always)]
-    fn prefetch_next_base(stems_ptr: NonNull<u8>, next_base: u32) {
+    fn prefetch_next_base(stems_ptr: NonNull<u8>, next_base: u32, cache_line_count: usize) {
         #[cfg(target_arch = "x86_64")]
-        unsafe {
-            const BYTES_PER_LINE: usize = 64;
-            let base_ptr = stems_ptr.as_ptr().add((next_base as usize) * VB as usize);
-
-            let ptr_1 = base_ptr.add(1 * BYTES_PER_LINE);
-            let ptr_2 = base_ptr.add(2 * BYTES_PER_LINE);
-            let ptr_3 = base_ptr.add(3 * BYTES_PER_LINE);
-            let ptr_4 = base_ptr.add(4 * BYTES_PER_LINE);
-            let ptr_5 = base_ptr.add(5 * BYTES_PER_LINE);
-            let ptr_6 = base_ptr.add(6 * BYTES_PER_LINE);
-            let ptr_7 = base_ptr.add(7 * BYTES_PER_LINE);
-
-            // prevent LLVM from "helpfully" removing redundant prefetches
-            core::arch::asm!("", in("rax") base_ptr, options(nomem, nostack, preserves_flags));
-
-            _mm_prefetch::<{ _MM_HINT_T1 }>(base_ptr as *const i8);
-            _mm_prefetch::<{ _MM_HINT_T1 }>(ptr_1 as *const i8);
-            _mm_prefetch::<{ _MM_HINT_T1 }>(ptr_2 as *const i8);
-            _mm_prefetch::<{ _MM_HINT_T1 }>(ptr_3 as *const i8);
-            _mm_prefetch::<{ _MM_HINT_T1 }>(ptr_4 as *const i8);
-            _mm_prefetch::<{ _MM_HINT_T1 }>(ptr_5 as *const i8);
-            _mm_prefetch::<{ _MM_HINT_T1 }>(ptr_6 as *const i8);
-            _mm_prefetch::<{ _MM_HINT_T1 }>(ptr_7 as *const i8);
-        }
+        const BYTES_PER_LINE: usize = 64;
 
         #[cfg(target_arch = "aarch64")]
-        unsafe {
-            use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY2, _PREFETCH_READ};
+        const BYTES_PER_LINE: usize = 64; // 64 for most ARM, 128 for Apple M-series
 
-            const BYTES_PER_LINE: usize = 64; // 64 for most ARM, 128 for Apple M-series
-            let base_ptr = stems_ptr.as_ptr().add((next_base as usize) * VB as usize);
+        let base_ptr = unsafe { stems_ptr.as_ptr().add((next_base as usize) * VB as usize) };
 
-            let ptr_1 = base_ptr.add(BYTES_PER_LINE);
-            let ptr_2 = base_ptr.add(2 * BYTES_PER_LINE);
-            let ptr_3 = base_ptr.add(3 * BYTES_PER_LINE);
-            let ptr_4 = base_ptr.add(4 * BYTES_PER_LINE);
-            let ptr_5 = base_ptr.add(5 * BYTES_PER_LINE);
-            let ptr_6 = base_ptr.add(6 * BYTES_PER_LINE);
-            let ptr_7 = base_ptr.add(7 * BYTES_PER_LINE);
-
-            // prevent LLVM from "helpfully" removing redundant prefetches
-            #[allow(clippy::pointers_in_nomem_asm_block)]
-            {
-                core::arch::asm!("", in("x0") base_ptr, options(nomem, nostack, preserves_flags));
-            }
-
-            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(base_ptr as *const i8);
-            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_1 as *const i8);
-            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_2 as *const i8);
-            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_3 as *const i8);
-            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_4 as *const i8);
-            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_5 as *const i8);
-            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_6 as *const i8);
-            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr_7 as *const i8);
+        for i in 0..cache_line_count {
+            let ptr = unsafe { base_ptr.add(i * BYTES_PER_LINE) };
+            unsafe { prefetch_t1(ptr) };
         }
     }
 

@@ -1,4 +1,5 @@
 //! Definitions and implementations for some traits that are common between the [`float`](crate::mutable::float), [`immutable`](crate::immutable) and [`fixed`](crate::mutable::fixed)  modules
+// use crate::{BestNeighbour, NearestNeighbour, WithinUnsortedIter};
 use aligned_vec::AVec;
 use az::Cast;
 use divrem::DivCeil;
@@ -8,6 +9,7 @@ use num_traits::float::FloatCore;
 use num_traits::{PrimInt, Unsigned, Zero};
 use std::fmt::Debug;
 use std::iter::Sum;
+// use std::num::NonZero;
 use std::ptr::NonNull;
 
 /// Axis trait represents the traits that must be implemented
@@ -260,6 +262,57 @@ pub trait StemStrategy: Clone + Sync + Send {
         unimplemented!();
     }
 }
+
+/*/// Structs defining this trait can perform nearest neighbour queries
+pub trait NNQueryable<A: Axis, T, const K: usize> {
+    fn get_bucket_idx(&self, query: &[A; K]) -> usize;
+
+    fn approx_nearest_one(&self, query: &[A; K]) -> NearestNeighbour<A, T>;
+    fn nearest_one(&self, query: &[A; K]) -> NearestNeighbour<A, T>;
+
+    fn best_n_within(
+        &self,
+        query: &[A; K],
+        dist: A,
+        max_qty: NonZero<usize>,
+    ) -> impl Iterator<Item = BestNeighbour<A, T>>;
+    fn nearest_n_within(
+        &self,
+        query: &[A; K],
+        dist: A,
+        max_qty: NonZero<usize>,
+        sorted: bool,
+    ) -> Vec<NearestNeighbour<A, T>>;
+
+    fn nearest_n(
+        &self,
+        query: &[A; K],
+        max_qty: NonZero<usize>,
+        sorted: bool,
+    ) -> Vec<NearestNeighbour<A, T>> {
+        self.nearest_n_within(query, A::infinity(), max_qty, sorted)
+    }
+
+    fn within(&self, query: &[A; K], dist: A) -> Vec<NearestNeighbour<A, T>> {
+        self.nearest_n_within(query, dist, NonZero::new(usize::MAX).unwrap(), true)
+    }
+
+    fn within_unsorted(&self, query: &[A; K], dist: A) -> Vec<NearestNeighbour<A, T>> {
+        self.nearest_n_within(query, dist, NonZero::new(usize::MAX).unwrap(), false)
+    }
+}
+
+/// Structs defining this trait can perform nearest neighbour queries that return an iterator
+pub trait NNIterQueryable<A, T, const K: usize> {
+    fn within_unsorted_iter<'a>(
+        &'a self,
+        query: &'a [A; K],
+        dist: A,
+    ) -> WithinUnsortedIter<'a, A, T>;
+}
+
+/// Structs defining this trait can have their contents modified after construction
+pub trait NNMutable<A: Axis, T, const K: usize> {}*/
 
 #[cfg(test)]
 mod tests {

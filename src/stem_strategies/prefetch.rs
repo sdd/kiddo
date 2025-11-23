@@ -2,6 +2,13 @@
 #[inline(always)]
 pub(crate) unsafe fn prefetch_t0(ptr: *const u8) {
     use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY3, _PREFETCH_READ};
+
+    // prevent LLVM from "helpfully" removing redundant prefetches
+    #[allow(clippy::pointers_in_nomem_asm_block)]
+    {
+        core::arch::asm!("", in("x0") ptr, options(nomem, nostack, preserves_flags));
+    }
+
     _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY3>(ptr as *const i8);
 }
 
@@ -9,6 +16,13 @@ pub(crate) unsafe fn prefetch_t0(ptr: *const u8) {
 #[inline(always)]
 pub(crate) unsafe fn prefetch_t1(ptr: *const u8) {
     use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY2, _PREFETCH_READ};
+
+    // prevent LLVM from "helpfully" removing redundant prefetches
+    #[allow(clippy::pointers_in_nomem_asm_block)]
+    {
+        core::arch::asm!("", in("x0") ptr, options(nomem, nostack, preserves_flags));
+    }
+
     _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr as *const i8);
 }
 
@@ -16,6 +30,10 @@ pub(crate) unsafe fn prefetch_t1(ptr: *const u8) {
 #[inline(always)]
 pub(crate) unsafe fn prefetch_t0(ptr: *const u8) {
     use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
+
+    // prevent LLVM from "helpfully" removing redundant prefetches
+    core::arch::asm!("", in("rax") ptr, options(nomem, nostack, preserves_flags));
+
     _mm_prefetch::<{ _MM_HINT_T0 }>(ptr as *const i8);
 }
 
@@ -23,5 +41,9 @@ pub(crate) unsafe fn prefetch_t0(ptr: *const u8) {
 #[inline(always)]
 pub(crate) unsafe fn prefetch_t1(ptr: *const u8) {
     use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T1};
+
+    // prevent LLVM from "helpfully" removing redundant prefetches
+    core::arch::asm!("", in("rax") ptr, options(nomem, nostack, preserves_flags));
+
     _mm_prefetch::<{ _MM_HINT_T1 }>(ptr as *const i8);
 }

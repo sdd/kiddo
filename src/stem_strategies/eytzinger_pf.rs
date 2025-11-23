@@ -1,4 +1,4 @@
-use crate::stem_strategies::prefetch::{prefetch_t0, prefetch_t1};
+use crate::stem_strategies::prefetch::prefetch_t0;
 use crate::StemStrategy;
 use aligned_vec::AVec;
 use std::ptr::NonNull;

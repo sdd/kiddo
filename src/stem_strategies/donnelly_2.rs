@@ -228,9 +228,17 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
     // TODO: It would be nice to be able to determine the exact required length up-front.
     //  Instead, we just trim the stems afterwards by traversing right-child non-inf nodes
     //  till we hit max level to get the max used stem
+
+    // TODO: It seems to be the case that you can set your stem array length to the first value in
+    //       this series that is greater than the desired number of stem nodes:
+    //       https://oeis.org/A052379
+    //       First few values of this are:
+    //       8, 72, 584, 4680, 37448, 299592, 2396744, 19173960, 153391688, 1227133512, 9817068104
+    //       Formula is (8^(n+2)-1)/7-1
     fn stem_node_padding_factor() -> usize {
         50
     }
+
     fn trim_unneeded_stems<A: Axis>(stems: &mut AVec<A>, max_stem_level: usize) {
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         if !stems.is_empty() {

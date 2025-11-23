@@ -125,6 +125,7 @@ ubyte = "0.10"
 debug = true
 lto = true
 codegen-units = 1
+opt-level = 3
 
 [profile.bench]
 debug = true
