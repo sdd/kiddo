@@ -1,12 +1,227 @@
+use crate::StemStrategy;
+use aligned_vec::AVec;
 use fixed::traits::{Fixed, LossyFrom, LossyInto};
 use fixed::types::extra::{U0, U16};
 use fixed::FixedI32;
+use std::fmt::Debug;
+
+pub trait Basics: Copy + Debug + Default + Send + Sync + 'static {}
+impl<T> Basics for T where T: Copy + Debug + Default + Send + Sync + 'static {}
+
+pub trait AxisUnified {
+    /// Coordinate scalar type stored in the tree and queries.
+    type Coord: Copy;
+
+    /// Zero coord.
+    fn zero() -> Self::Coord;
+
+    /// Absolute/saturating difference along one axis, in coord units.
+    fn saturating_dist(a: Self::Coord, b: Self::Coord) -> Self::Coord;
+}
+
+/// Strategy for how leaf storage is laid out and constructed.
+/// - AX: Axis marker implementing AxisUnified (selects float or fixed semantics).
+/// - T: item/content type stored alongside points.
+/// - SS: stem layout strategy used to map split values into KdTree::stems (external).
+/// - K: dimensionality.
+/// - B: nominal bucket size (strategies may use or ignore it).
+pub trait LeafStrategy<AX, T, SS, const K: usize, const B: usize>
+where
+    AX: AxisUnified,
+    T: Basics,
+    SS: crate::traits::StemStrategy,
+{
+    /// Coordinate scalar type.
+    type Num;
+
+    // ---- Construction ----
+
+    /// Create a builder with an intended capacity (in points).
+    fn new_builder(capacity: usize) -> Self;
+
+    /// Bulk-build from a slice of points. Implementations should:
+    /// - write split values into `stems` at indices determined by `stem_strategy`,
+    /// - lay out leaf storage according to the strategy,
+    /// - return the max stem level reached (for later traversal).
+    fn bulk_build_from_slice(
+        &mut self,
+        source: &[[Self::Num; K]],
+        stems: &mut AVec<Self::Num>,
+        stem_strategy: SS,
+    ) -> i32;
+
+    /// Finalization hook (e.g., trim stems or compact internal buffers).
+    fn finalize(
+        &mut self,
+        stems: &mut AVec<Self::Num>,
+        stem_strategy: &mut SS,
+        max_stem_level: i32,
+    );
+
+    // ---- Mutation (optional; immutable strategies may panic or be no-ops) ----
+
+    /// Add a point/item pair into the structure, updating stems as necessary.
+    fn add_point(
+        &mut self,
+        point: &[Self::Num; K],
+        item: T,
+        stems: &mut AVec<Self::Num>,
+        stem_strategy: &mut SS,
+    );
+
+    /// Remove a specific point/item pair; returns number removed.
+    fn remove_point(&mut self, point: &[Self::Num; K], item: T) -> usize;
+
+    // ---- Introspection / minimal accessors ----
+
+    /// Total number of stored items.
+    fn size(&self) -> usize;
+
+    /// Number of leaves maintained by the strategy (buckets/extents).
+    fn leaf_count(&self) -> usize;
+
+    /// Number of items in a given leaf.
+    fn leaf_len(&self, leaf_idx: usize) -> usize;
+
+    fn leaf_view(&self, leaf_idx: usize) -> LeafView<'_, AX, T, K>;
+}
+
+#[derive(Debug, Default)]
+pub struct DummyLeafStrategy {}
+
+impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B> for DummyLeafStrategy
+where
+    AX: AxisUnified,
+    T: Basics,
+    SS: StemStrategy,
+{
+    type Num = ();
+
+    fn new_builder(capacity: usize) -> Self {
+        unimplemented!()
+    }
+
+    fn bulk_build_from_slice(
+        &mut self,
+        source: &[[Self::Num; K]],
+        stems: &mut AVec<Self::Num>,
+        stem_strategy: SS,
+    ) -> i32 {
+        unimplemented!()
+    }
+
+    fn finalize(
+        &mut self,
+        stems: &mut AVec<Self::Num>,
+        stem_strategy: &mut SS,
+        max_stem_level: i32,
+    ) {
+        unimplemented!()
+    }
+
+    fn add_point(
+        &mut self,
+        point: &[Self::Num; K],
+        item: T,
+        stems: &mut AVec<Self::Num>,
+        stem_strategy: &mut SS,
+    ) {
+        unimplemented!()
+    }
+
+    fn remove_point(&mut self, point: &[Self::Num; K], item: T) -> usize {
+        unimplemented!()
+    }
+
+    fn size(&self) -> usize {
+        unimplemented!()
+    }
+
+    fn leaf_count(&self) -> usize {
+        unimplemented!()
+    }
+
+    fn leaf_len(&self, leaf_idx: usize) -> usize {
+        unimplemented!()
+    }
+
+    fn leaf_view(&self, leaf_idx: usize) -> LeafView<'_, AX, T, K> {
+        unimplemented!()
+    }
+}
+
+pub type LeafView<'a, AX, T, const K: usize> = ([&'a [AX]; K], &'a [T]);
+
+#[macro_export]
+macro_rules! impl_axis_float {
+    ($t:ty) => {
+        impl AxisUnified for $t {
+            type Coord = $t;
+
+            #[inline(always)]
+            fn zero() -> Self::Coord {
+                0.0
+            }
+
+            #[inline(always)]
+            fn saturating_dist(a: Self::Coord, b: Self::Coord) -> Self::Coord {
+                (a - b).abs()
+            }
+        }
+    };
+}
+
+macro_rules! impl_axis_fixed {
+    ($t:ty) => {
+        impl AxisUnified for $t {
+            type Coord = $t;
+
+            #[inline(always)]
+            fn zero() -> Self::Coord {
+                <$t>::from_num(0)
+            }
+
+            #[inline(always)]
+            fn saturating_dist(a: Self::Coord, b: Self::Coord) -> Self::Coord {
+                if a >= b {
+                    a - b
+                } else {
+                    b - a
+                }
+            }
+        }
+    };
+}
 
 pub trait DistanceMetricUnified<A, const K: usize> {
-    type Output;
+    type Output: Copy + PartialOrd;
+
+    /// Desired sort order on Output to get "nearest" first:
+    /// - Ordering::Less    => ascending (smaller is better)
+    /// - Ordering::Greater => descending (larger is better)
+    const ORDERING: std::cmp::Ordering;
 
     fn dist(a: &[A; K], b: &[A; K]) -> Self::Output;
     fn dist1(a: A, b: A) -> Self::Output;
+
+    #[inline(always)]
+    fn better(a: Self::Output, b: Self::Output) -> bool {
+        match Self::ORDERING {
+            std::cmp::Ordering::Less => a < b,    // smaller is better
+            std::cmp::Ordering::Greater => a > b, // larger is better (dot)
+            std::cmp::Ordering::Equal => false,
+        }
+    }
+
+    #[inline(always)]
+    fn cmp(a: Self::Output, b: Self::Output) -> std::cmp::Ordering {
+        let base = a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal);
+        match Self::ORDERING {
+            std::cmp::Ordering::Less => base,
+            std::cmp::Ordering::Greater => base.reverse(),
+            std::cmp::Ordering::Equal => std::cmp::Ordering::Equal,
+        }
+    }
 }
 
 pub struct SquaredEuclidean;
@@ -17,6 +232,7 @@ macro_rules! impl_squared_euclidean_float {
     ($t:ty) => {
         impl<const K: usize> DistanceMetricUnified<$t, K> for SquaredEuclidean {
             type Output = $t;
+            const ORDERING: std::cmp::Ordering = std::cmp::Ordering::Less;
 
             #[inline(always)]
             fn dist(a: &[$t; K], b: &[$t; K]) -> Self::Output {
@@ -43,6 +259,7 @@ macro_rules! impl_squared_euclidean_fixed {
     ($t:ty) => {
         impl<const K: usize> DistanceMetricUnified<$t, K> for SquaredEuclidean {
             type Output = $t;
+            const ORDERING: std::cmp::Ordering = std::cmp::Ordering::Less;
 
             #[inline(always)]
             fn dist(a: &[$t; K], b: &[$t; K]) -> Self::Output {
@@ -72,6 +289,7 @@ macro_rules! impl_squared_euclidean_fixed_widening {
             R: Fixed + LossyFrom<$t>,
         {
             type Output = R;
+            const ORDERING: std::cmp::Ordering = std::cmp::Ordering::Less;
 
             #[inline(always)]
             fn dist(a: &[$t; K], b: &[$t; K]) -> Self::Output {
@@ -99,6 +317,11 @@ macro_rules! impl_squared_euclidean_fixed_widening {
     };
 }
 
+impl_axis_float!(f32);
+impl_axis_float!(f64);
+impl_axis_fixed!(FixedI32<U16>);
+impl_axis_fixed!(FixedI32<U0>);
+
 impl_squared_euclidean_float!(f32);
 impl_squared_euclidean_float!(f64);
 impl_squared_euclidean_fixed!(FixedI32<U16>);
@@ -106,6 +329,97 @@ impl_squared_euclidean_fixed!(FixedI32<U0>);
 
 impl_squared_euclidean_fixed_widening!(FixedI32<U16>);
 impl_squared_euclidean_fixed_widening!(FixedI32<U0>);
+
+pub struct DotProduct;
+pub struct DotProductWiden<R>(core::marker::PhantomData<R>);
+
+#[macro_export]
+macro_rules! impl_dot_product_float {
+    ($t:ty) => {
+        impl<const K: usize> DistanceMetricUnified<$t, K> for DotProduct {
+            type Output = $t;
+            const ORDERING: std::cmp::Ordering = std::cmp::Ordering::Greater;
+
+            #[inline(always)]
+            fn dist(a: &[$t; K], b: &[$t; K]) -> Self::Output {
+                a.iter()
+                    .zip(b.iter())
+                    .map(|(&ai, &bi)| ai * bi)
+                    .fold(0.0, |acc, x| acc + x)
+            }
+
+            #[inline(always)]
+            fn dist1(a: $t, b: $t) -> Self::Output {
+                a * b
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! impl_dot_product_fixed {
+    ($t:ty) => {
+        impl<const K: usize> DistanceMetricUnified<$t, K> for DotProduct {
+            type Output = $t;
+            const ORDERING: std::cmp::Ordering = std::cmp::Ordering::Greater;
+
+            #[inline(always)]
+            fn dist(a: &[$t; K], b: &[$t; K]) -> Self::Output {
+                a.iter()
+                    .zip(b.iter())
+                    .map(|(&ai, &bi)| ai * bi)
+                    .fold(<Self::Output>::from_num(0), |acc, x| acc + x)
+            }
+
+            #[inline(always)]
+            fn dist1(a: $t, b: $t) -> Self::Output {
+                a * b
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! impl_dot_product_fixed_widening {
+    ($t:ty) => {
+        impl<R, const K: usize> DistanceMetricUnified<$t, K> for DotProductWiden<R>
+        where
+            R: Fixed + LossyFrom<$t>,
+        {
+            type Output = R;
+            const ORDERING: std::cmp::Ordering = std::cmp::Ordering::Greater;
+
+            #[inline(always)]
+            fn dist(a: &[$t; K], b: &[$t; K]) -> Self::Output {
+                a.iter()
+                    .zip(b.iter())
+                    .map(|(&ai, &bi)| {
+                        let ai: Self::Output = ai.lossy_into();
+                        let bi: Self::Output = bi.lossy_into();
+
+                        ai * bi
+                    })
+                    .fold(<Self::Output>::from_num(0), |acc, x| acc + x)
+            }
+
+            #[inline(always)]
+            fn dist1(a: $t, b: $t) -> Self::Output {
+                let a: Self::Output = a.lossy_into();
+                let b: Self::Output = b.lossy_into();
+
+                a * b
+            }
+        }
+    };
+}
+
+impl_dot_product_float!(f32);
+impl_dot_product_float!(f64);
+impl_dot_product_fixed!(FixedI32<U16>);
+impl_dot_product_fixed!(FixedI32<U0>);
+
+impl_dot_product_fixed_widening!(FixedI32<U16>);
+impl_dot_product_fixed_widening!(FixedI32<U0>);
 
 #[inline]
 pub fn calc_dists(content_points: &[[f32; 64]; 3], acc: &mut [f32; 64], query: &[f32; 3]) {
