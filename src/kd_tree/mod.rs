@@ -2,7 +2,7 @@ mod query_orchestrator;
 mod query_stack;
 mod traits;
 
-use crate::traits_unified::{AxisUnified, Basics, LeafStrategy};
+use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::{AVec, CACHELINE_ALIGN};
 
@@ -64,7 +64,7 @@ where
     }
 }
 
-impl<A, T, SS, LS, const K: usize, const B: usize> FromIterator<(T, [A; K])>
+impl<A, T, SS, LS, const K: usize, const B: usize> FromIterator<(usize, [A; K])>
     for KdTree<A, T, SS, LS, K, B>
 where
     A: AxisUnified,
@@ -72,7 +72,7 @@ where
     LS: LeafStrategy<A, T, SS, K, B> + Default,
     SS: StemStrategy,
 {
-    fn from_iter<I: IntoIterator<Item = (T, [A; K])>>(iter: I) -> Self {
+    fn from_iter<I: IntoIterator<Item = (usize, [A; K])>>(_iter: I) -> Self {
         // TODO: Proper impl
         Self::default()
     }
@@ -81,13 +81,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::traits_unified::{DummyLeafStrategy, FloatMarker};
+    use crate::traits_unified_2::DummyLeafStrategy;
     use crate::Eytzinger;
 
     #[test]
     fn test_default() {
-        let kd_tree: KdTree<FloatMarker<f32>, u32, Eytzinger<3>, DummyLeafStrategy, 3, 16> =
-            Default::default();
+        let kd_tree: KdTree<f32, u32, Eytzinger<3>, DummyLeafStrategy, 3, 16> = Default::default();
 
         assert_eq!(kd_tree.size, 0);
         assert_eq!(kd_tree.max_stem_level, 0);
@@ -98,7 +97,7 @@ mod tests {
     fn test_from_iterator_empty() {
         let points = vec![[0.0f64; 3]];
 
-        let kd_tree: KdTree<FloatMarker<f64>, u32, Eytzinger<3>, DummyLeafStrategy, 3, 16> =
+        let kd_tree: KdTree<f64, u32, Eytzinger<3>, DummyLeafStrategy, 3, 16> =
             points.into_iter().enumerate().collect();
 
         assert_eq!(kd_tree.size, 0);
