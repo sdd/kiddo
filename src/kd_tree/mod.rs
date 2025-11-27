@@ -1,3 +1,4 @@
+mod query;
 mod query_orchestrator;
 mod query_stack;
 mod traits;
@@ -25,7 +26,7 @@ pub struct KdTree<
 
 impl<A, T, SS, LS, const K: usize, const B: usize> Default for KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified,
+    A: AxisUnified<Coord = A>,
     T: Basics,
     LS: LeafStrategy<A, T, SS, K, B> + Default,
     SS: StemStrategy,
@@ -35,7 +36,7 @@ where
             stems: AVec::new(CACHELINE_ALIGN),
             leaves: Default::default(),
             size: 0,
-            max_stem_level: 0,
+            max_stem_level: -1,
             _phantom: std::marker::PhantomData,
         }
     }
@@ -43,7 +44,7 @@ where
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified,
+    A: AxisUnified<Coord = A>,
     T: Basics,
     LS: LeafStrategy<A, T, SS, K, B> + Default,
     SS: StemStrategy,
@@ -67,7 +68,7 @@ where
 impl<A, T, SS, LS, const K: usize, const B: usize> FromIterator<(usize, [A; K])>
     for KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified,
+    A: AxisUnified<Coord = A>,
     T: Basics,
     LS: LeafStrategy<A, T, SS, K, B> + Default,
     SS: StemStrategy,

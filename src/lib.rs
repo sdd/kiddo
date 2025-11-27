@@ -125,7 +125,7 @@ pub mod distance;
 mod donnelly_stem_layout;
 pub mod kd_tree;
 mod rkyv_utils;
-pub mod traits_unified;
+// pub mod traits_unified;
 pub mod traits_unified_2;
 
 /// A floating-point k-d tree with default parameters.
