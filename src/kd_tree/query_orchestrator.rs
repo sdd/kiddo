@@ -1,40 +1,112 @@
-use crate::kd_tree::query_stack::QueryStack;
-use crate::kd_tree::traits::{QueryContext, ResultContext};
+use crate::kd_tree::query_stack::{QueryStack, QueryStackContext};
+use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
-use crate::traits_unified::{AxisUnified, Basics, LeafStrategy};
+use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy, LeafView};
 use crate::StemStrategy;
+use std::ptr::NonNull;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified,
-    T: Basics + Copy + Default,
+    A: AxisUnified<Coord = A>,
+    T: Basics + Copy + Default + PartialOrd + PartialEq,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
-    // High-level entry: obtains a temporary stack and delegates.
+    /// Backtracking query.
+    ///
+    /// Used for exact queries. Wraps `backtracking_query_with_stack`
+    /// and provides a default stack.
+    /// Usually you would want to call one of the high-level query functions
+    /// rather than this function directly.
     #[inline(always)]
-    pub(crate) fn query<QC, RC>(&self, query_ctx: &QC, result_ctx: &mut RC)
-    where
+    pub(crate) fn backtracking_query<QC>(
+        &self,
+        query_ctx: QC,
+        process_leaf: impl FnMut(&LeafView<A, T, K>, usize) -> bool,
+    ) where
         QC: QueryContext<A, K>,
-        RC: ResultContext<A::NumType>,
     {
         // TODO: replace with TLS-backed stack
         let mut stack = QueryStack::new();
-        self.query_with_stack(query_ctx, result_ctx, &mut stack);
+        self.backtracking_query_with_stack(query_ctx, &mut stack, process_leaf);
     }
 
-    // Core entry used by power users with a reusable stack.
-    #[inline(always)]
-    pub(crate) fn query_with_stack<QC, RC>(
+    /// Non-backtracking query
+    ///
+    /// Used for approx-NN queries
+    #[inline]
+    pub(crate) fn straight_query<QC>(
         &self,
-        _query_ctx: &QC,
-        _result_ctx: &mut RC,
-        _stack: &mut QueryStack,
+        query_ctx: QC,
+        mut process_leaf: impl FnMut(&LeafView<A, T, K>, usize) -> bool,
+    ) -> bool
+    where
+        QC: QueryContext<A, K>,
+    {
+        let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
+        let mut stem_strat: SS = SS::new(stems_ptr);
+
+        while stem_strat.level() <= self.max_stem_level {
+            let pivot = unsafe { self.stems.get_unchecked(stem_strat.stem_idx()) };
+            let is_right_child: bool =
+                *unsafe { query_ctx.query().get_unchecked(stem_strat.dim()) } >= *pivot;
+            stem_strat.traverse(is_right_child);
+        }
+
+        let leaf_view = self.leaves.leaf_view(stem_strat.leaf_idx());
+        process_leaf(&leaf_view, stem_strat.leaf_idx())
+    }
+
+    /// Backtracking query with explicit stack.
+    ///
+    /// Used for exact queries. Wrapped by `backtracking_query`.
+    /// Usually you would want to call one of the high-level query functions
+    /// rather than this function directly.
+    #[inline(always)]
+    pub(crate) fn backtracking_query_with_stack<QC>(
+        &self,
+        query_ctx: QC,
+        stack: &mut QueryStack<A, SS>,
+        mut process_leaf: impl FnMut(&LeafView<A, T, K>, usize) -> bool,
     ) where
         QC: QueryContext<A, K>,
-        RC: ResultContext<A::NumType>,
     {
-        // Skeleton only; wire StemStrategy-driven descent here.
-        let _ = (&self.stems, &self.leaves, self.max_stem_level);
+        let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
+        let stem_strat: SS = SS::new(stems_ptr);
+        let mut off = [A::zero(); K];
+
+        stack.push(QueryStackContext::new(stem_strat));
+
+        while let Some(stack_ctx) = stack.pop() {
+            let (mut stem_strat, mut dim, mut old_off, mut rd) = stack_ctx.into_parts();
+            off[dim] = old_off;
+
+            while stem_strat.level() <= self.max_stem_level {
+                dim = stem_strat.dim();
+                old_off = off[dim];
+
+                let pivot = *unsafe { self.stems.get_unchecked(stem_strat.stem_idx()) };
+                let query_coord = *unsafe { query_ctx.query().get_unchecked(dim) };
+                let is_right_child = query_coord >= pivot;
+
+                let new_off = A::saturating_dist(query_coord, pivot);
+                let delta = new_off - old_off;
+                rd = A::saturating_add(rd, delta);
+
+                let far = stem_strat.branch_relative(is_right_child);
+
+                stack.push(QueryStackContext {
+                    stem_strat: far,
+                    dim,
+                    old_off,
+                    rd,
+                })
+            }
+
+            let leaf_view = self.leaves.leaf_view(stem_strat.leaf_idx());
+            if !process_leaf(&leaf_view, stem_strat.leaf_idx()) {
+                break;
+            }
+        }
     }
 }

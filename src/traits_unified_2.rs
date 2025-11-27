@@ -3,20 +3,30 @@ use aligned_vec::AVec;
 use fixed::traits::{Fixed, LossyFrom, LossyInto};
 use fixed::types::extra::{U0, U16};
 use fixed::FixedI32;
+use ordered_float::Float;
 use std::fmt::Debug;
+use std::ops::{AddAssign, Sub};
 
 pub trait Basics: Copy + Debug + Default + Send + Sync + 'static {}
 impl<T> Basics for T where T: Copy + Debug + Default + Send + Sync + 'static {}
 
-pub trait AxisUnified {
+// Make AxisUnified a supertrait of the common numeric bounds you need everywhere.
+pub trait AxisUnified:
+    Copy + PartialEq + PartialOrd + Sub<Output = Self> + AddAssign<Self>
+{
     /// Coordinate scalar type stored in the tree and queries.
     type Coord: Copy;
 
     /// Zero coord.
     fn zero() -> Self::Coord;
 
+    /// Maximum coord value.
+    fn max_value() -> Self::Coord;
+
     /// Absolute/saturating difference along one axis, in coord units.
     fn saturating_dist(a: Self::Coord, b: Self::Coord) -> Self::Coord;
+
+    fn saturating_add(a: Self::Coord, b: Self::Coord) -> Self::Coord;
 }
 
 /// Strategy for how leaf storage is laid out and constructed.
@@ -29,7 +39,7 @@ pub trait LeafStrategy<AX, T, SS, const K: usize, const B: usize>
 where
     AX: AxisUnified,
     T: Basics,
-    SS: crate::traits::StemStrategy,
+    SS: StemStrategy,
 {
     /// Coordinate scalar type.
     type Num;
@@ -97,39 +107,39 @@ where
 {
     type Num = ();
 
-    fn new_builder(capacity: usize) -> Self {
+    fn new_builder(_capacity: usize) -> Self {
         unimplemented!()
     }
 
     fn bulk_build_from_slice(
         &mut self,
-        source: &[[Self::Num; K]],
-        stems: &mut AVec<Self::Num>,
-        stem_strategy: SS,
+        _source: &[[Self::Num; K]],
+        _stems: &mut AVec<Self::Num>,
+        _stem_strategy: SS,
     ) -> i32 {
         unimplemented!()
     }
 
     fn finalize(
         &mut self,
-        stems: &mut AVec<Self::Num>,
-        stem_strategy: &mut SS,
-        max_stem_level: i32,
+        _stems: &mut AVec<Self::Num>,
+        _stem_strategy: &mut SS,
+        _max_stem_level: i32,
     ) {
         unimplemented!()
     }
 
     fn add_point(
         &mut self,
-        point: &[Self::Num; K],
-        item: T,
-        stems: &mut AVec<Self::Num>,
-        stem_strategy: &mut SS,
+        _point: &[Self::Num; K],
+        _item: T,
+        _stems: &mut AVec<Self::Num>,
+        _stem_strategy: &mut SS,
     ) {
         unimplemented!()
     }
 
-    fn remove_point(&mut self, point: &[Self::Num; K], item: T) -> usize {
+    fn remove_point(&mut self, _point: &[Self::Num; K], _item: T) -> usize {
         unimplemented!()
     }
 
@@ -141,11 +151,11 @@ where
         unimplemented!()
     }
 
-    fn leaf_len(&self, leaf_idx: usize) -> usize {
+    fn leaf_len(&self, _leaf_idx: usize) -> usize {
         unimplemented!()
     }
 
-    fn leaf_view(&self, leaf_idx: usize) -> LeafView<'_, AX, T, K> {
+    fn leaf_view(&self, _leaf_idx: usize) -> LeafView<'_, AX, T, K> {
         unimplemented!()
     }
 }
@@ -164,8 +174,18 @@ macro_rules! impl_axis_float {
             }
 
             #[inline(always)]
+            fn max_value() -> Self::Coord {
+                <$t>::infinity()
+            }
+
+            #[inline(always)]
             fn saturating_dist(a: Self::Coord, b: Self::Coord) -> Self::Coord {
                 (a - b).abs()
+            }
+
+            #[inline(always)]
+            fn saturating_add(a: Self::Coord, b: Self::Coord) -> Self::Coord {
+                a + b
             }
         }
     };
@@ -182,6 +202,11 @@ macro_rules! impl_axis_fixed {
             }
 
             #[inline(always)]
+            fn max_value() -> Self::Coord {
+                <$t>::max_value()
+            }
+
+            #[inline(always)]
             fn saturating_dist(a: Self::Coord, b: Self::Coord) -> Self::Coord {
                 if a >= b {
                     a - b
@@ -189,12 +214,18 @@ macro_rules! impl_axis_fixed {
                     b - a
                 }
             }
+
+            #[inline(always)]
+            fn saturating_add(a: Self::Coord, b: Self::Coord) -> Self::Coord {
+                a.saturating_add(b)
+            }
         }
     };
 }
 
 pub trait DistanceMetricUnified<A, const K: usize> {
-    type Output: Copy + PartialOrd;
+    // Output must itself be a valid axis-like type
+    type Output: AxisUnified<Coord = Self::Output>;
 
     /// Desired sort order on Output to get "nearest" first:
     /// - Ordering::Less    => ascending (smaller is better)
@@ -284,9 +315,13 @@ macro_rules! impl_squared_euclidean_fixed {
 #[macro_export]
 macro_rules! impl_squared_euclidean_fixed_widening {
     ($t:ty) => {
-        impl<R, const K: usize> DistanceMetricUnified<$t, K> for SquaredEuclideanWiden<R>
+        impl<R, const K: usize> $crate::traits_unified_2::DistanceMetricUnified<$t, K>
+            for $crate::traits_unified_2::SquaredEuclideanWiden<R>
         where
-            R: Fixed + LossyFrom<$t>,
+            R: $crate::traits_unified_2::AxisUnified<Coord = R>
+                + fixed::traits::LossyFrom<$t>
+                + std::ops::Mul<Output = R>
+                + std::ops::Add<Output = R>,
         {
             type Output = R;
             const ORDERING: std::cmp::Ordering = std::cmp::Ordering::Less;
@@ -296,21 +331,56 @@ macro_rules! impl_squared_euclidean_fixed_widening {
                 a.iter()
                     .zip(b.iter())
                     .map(|(&ai, &bi)| {
-                        let ai: Self::Output = ai.lossy_into();
-                        let bi: Self::Output = bi.lossy_into();
+                        let ai: R = fixed::traits::LossyFrom::<$t>::lossy_from(ai);
+                        let bi: R = fixed::traits::LossyFrom::<$t>::lossy_from(bi);
 
                         let d = if ai >= bi { ai - bi } else { bi - ai };
                         d * d
                     })
-                    .fold(<Self::Output>::from_num(0), |acc, x| acc + x)
+                    .fold(R::zero(), |acc, x| acc + x)
             }
 
             #[inline(always)]
             fn dist1(a: $t, b: $t) -> Self::Output {
-                let a: Self::Output = a.lossy_into();
-                let b: Self::Output = b.lossy_into();
+                let a: R = fixed::traits::LossyFrom::<$t>::lossy_from(a);
+                let b: R = fixed::traits::LossyFrom::<$t>::lossy_from(b);
 
-                let d: Self::Output = if a >= b { a - b } else { b - a };
+                let d: R = if a >= b { a - b } else { b - a };
+                d * d
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! impl_squared_euclidean_float_widening {
+    ($src:ty => $dst:ty) => {
+        impl<const K: usize> $crate::traits_unified_2::DistanceMetricUnified<$src, K>
+            for $crate::traits_unified_2::SquaredEuclideanWiden<$dst>
+        where
+            $dst: $crate::traits_unified_2::AxisUnified + From<$src>,
+        {
+            type Output = $dst;
+            const ORDERING: std::cmp::Ordering = std::cmp::Ordering::Less;
+
+            #[inline(always)]
+            fn dist(a: &[$src; K], b: &[$src; K]) -> Self::Output {
+                a.iter()
+                    .zip(b.iter())
+                    .map(|(&ai, &bi)| {
+                        let ai: $dst = <$dst as From<$src>>::from(ai);
+                        let bi: $dst = <$dst as From<$src>>::from(bi);
+                        let d = ai - bi;
+                        d * d
+                    })
+                    .fold(<$dst as From<$src>>::from(0 as $src), |acc, x| acc + x)
+            }
+
+            #[inline(always)]
+            fn dist1(a: $src, b: $src) -> Self::Output {
+                let a: $dst = <$dst as From<$src>>::from(a);
+                let b: $dst = <$dst as From<$src>>::from(b);
+                let d = a - b;
                 d * d
             }
         }
@@ -326,6 +396,8 @@ impl_squared_euclidean_float!(f32);
 impl_squared_euclidean_float!(f64);
 impl_squared_euclidean_fixed!(FixedI32<U16>);
 impl_squared_euclidean_fixed!(FixedI32<U0>);
+
+impl_squared_euclidean_float_widening!(f32 => f64);
 
 impl_squared_euclidean_fixed_widening!(FixedI32<U16>);
 impl_squared_euclidean_fixed_widening!(FixedI32<U0>);
@@ -384,7 +456,7 @@ macro_rules! impl_dot_product_fixed_widening {
     ($t:ty) => {
         impl<R, const K: usize> DistanceMetricUnified<$t, K> for DotProductWiden<R>
         where
-            R: Fixed + LossyFrom<$t>,
+            R: Fixed + LossyFrom<$t> + $crate::traits_unified_2::AxisUnified<Coord = R>,
         {
             type Output = R;
             const ORDERING: std::cmp::Ordering = std::cmp::Ordering::Greater;
