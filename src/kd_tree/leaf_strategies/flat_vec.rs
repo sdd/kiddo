@@ -77,8 +77,8 @@ where
         }
 
         self.leaf_extents.push((
-            leaf_items.len() as u32,
-            (leaf_items.len() + chunk_length) as u32,
+            self.leaf_items.len() as u32,
+            (self.leaf_items.len() + chunk_length) as u32,
         ));
 
         for dim in 0..K {
@@ -110,8 +110,8 @@ mod test {
             );
         let (leaf_points, leaf_items) = leaf_view;
         assert_eq!(leaf_points[0][0], points[0][0]);
-        assert_eq!(leaf_points[0][1], points[0][1]);
-        assert_eq!(leaf_points[0][2], points[0][2]);
+        assert_eq!(leaf_points[1][0], points[0][1]);
+        assert_eq!(leaf_points[2][0], points[0][2]);
         assert_eq!(leaf_items, vec![0]);
     }
 }
