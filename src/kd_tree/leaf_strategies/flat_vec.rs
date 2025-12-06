@@ -91,6 +91,9 @@ where
 
 #[cfg(test)]
 mod test {
+    use fixed::{types::extra::U8, FixedU16};
+    use rand::Rng;
+
     use crate::kd_tree::leaf_strategies::flat_vec::FlatVec;
     use crate::traits_unified_2::LeafStrategy;
     use crate::{kd_tree, Eytzinger};
@@ -113,5 +116,54 @@ mod test {
         assert_eq!(leaf_points[1][0], points[0][1]);
         assert_eq!(leaf_points[2][0], points[0][2]);
         assert_eq!(leaf_items, vec![0]);
+    }
+
+    #[test]
+    fn create_single_leaf_flat_vec_fixed_point_kd_tree() {
+        let points: Vec<[FixedU16<U8>; 3]> = vec![[1.into(), 2.into(), 3.into()]];
+        let tree: kd_tree::KdTree<
+            FixedU16<U8>,
+            u32,
+            Eytzinger<3>,
+            FlatVec<FixedU16<U8>, u32, 3, 32>,
+            3,
+            32,
+        > = kd_tree::KdTree::new_from_slice(&points);
+
+        assert_eq!(tree.size(), 1);
+
+        let leaf_view = <FlatVec<FixedU16<U8>, u32, 3, 32> as LeafStrategy<
+            FixedU16<U8>,
+            u32,
+            Eytzinger<3>,
+            3,
+            32,
+        >>::leaf_view(&tree.leaves, 0);
+        let (leaf_points, leaf_items) = leaf_view;
+        assert_eq!(leaf_points[0][0], points[0][0]);
+        assert_eq!(leaf_points[1][0], points[0][1]);
+        assert_eq!(leaf_points[2][0], points[0][2]);
+        assert_eq!(leaf_items, vec![0]);
+    }
+
+    #[test]
+    fn create_multiple_leaf_flat_vec_float_kd_tree() {
+        // create 2^16 random 3d points in the unit cube
+        let mut rng = rand::thread_rng();
+        let mut points: Vec<[f32; 3]> = vec![];
+        for _ in 0..65_536 {
+            let x = rng.gen_range(0.0..1.0);
+            let y = rng.gen_range(0.0..1.0);
+            let z = rng.gen_range(0.0..1.0);
+            points.push([x, y, z]);
+        }
+
+        let tree: kd_tree::KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+            kd_tree::KdTree::new_from_slice(&points);
+
+        assert!(!tree.is_empty());
+        assert_eq!(tree.size(), 65_536);
+        assert_eq!(tree.leaf_count(), 2048);
+        assert_eq!(tree.max_stem_level(), 10);
     }
 }

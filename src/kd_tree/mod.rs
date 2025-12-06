@@ -8,6 +8,7 @@ mod traits;
 use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::{AVec, CACHELINE_ALIGN};
+use az::Cast;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct KdTree<
@@ -64,6 +65,11 @@ where
     #[inline]
     pub fn max_stem_level(&self) -> i32 {
         self.max_stem_level
+    }
+
+    #[inline]
+    pub fn leaf_count(&self) -> usize {
+        self.leaves.leaf_count()
     }
 }
 

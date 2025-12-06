@@ -1,8 +1,8 @@
 use crate::StemStrategy;
 use aligned_vec::AVec;
 use fixed::traits::{LossyFrom, LossyInto};
-use fixed::types::extra::{U0, U16};
-use fixed::FixedI32;
+use fixed::types::extra::{U0, U16, U8};
+use fixed::{FixedI32, FixedU16};
 use ordered_float::Float;
 use std::fmt::Debug;
 use std::ops::{AddAssign, Sub};
@@ -235,7 +235,7 @@ macro_rules! impl_axis_fixed {
 
             #[inline(always)]
             fn max_value() -> Self::Coord {
-                <$t>::max_value()
+                <Self::Coord>::MAX
             }
 
             #[inline(always)]
@@ -296,6 +296,7 @@ impl_axis_float!(f32);
 impl_axis_float!(f64);
 impl_axis_fixed!(FixedI32<U16>);
 impl_axis_fixed!(FixedI32<U0>);
+impl_axis_fixed!(FixedU16<U8>);
 
 // Dot product metric, also parameterized by Output type R.
 pub struct DotProduct<R>(core::marker::PhantomData<R>);
