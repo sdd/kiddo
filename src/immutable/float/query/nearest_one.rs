@@ -5,6 +5,7 @@ use crate::immutable::float::kdtree::ImmutableKdTree;
 use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::traits::{Axis, Content, DistanceMetric, StemStrategy};
+use crate::traits_unified_2::AxisUnified;
 
 macro_rules! generate_immutable_float_nearest_one {
     ($doctest_build_tree:tt) => {
@@ -35,7 +36,7 @@ to not needing to allocate memory or maintain sorted results.
 
 impl<A, T, SO, const K: usize, const B: usize> ImmutableKdTree<A, T, SO, K, B>
 where
-    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + AxisUnified<Coord = A>,
     T: Content,
     SO: StemStrategy,
     usize: Cast<T>,

@@ -10,9 +10,9 @@ macro_rules! generate_immutable_nearest_one {
                 where
                     D: DistanceMetric<A, K>,
             {
-                let mut off = [A::zero(); K];
+                let mut off = [<A as AxisUnified>::zero(); K];
                 let mut result = NearestNeighbour {
-                    distance: A::max_value(),
+                    distance: <A as AxisUnified>::max_value(),
                     item: T::default(),
                 };
 
@@ -34,7 +34,7 @@ macro_rules! generate_immutable_nearest_one {
                     stem_ordering,
                     &mut result,
                     &mut off,
-                    A::zero(),
+                    <A as AxisUnified>::zero(),
                 );
 
                 // LLVM-MCA end marker

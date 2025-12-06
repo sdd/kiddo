@@ -15,6 +15,7 @@ use crate::mutable::float::kdtree::KdTree;
 use crate::traits::{Axis, AxisFixed, Content, Index};
 use crate::StemStrategy;
 
+use crate::traits_unified_2::AxisUnified;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
@@ -151,7 +152,7 @@ where
     StandardUniform: Distribution<T>,
     StandardUniform: Distribution<([A; K], T)>,
     StandardUniform: Distribution<[A; K]>,
-    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + AxisUnified<Coord = A>,
 {
     let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
@@ -340,7 +341,7 @@ pub fn build_populated_tree_and_query_points_immutable_float<
     query_point_qty: usize,
 ) -> (ImmutableKdTree<A, T, SO, K, B>, Vec<[A; K]>)
 where
-    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + AxisUnified<Coord = A>,
     usize: Cast<T>,
     StandardUniform: Distribution<T>,
     StandardUniform: Distribution<[A; K]>,

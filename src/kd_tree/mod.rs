@@ -1,3 +1,5 @@
+mod construction;
+mod leaf_strategies;
 mod query;
 mod query_orchestrator;
 mod query_stack;
@@ -46,7 +48,7 @@ impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: AxisUnified<Coord = A>,
     T: Basics,
-    LS: LeafStrategy<A, T, SS, K, B> + Default,
+    LS: LeafStrategy<A, T, SS, K, B>, // + Default,
     SS: StemStrategy,
 {
     #[inline]
@@ -82,7 +84,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::traits_unified_2::DummyLeafStrategy;
+    use crate::kd_tree::leaf_strategies::dummy::DummyLeafStrategy;
     use crate::Eytzinger;
 
     #[test]

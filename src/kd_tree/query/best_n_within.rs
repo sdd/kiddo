@@ -32,13 +32,22 @@ where
             BinaryHeap::with_capacity(max_qty);
 
         self.backtracking_query(req_ctx, |(coords, items): &([&[A]; K], &[T]), _l| {
+            // Pre-widen query coords once for this leaf
+            let mut query_wide: [DistOut<A, K, D>; K] =
+                [<DistOut<A, K, D> as AxisUnified>::zero(); K];
+            for dim in 0..K {
+                query_wide[dim] = D::widen_coord(query[dim]);
+            }
+
             // TODO: Vectorized
             for idx in 0..items.len() {
                 let mut distance = <DistOut<A, K, D> as AxisUnified>::zero();
 
-                (0..K).for_each(|dim| {
-                    distance += D::dist1(coords[dim][idx], query[dim]);
-                });
+                for dim in 0..K {
+                    // Widen leaf coord per item
+                    let coord_wide = D::widen_coord(coords[dim][idx]);
+                    distance += D::dist1(coord_wide, query_wide[dim]);
+                }
 
                 if distance < req_ctx.dist {
                     let item = *unsafe { items.get_unchecked(idx) };
@@ -126,7 +135,9 @@ impl<DOut, T: Basics> From<BestNeighbour<DOut, T>> for (DOut, T) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::traits_unified_2::{DummyLeafStrategy, SquaredEuclidean};
+    use crate::kd_tree::leaf_strategies::dummy::DummyLeafStrategy;
+    use crate::traits_unified_2::SquaredEuclidean;
+
     use crate::Eytzinger;
 
     #[test]
@@ -136,7 +147,7 @@ mod tests {
         let query = [0.0f32; 3];
 
         let result = tree
-            .best_n_within::<SquaredEuclidean>(&query, 0.5f32, NonZero::new(3).unwrap())
+            .best_n_within::<SquaredEuclidean<_>>(&query, 0.5f32, NonZero::new(3).unwrap())
             .len();
 
         assert_eq!(result, 3);

@@ -8,6 +8,7 @@ use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::traits::{Axis, Content, DistanceMetric, StemStrategy};
 
 use crate::generate_immutable_best_n_within;
+use crate::traits_unified_2::AxisUnified;
 
 macro_rules! generate_immutable_float_best_n_within {
     ($doctest_build_tree:tt) => {
@@ -15,7 +16,7 @@ macro_rules! generate_immutable_float_best_n_within {
             (
                 "Finds the \"best\" `n` elements within `dist` of `query`.
 
-Results are returned in arbitrary order. 'Best' is determined by
+Results are returned i<A as AxisUnified>::rbitrary order. 'Best' is determined by
 performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt`]). Returns an iterator.
 
 # Examples
@@ -42,7 +43,7 @@ performing a comparison of the elements using < (ie, [`std::cmp::Ordering::is_lt
 
 impl<A: Axis, T: Content, SO, const K: usize, const B: usize> ImmutableKdTree<A, T, SO, K, B>
 where
-    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + AxisUnified<Coord = A>,
     T: Content,
     SO: StemStrategy,
     usize: Cast<T>,

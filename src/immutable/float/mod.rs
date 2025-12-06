@@ -22,6 +22,7 @@
 //! or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if used with the
 //! [`half`](https://docs.rs/half/latest/half) crate.
 
+// pub mod kdbtree;
 pub mod kdtree;
 #[doc(hidden)]
 pub mod query;

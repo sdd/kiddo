@@ -1,5 +1,5 @@
 use crate::stem_strategies::prefetch::prefetch_t0;
-use crate::traits::Axis;
+use crate::traits_unified_2::AxisUnified;
 use crate::StemStrategy;
 use aligned_vec::AVec;
 #[cfg(target_arch = "x86_64")]
@@ -239,13 +239,13 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         50
     }
 
-    fn trim_unneeded_stems<A: Axis>(stems: &mut AVec<A>, max_stem_level: usize) {
+    fn trim_unneeded_stems<A: AxisUnified<Coord = A>>(stems: &mut AVec<A>, max_stem_level: usize) {
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         if !stems.is_empty() {
             let mut so = Self::new(stems_ptr);
             loop {
                 let val = &stems[so.stem_idx()];
-                let is_right_child = val.is_finite();
+                let is_right_child = !A::is_max_value(*val);
                 so.traverse(is_right_child);
                 if so.level() as usize == max_stem_level {
                     break;

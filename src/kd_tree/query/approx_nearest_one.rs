@@ -41,7 +41,7 @@ impl<A, const K: usize> QueryContext<A, K> for GetLeafIdxReqCtx<'_, A, K> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::traits_unified_2::DummyLeafStrategy;
+    use crate::kd_tree::leaf_strategies::dummy::DummyLeafStrategy;
     use crate::Eytzinger;
 
     #[test]
