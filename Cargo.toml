@@ -35,6 +35,7 @@ simulator = []
 rkyv_08 = ["dep:rkyv_08"]
 test_utils = ["dep:rand", "dep:rand_chacha", "dep:rayon", "dep:fixed"]
 tracing = ["dep:tracing", "dep:tracing-subscriber"]
+unreliable_select_nth_unstable = []
 
 [target.'cfg(any(target_arch = "x86_64", target_arch = "aarch64"))'.dependencies]
 generator = "0.8.4"

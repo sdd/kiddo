@@ -16,7 +16,7 @@ macro_rules! generate_immutable_best_n_within {
                 usize: Cast<T>,
                 D: DistanceMetric<A, K>,
             {
-                let mut off = [A::zero(); K];
+                let mut off = [<A as AxisUnified>::zero(); K];
                 let mut best_items: BinaryHeap<BestNeighbour<A, T>> = BinaryHeap::with_capacity(max_qty.into());
 
                 let stems_ptr = std::ptr::NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
@@ -29,7 +29,7 @@ macro_rules! generate_immutable_best_n_within {
                     stem_ordering,
                     &mut best_items,
                     &mut off,
-                    A::zero(),
+                    <A as AxisUnified>::zero(),
                 );
 
                 best_items.into_iter()

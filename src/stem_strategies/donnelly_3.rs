@@ -1,9 +1,9 @@
-use crate::traits::Axis;
 use crate::StemStrategy;
 use aligned_vec::AVec;
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0, _MM_HINT_T1};
 
+use crate::traits_unified_2::AxisUnified;
 #[cfg(feature = "rkyv_08")]
 use rkyv_08::util::AlignedVec;
 use std::ptr::NonNull;
@@ -211,13 +211,13 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
     fn stem_node_padding_factor() -> usize {
         50
     }
-    fn trim_unneeded_stems<A: Axis>(stems: &mut AVec<A>, max_stem_level: usize) {
+    fn trim_unneeded_stems<A: AxisUnified<Coord = A>>(stems: &mut AVec<A>, max_stem_level: usize) {
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         if !stems.is_empty() {
             let mut so = Self::new(stems_ptr);
             loop {
                 let val = &stems[so.stem_idx()];
-                let is_right_child = val.is_finite();
+                let is_right_child = !A::is_max_value(*val);
                 so.traverse(is_right_child);
                 if so.level() as usize == max_stem_level {
                     break;
@@ -337,6 +337,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellySwPre<L
         (result, minor_level)
     }
 
+    #[allow(unused)]
     #[inline(always)]
     fn prefetch_next_base(stems_ptr: NonNull<u8>, next_base: u32) {
         #[cfg(target_arch = "x86_64")]
@@ -427,6 +428,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellySwPre<L
         (left, right)
     }
 
+    #[allow(unused)]
     #[inline(always)]
     fn prefetch_next_minor_tri(&self, stems_ptr: *const f32) {
         // Only act on the first level of each minor triangle
@@ -482,6 +484,7 @@ unsafe fn prefetch_t0(ptr: *const u8) {
     _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY3>(ptr as *const i8);
 }
 
+#[allow(unused)]
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 unsafe fn prefetch_t1(ptr: *const u8) {
@@ -504,12 +507,14 @@ unsafe fn prefetch_t1(ptr: *const u8) {
 }
 
 // helper: line base (16 f32 per 64B line)
+#[allow(unused)]
 #[inline(always)]
 fn line_base_f32(idx: u32) -> u32 {
     idx & !15
 }
 
 // prefetch an 8-line run starting at base_line (in f32 indices)
+#[allow(unused)]
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 unsafe fn prefetch_8_lines_f32(stems_ptr: *const f32, base_line: u32) {
@@ -592,7 +597,7 @@ mod tests {
         #[case] input: Vec<bool>,
         #[case] expected: usize,
     ) {
-        let mut stems = avec![f64::INFINITY; 9];
+        let stems = avec![f64::INFINITY; 9];
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
 
         let mut stem_strat = DonnellySwPre::<3, 64, 8, 3>::new(stems_ptr);
@@ -653,7 +658,7 @@ mod tests {
         #[case] input: Vec<bool>,
         #[case] expected: (usize, usize),
     ) {
-        let mut stems = avec![f64::INFINITY; 9];
+        let stems = avec![f64::INFINITY; 9];
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
 
         let mut stem_strat = DonnellySwPre::<3, 64, 8, 3>::new(stems_ptr);

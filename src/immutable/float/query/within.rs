@@ -4,6 +4,7 @@ use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
 use crate::nearest_neighbour::NearestNeighbour;
 use crate::traits::{Axis, Content, DistanceMetric, StemStrategy};
 
+use crate::traits_unified_2::AxisUnified;
 use az::Cast;
 
 macro_rules! generate_immutable_float_within {
@@ -33,7 +34,7 @@ Results are returned sorted nearest-first
 
 impl<A: Axis, T: Content, SO, const K: usize, const B: usize> ImmutableKdTree<A, T, SO, K, B>
 where
-    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + AxisUnified<Coord = A>,
     T: Content,
     SO: StemStrategy,
     usize: Cast<T>,

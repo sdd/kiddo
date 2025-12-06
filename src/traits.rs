@@ -10,6 +10,7 @@ use num_traits::{PrimInt, Unsigned, Zero};
 use std::fmt::Debug;
 use std::iter::Sum;
 // use std::num::NonZero;
+use crate::traits_unified_2::AxisUnified;
 use std::ptr::NonNull;
 
 /// Axis trait represents the traits that must be implemented
@@ -251,7 +252,7 @@ pub trait StemStrategy: Clone + Sync + Send {
     fn stem_node_padding_factor() -> usize;
 
     /// Trim unneeded stem nodes.
-    fn trim_unneeded_stems<A: Axis>(stems: &mut AVec<A>, max_stem_level: usize);
+    fn trim_unneeded_stems<A: AxisUnified<Coord = A>>(stems: &mut AVec<A>, max_stem_level: usize);
 
     #[cfg(feature = "simulator")]
     fn simulate_traverse(

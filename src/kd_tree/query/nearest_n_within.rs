@@ -84,7 +84,7 @@ impl<A, const K: usize> QueryContext<A, K> for NeaarestNWithinReqCtx<'_, A, K> {
 #[cfg(test)]
 mod tests {
     use crate::Eytzinger;
-    use crate::traits_unified_2::DummyLeafStrategy;
+    use crate::kd_tree::leaf_strategies::dummy::DummyLeafStrategy;
     use super::*;
 
     #[test]

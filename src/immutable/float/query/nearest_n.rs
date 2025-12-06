@@ -7,6 +7,7 @@ use az::Cast;
 use std::num::NonZero;
 
 use crate::generate_immutable_nearest_n;
+use crate::traits_unified_2::AxisUnified;
 
 macro_rules! generate_immutable_float_nearest_n {
     ($doctest_build_tree:tt) => {
@@ -36,7 +37,7 @@ distance metric function.
 
 impl<A: Axis, T: Content, SO, const K: usize, const B: usize> ImmutableKdTree<A, T, SO, K, B>
 where
-    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + AxisUnified<Coord = A>,
     T: Content,
     SO: StemStrategy,
     usize: Cast<T>,
