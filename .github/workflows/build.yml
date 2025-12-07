@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           show-progress: false
 
@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           show-progress: false
 
@@ -85,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           show-progress: false
 
@@ -120,7 +120,7 @@ jobs:
     name: Cargo Check (Stable)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           show-progress: false
 
@@ -154,7 +154,7 @@ jobs:
     name: Cargo Check (Nightly)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           show-progress: false
 
@@ -190,7 +190,7 @@ jobs:
     name: Run Tests (Stable, no crate features enabled that require unstable Rust)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           show-progress: false
 
@@ -223,7 +223,7 @@ jobs:
     name: Run Tests (Nightly, all features enabled)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           show-progress: false
 
