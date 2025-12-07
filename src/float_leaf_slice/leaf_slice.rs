@@ -650,6 +650,9 @@ mod test {
         slice.nearest_n_within::<SquaredEuclidean, _>(&[32.0f64, 0.0f64], 4.0f64, &mut results);
 
         let items_found: Vec<_> = results.iter().map(|n| n.item).collect();
-        assert!(items_found.contains(&32u32), "Should find item 32 in remainder region");
+        assert!(
+            items_found.contains(&32u32),
+            "Should find item 32 in remainder region"
+        );
     }
 }
