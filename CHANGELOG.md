@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.2.2] - 2025-12-07
+
+### Chore
+
+- Update actions/checkout action to v6
+
 ## [5.2.1] - 2025-06-29
 
 ### 📝 Documentation
