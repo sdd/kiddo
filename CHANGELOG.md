@@ -1,5 +1,11 @@
 # Kiddo Changelog
 
+## [5.2.2] - 2025-12-07
+
+### Chore
+
+- Update codspeedhq/action action to v4
+
 ## [5.2.1] - 2025-06-29
 
 ### 📝 Documentation
