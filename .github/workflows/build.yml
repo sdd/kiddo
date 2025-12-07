@@ -15,6 +15,15 @@ env:
   LATEST_STABLE_RUST_VERSION: "TBD"
 
 jobs:
+  commitlint:
+    name: Commit Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: wagoid/commitlint-github-action@v6
+        with:
+          configFile: .commitlintrc.yaml
+
   format:
     name: Formatting
     runs-on: ubuntu-latest
