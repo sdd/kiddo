@@ -190,7 +190,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let dist = kilometres_to_unit_sphere_squared_euclidean(1000.0);
     let best_3_iter = kdtree.best_n_within::<SquaredEuclidean>(&query, dist, 3);
     let best_3 = best_3_iter
-        .map(|neighbour| (&cities[neighbour.item].name))
+        .map(|neighbour| &cities[neighbour.item].name)
         .collect::<Vec<_>>();
     println!("\nMost populous 3 cities within 1000km of 0N, 0W: {best_3:?}");
 
