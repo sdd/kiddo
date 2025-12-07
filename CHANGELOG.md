@@ -1,5 +1,53 @@
 # Kiddo Changelog
 
+## [5.3.0] - 2025-12-07
+
+### Ci
+
+- Update CI workflow triggers to include PR and workflow_dispatch
+- Permit coverage to run for PRs as well
+- Fix release-plz and add commitlint
+
+### Deps
+
+- Remove doc-comment dependency and use doc attribute that was added in Rust 1.54 instead
+
+### ♻️ Refactor
+
+- Remove within_unsorted_iter_owned in favour of modifying within_unsorted_iter
+
+### ✨ Features
+
+- Improve the flexibility of T type, KdTree.size. Add generate nearest_one_point
+
+### 🐛 Bug Fixes
+
+- Remove needless SubAssign trait bound from Content trait
+- Broken during rebase of earlier trait change commit
+- Update to use transform function
+- Correct slice access in remainder processing and remove unsafe, Signed-off-by:Markus Zoppelt <markus.zoppelt@helsing.ai>
+- Use try_from() with error for leaf_items.len()
+
+### 💄 Styling
+
+- Remove unnecessary parentheses
+- Fix formatting
+
+### 🧪 Testing
+
+- Fix broken test of custom struct as T. Add test for () as T
+- Add regression test for remainder slice access bug, Signed-off-by:Markus Zoppelt <markus.zoppelt@helsing.ai>
+
+### 🧹 Chore
+
+- Fix some lint issues
+- Use `doc` attribute instead of `doc_comment!`
+- Update actions/checkout action to v6
+- Update codspeedhq/action action to v4
+- Update ad-m/github-push-action action to v1
+- Update rust crate rstest to 0.26
+- Update rust crate codspeed-criterion-compat to v4
+
 ## [5.2.1] - 2025-06-29
 
 ### 📝 Documentation
