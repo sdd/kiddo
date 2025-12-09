@@ -13,7 +13,7 @@ pub struct NearestNeighbour<A, T> {
     pub item: T,
 }
 
-impl<A: PartialOrd, T: Content> Ord for NearestNeighbour<A, T> {
+impl<A: PartialOrd, T> Ord for NearestNeighbour<A, T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap_or(Ordering::Equal)
     }
@@ -23,17 +23,17 @@ impl<A: PartialOrd, T: Content> Ord for NearestNeighbour<A, T> {
 #[allow(unknown_lints)]
 #[allow(clippy::incorrect_partial_ord_impl_on_ord_type)]
 #[allow(clippy::non_canonical_partial_ord_impl)]
-impl<A: PartialOrd, T: Content> PartialOrd for NearestNeighbour<A, T> {
+impl<A: PartialOrd, T> PartialOrd for NearestNeighbour<A, T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.distance.partial_cmp(&other.distance)
     }
 }
 
-impl<A: PartialEq, T: Content> Eq for NearestNeighbour<A, T> {}
+impl<A: PartialEq, T> Eq for NearestNeighbour<A, T> {}
 
-impl<A: PartialEq, T: Content> PartialEq for NearestNeighbour<A, T> {
+impl<A: PartialEq, T> PartialEq for NearestNeighbour<A, T> {
     fn eq(&self, other: &Self) -> bool {
-        self.distance == other.distance && self.item == other.item
+        self.distance == other.distance // && self.item == other.item
     }
 }
 

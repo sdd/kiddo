@@ -1,6 +1,7 @@
+use crate::kd_tree::leaf_view::LeafView;
 use crate::StemStrategy;
 use aligned_vec::AVec;
-use fixed::traits::{LossyFrom, LossyInto};
+use fixed::traits::LossyFrom;
 use fixed::types::extra::{U0, U16, U8};
 use fixed::{FixedI32, FixedU16};
 use ordered_float::Float;
@@ -114,8 +115,6 @@ where
 
     fn split_leaf(&mut self, leaf_idx: usize) -> usize;
 }
-
-pub type LeafView<'a, AX, T, const K: usize, const B: usize> = ([&'a [AX]; K], &'a [T]);
 
 pub trait DistanceMetricUnified<A: Copy, const K: usize> {
     /// Accumulator / distance scalar type.

@@ -1,7 +1,8 @@
+use crate::kd_tree::leaf_view::LeafView;
 use crate::kd_tree::query_stack::{QueryStack, QueryStackContext};
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy, LeafView};
+use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
 use crate::StemStrategy;
 use std::ptr::NonNull;
 
@@ -43,7 +44,7 @@ where
     pub(crate) fn backtracking_query<QC>(
         &self,
         query_ctx: QC,
-        process_leaf: impl FnMut(&LeafView<A, T, K, B>, usize) -> bool,
+        process_leaf: impl FnMut(&LeafView<A, T, K, B>),
     ) where
         QC: QueryContext<A, K>,
     {
@@ -59,15 +60,14 @@ where
     pub(crate) fn straight_query<QC>(
         &self,
         query_ctx: QC,
-        mut process_leaf: impl FnMut(&LeafView<A, T, K, B>, usize) -> bool,
-    ) -> bool
-    where
+        mut process_leaf: impl FnMut(&LeafView<A, T, K, B>),
+    ) where
         QC: QueryContext<A, K>,
     {
         let leaf_idx = self.get_leaf_idx(query_ctx.query());
 
         let leaf_view = self.leaves.leaf_view(leaf_idx);
-        process_leaf(&leaf_view, leaf_idx)
+        process_leaf(&leaf_view);
     }
 
     /// Backtracking query with explicit stack.
@@ -80,7 +80,7 @@ where
         &self,
         query_ctx: QC,
         stack: &mut QueryStack<A, SS>,
-        mut process_leaf: impl FnMut(&LeafView<A, T, K, B>, usize) -> bool,
+        mut process_leaf: impl FnMut(&LeafView<A, T, K, B>),
     ) where
         QC: QueryContext<A, K>,
     {
@@ -117,9 +117,7 @@ where
             }
 
             let leaf_view = self.leaves.leaf_view(stem_strat.leaf_idx());
-            if !process_leaf(&leaf_view, stem_strat.leaf_idx()) {
-                break;
-            }
+            process_leaf(&leaf_view);
         }
     }
 }

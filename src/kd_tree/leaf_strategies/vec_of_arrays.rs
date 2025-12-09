@@ -1,4 +1,5 @@
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy, LeafView, MutableLeafStrategy};
+use crate::kd_tree::leaf_view::LeafView;
+use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy, MutableLeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::AVec;
 
@@ -34,7 +35,7 @@ where
         &mut self,
         _source: &[[Self::Num; K]],
         _stems: &mut AVec<Self::Num>,
-        stem_strategy: SS,
+        _stem_strategy: SS,
     ) -> i32 {
         todo!()
     }
@@ -67,7 +68,7 @@ where
             array_init::array_init(|i| &leaf.content_points[i].as_slice()[..leaf.size]);
         let leaf_items_view = &leaf.content_items[..leaf.size];
 
-        (points, leaf_items_view)
+        LeafView::new(points, leaf_items_view)
     }
 
     fn append_leaf(&mut self, leaf_points: &[&[AX]; K], leaf_items: &[T]) {
@@ -202,7 +203,7 @@ mod test {
     use crate::{kd_tree, Eytzinger};
 
     #[test]
-    fn create_single_leaf_flat_vec_float_kd_tree() {
+    fn create_single_leaf_vec_of_arrays_float_kd_tree() {
         let points: Vec<[f32; 3]> = vec![[1.0f32, 2.0f32, 3.0f32]];
         let tree: kd_tree::KdTree<f32, u32, Eytzinger<3>, VecOfArrays<f32, u32, 3, 32>, 3, 32> =
             kd_tree::KdTree::new_from_slice(&points);
@@ -216,7 +217,8 @@ mod test {
             3,
             32,
         >>::leaf_view(&tree.leaves, 0);
-        let (leaf_points, leaf_items) = leaf_view;
+
+        let (leaf_points, leaf_items) = leaf_view.into_parts();
         assert_eq!(leaf_points[0][0], points[0][0]);
         assert_eq!(leaf_points[1][0], points[0][1]);
         assert_eq!(leaf_points[2][0], points[0][2]);
@@ -224,7 +226,7 @@ mod test {
     }
 
     #[test]
-    fn create_single_leaf_flat_vec_fixed_point_kd_tree() {
+    fn create_single_leaf_vec_of_arrays_fixed_point_kd_tree() {
         let points: Vec<[FixedU16<U8>; 3]> = vec![[1.into(), 2.into(), 3.into()]];
         let tree: kd_tree::KdTree<
             FixedU16<U8>,
@@ -244,7 +246,7 @@ mod test {
             3,
             32,
         >>::leaf_view(&tree.leaves, 0);
-        let (leaf_points, leaf_items) = leaf_view;
+        let (leaf_points, leaf_items) = leaf_view.into_parts();
         assert_eq!(leaf_points[0][0], points[0][0]);
         assert_eq!(leaf_points[1][0], points[0][1]);
         assert_eq!(leaf_points[2][0], points[0][2]);
@@ -252,7 +254,29 @@ mod test {
     }
 
     #[test]
-    fn create_multiple_leaf_flat_vec_float_kd_tree() {
+    fn create_single_leaf_vec_of_arrays_float_no_items_kd_tree() {
+        let points: Vec<[f32; 3]> = vec![[1.0f32, 2.0f32, 3.0f32]];
+
+        let tree: kd_tree::KdTree<f32, (), Eytzinger<3>, VecOfArrays<f32, (), 3, 32>, 3, 32> =
+            kd_tree::KdTree::new_from_slice_no_items(&points);
+
+        assert_eq!(tree.size(), 1);
+
+        let leaf_view =
+            <VecOfArrays<f32, (), 3, 32> as LeafStrategy<f32, (), Eytzinger<3>, 3, 32>>::leaf_view(
+                &tree.leaves,
+                0,
+            );
+
+        let (leaf_points, leaf_items) = leaf_view.into_parts();
+        assert_eq!(leaf_points[0][0], points[0][0]);
+        assert_eq!(leaf_points[1][0], points[0][1]);
+        assert_eq!(leaf_points[2][0], points[0][2]);
+        assert_eq!(leaf_items, vec![()]);
+    }
+
+    #[test]
+    fn create_multiple_leaf_vec_of_arrays_float_kd_tree() {
         // create 2^16 random 3d points in the unit cube
         let mut rng = rand::thread_rng();
         let mut points: Vec<[f32; 3]> = vec![];
@@ -270,5 +294,10 @@ mod test {
         assert_eq!(tree.size(), 65_536);
         assert_eq!(tree.leaf_count(), 2048);
         assert_eq!(tree.max_stem_level(), 10);
+
+        // perform a nearest_one query
+        let query_point = [0.5, 0.5, 0.5];
+
+        let nearest = tree.nearest_one(&query_point);
     }
 }
