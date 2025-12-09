@@ -55,9 +55,6 @@ where
     /// Creates a `KdTree`, balanced and optimised, populated
     /// with items from `source`.
     ///
-    /// `KdTree` instances are optimally
-    /// balanced and tuned, but are not modifiable after construction.
-    ///
     /// # Examples
     ///
     /// ```rust
@@ -73,6 +70,20 @@ where
     pub fn new_from_slice(source: &[[A; K]]) -> Self
     where
         usize: Cast<T>,
+    {
+        Self::new_from_slice_with(source, |leaf_items: &mut Vec<T>, src_idx: usize| {
+            leaf_items.push(src_idx.az::<T>());
+        })
+    }
+
+    /// Inner constructor shared by all variants. The `push_item` callback
+    /// is invoked wherever we would normally push an item for a source index.
+    ///
+    /// This has *no* `usize: Cast<T>` bound; callers can decide what to do
+    /// with the index (e.g. cast it, ignore it, or something else).
+    fn new_from_slice_with<F>(source: &[[A; K]], mut push_item: F) -> Self
+    where
+        F: FnMut(&mut Vec<T>, usize),
     {
         let item_count = source.len();
         let leaf_node_count = item_count.div_ceil(B);
@@ -100,16 +111,15 @@ where
                 for dim in 0..K {
                     leaf_points[dim].push(source[src_idx][dim]);
                 }
-                leaf_items.push(src_idx.az::<T>());
+                push_item(&mut leaf_items, src_idx);
             }
 
-            // Convert to the shape expected by LeafStrategy::append_leaf: &[&[A]; K]
             let leaf_points_refs: [&[A]; K] =
                 array_init::array_init(|dim| leaf_points[dim].as_slice());
 
             leaves.append_leaf(&leaf_points_refs, leaf_items.as_slice());
         } else {
-            Self::populate_recursive(
+            Self::populate_recursive_with(
                 &mut stems,
                 source,
                 &mut sort_index,
@@ -117,6 +127,7 @@ where
                 max_stem_level,
                 leaf_node_count * B,
                 &mut leaves,
+                &mut push_item,
             );
 
             // TODO: eliminate the need for this
@@ -133,7 +144,7 @@ where
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn populate_recursive(
+    fn populate_recursive_with<F>(
         stems: &mut AVec<A, ConstAlign<{ CACHELINE_ALIGN }>>,
         source: &[[A; K]],
         sort_index: &mut [usize],
@@ -141,8 +152,9 @@ where
         max_stem_level: i32,
         capacity: usize,
         leaves: &mut LS,
+        push_item: &mut F,
     ) where
-        usize: Cast<T>,
+        F: FnMut(&mut Vec<T>, usize),
     {
         let chunk_length = sort_index.len();
         let dim = stem_ordering.dim();
@@ -157,16 +169,15 @@ where
             // Gather from `source` via `sort_index`
             for &src_idx in sort_index.iter() {
                 // points
-                for dim in 0..K {
-                    leaf_points[dim].push(source[src_idx][dim]);
+                for d in 0..K {
+                    leaf_points[d].push(source[src_idx][d]);
                 }
-                // item index (or whatever mapping you want)
-                leaf_items.push(src_idx.az::<T>());
+                // delegate item handling
+                push_item(&mut leaf_items, src_idx);
             }
 
             // Convert [Vec<A>; K] -> [&[A]; K]
-            let leaf_points_refs: [&[A]; K] =
-                array_init::array_init(|dim| leaf_points[dim].as_slice());
+            let leaf_points_refs: [&[A]; K] = array_init::array_init(|d| leaf_points[d].as_slice());
 
             leaves.append_leaf(&leaf_points_refs, leaf_items.as_slice());
             return;
@@ -197,7 +208,7 @@ where
         let right_stem_ordering = stem_ordering.branch();
         let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
 
-        Self::populate_recursive(
+        Self::populate_recursive_with(
             stems,
             source,
             lower_sort_index,
@@ -205,9 +216,10 @@ where
             max_stem_level,
             left_capacity,
             leaves,
+            push_item,
         );
 
-        Self::populate_recursive(
+        Self::populate_recursive_with(
             stems,
             source,
             upper_sort_index,
@@ -215,9 +227,36 @@ where
             max_stem_level,
             right_capacity,
             leaves,
+            push_item,
         );
     }
+}
 
+impl<A, SS, LS, const K: usize, const B: usize> KdTree<A, (), SS, LS, K, B>
+where
+    A: AxisUnified<Coord = A>,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, (), SS, K, B>,
+{
+    /// Creates a `KdTree` with no stored item values (`T = ()`).
+    ///
+    /// Leaf item slices will have the correct length but contain only `()`.
+    /// LLVM can generally optimize the `Vec<()>` storage away.
+    #[cfg_attr(not(feature = "no_inline"), inline)]
+    pub fn new_from_slice_no_items(source: &[[A; K]]) -> Self {
+        Self::new_from_slice_with(source, |leaf_items: &mut Vec<()>, _src_idx: usize| {
+            leaf_items.push(());
+        })
+    }
+}
+
+impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
+where
+    A: AxisUnified<Coord = A>,
+    T: Basics,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+{
     #[cfg(not(feature = "unreliable_select_nth_unstable"))]
     #[cfg_attr(not(feature = "no_inline"), inline)]
     fn update_pivot(

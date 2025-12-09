@@ -1,6 +1,6 @@
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
+use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, LeafStrategy};
 use crate::StemStrategy;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
@@ -10,18 +10,17 @@ where
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
-    pub fn approx_nearest_one(&self, query: &[A; K]) -> (A, T) {
+    pub fn approx_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
+    where
+        D: DistanceMetricUnified<A, K>,
+    {
         let req_ctx = GetLeafIdxReqCtx { query };
 
-        let mut best_dist = A::max_value();
+        let mut best_dist = D::Output::max_value();
         let mut best_item = T::default();
 
-        self.straight_query(req_ctx, |leaf, _l| {
-            // TODO: real impl
-            best_dist = A::zero();
-            best_item = leaf.1[0];
-
-            false // stop processing
+        self.straight_query(req_ctx, |leaf| {
+            leaf.nearest_one::<D>(query, &mut best_dist, &mut best_item);
         });
 
         (best_dist, best_item)

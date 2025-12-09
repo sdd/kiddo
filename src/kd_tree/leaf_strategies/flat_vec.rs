@@ -1,4 +1,5 @@
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy, LeafView};
+use crate::kd_tree::leaf_view::LeafView;
+use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::AVec;
 
@@ -31,7 +32,7 @@ where
         &mut self,
         _source: &[[Self::Num; K]],
         _stems: &mut AVec<Self::Num>,
-        stem_strategy: SS,
+        _stem_strategy: SS,
     ) -> i32 {
         todo!()
     }
@@ -65,7 +66,7 @@ where
 
         let leaf_items_view = &self.leaf_items[start as usize..end as usize];
 
-        (leaf_points_view, leaf_items_view)
+        LeafView::new(leaf_points_view, leaf_items_view)
     }
 
     fn append_leaf(&mut self, leaf_points: &[&[AX]; K], leaf_items: &[T]) {
@@ -93,9 +94,10 @@ where
 mod test {
     use fixed::{types::extra::U8, FixedU16};
     use rand::Rng;
+    use std::num::NonZeroUsize;
 
     use crate::kd_tree::leaf_strategies::flat_vec::FlatVec;
-    use crate::traits_unified_2::LeafStrategy;
+    use crate::traits_unified_2::{LeafStrategy, SquaredEuclidean};
     use crate::{kd_tree, Eytzinger};
 
     #[test]
@@ -111,11 +113,33 @@ mod test {
                 &tree.leaves,
                 0,
             );
-        let (leaf_points, leaf_items) = leaf_view;
+
+        let (leaf_points, leaf_items) = leaf_view.into_parts();
         assert_eq!(leaf_points[0][0], points[0][0]);
         assert_eq!(leaf_points[1][0], points[0][1]);
         assert_eq!(leaf_points[2][0], points[0][2]);
         assert_eq!(leaf_items, vec![0]);
+    }
+
+    #[test]
+    fn create_single_leaf_flat_vec_float_no_items_kd_tree() {
+        let points: Vec<[f32; 3]> = vec![[1.0f32, 2.0f32, 3.0f32]];
+        let tree: kd_tree::KdTree<f32, (), Eytzinger<3>, FlatVec<f32, (), 3, 32>, 3, 32> =
+            kd_tree::KdTree::new_from_slice_no_items(&points);
+
+        assert_eq!(tree.size(), 1);
+
+        let leaf_view =
+            <FlatVec<f32, (), 3, 32> as LeafStrategy<f32, (), Eytzinger<3>, 3, 32>>::leaf_view(
+                &tree.leaves,
+                0,
+            );
+
+        let (leaf_points, leaf_items) = leaf_view.into_parts();
+        assert_eq!(leaf_points[0][0], points[0][0]);
+        assert_eq!(leaf_points[1][0], points[0][1]);
+        assert_eq!(leaf_points[2][0], points[0][2]);
+        assert_eq!(leaf_items, vec![()]);
     }
 
     #[test]
@@ -139,7 +163,8 @@ mod test {
             3,
             32,
         >>::leaf_view(&tree.leaves, 0);
-        let (leaf_points, leaf_items) = leaf_view;
+
+        let (leaf_points, leaf_items) = leaf_view.into_parts();
         assert_eq!(leaf_points[0][0], points[0][0]);
         assert_eq!(leaf_points[1][0], points[0][1]);
         assert_eq!(leaf_points[2][0], points[0][2]);
@@ -165,5 +190,12 @@ mod test {
         assert_eq!(tree.size(), 65_536);
         assert_eq!(tree.leaf_count(), 2048);
         assert_eq!(tree.max_stem_level(), 10);
+
+        // perform a best_n_within query
+        let query_point = [0.5, 0.5, 0.5];
+        let radius = 0.1;
+        let max_qty = NonZeroUsize::new(10).unwrap();
+        let results = tree.best_n_within::<SquaredEuclidean<f32>>(&query_point, radius, max_qty);
+        assert_eq!(results.len(), 10);
     }
 }

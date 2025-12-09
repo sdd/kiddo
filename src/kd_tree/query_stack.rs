@@ -1,6 +1,5 @@
 use crate::traits_unified_2::AxisUnified;
 
-// Minimal placeholders so this module compiles; replace with real ones later.
 #[derive(Debug, Default)]
 pub(crate) struct QueryStack<A, SS> {
     stack: Vec<QueryStackContext<A, SS>>,
@@ -10,8 +9,8 @@ pub(crate) struct QueryStack<A, SS> {
 pub(crate) struct QueryStackContext<A, SS> {
     pub stem_strat: SS,
     pub dim: usize,
-    pub old_off: A, // off[dim] before we crossed this plane
-    pub rd: A,      // rd before we crossed this plane
+    pub old_off: A,
+    pub rd: A,
 }
 
 impl<A, SS> QueryStack<A, SS> {

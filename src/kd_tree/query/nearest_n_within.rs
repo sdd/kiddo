@@ -1,81 +1,87 @@
-use std::num::NonZero;
-use std::ops::Sub;
-use crate::kd_tree::KdTree;
 use crate::kd_tree::traits::QueryContext;
+use crate::kd_tree::KdTree;
 use crate::mutable::float::result_collection::ResultCollection;
-use crate::StemStrategy;
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
+use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, LeafStrategy};
+use crate::{NearestNeighbour, StemStrategy};
+use sorted_vec::SortedVec;
+use std::collections::BinaryHeap;
+
+const MAX_VEC_RESULT_SIZE: usize = 20;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: AxisUnified<Coord = A>,
-    T: Basics + Copy + Default,
+    T: Basics + Ord,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
     pub fn nearest_n_within<D>(
         &self,
         query: &[A; K],
-        max_dist: A,
-        max_qty: NonZero<usize>,
+        max_dist: D::Output,
+        max_qty: usize,
         sorted: bool,
-    ) -> (A, T) {
-        let max_qty = max_qty.into();
-        
-        let req_ctx = NeaarestNWithinReqCtx {
+    ) -> Vec<NearestNeighbour<D::Output, T>>
+    where
+        D: DistanceMetricUnified<A, K>,
+    {
+        if sorted && max_qty < usize::MAX {
+            if max_qty <= MAX_VEC_RESULT_SIZE {
+                self.nearest_n_within_inner::<D, SortedVec<NearestNeighbour<D::Output, T>>>(
+                    query, max_dist, max_qty, sorted,
+                )
+            } else {
+                self.nearest_n_within_inner::<D, BinaryHeap<NearestNeighbour<D::Output, T>>>(
+                    query, max_dist, max_qty, sorted,
+                )
+            }
+        } else {
+            self.nearest_n_within_inner::<D, Vec<NearestNeighbour<D::Output, T>>>(
+                query, max_dist, 0, sorted,
+            )
+        }
+    }
+
+    fn nearest_n_within_inner<D, R>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        max_qty: usize,
+        sorted: bool,
+    ) -> Vec<NearestNeighbour<D::Output, T>>
+    where
+        D: DistanceMetricUnified<A, K>,
+        R: ResultCollection<D::Output, T>,
+    {
+        let req_ctx = NearestNWithinReqCtx {
             query,
             max_dist,
             max_qty,
-            sorted
+            sorted,
         };
 
-        let mut best_dist = A::max_value();
-        let mut best_item = T::default();
-        
-        self.backtracking_query(
-            req_ctx,
-            |leaf, _l| {
-                // TODO: real impl
-                best_dist = A::zero();
-                best_item = leaf.1[0];
-                
-                true // continue processing
-            }
-        );
+        let mut results = R::new_with_capacity(max_qty);
 
-        (best_dist, best_item)
-    }
+        self.backtracking_query(req_ctx, |leaf| {
+            leaf.nearest_n_within::<D, R>(query, max_dist, &mut results);
+        });
 
-    fn nearest_n_within_inner<D, H: ResultCollection<A, T>>(
-        &self,
-        req_ctx: NeaarestNWithinReqCtx<A, K>,
-    ) -> H {
-        
-
-        self.backtracking_query(
-            req_ctx,
-            |leaf, _l| {
-                // TODO: real impl
-                best_dist = A::zero();
-                best_item = leaf.1[0];
-
-                true // continue processing
-            }
-        );
-
-        (best_dist, best_item)
+        if sorted {
+            results.into_sorted_vec()
+        } else {
+            results.into_vec()
+        }
     }
 }
 
-struct NeaarestNWithinReqCtx<'a, A, const K: usize> {
+struct NearestNWithinReqCtx<'a, A, O, const K: usize> {
     query: &'a [A; K],
-    max_dist: A,
+    max_dist: O,
     max_qty: usize,
     sorted: bool,
 }
 
-
-impl<A, const K: usize> QueryContext<A, K> for NeaarestNWithinReqCtx<'_, A, K> {
+impl<A, O, const K: usize> QueryContext<A, K> for NearestNWithinReqCtx<'_, A, O, K> {
     fn query(&self) -> &[A; K] {
         self.query
     }
@@ -83,9 +89,9 @@ impl<A, const K: usize> QueryContext<A, K> for NeaarestNWithinReqCtx<'_, A, K> {
 
 #[cfg(test)]
 mod tests {
-    use crate::Eytzinger;
-    use crate::kd_tree::leaf_strategies::dummy::DummyLeafStrategy;
     use super::*;
+    use crate::kd_tree::leaf_strategies::dummy::DummyLeafStrategy;
+    use crate::Eytzinger;
 
     #[test]
     fn test_get_leaf_idx() {

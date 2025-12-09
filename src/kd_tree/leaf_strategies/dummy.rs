@@ -1,4 +1,5 @@
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy, LeafView};
+use crate::kd_tree::leaf_view::LeafView;
+use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::AVec;
 
