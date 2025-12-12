@@ -14,7 +14,10 @@ where
     where
         D: DistanceMetricUnified<A, K>,
     {
-        let req_ctx = GetLeafIdxReqCtx { query };
+        let req_ctx = GetLeafIdxReqCtx::<A, D::Output, K> {
+            query,
+            _phantom: std::marker::PhantomData,
+        };
 
         let mut best_dist = D::Output::max_value();
         let mut best_item = T::default();
@@ -27,30 +30,58 @@ where
     }
 }
 
-struct GetLeafIdxReqCtx<'a, A, const K: usize> {
+struct GetLeafIdxReqCtx<'a, A, O, const K: usize> {
     query: &'a [A; K],
+    _phantom: std::marker::PhantomData<O>,
 }
 
-impl<A, const K: usize> QueryContext<A, K> for GetLeafIdxReqCtx<'_, A, K> {
+impl<A, O, const K: usize> QueryContext<A, O, K> for GetLeafIdxReqCtx<'_, A, O, K> {
     fn query(&self) -> &[A; K] {
         self.query
+    }
+
+    fn max_dist(&self) -> O {
+        panic!("approx_nearest_one should not be called with max_dist")
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::kd_tree::leaf_strategies::dummy::DummyLeafStrategy;
+    use rand::rngs::StdRng;
+    use rand::Rng;
+    use rand::SeedableRng;
+
+    use crate::kd_tree::leaf_strategies::flat_vec::FlatVec;
+    use crate::kd_tree::KdTree;
+    use crate::traits_unified_2::SquaredEuclidean;
     use crate::Eytzinger;
 
+    const RNG_SEED: u64 = 42;
+
     #[test]
-    fn test_get_leaf_idx() {
-        let tree: KdTree<f32, u32, Eytzinger<3>, DummyLeafStrategy, 3, 32> = KdTree::default();
+    fn approx_nearest_one_flat_vec_f32() {
+        let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
-        let query = [0.0f32; 3];
+        let mut points: Vec<[f32; 3]> = vec![];
+        for _ in 0..65_536 {
+            let x = rng.gen_range(0.0..1.0);
+            let y = rng.gen_range(0.0..1.0);
+            let z = rng.gen_range(0.0..1.0);
+            points.push([x, y, z]);
+        }
 
-        let result = tree.get_leaf_idx(&query);
+        let tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
 
-        assert_eq!(result, 3);
+        assert!(!tree.is_empty());
+        assert_eq!(tree.size(), 65_536);
+        assert_eq!(tree.leaf_count(), 2048);
+        assert_eq!(tree.max_stem_level(), 10);
+
+        let query_point = [0.5, 0.5, 0.5];
+
+        let results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
+
+        assert_eq!(results, (0.0014114721, 19074));
     }
 }

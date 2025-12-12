@@ -2,7 +2,7 @@ use crate::kd_tree::leaf_view::LeafView;
 use crate::kd_tree::query_stack::{QueryStack, QueryStackContext};
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
+use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, LeafStrategy};
 use crate::StemStrategy;
 use std::ptr::NonNull;
 
@@ -41,28 +41,30 @@ where
     /// Usually you would want to call one of the high-level query functions
     /// rather than this function directly.
     #[inline(always)]
-    pub(crate) fn backtracking_query<QC>(
+    pub(crate) fn backtracking_query<QC, O, D>(
         &self,
-        query_ctx: QC,
-        process_leaf: impl FnMut(&LeafView<A, T, K, B>),
+        query_ctx: &mut QC,
+        process_leaf: impl FnMut(&LeafView<A, T, K, B>, &mut QC),
     ) where
-        QC: QueryContext<A, K>,
+        QC: QueryContext<A, O, K>,
+        O: AxisUnified<Coord = O>,
+        D: DistanceMetricUnified<A, K, Output = O>,
     {
         // TODO: replace with TLS-backed stack
         let mut stack = QueryStack::new();
-        self.backtracking_query_with_stack(query_ctx, &mut stack, process_leaf);
+        self.backtracking_query_with_stack::<QC, O, D>(query_ctx, &mut stack, process_leaf);
     }
 
     /// Non-backtracking query
     ///
     /// Used for approx-NN queries
     #[inline]
-    pub(crate) fn straight_query<QC>(
+    pub(crate) fn straight_query<QC, O>(
         &self,
         query_ctx: QC,
         mut process_leaf: impl FnMut(&LeafView<A, T, K, B>),
     ) where
-        QC: QueryContext<A, K>,
+        QC: QueryContext<A, O, K>,
     {
         let leaf_idx = self.get_leaf_idx(query_ctx.query());
 
@@ -76,48 +78,77 @@ where
     /// Usually you would want to call one of the high-level query functions
     /// rather than this function directly.
     #[inline(always)]
-    pub(crate) fn backtracking_query_with_stack<QC>(
+    pub(crate) fn backtracking_query_with_stack<QC, O, D>(
         &self,
-        query_ctx: QC,
-        stack: &mut QueryStack<A, SS>,
-        mut process_leaf: impl FnMut(&LeafView<A, T, K, B>),
+        mut query_ctx: &mut QC,
+        stack: &mut QueryStack<O, SS>,
+        mut process_leaf: impl FnMut(&LeafView<A, T, K, B>, &mut QC),
     ) where
-        QC: QueryContext<A, K>,
+        QC: QueryContext<A, O, K>,
+        O: AxisUnified<Coord = O>,
+        D: DistanceMetricUnified<A, K, Output = O>,
     {
         let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
         let stem_strat: SS = SS::new(stems_ptr);
-        let mut off = [A::zero(); K];
 
+        let query: [A; K] = *query_ctx.query();
+        let mut query_wide: [O; K] = [O::zero(); K];
+        for dim in 0..K {
+            query_wide[dim] = D::widen_coord(query[dim]);
+        }
+
+        let mut off = [O::zero(); K];
         stack.push(QueryStackContext::new(stem_strat));
 
         while let Some(stack_ctx) = stack.pop() {
-            let (mut stem_strat, mut dim, mut old_off, mut rd) = stack_ctx.into_parts();
+            let (mut stem_strat, old_off, mut rd) = stack_ctx.into_parts();
+            let mut dim = stem_strat.dim();
+            tracing::trace!(%dim, %old_off, %rd, "Popped stack context");
+
+            let max_dist = query_ctx.max_dist();
+            if O::cmp(rd, max_dist) != std::cmp::Ordering::Less {
+                tracing::trace!(%rd, %max_dist, "Prune check: PRUNE");
+                continue;
+            }
+            tracing::trace!(%rd, %max_dist, "Prune check: VISIT");
+
+            tracing::trace!("Restoring off[{}]. was {}, now {}", dim, off[dim], old_off);
             off[dim] = old_off;
 
             while stem_strat.level() <= self.max_stem_level {
-                dim = stem_strat.dim();
-                old_off = off[dim];
-
                 let pivot = *unsafe { self.stems.get_unchecked(stem_strat.stem_idx()) };
-                let query_coord = *unsafe { query_ctx.query().get_unchecked(dim) };
-                let is_right_child = query_coord >= pivot;
+                let query_elem = *unsafe { query.get_unchecked(dim) };
+                let is_right_child = query_elem >= pivot;
 
-                let new_off = A::saturating_dist(query_coord, pivot);
-                let delta = new_off - old_off;
-                rd = A::saturating_add(rd, delta);
+                let far_ctx = stem_strat.branch_relative(is_right_child);
 
-                let far = stem_strat.branch_relative(is_right_child);
+                let pivot_wide: O = D::widen_coord(pivot);
+                let query_elem_wide = *unsafe { query_wide.get_unchecked(dim) };
+
+                let new_off = O::saturating_dist(query_elem_wide, pivot_wide);
+                let old_off = *unsafe { off.get_unchecked(dim) };
+                rd = O::saturating_add(rd, D::dist1(new_off, old_off));
+                tracing::trace!(
+                    "new_off = dist({}, {}) = {}. rd = {}",
+                    query_elem_wide,
+                    pivot_wide,
+                    new_off,
+                    rd
+                );
 
                 stack.push(QueryStackContext {
-                    stem_strat: far,
-                    dim,
-                    old_off,
+                    stem_strat: far_ctx,
+                    // dim,
+                    old_off: new_off,
                     rd,
-                })
+                });
+
+                dim = stem_strat.dim();
             }
 
+            tracing::trace!(leaf_idx = %stem_strat.leaf_idx(), "processing leaf");
             let leaf_view = self.leaves.leaf_view(stem_strat.leaf_idx());
-            process_leaf(&leaf_view);
+            process_leaf(&leaf_view, &mut query_ctx);
         }
     }
 }

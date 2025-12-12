@@ -293,6 +293,7 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(3);
 
         const TREE_SIZE: usize = 100_000;
+        // const TREE_SIZE: usize = 256;
         const NUM_QUERIES: usize = 1000;
 
         let content_to_add: Vec<[f32; 4]> =
@@ -304,18 +305,19 @@ mod tests {
         assert_eq!(tree.size(), TREE_SIZE);
 
         let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)
-            .map(|_| rand::random::<[f32; 4]>())
+            .map(|_| rng.random::<[f32; 4]>()) // Use the seeded rng
             .collect();
 
         for (i, query_point) in query_points.iter().enumerate() {
             let expected = linear_search(&content_to_add, query_point);
 
-            println!("query #{i:?}");
+            // println!("query #{i:?} ({:?})", query_point);
             let result = tree.nearest_one::<SquaredEuclidean>(query_point);
 
             assert_eq!(result.distance, expected.distance);
             assert_eq!(result.item as usize, expected.item);
-            println!("query #{i:?} passed");
+            // println!("query #{i:?} passed");
+            // break;
         }
     }
 

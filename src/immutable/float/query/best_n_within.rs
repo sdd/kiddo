@@ -86,14 +86,20 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZero;
+
+    use rand::rngs::StdRng;
+    use rand::Rng;
+    use rand::SeedableRng;
+
     use crate::best_neighbour::BestNeighbour;
     use crate::distance::float::SquaredEuclidean;
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use crate::{stem_strategies::Donnelly, traits::DistanceMetric, Eytzinger};
-    use rand::Rng;
-    use std::num::NonZero;
 
     type AX = f64;
+
+    const RNG_SEED: u64 = 42;
 
     #[test]
     fn can_query_single_bucket_tree() {
@@ -276,6 +282,8 @@ mod tests {
 
     #[test]
     fn can_query_best_items_within_radius_large_scale() {
+        let mut rng = StdRng::seed_from_u64(RNG_SEED);
+
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
         let max_qty = NonZero::new(2).unwrap();
@@ -288,7 +296,7 @@ mod tests {
         assert_eq!(tree.size(), TREE_SIZE);
 
         let query_points: Vec<[AX; 2]> = (0..NUM_QUERIES)
-            .map(|_| rand::random::<[AX; 2]>())
+            .map(|_| rng.random::<[AX; 2]>()) // Use the seeded rng
             .collect();
 
         for query_point in query_points {

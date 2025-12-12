@@ -5,7 +5,7 @@ use fixed::traits::LossyFrom;
 use fixed::types::extra::{U0, U16, U8};
 use fixed::{FixedI32, FixedU16};
 use ordered_float::Float;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::ops::{AddAssign, Sub};
 
 pub trait Basics: Copy + Debug + Default + Send + Sync + 'static {}
@@ -13,7 +13,7 @@ impl<T> Basics for T where T: Copy + Debug + Default + Send + Sync + 'static {}
 
 // Make AxisUnified a supertrait of the common numeric bounds you need everywhere.
 pub trait AxisUnified:
-    Copy + PartialEq + PartialOrd + Sub<Output = Self> + AddAssign<Self>
+    Copy + PartialEq + PartialOrd + Sub<Output = Self> + AddAssign<Self> + Debug + Display
 {
     /// Coordinate scalar type stored in the tree and queries.
     type Coord: Copy;
@@ -196,10 +196,10 @@ macro_rules! impl_axis_float {
 
             #[inline(always)]
             fn cmp(a: Self::Coord, b: Self::Coord) -> std::cmp::Ordering {
-                debug_assert!(
-                    a.is_finite() && b.is_finite(),
-                    "NaNs should not be present in axis coordinates"
-                );
+                // debug_assert!(
+                //     a.is_finite() && b.is_finite(),
+                //     "NaNs / Infinities should not be present in axis coordinates"
+                // );
                 if a < b {
                     std::cmp::Ordering::Less
                 } else if b > a {

@@ -1,9 +1,9 @@
 use crate::nearest_neighbour::NearestNeighbour;
-use crate::traits::{Axis, Content};
+use crate::traits_unified_2::AxisUnified;
 use sorted_vec::SortedVec;
 use std::collections::BinaryHeap;
 
-pub trait ResultCollection<A: Axis, T: Content> {
+pub trait ResultCollection<A: AxisUnified<Coord = A>, T> {
     fn new_with_capacity(capacity: usize) -> Self;
     fn add(&mut self, entry: NearestNeighbour<A, T>);
     fn max_dist(&self) -> A;
@@ -11,7 +11,7 @@ pub trait ResultCollection<A: Axis, T: Content> {
     fn into_sorted_vec(self) -> Vec<NearestNeighbour<A, T>>;
 }
 
-impl<A: Axis, T: Content> ResultCollection<A, T> for BinaryHeap<NearestNeighbour<A, T>> {
+impl<A: AxisUnified<Coord = A>, T> ResultCollection<A, T> for BinaryHeap<NearestNeighbour<A, T>> {
     fn new_with_capacity(capacity: usize) -> Self {
         BinaryHeap::with_capacity(capacity)
     }
@@ -28,9 +28,9 @@ impl<A: Axis, T: Content> ResultCollection<A, T> for BinaryHeap<NearestNeighbour
     }
     fn max_dist(&self) -> A {
         if self.len() < self.capacity() {
-            A::infinity()
+            A::max_value()
         } else {
-            self.peek().map_or(A::infinity(), |n| n.distance)
+            self.peek().map_or(A::max_value(), |n| n.distance)
         }
     }
     fn into_vec(self) -> Vec<NearestNeighbour<A, T>> {
@@ -41,7 +41,7 @@ impl<A: Axis, T: Content> ResultCollection<A, T> for BinaryHeap<NearestNeighbour
     }
 }
 
-impl<A: Axis, T: Content> ResultCollection<A, T> for Vec<NearestNeighbour<A, T>> {
+impl<A: AxisUnified<Coord = A>, T> ResultCollection<A, T> for Vec<NearestNeighbour<A, T>> {
     fn new_with_capacity(capacity: usize) -> Self {
         Vec::with_capacity(capacity)
     }
@@ -51,7 +51,7 @@ impl<A: Axis, T: Content> ResultCollection<A, T> for Vec<NearestNeighbour<A, T>>
     }
 
     fn max_dist(&self) -> A {
-        A::infinity()
+        A::max_value()
     }
 
     fn into_vec(self) -> Vec<NearestNeighbour<A, T>> {
@@ -64,7 +64,7 @@ impl<A: Axis, T: Content> ResultCollection<A, T> for Vec<NearestNeighbour<A, T>>
     }
 }
 
-impl<A: Axis, T: Content> ResultCollection<A, T> for SortedVec<NearestNeighbour<A, T>> {
+impl<A: AxisUnified<Coord = A>, T> ResultCollection<A, T> for SortedVec<NearestNeighbour<A, T>> {
     fn new_with_capacity(capacity: usize) -> Self {
         SortedVec::with_capacity(capacity)
     }
@@ -81,9 +81,9 @@ impl<A: Axis, T: Content> ResultCollection<A, T> for SortedVec<NearestNeighbour<
 
     fn max_dist(&self) -> A {
         if self.len() < self.capacity() {
-            A::infinity()
+            A::max_value()
         } else {
-            self.last().map_or(A::infinity(), |n| n.distance)
+            self.last().map_or(A::max_value(), |n| n.distance)
         }
     }
 

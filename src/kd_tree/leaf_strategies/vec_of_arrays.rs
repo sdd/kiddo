@@ -199,7 +199,7 @@ mod test {
     use rand::Rng;
 
     use crate::kd_tree::leaf_strategies::vec_of_arrays::VecOfArrays;
-    use crate::traits_unified_2::LeafStrategy;
+    use crate::traits_unified_2::{LeafStrategy, SquaredEuclidean};
     use crate::{kd_tree, Eytzinger};
 
     #[test]
@@ -298,6 +298,6 @@ mod test {
         // perform a nearest_one query
         let query_point = [0.5, 0.5, 0.5];
 
-        let nearest = tree.nearest_one(&query_point);
+        let nearest = tree.nearest_one::<SquaredEuclidean<f32>>(&query_point);
     }
 }
