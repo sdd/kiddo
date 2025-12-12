@@ -8,7 +8,7 @@ pub(crate) struct QueryStack<A, SS> {
 #[derive(Debug)]
 pub(crate) struct QueryStackContext<A, SS> {
     pub stem_strat: SS,
-    pub dim: usize,
+    // pub dim: usize,
     pub old_off: A,
     pub rd: A,
 }
@@ -34,13 +34,13 @@ impl<A: AxisUnified<Coord = A>, SS> QueryStackContext<A, SS> {
     pub fn new(stem_strat: SS) -> Self {
         Self {
             stem_strat,
-            dim: 0,
+            // dim: 0,
             old_off: A::zero(),
             rd: A::zero(),
         }
     }
 
-    pub fn into_parts(self) -> (SS, usize, A, A) {
-        (self.stem_strat, self.dim, self.old_off, self.rd)
+    pub fn into_parts(self) -> (SS, /*usize,*/ A, A) {
+        (self.stem_strat, /*self.dim,*/ self.old_off, self.rd)
     }
 }

@@ -4,6 +4,7 @@ pub mod leaf_view;
 mod query;
 mod query_orchestrator;
 mod query_stack;
+mod result_collection;
 mod traits;
 
 use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};

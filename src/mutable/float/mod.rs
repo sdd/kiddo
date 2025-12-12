@@ -6,9 +6,9 @@
 //! NB if you don't need to be able to add or remove items from the tree after construction /
 //! deserialization, you may get better performance from [`immutable::float::kdtree::ImmutableKdTree`](`crate::immutable::float::kdtree::ImmutableKdTree`)
 
-// #[doc(hidden)]
-// pub mod construction;
-// pub mod kdtree;
-// #[doc(hidden)]
-// pub mod query;
+#[doc(hidden)]
+pub mod construction;
+pub mod kdtree;
+#[doc(hidden)]
+pub mod query;
 pub(crate) mod result_collection;

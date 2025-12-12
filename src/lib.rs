@@ -83,8 +83,8 @@
 //!
 //! **NOTE**: Support for rkyv 0.7 was removed in Kiddo v6.
 
-// #[macro_use]
-// extern crate doc_comment;
+#[macro_use]
+extern crate doc_comment;
 extern crate core;
 
 #[doc(hidden)]
@@ -95,9 +95,9 @@ pub mod best_neighbour;
 mod custom_serde;
 
 #[doc(hidden)]
-// pub mod leaf_slice;
+pub mod leaf_slice;
 
-// pub mod immutable;
+pub mod immutable;
 mod mirror_select_nth_unstable_by;
 #[cfg(feature = "fixed")]
 pub mod mutable;
@@ -135,7 +135,7 @@ pub mod traits_unified_2;
 // ///
 // /// To manually specify more advanced parameters, use [`KdTree`](`mutable::float::kdtree::KdTree``) directly.
 // /// To store positions using integer or fixed-point types, use [`mutable::fixed::kdtree::KdTree`].
-// pub type KdTree<A, const K: usize> = mutable::float::kdtree::KdTree<A, u64, K, 32, u32>;
+pub type KdTree<A, const K: usize> = mutable::float::kdtree::KdTree<A, u64, K, 32, u32>;
 //
 // /// An immutable floating-point k-d tree with default parameters.
 // ///
@@ -144,8 +144,8 @@ pub mod traits_unified_2;
 // ///
 // /// To manually specify more advanced parameters, use [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) directly.
 // /// To store positions using integer or fixed-point types, use [`mutable::fixed::kdtree::KdTree`].
-// pub type ImmutableKdTree<A, const K: usize> =
-//     immutable::float::kdtree::ImmutableKdTree<A, u64, Eytzinger<K>, K, 32>;
+pub type ImmutableKdTree<A, const K: usize> =
+    immutable::float::kdtree::ImmutableKdTree<A, u64, Eytzinger<K>, K, 32>;
 
 pub use best_neighbour::BestNeighbour;
 pub use distance::float::Manhattan;

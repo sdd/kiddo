@@ -1,4 +1,4 @@
-use crate::mutable::float::result_collection::ResultCollection;
+use crate::kd_tree::result_collection::ResultCollection;
 use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified};
 use crate::{BestNeighbour, NearestNeighbour};
 use std::array;
