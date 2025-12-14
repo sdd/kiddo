@@ -19,11 +19,11 @@ union SimdToArray {
 //}
 
 fn rand_unit_sphere_point_f64() -> [f64; 3] {
-    SPHERE.sample(&mut rand::thread_rng())
+    SPHERE.sample(&mut rand::rng())
 }
 
 fn rand_unit_sphere_point_f32() -> [f32; 3] {
-    let sph64: [f64; 3] = SPHERE.sample(&mut rand::thread_rng());
+    let sph64: [f64; 3] = SPHERE.sample(&mut rand::rng());
     let res: Aligned<A16, _> = Aligned([
         f32::from_f64(sph64[0]).unwrap(),
         f32::from_f64(sph64[1]).unwrap(),
@@ -33,7 +33,7 @@ fn rand_unit_sphere_point_f32() -> [f32; 3] {
 }
 
 fn rand_unit_sphere_point_f32_qwalign() -> [f32; 4] {
-    let sph64: [f64; 3] = SPHERE.sample(&mut rand::thread_rng());
+    let sph64: [f64; 3] = SPHERE.sample(&mut rand::rng());
     let res: Aligned<A16, _> = Aligned([
         f32::from_f64(sph64[0]).unwrap(),
         f32::from_f64(sph64[1]).unwrap(),

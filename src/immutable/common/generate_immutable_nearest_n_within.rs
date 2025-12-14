@@ -72,6 +72,7 @@ macro_rules! generate_immutable_nearest_n_within {
                 let mut rd = rd;
                 let old_off = off[dim];
                 let new_off = query[dim].saturating_dist(val);
+                tracing::trace!("rd = {}, new_off = {}, old_off = {}", rd, new_off, old_off);
 
                 let farther_so = stem_ordering.branch_relative(is_right_child);
 
@@ -85,8 +86,10 @@ macro_rules! generate_immutable_nearest_n_within {
                 );
 
                 rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
+                tracing::trace!("new rd = {}", rd);
 
                 if rd <= radius && rd < matching_items.max_dist() {
+                    tracing::trace!("ENTER: rd ({}) <= radius ({}) && rd < matching_items.max_dist() ({})", rd, radius, matching_items.max_dist());
                     off[dim] = new_off;
                     self.nearest_n_within_recurse::<D, R>(
                         query,
@@ -97,6 +100,9 @@ macro_rules! generate_immutable_nearest_n_within {
                         rd,
                     );
                     off[dim] = old_off;
+                    tracing::trace!("off[{}] = {}", dim, old_off);
+                } else {
+                    tracing::trace!("PRUNE: rd ({}) > radius ({}) || rd >= matching_items.max_dist() ({})", rd, radius, matching_items.max_dist());
                 }
             }
 
@@ -111,6 +117,7 @@ macro_rules! generate_immutable_nearest_n_within {
                 D: DistanceMetric<A, K>,
                 R: ResultCollection<A, T>,
             {
+                tracing::trace!("search_leaf_for_nearest_n_within: leaf_idx = {}", leaf_idx);
                 let leaf_slice = self.get_leaf_slice(leaf_idx);
 
                 leaf_slice.nearest_n_within::<D, R>(

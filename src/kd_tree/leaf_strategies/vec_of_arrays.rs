@@ -3,15 +3,22 @@ use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy, MutableLeafStra
 use crate::StemStrategy;
 use aligned_vec::AVec;
 
+/// A leaf storage strategy using vectors of fixed-size arrays.
+///
+/// Stores each leaf as a fixed-size array for better cache locality.
 pub struct VecOfArrays<A, T, const K: usize, const B: usize> {
     leaves: Vec<LeafNode<A, T, K, B>>,
     size: usize,
 }
 
+/// A single leaf node storing up to B points.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeafNode<A, T, const K: usize, const B: usize> {
+    /// Point coordinates organized by dimension
     pub content_points: [[A; B]; K],
+    /// Items associated with each point
     pub content_items: [T; B],
+    /// Number of points currently stored
     pub size: usize,
 }
 
@@ -278,12 +285,12 @@ mod test {
     #[test]
     fn create_multiple_leaf_vec_of_arrays_float_kd_tree() {
         // create 2^16 random 3d points in the unit cube
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut points: Vec<[f32; 3]> = vec![];
         for _ in 0..65_536 {
-            let x = rng.gen_range(0.0..1.0);
-            let y = rng.gen_range(0.0..1.0);
-            let z = rng.gen_range(0.0..1.0);
+            let x = rng.random_range(0.0..1.0);
+            let y = rng.random_range(0.0..1.0);
+            let z = rng.random_range(0.0..1.0);
             points.push([x, y, z]);
         }
 
@@ -298,6 +305,6 @@ mod test {
         // perform a nearest_one query
         let query_point = [0.5, 0.5, 0.5];
 
-        let nearest = tree.nearest_one::<SquaredEuclidean<f32>>(&query_point);
+        let _nearest = tree.nearest_one::<SquaredEuclidean<f32>>(&query_point);
     }
 }

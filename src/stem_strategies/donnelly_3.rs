@@ -1,3 +1,5 @@
+//! V3 Donnelly Stem Strategy
+
 use crate::StemStrategy;
 use aligned_vec::AVec;
 #[cfg(target_arch = "x86_64")]

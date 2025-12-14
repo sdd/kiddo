@@ -12,6 +12,9 @@ where
     SS: StemStrategy,
     LS: MutableLeafStrategy<A, T, SS, K, B>,
 {
+    /// Adds a point and associated item to the tree.
+    ///
+    /// If the target leaf is full, it will be split before insertion.
     pub fn add(&mut self, point: &[A; K], item: T) {
         // get matching leaf idx by traversal
 
@@ -39,6 +42,9 @@ where
         self.size += 1;
     }
 
+    /// Removes a point and associated item from the tree.
+    ///
+    /// Note: This does not rebalance the tree.
     pub fn remove(&mut self, point: &[A; K], item: T) {
         let leaf_idx = self.get_leaf_idx(point);
         self.leaves.remove_from_leaf(leaf_idx, point, item);

@@ -1,3 +1,5 @@
+//! Eytzinger Stem Strategy with prefetch
+
 use crate::stem_strategies::prefetch::prefetch_t0;
 use crate::StemStrategy;
 use aligned_vec::AVec;

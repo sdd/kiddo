@@ -50,6 +50,7 @@ doc-comment = "0.3"
 num-traits = "0.2"
 ordered-float = "5"
 sorted-vec = "0.8"
+test-log = { version = "0.2.19", features = ["trace"] }
 
 [dependencies.csv]
 version = "1"

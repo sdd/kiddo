@@ -1,3 +1,5 @@
+//! V2 Donnelly stem strategy
+
 use crate::stem_strategies::prefetch::prefetch_t0;
 use crate::traits_unified_2::AxisUnified;
 use crate::StemStrategy;

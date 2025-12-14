@@ -4,8 +4,14 @@ use crate::{BestNeighbour, NearestNeighbour};
 use std::array;
 use std::collections::BinaryHeap;
 
+// TODO: chunking
+#[allow(unused)]
 const CHUNK_SIZE: usize = 32;
 
+/// A view into a leaf node's data.
+///
+/// Provides a unified interface for accessing leaf data regardless of the underlying
+/// storage strategy.
 #[derive(Debug)]
 pub struct LeafView<'a, AX, T, const K: usize, const B: usize> {
     points: [&'a [AX]; K],
@@ -19,6 +25,7 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
         Self { points, items }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn into_parts(self) -> ([&'a [AX]; K], &'a [T]) {
         (self.points, self.items)
     }

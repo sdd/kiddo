@@ -1,3 +1,6 @@
+//! V5 Donnelly Stem Strategy
+
+
 use crate::donnelly_stem_layout::donnelly_get_idx_v2_branchless;
 use crate::traits::Axis;
 use crate::StemStrategy;
