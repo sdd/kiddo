@@ -89,11 +89,16 @@ mod tests {
     use crate::traits::Axis;
     use crate::traits::DistanceMetric;
     use crate::Eytzinger;
+    use rand::rngs::StdRng;
     use rand::Rng;
+    use rand::SeedableRng;
     use std::cmp::Ordering;
     use std::num::NonZero;
+    use test_log::test;
 
     type AX = f32;
+
+    const RNG_SEED: u64 = 42;
 
     #[test]
     fn can_query_items_within_radius() {
@@ -164,7 +169,9 @@ mod tests {
     }
 
     #[test]
-    fn can_query_items_within_radius_large_scale() {
+    fn immutable_n_items_within_f32_eytzinger_large_scale() {
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(3);
+
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
         const RADIUS: f32 = 0.2;
@@ -172,17 +179,16 @@ mod tests {
         let max_qty: NonZero<usize> = NonZero::new(3).unwrap();
 
         let content_to_add: Vec<[f32; 4]> =
-            (0..TREE_SIZE).map(|_| rand::random::<[f32; 4]>()).collect();
+            (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
         let tree: ImmutableKdTree<AX, u32, Eytzinger<4>, 4, 32> =
             ImmutableKdTree::new_from_slice(&content_to_add);
         assert_eq!(tree.size(), TREE_SIZE);
 
-        let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)
-            .map(|_| rand::random::<[f32; 4]>())
-            .collect();
+        let query_points: Vec<[f32; 4]> =
+            (0..NUM_QUERIES).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        for query_point in query_points {
+        for (i, query_point) in query_points.iter().enumerate() {
             let expected = linear_search(&content_to_add, &query_point, RADIUS)
                 .into_iter()
                 .take(max_qty.into())
@@ -196,7 +202,12 @@ mod tests {
 
             stabilize_sort(&mut result);
 
+            println!(
+                "query {}, point = {:?}, result = {:?}",
+                i, query_point, result
+            );
             assert_eq!(result, expected);
+            break;
         }
     }
 

@@ -3,6 +3,9 @@ use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::AVec;
 
+/// A leaf storage strategy using flat vectors for coordinates.
+///
+/// Stores coordinates as K separate vectors (one per dimension) and items in a separate vector.
 pub struct FlatVec<A, T, const K: usize, const B: usize> {
     leaf_points: [Vec<A>; K],
     leaf_items: Vec<T>,
@@ -174,12 +177,12 @@ mod test {
     #[test]
     fn create_multiple_leaf_flat_vec_float_kd_tree() {
         // create 2^16 random 3d points in the unit cube
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut points: Vec<[f32; 3]> = vec![];
         for _ in 0..65_536 {
-            let x = rng.gen_range(0.0..1.0);
-            let y = rng.gen_range(0.0..1.0);
-            let z = rng.gen_range(0.0..1.0);
+            let x = rng.random_range(0.0..1.0);
+            let y = rng.random_range(0.0..1.0);
+            let z = rng.random_range(0.0..1.0);
             points.push([x, y, z]);
         }
 

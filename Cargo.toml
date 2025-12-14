@@ -48,6 +48,7 @@ divrem = "1"
 num-traits = "0.2"
 ordered-float = "5"
 sorted-vec = "0.8"
+test-log = { version = "0.2.19", features = ["trace"] }
 
 [dev-dependencies]
 bincode = {  version = "2", features = ["serde"] }

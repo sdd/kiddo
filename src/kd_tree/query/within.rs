@@ -10,6 +10,9 @@ where
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
+    /// Finds all points within a given distance of the query point.
+    ///
+    /// Returns all points within `max_dist` of the query point, sorted by distance.
     pub fn within<D>(
         &self,
         query: &[A; K],
@@ -41,9 +44,9 @@ mod tests {
 
         let mut points: Vec<[f32; 3]> = vec![];
         for _ in 0..65_536 {
-            let x = rng.gen_range(0.0..1.0);
-            let y = rng.gen_range(0.0..1.0);
-            let z = rng.gen_range(0.0..1.0);
+            let x = rng.random_range(0.0..1.0);
+            let y = rng.random_range(0.0..1.0);
+            let z = rng.random_range(0.0..1.0);
             points.push([x, y, z]);
         }
 

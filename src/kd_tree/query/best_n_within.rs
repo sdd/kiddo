@@ -12,6 +12,10 @@ where
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
+    /// Finds the best N points within a given distance.
+    ///
+    /// Returns up to `max_qty` points that are within `max_dist` of the query point,
+    /// prioritizing closer points.
     pub fn best_n_within<D>(
         &self,
         query: &[A; K],
@@ -38,6 +42,7 @@ where
     }
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 struct BestNWithinReqCtx<'a, A, T, O, const K: usize>
 where
@@ -77,7 +82,6 @@ mod tests {
     use crate::kd_tree::leaf_strategies::flat_vec::FlatVec;
     use crate::kd_tree::KdTree;
     use crate::traits::DistanceMetric;
-    use crate::traits_unified_2::DistanceMetricUnified;
     use crate::traits_unified_2::SquaredEuclidean;
     use crate::{BestNeighbour, Eytzinger};
 
@@ -89,9 +93,9 @@ mod tests {
 
         let mut points: Vec<[f32; 3]> = vec![];
         for _ in 0..65_536 {
-            let x = rng.gen_range(0.0..1.0);
-            let y = rng.gen_range(0.0..1.0);
-            let z = rng.gen_range(0.0..1.0);
+            let x = rng.random_range(0.0..1.0);
+            let y = rng.random_range(0.0..1.0);
+            let z = rng.random_range(0.0..1.0);
             points.push([x, y, z]);
         }
 

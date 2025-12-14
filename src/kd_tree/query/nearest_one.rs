@@ -10,6 +10,9 @@ where
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
+    /// Finds the nearest point to the query point.
+    ///
+    /// Returns a tuple of (distance, item) for the nearest neighbor.
     pub fn nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         D: DistanceMetricUnified<A, K>,
@@ -116,7 +119,7 @@ mod tests {
             .map(|_| rng.random::<[f32; 4]>()) // Use the seeded rng
             .collect();
 
-        for (i, query_point) in query_points.iter().enumerate() {
+        for (_i, query_point) in query_points.iter().enumerate() {
             let expected = linear_search(&content_to_add, query_point);
             let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
 

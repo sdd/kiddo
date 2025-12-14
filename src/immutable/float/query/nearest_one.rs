@@ -308,7 +308,7 @@ mod tests {
             .map(|_| rng.random::<[f32; 4]>()) // Use the seeded rng
             .collect();
 
-        for (i, query_point) in query_points.iter().enumerate() {
+        for (_i, query_point) in query_points.iter().enumerate() {
             let expected = linear_search(&content_to_add, query_point);
 
             // println!("query #{i:?} ({:?})", query_point);

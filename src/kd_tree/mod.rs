@@ -1,5 +1,9 @@
+//! Flexible kd-trees that can be used with float or fixed point, mutable or immutable, and selectable stem ordering strategies
+
 mod construction;
-mod leaf_strategies;
+/// Leaf storage strategies for the kd-tree
+pub mod leaf_strategies;
+/// Leaf view abstraction for accessing leaf data
 pub mod leaf_view;
 mod query;
 mod query_orchestrator;
@@ -11,6 +15,15 @@ use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::{AVec, CACHELINE_ALIGN};
 
+/// A k-d tree for efficient spatial queries.
+///
+/// # Type Parameters
+/// * `A` - Axis/coordinate type (e.g., f32, f64, or fixed-point types)
+/// * `T` - Content/item type stored at each point
+/// * `SS` - Stem ordering strategy (e.g., Eytzinger, Donnelly)
+/// * `LS` - Leaf storage strategy
+/// * `K` - Dimensionality (number of dimensions)
+/// * `B` - Bucket size (maximum items per leaf node)
 #[derive(Clone, Debug, PartialEq)]
 pub struct KdTree<
     A,              // Axis
@@ -53,21 +66,25 @@ where
     LS: LeafStrategy<A, T, SS, K, B>, // + Default,
     SS: StemStrategy,
 {
+    /// Returns `true` if the tree contains no points.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.size == 0
     }
 
+    /// Returns the number of points in the tree.
     #[inline]
     pub fn size(&self) -> usize {
         self.size
     }
 
+    /// Returns the maximum stem level in the tree.
     #[inline]
     pub fn max_stem_level(&self) -> i32 {
         self.max_stem_level
     }
 
+    /// Returns the number of leaf nodes in the tree.
     #[inline]
     pub fn leaf_count(&self) -> usize {
         self.leaves.leaf_count()

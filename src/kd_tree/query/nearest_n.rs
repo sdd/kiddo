@@ -10,6 +10,9 @@ where
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
+    /// Finds the N nearest points to the query point.
+    ///
+    /// If `sorted` is true, results are returned in order of increasing distance.
     pub fn nearest_n<D>(
         &self,
         query: &[A; K],
@@ -44,9 +47,9 @@ mod tests {
 
         let mut points: Vec<[f32; 3]> = vec![];
         for _ in 0..65_536 {
-            let x = rng.gen_range(0.0..1.0);
-            let y = rng.gen_range(0.0..1.0);
-            let z = rng.gen_range(0.0..1.0);
+            let x = rng.random_range(0.0..1.0);
+            let y = rng.random_range(0.0..1.0);
+            let z = rng.random_range(0.0..1.0);
             points.push([x, y, z]);
         }
 

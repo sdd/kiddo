@@ -10,11 +10,15 @@ where
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
+    /// Finds an approximate nearest point to the query point.
+    ///
+    /// This is faster than `nearest_one` but may not return the true nearest neighbor.
+    /// It searches only the leaf that the query point falls into.
     pub fn approx_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         D: DistanceMetricUnified<A, K>,
     {
-        let req_ctx = GetLeafIdxReqCtx::<A, D::Output, K> {
+        let req_ctx = ApproxNearestOneReqCtx::<A, D::Output, K> {
             query,
             _phantom: std::marker::PhantomData,
         };
@@ -30,12 +34,12 @@ where
     }
 }
 
-struct GetLeafIdxReqCtx<'a, A, O, const K: usize> {
+struct ApproxNearestOneReqCtx<'a, A, O, const K: usize> {
     query: &'a [A; K],
     _phantom: std::marker::PhantomData<O>,
 }
 
-impl<A, O, const K: usize> QueryContext<A, O, K> for GetLeafIdxReqCtx<'_, A, O, K> {
+impl<A, O, const K: usize> QueryContext<A, O, K> for ApproxNearestOneReqCtx<'_, A, O, K> {
     fn query(&self) -> &[A; K] {
         self.query
     }
@@ -64,9 +68,9 @@ mod tests {
 
         let mut points: Vec<[f32; 3]> = vec![];
         for _ in 0..65_536 {
-            let x = rng.gen_range(0.0..1.0);
-            let y = rng.gen_range(0.0..1.0);
-            let z = rng.gen_range(0.0..1.0);
+            let x = rng.random_range(0.0..1.0);
+            let y = rng.random_range(0.0..1.0);
+            let z = rng.random_range(0.0..1.0);
             points.push([x, y, z]);
         }
 

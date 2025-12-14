@@ -3,6 +3,10 @@ use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::AVec;
 
+/// A dummy leaf strategy used for testing.
+///
+/// This strategy provides no-op implementations and is not meant for production use.
+#[allow(dead_code)]
 #[derive(Debug, Default)]
 pub struct DummyLeafStrategy {}
 

@@ -1,3 +1,5 @@
+//! Definitions and implementations for some traits that are used by KdTree, LeafStrategies, StemStrategies and DistanceMEtrics
+
 use crate::kd_tree::leaf_view::LeafView;
 use crate::StemStrategy;
 use aligned_vec::AVec;
@@ -8,10 +10,14 @@ use ordered_float::Float;
 use std::fmt::{Debug, Display};
 use std::ops::{AddAssign, Sub};
 
+/// Basic type requirements for items stored in the tree.
 pub trait Basics: Copy + Debug + Default + Send + Sync + 'static {}
 impl<T> Basics for T where T: Copy + Debug + Default + Send + Sync + 'static {}
 
-// Make AxisUnified a supertrait of the common numeric bounds you need everywhere.
+/// Trait for coordinate/axis types used in the k-d tree.
+///
+/// This trait defines the operations needed for coordinate values,
+/// including comparison, distance calculation, and arithmetic operations.
 pub trait AxisUnified:
     Copy + PartialEq + PartialOrd + Sub<Output = Self> + AddAssign<Self> + Debug + Display
 {
@@ -27,11 +33,13 @@ pub trait AxisUnified:
     /// If coord is max value or not.
     fn is_max_value(coord: Self::Coord) -> bool;
 
+    /// Compares two coordinate values.
     fn cmp(a: Self::Coord, b: Self::Coord) -> std::cmp::Ordering;
 
     /// Absolute/saturating difference along one axis, in coord units.
     fn saturating_dist(a: Self::Coord, b: Self::Coord) -> Self::Coord;
 
+    /// Saturating addition of two coordinate values.
     fn saturating_add(a: Self::Coord, b: Self::Coord) -> Self::Coord;
 }
 
@@ -85,11 +93,14 @@ where
     /// Number of items in a given leaf.
     fn leaf_len(&self, leaf_idx: usize) -> usize;
 
+    /// Returns a view into the specified leaf's data.
     fn leaf_view(&self, leaf_idx: usize) -> LeafView<'_, AX, T, K, B>;
 
+    /// Appends a new leaf to the storage.
     fn append_leaf(&mut self, leaf_points: &[&[AX]; K], leaf_items: &[T]);
 }
 
+/// Trait for leaf strategies that support mutation (adding/removing points).
 pub trait MutableLeafStrategy<AX, T, SS, const K: usize, const B: usize>:
     LeafStrategy<AX, T, SS, K, B>
 where
@@ -111,11 +122,17 @@ where
     ///   value match. Any entries matching are removed.
     fn remove_from_leaf(&mut self, leaf_idx: usize, point: &[AX; K], item: T);
 
+    /// Returns true if the specified leaf is full.
     fn is_leaf_full(&self, leaf_idx: usize) -> bool;
 
+    /// Splits a full leaf, returning the index of the new leaf.
     fn split_leaf(&mut self, leaf_idx: usize) -> usize;
 }
 
+/// Trait for distance metrics used in spatial queries.
+///
+/// This trait supports both standard distance metrics (e.g., squared Euclidean)
+/// and similarity metrics (e.g., dot product) through the ORDERING associated constant.
 pub trait DistanceMetricUnified<A: Copy, const K: usize> {
     /// Accumulator / distance scalar type.
     type Output: AxisUnified<Coord = Self::Output>;
@@ -153,6 +170,7 @@ pub trait DistanceMetricUnified<A: Copy, const K: usize> {
         acc
     }
 
+    /// Returns true if `a` is better than `b` according to the metric's ordering.
     #[inline(always)]
     fn better(a: Self::Output, b: Self::Output) -> bool {
         match Self::ORDERING {
@@ -162,6 +180,7 @@ pub trait DistanceMetricUnified<A: Copy, const K: usize> {
         }
     }
 
+    /// Compares two distance values according to the metric's ordering.
     #[inline(always)]
     fn cmp(a: Self::Output, b: Self::Output) -> std::cmp::Ordering {
         let base = a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal);
@@ -173,6 +192,7 @@ pub trait DistanceMetricUnified<A: Copy, const K: usize> {
     }
 }
 
+/// Macro to implement AxisUnified for floating-point types.
 #[macro_export]
 macro_rules! impl_axis_float {
     ($t:ty) => {
@@ -222,6 +242,7 @@ macro_rules! impl_axis_float {
     };
 }
 
+/// Macro to implement AxisUnified for fixed-point types.
 macro_rules! impl_axis_fixed {
     ($t:ty) => {
         impl AxisUnified for $t {
@@ -264,7 +285,10 @@ macro_rules! impl_axis_fixed {
     };
 }
 
-// Squared Euclidean metric, parameterized by Output type R.
+/// Squared Euclidean distance metric, parameterized by output type R.
+///
+/// This metric computes the squared Euclidean distance between points,
+/// widening input coordinates to the output type R.
 pub struct SquaredEuclidean<R>(core::marker::PhantomData<R>);
 
 impl<A, R, const K: usize> DistanceMetricUnified<A, K> for SquaredEuclidean<R>
@@ -297,7 +321,10 @@ impl_axis_fixed!(FixedI32<U16>);
 impl_axis_fixed!(FixedI32<U0>);
 impl_axis_fixed!(FixedU16<U8>);
 
-// Dot product metric, also parameterized by Output type R.
+/// Dot product similarity metric, parameterized by output type R.
+///
+/// This metric computes the dot product between points (higher is better),
+/// widening input coordinates to the output type R.
 pub struct DotProduct<R>(core::marker::PhantomData<R>);
 
 impl<A, R, const K: usize> DistanceMetricUnified<A, K> for DotProduct<R>
@@ -322,6 +349,9 @@ where
     }
 }
 
+/// Calculates squared Euclidean distances for a batch of 64 points.
+///
+/// Used for benchmarking autovectorization with concrete types.
 #[inline]
 pub fn calc_dists(content_points: &[[f32; 64]; 3], acc: &mut [f32; 64], query: &[f32; 3]) {
     // AVX512: 4 loops of 32 iterations, each 4x unrolled, 5 instructions per pre-unrolled iteration
@@ -333,6 +363,9 @@ pub fn calc_dists(content_points: &[[f32; 64]; 3], acc: &mut [f32; 64], query: &
     });
 }
 
+/// Updates the nearest neighbor from a batch of 64 distance calculations.
+///
+/// Used for benchmarking autovectorization with concrete types.
 pub(crate) fn update_nearest(
     dists: &[f32; 64],
     items: &[usize; 64],

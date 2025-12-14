@@ -1,3 +1,5 @@
+//! Prefetch helper functions
+
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 pub(crate) unsafe fn prefetch_t0(ptr: *const u8) {

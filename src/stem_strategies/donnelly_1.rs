@@ -1,3 +1,4 @@
+//! V1 Donnelly stem strategy
 use crate::donnelly_stem_layout::donnelly_get_idx_v2_branchless;
 use crate::stem_strategies::donnelly_4::DonnellyFullArith;
 use crate::traits::Axis;

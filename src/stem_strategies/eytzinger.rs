@@ -1,3 +1,5 @@
+//! Eytzinger Stem Strategy
+
 use crate::StemStrategy;
 use aligned_vec::AVec;
 use std::ptr::NonNull;

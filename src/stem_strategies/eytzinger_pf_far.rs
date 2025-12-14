@@ -1,3 +1,5 @@
+//! Eytzinger Stem Ordering with prefetching for 2 levels
+
 use crate::stem_strategies::prefetch::{prefetch_t0, prefetch_t1};
 use crate::StemStrategy;
 use aligned_vec::AVec;

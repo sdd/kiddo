@@ -16,6 +16,10 @@ where
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
+    /// Finds up to N nearest points within a given distance.
+    ///
+    /// Returns up to `max_qty` points that are within `max_dist` of the query point.
+    /// If `sorted` is true, results are returned in order of increasing distance.
     pub fn nearest_n_within<D>(
         &self,
         query: &[A; K],
@@ -77,6 +81,7 @@ where
     }
 }
 
+#[allow(unused)]
 struct NearestNWithinReqCtx<'a, A, T, O, R, const K: usize>
 where
     O: AxisUnified<Coord = O>,
@@ -111,12 +116,13 @@ mod tests {
     use rand::rngs::StdRng;
     use rand::Rng;
     use rand::SeedableRng;
+    use test_log::test;
 
     use crate::kd_tree::result_collection::ResultCollection;
     use crate::kd_tree::{leaf_strategies::flat_vec::FlatVec, KdTree};
     use crate::traits::{Axis, DistanceMetric};
     use crate::traits_unified_2::SquaredEuclidean;
-    use crate::{Eytzinger, NearestNeighbour};
+    use crate::Eytzinger;
 
     const RNG_SEED: u64 = 42;
 
@@ -126,9 +132,9 @@ mod tests {
 
         let mut points: Vec<[f32; 3]> = vec![];
         for _ in 0..65_536 {
-            let x = rng.gen_range(0.0..1.0);
-            let y = rng.gen_range(0.0..1.0);
-            let z = rng.gen_range(0.0..1.0);
+            let x = rng.random_range(0.0..1.0);
+            let y = rng.random_range(0.0..1.0);
+            let z = rng.random_range(0.0..1.0);
             points.push([x, y, z]);
         }
 
@@ -150,7 +156,7 @@ mod tests {
     }
 
     #[test]
-    fn can_query_items_within_radius_large_scale() {
+    fn v6_n_items_within_f32_eytzinger_large_scale() {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(3);
 
         const TREE_SIZE: usize = 100_000;
@@ -170,7 +176,7 @@ mod tests {
             .map(|_| rng.random::<[f32; 4]>()) // Use the seeded rng
             .collect();
 
-        for query_point in query_points {
+        for (i, query_point) in query_points.iter().enumerate() {
             let expected = linear_search(&content_to_add, &query_point, RADIUS)
                 .into_iter()
                 .take(max_qty.into())
@@ -185,6 +191,7 @@ mod tests {
 
             stabilize_sort(&mut result);
 
+            println!("Query #{}", i);
             assert_eq!(result, expected);
         }
     }
