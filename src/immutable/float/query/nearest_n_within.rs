@@ -188,7 +188,7 @@ mod tests {
         let query_points: Vec<[f32; 4]> =
             (0..NUM_QUERIES).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        for (i, query_point) in query_points.iter().enumerate() {
+        for (_i, query_point) in query_points.iter().enumerate() {
             let expected = linear_search(&content_to_add, &query_point, RADIUS)
                 .into_iter()
                 .take(max_qty.into())
@@ -202,12 +202,14 @@ mod tests {
 
             stabilize_sort(&mut result);
 
-            println!(
-                "query {}, point = {:?}, result = {:?}",
-                i, query_point, result
-            );
+            // println!(
+            //     "query {}, point = {:?}, result = {:?}",
+            //     i, query_point, result
+            // );
             assert_eq!(result, expected);
-            break;
+            // if i == 47 {
+            //     break;
+            // }
         }
     }
 

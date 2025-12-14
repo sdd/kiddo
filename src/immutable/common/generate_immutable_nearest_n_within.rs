@@ -72,7 +72,7 @@ macro_rules! generate_immutable_nearest_n_within {
                 let mut rd = rd;
                 let old_off = off[dim];
                 let new_off = query[dim].saturating_dist(val);
-                tracing::trace!("rd = {}, new_off = {}, old_off = {}", rd, new_off, old_off);
+                tracing::trace!(?rd, ?new_off, ?old_off, ?off, dim);
 
                 let farther_so = stem_ordering.branch_relative(is_right_child);
 
@@ -86,7 +86,7 @@ macro_rules! generate_immutable_nearest_n_within {
                 );
 
                 rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
-                tracing::trace!("new rd = {}", rd);
+                tracing::trace!(?off, "new rd = {}", rd);
 
                 if rd <= radius && rd < matching_items.max_dist() {
                     tracing::trace!("ENTER: rd ({}) <= radius ({}) && rd < matching_items.max_dist() ({})", rd, radius, matching_items.max_dist());
