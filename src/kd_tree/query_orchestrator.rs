@@ -101,12 +101,12 @@ where
         stack.push(QueryStackContext::new(stem_strat));
 
         while let Some(stack_ctx) = stack.pop() {
-            let (mut stem_strat, old_off, mut rd) = stack_ctx.into_parts();
+            let (mut stem_strat, old_off, rd) = stack_ctx.into_parts();
             let mut dim = stem_strat.dim();
-            tracing::trace!(%dim, %old_off, %rd, "Popped stack context");
+            tracing::trace!(%dim, %old_off, %rd, ?off, "Popped stack context");
 
             let max_dist = query_ctx.max_dist();
-            if O::cmp(rd, max_dist) != std::cmp::Ordering::Less {
+            if O::cmp(rd, max_dist) == std::cmp::Ordering::Greater {
                 tracing::trace!(%rd, %max_dist, "Prune check: PRUNE");
                 continue;
             }
@@ -127,20 +127,22 @@ where
 
                 let new_off = O::saturating_dist(query_elem_wide, pivot_wide);
                 let old_off = *unsafe { off.get_unchecked(dim) };
-                rd = O::saturating_add(rd, D::dist1(new_off, old_off));
+                let rd_far = O::saturating_add(rd, D::dist1(new_off, old_off));
                 tracing::trace!(
-                    "new_off = dist({}, {}) = {}. rd = {}",
+                    "new_off = dist({}, {}) = {}. rd = {}, rd_far = {}, off = {:?}",
                     query_elem_wide,
                     pivot_wide,
                     new_off,
-                    rd
+                    rd,
+                    rd_far,
+                    off,
                 );
 
                 stack.push(QueryStackContext {
                     stem_strat: far_ctx,
                     // dim,
                     old_off: new_off,
-                    rd,
+                    rd: rd_far,
                 });
 
                 dim = stem_strat.dim();
