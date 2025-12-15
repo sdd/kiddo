@@ -30,38 +30,76 @@ mod tests {
     use rand::rngs::StdRng;
     use rand::Rng;
     use rand::SeedableRng;
+    use std::cmp::Ordering;
 
     use crate::kd_tree::leaf_strategies::flat_vec::FlatVec;
     use crate::kd_tree::KdTree;
-    use crate::traits_unified_2::SquaredEuclidean;
+    use crate::traits::Axis;
+    use crate::traits::DistanceMetric;
+    use crate::traits_unified_2::Manhattan;
     use crate::Eytzinger;
 
     const RNG_SEED: u64 = 42;
 
     #[test]
-    fn within_sorted_flat_vec_f32() {
+    fn can_query_items_within_radius_large_scale() {
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
-        let mut points: Vec<[f32; 3]> = vec![];
-        for _ in 0..65_536 {
-            let x = rng.random_range(0.0..1.0);
-            let y = rng.random_range(0.0..1.0);
-            let z = rng.random_range(0.0..1.0);
-            points.push([x, y, z]);
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 100;
+        const RADIUS: f32 = 0.2;
+
+        let content_to_add: Vec<[f32; 4]> =
+            (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
+
+        let tree: KdTree<f32, u32, Eytzinger<4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
+            KdTree::new_from_slice(&content_to_add);
+
+        let query_points: Vec<[f32; 4]> =
+            (0..NUM_QUERIES).map(|_| rng.random::<[f32; 4]>()).collect();
+
+        for query_point in query_points {
+            let expected = linear_search(&content_to_add, &query_point, RADIUS);
+
+            let mut result: Vec<_> = tree
+                .within::<Manhattan<f32>>(&query_point, RADIUS)
+                .into_iter()
+                .map(|n| (n.distance, n.item))
+                .collect();
+
+            stabilize_sort(&mut result);
+
+            assert_eq!(result, expected);
+        }
+    }
+
+    fn linear_search<A: Axis, const K: usize>(
+        content: &[[A; K]],
+        query_point: &[A; K],
+        radius: A,
+    ) -> Vec<(A, u32)> {
+        let mut matching_items = vec![];
+
+        for (idx, p) in content.iter().enumerate() {
+            let dist = crate::Manhattan::dist(query_point, p);
+            if dist < radius {
+                matching_items.push((dist, idx as u32));
+            }
         }
 
-        let tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
-            KdTree::new_from_slice(&points);
+        stabilize_sort(&mut matching_items);
 
-        assert!(!tree.is_empty());
-        assert_eq!(tree.size(), 65_536);
-        assert_eq!(tree.leaf_count(), 2048);
-        assert_eq!(tree.max_stem_level(), 10);
+        matching_items
+    }
 
-        let query_point = [0.5, 0.5, 0.5];
-        let radius = 0.1;
-
-        let results = tree.within::<SquaredEuclidean<f32>>(&query_point, radius);
-        assert_eq!(results.len(), 8776);
+    fn stabilize_sort<A: Axis>(matching_items: &mut [(A, u32)]) {
+        matching_items.sort_unstable_by(|a, b| {
+            let dist_cmp = a.0.partial_cmp(&b.0).unwrap();
+            if dist_cmp == Ordering::Equal {
+                a.1.cmp(&b.1)
+            } else {
+                dist_cmp
+            }
+        });
     }
 }

@@ -80,7 +80,7 @@ where
     #[inline(always)]
     pub(crate) fn backtracking_query_with_stack<QC, O, D>(
         &self,
-        mut query_ctx: &mut QC,
+        query_ctx: &mut QC,
         stack: &mut QueryStack<O, SS>,
         mut process_leaf: impl FnMut(&LeafView<A, T, K, B>, &mut QC),
     ) where
@@ -150,7 +150,7 @@ where
 
             tracing::trace!(leaf_idx = %stem_strat.leaf_idx(), "processing leaf");
             let leaf_view = self.leaves.leaf_view(stem_strat.leaf_idx());
-            process_leaf(&leaf_view, &mut query_ctx);
+            process_leaf(&leaf_view, query_ctx);
         }
     }
 }

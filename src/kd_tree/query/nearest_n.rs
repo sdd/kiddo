@@ -28,43 +28,75 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroUsize;
-
+    use az::{Az, Cast};
     use rand::rngs::StdRng;
     use rand::Rng;
     use rand::SeedableRng;
+    use std::num::NonZero;
 
     use crate::kd_tree::leaf_strategies::flat_vec::FlatVec;
     use crate::kd_tree::KdTree;
+    use crate::traits::Axis;
+    use crate::traits::DistanceMetric;
     use crate::traits_unified_2::SquaredEuclidean;
     use crate::Eytzinger;
 
     const RNG_SEED: u64 = 42;
 
     #[test]
-    fn nearest_n_within_sorted_flat_vec_f32() {
+    fn v6_query_nearest_n_large_f64_flat_vec() {
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
-        let mut points: Vec<[f32; 3]> = vec![];
-        for _ in 0..65_536 {
-            let x = rng.random_range(0.0..1.0);
-            let y = rng.random_range(0.0..1.0);
-            let z = rng.random_range(0.0..1.0);
-            points.push([x, y, z]);
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 100;
+
+        let max_qty = NonZero::new(10).unwrap();
+
+        let content_to_add: Vec<[f64; 4]> =
+            (0..TREE_SIZE).map(|_| rng.random::<[f64; 4]>()).collect();
+
+        let tree: KdTree<f64, u32, Eytzinger<4>, FlatVec<f64, u32, 4, 32>, 4, 32> =
+            KdTree::new_from_slice(&content_to_add);
+
+        assert_eq!(tree.size(), TREE_SIZE);
+
+        let query_points: Vec<[f64; 4]> =
+            (0..NUM_QUERIES).map(|_| rng.random::<[f64; 4]>()).collect();
+
+        for query_point in query_points {
+            let expected = linear_search(&content_to_add, max_qty.into(), &query_point);
+
+            let result: Vec<_> = tree
+                .nearest_n::<SquaredEuclidean<f64>>(&query_point, max_qty, true)
+                .into_iter()
+                .map(|n| (n.distance, n.item))
+                .collect();
+
+            assert_eq!(result, expected);
+        }
+    }
+
+    fn linear_search<A: Axis, R, const K: usize>(
+        content: &[[A; K]],
+        qty: usize,
+        query_point: &[A; K],
+    ) -> Vec<(A, R)>
+    where
+        usize: Cast<R>,
+    {
+        let mut results: Vec<(A, R)> = vec![];
+
+        for (idx, p) in content.iter().enumerate() {
+            let dist = crate::SquaredEuclidean::dist(query_point, p);
+            if results.len() < qty {
+                results.push((dist, idx.az::<R>()));
+                results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(b_dist).unwrap());
+            } else if dist < results[qty - 1].0 {
+                results[qty - 1] = (dist, idx.az::<R>());
+                results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(b_dist).unwrap());
+            }
         }
 
-        let tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
-            KdTree::new_from_slice(&points);
-
-        assert!(!tree.is_empty());
-        assert_eq!(tree.size(), 65_536);
-        assert_eq!(tree.leaf_count(), 2048);
-        assert_eq!(tree.max_stem_level(), 10);
-
-        let query_point = [0.5, 0.5, 0.5];
-        let max_qty = NonZeroUsize::new(10).unwrap();
-
-        let results = tree.nearest_n::<SquaredEuclidean<f32>>(&query_point, max_qty, true);
-        assert_eq!(results.len(), 10);
+        results
     }
 }

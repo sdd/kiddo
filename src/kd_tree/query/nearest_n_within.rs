@@ -157,7 +157,7 @@ mod tests {
 
     #[test]
     fn v6_n_items_within_f32_eytzinger_large_scale() {
-        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(3);
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(RNG_SEED);
 
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
