@@ -314,6 +314,38 @@ where
     }
 }
 
+/// Manhattan distance metric, parameterized by output type R.
+///
+/// This metric computes the Manhattan distance between points,
+/// widening input coordinates to the output type R.
+pub struct Manhattan<R>(core::marker::PhantomData<R>);
+
+impl<A, R, const K: usize> DistanceMetricUnified<A, K> for Manhattan<R>
+where
+    A: Copy,
+    R: AxisUnified<Coord = R>
+        + LossyFrom<A>
+        + core::ops::Mul<Output = R>
+        + core::ops::Add<Output = R>,
+{
+    type Output = R;
+    const ORDERING: std::cmp::Ordering = std::cmp::Ordering::Less;
+
+    #[inline(always)]
+    fn widen_coord(a: A) -> R {
+        R::lossy_from(a)
+    }
+
+    #[inline(always)]
+    fn dist1(a: R, b: R) -> R {
+        if a >= b {
+            a - b
+        } else {
+            b - a
+        }
+    }
+}
+
 // Axis impls stay as they are.
 impl_axis_float!(f32);
 impl_axis_float!(f64);

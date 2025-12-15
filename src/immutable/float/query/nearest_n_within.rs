@@ -89,7 +89,6 @@ mod tests {
     use crate::traits::Axis;
     use crate::traits::DistanceMetric;
     use crate::Eytzinger;
-    use rand::rngs::StdRng;
     use rand::Rng;
     use rand::SeedableRng;
     use std::cmp::Ordering;
@@ -170,7 +169,7 @@ mod tests {
 
     #[test]
     fn immutable_n_items_within_f32_eytzinger_large_scale() {
-        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(3);
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(RNG_SEED);
 
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 100;
