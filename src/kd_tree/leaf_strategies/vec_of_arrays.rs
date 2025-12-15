@@ -32,10 +32,20 @@ where
     type Num = AX;
 
     fn new_with_capacity(capacity: usize) -> Self {
-        Self {
+        let mut result = Self {
             leaves: Vec::with_capacity(capacity / B + 1),
             size: 0,
-        }
+        };
+
+        let leaf = LeafNode {
+            content_points: [[AX::zero(); B]; K],
+            content_items: [T::default(); B],
+            size: 0,
+        };
+
+        result.leaves.push(leaf);
+
+        result
     }
 
     fn bulk_build_from_slice(

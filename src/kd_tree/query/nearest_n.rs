@@ -34,7 +34,7 @@ mod tests {
     use rand::SeedableRng;
     use std::num::NonZero;
 
-    use crate::kd_tree::leaf_strategies::flat_vec::FlatVec;
+    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
     use crate::kd_tree::KdTree;
     use crate::traits::Axis;
     use crate::traits::DistanceMetric;
@@ -56,6 +56,39 @@ mod tests {
             (0..TREE_SIZE).map(|_| rng.random::<[f64; 4]>()).collect();
 
         let tree: KdTree<f64, u32, Eytzinger<4>, FlatVec<f64, u32, 4, 32>, 4, 32> =
+            KdTree::new_from_slice(&content_to_add);
+
+        assert_eq!(tree.size(), TREE_SIZE);
+
+        let query_points: Vec<[f64; 4]> =
+            (0..NUM_QUERIES).map(|_| rng.random::<[f64; 4]>()).collect();
+
+        for query_point in query_points {
+            let expected = linear_search(&content_to_add, max_qty.into(), &query_point);
+
+            let result: Vec<_> = tree
+                .nearest_n::<SquaredEuclidean<f64>>(&query_point, max_qty, true)
+                .into_iter()
+                .map(|n| (n.distance, n.item))
+                .collect();
+
+            assert_eq!(result, expected);
+        }
+    }
+
+    #[test]
+    fn v6_query_nearest_n_large_f64_vec_of_arrays() {
+        let mut rng = StdRng::seed_from_u64(RNG_SEED);
+
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 100;
+
+        let max_qty = NonZero::new(10).unwrap();
+
+        let content_to_add: Vec<[f64; 4]> =
+            (0..TREE_SIZE).map(|_| rng.random::<[f64; 4]>()).collect();
+
+        let tree: KdTree<f64, u32, Eytzinger<4>, VecOfArrays<f64, u32, 4, 32>, 4, 32> =
             KdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), TREE_SIZE);

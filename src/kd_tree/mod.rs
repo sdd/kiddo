@@ -45,13 +45,13 @@ impl<A, T, SS, LS, const K: usize, const B: usize> Default for KdTree<A, T, SS, 
 where
     A: AxisUnified<Coord = A>,
     T: Basics,
-    LS: LeafStrategy<A, T, SS, K, B> + Default,
+    LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
     fn default() -> Self {
         Self {
             stems: AVec::new(CACHELINE_ALIGN),
-            leaves: Default::default(),
+            leaves: LS::new_with_capacity(32),
             size: 0,
             max_stem_level: -1,
             _phantom: std::marker::PhantomData,

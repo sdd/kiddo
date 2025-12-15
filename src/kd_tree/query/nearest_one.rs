@@ -60,7 +60,8 @@ mod tests {
     use rand::Rng;
     use rand::SeedableRng;
 
-    use crate::kd_tree::{leaf_strategies::flat_vec::FlatVec, KdTree};
+    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
+    use crate::kd_tree::KdTree;
     use crate::traits::{Axis, DistanceMetric};
     use crate::traits_unified_2::SquaredEuclidean;
     use crate::{Eytzinger, NearestNeighbour};
@@ -111,6 +112,34 @@ mod tests {
             (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
         let tree: KdTree<f32, u32, Eytzinger<4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
+            KdTree::new_from_slice(&content_to_add);
+
+        assert_eq!(tree.size(), TREE_SIZE);
+
+        let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)
+            .map(|_| rng.random::<[f32; 4]>()) // Use the seeded rng
+            .collect();
+
+        for (_i, query_point) in query_points.iter().enumerate() {
+            let expected = linear_search(&content_to_add, query_point);
+            let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
+
+            assert_eq!(result.0, expected.distance);
+            assert_eq!(result.1 as usize, expected.item);
+        }
+    }
+
+    #[test]
+    fn v6_query_nearest_one_item_large_f32_vec_of_arrays() {
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(3);
+
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 1000;
+
+        let content_to_add: Vec<[f32; 4]> =
+            (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
+
+        let tree: KdTree<f32, u32, Eytzinger<4>, VecOfArrays<f32, u32, 4, 32>, 4, 32> =
             KdTree::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), TREE_SIZE);

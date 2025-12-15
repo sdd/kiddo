@@ -33,7 +33,7 @@ mod tests {
     use rand::SeedableRng;
     use std::cmp::Ordering;
 
-    use crate::kd_tree::leaf_strategies::flat_vec::FlatVec;
+    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
     use crate::kd_tree::KdTree;
     use crate::traits::Axis;
     use crate::traits::DistanceMetric;
@@ -43,7 +43,7 @@ mod tests {
     const RNG_SEED: u64 = 42;
 
     #[test]
-    fn can_query_items_unsorted_within_radius_large_scale() {
+    fn v6_query_within_unsorted_large_f32_flat_vec() {
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
         const TREE_SIZE: usize = 100_000;
@@ -54,6 +54,37 @@ mod tests {
             (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
         let tree: KdTree<f32, u32, Eytzinger<4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
+            KdTree::new_from_slice(&content_to_add);
+
+        let query_points: Vec<[f32; 4]> =
+            (0..NUM_QUERIES).map(|_| rng.random::<[f32; 4]>()).collect();
+
+        for query_point in query_points {
+            let expected = linear_search(&content_to_add, &query_point, RADIUS);
+
+            let mut result: Vec<_> = tree
+                .within_unsorted::<SquaredEuclidean<f32>>(&query_point, RADIUS)
+                .into_iter()
+                .map(|n| (n.distance, n.item))
+                .collect();
+
+            stabilize_sort(&mut result);
+            assert_eq!(result, expected);
+        }
+    }
+
+    #[test]
+    fn v6_query_within_unsorted_large_f32_vec_of_arrays() {
+        let mut rng = StdRng::seed_from_u64(RNG_SEED);
+
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 100;
+        const RADIUS: f32 = 0.2;
+
+        let content_to_add: Vec<[f32; 4]> =
+            (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
+
+        let tree: KdTree<f32, u32, Eytzinger<4>, VecOfArrays<f32, u32, 4, 32>, 4, 32> =
             KdTree::new_from_slice(&content_to_add);
 
         let query_points: Vec<[f32; 4]> =
