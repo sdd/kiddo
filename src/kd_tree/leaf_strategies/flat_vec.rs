@@ -1,5 +1,5 @@
 use crate::kd_tree::leaf_view::LeafView;
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
+use crate::traits_unified_2::{AxisUnified, Basics, Immutable, LeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::AVec;
 
@@ -21,6 +21,7 @@ where
     SS: StemStrategy,
 {
     type Num = AX;
+    type Mutability = Immutable;
 
     fn new_with_capacity(capacity: usize) -> Self {
         Self {
@@ -29,6 +30,10 @@ where
             leaf_extents: Vec::with_capacity(capacity),
             size: 0,
         }
+    }
+
+    fn new_with_empty_leaf() -> Self {
+        unimplemented!()
     }
 
     fn bulk_build_from_slice(

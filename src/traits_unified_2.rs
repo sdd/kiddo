@@ -14,6 +14,54 @@ use std::ops::{AddAssign, Sub};
 pub trait Basics: Copy + Debug + Default + Send + Sync + 'static {}
 impl<T> Basics for T where T: Copy + Debug + Default + Send + Sync + 'static {}
 
+/// Marker trait indicating whether a leaf strategy supports mutation.
+///
+/// This trait is used to enable type-level distinction between mutable and
+/// immutable leaf strategies, allowing for optimized monomorphization.
+pub trait Mutability: 'static {
+    /// Creates the appropriate StemLeafResolution for this mutability type
+    fn initial_stem_leaf_resolution(
+        stems_depth: usize,
+        leaf_count: usize,
+    ) -> crate::kd_tree::StemLeafResolution;
+}
+
+/// Marker type for immutable leaf strategies.
+///
+/// Immutable strategies never mutate the tree structure after construction,
+/// allowing for simpler and faster traversal logic.
+#[derive(Debug, Clone, Copy)]
+pub struct Immutable;
+impl Mutability for Immutable {
+    fn initial_stem_leaf_resolution(
+        stems_depth: usize,
+        leaf_count: usize,
+    ) -> crate::kd_tree::StemLeafResolution {
+        crate::kd_tree::StemLeafResolution::Arithmetic {
+            stems_depth,
+            leaf_count,
+        }
+    }
+}
+
+/// Marker type for mutable leaf strategies.
+///
+/// Mutable strategies support adding/removing points after construction,
+/// requiring more complex traversal logic to handle non-uniform tree depths.
+#[derive(Debug, Clone, Copy)]
+pub struct Mutable;
+impl Mutability for Mutable {
+    fn initial_stem_leaf_resolution(
+        stems_depth: usize,
+        leaf_count: usize,
+    ) -> crate::kd_tree::StemLeafResolution {
+        crate::kd_tree::StemLeafResolution::Pristine {
+            stems_depth,
+            leaf_count,
+        }
+    }
+}
+
 /// Trait for coordinate/axis types used in the k-d tree.
 ///
 /// This trait defines the operations needed for coordinate values,
@@ -58,10 +106,15 @@ where
     /// Coordinate scalar type.
     type Num;
 
+    /// Marker type indicating whether this strategy supports mutation.
+    type Mutability: Mutability;
+
     // ---- Construction ----
 
     /// Create a builder with an intended capacity (in points).
     fn new_with_capacity(capacity: usize) -> Self;
+
+    fn new_with_empty_leaf() -> Self;
 
     /// Bulk-build from a slice of points. Implementations should:
     /// - write split values into `stems` at indices determined by `stem_strategy`,
@@ -102,7 +155,7 @@ where
 
 /// Trait for leaf strategies that support mutation (adding/removing points).
 pub trait MutableLeafStrategy<AX, T, SS, const K: usize, const B: usize>:
-    LeafStrategy<AX, T, SS, K, B>
+    LeafStrategy<AX, T, SS, K, B, Mutability = Mutable>
 where
     AX: AxisUnified,
     T: Basics,
