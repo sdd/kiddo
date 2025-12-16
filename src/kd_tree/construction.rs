@@ -1,5 +1,5 @@
 use crate::kd_tree::KdTree;
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy, MutableLeafStrategy};
+use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy, Mutability, MutableLeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::{avec, AVec, ConstAlign, CACHELINE_ALIGN};
 use az::{Az, Cast};
@@ -8,7 +8,7 @@ use std::ptr::NonNull;
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: AxisUnified<Coord = A>,
-    T: Basics,
+    T: Basics + Copy + Default + PartialOrd + PartialEq,
     SS: StemStrategy,
     LS: MutableLeafStrategy<A, T, SS, K, B>,
 {
@@ -25,7 +25,10 @@ where
         // Get leaf. Insert point & item.
         // Update leaf and tree size
 
-        let leaf_idx = self.get_leaf_idx(point);
+        let leaf_idx = match self.stem_leaf_resolution.uses_arithmetic() {
+            true => self.get_leaf_idx_immutable(point),
+            false => self.get_leaf_idx_mutable(point),
+        };
 
         if !self.leaves.is_leaf_full(leaf_idx) {
             self.leaves.add_to_leaf(leaf_idx, point, item);
@@ -36,7 +39,10 @@ where
         self.leaves.split_leaf(leaf_idx);
 
         // TODO: more efficient to navigate from leaf_idx rather than root
-        let leaf_idx = self.get_leaf_idx(point);
+        let leaf_idx = match self.stem_leaf_resolution.uses_arithmetic() {
+            true => self.get_leaf_idx_immutable(point),
+            false => self.get_leaf_idx_mutable(point),
+        };
 
         self.leaves.add_to_leaf(leaf_idx, point, item);
         self.size += 1;
@@ -46,11 +52,17 @@ where
     ///
     /// Note: This does not rebalance the tree.
     pub fn remove(&mut self, point: &[A; K], item: T) {
-        let leaf_idx = self.get_leaf_idx(point);
+        let leaf_idx = match self.stem_leaf_resolution.uses_arithmetic() {
+            true => self.get_leaf_idx_immutable(point),
+            false => self.get_leaf_idx_mutable(point),
+        };
         self.leaves.remove_from_leaf(leaf_idx, point, item);
+
+        // TODO: attempt to prune leaf if now empty
     }
 }
 
+// Shared construction implementation (works for both Immutable and Mutable)
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: AxisUnified<Coord = A>,
@@ -140,15 +152,48 @@ where
             SS::trim_unneeded_stems(&mut stems, max_stem_level as usize);
         }
 
+        // Initialize stem-to-leaf resolution strategy based on leaf mutability
+        let stem_leaf_resolution =
+            LS::Mutability::initial_stem_leaf_resolution(max_stem_level as usize, leaf_node_count);
+
         Self {
             stems,
             leaves,
+            stem_leaf_resolution,
             size: item_count,
             max_stem_level,
             _phantom: Default::default(),
         }
     }
+}
 
+impl<A, SS, LS, const K: usize, const B: usize> KdTree<A, (), SS, LS, K, B>
+where
+    A: AxisUnified<Coord = A>,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, (), SS, K, B>,
+{
+    /// Creates a `KdTree` with no stored item values (`T = ()`).
+    ///
+    /// Leaf item slices will have the correct length but contain only `()`.
+    /// LLVM can generally optimize the `Vec<()>` storage away.
+    #[cfg_attr(not(feature = "no_inline"), inline)]
+    pub fn new_from_slice_no_items(source: &[[A; K]]) -> Self {
+        Self::new_from_slice_with(source, |leaf_items: &mut Vec<()>, _src_idx: usize| {
+            leaf_items.push(());
+        })
+    }
+}
+
+// Shared utility methods for construction (available to both Immutable and Mutable)
+impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
+where
+    A: AxisUnified<Coord = A>,
+    T: Basics,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+{
+    /// Shared recursive tree construction helper
     #[allow(clippy::too_many_arguments)]
     fn populate_recursive_with<F>(
         stems: &mut AVec<A, ConstAlign<{ CACHELINE_ALIGN }>>,
@@ -236,33 +281,7 @@ where
             push_item,
         );
     }
-}
 
-impl<A, SS, LS, const K: usize, const B: usize> KdTree<A, (), SS, LS, K, B>
-where
-    A: AxisUnified<Coord = A>,
-    SS: StemStrategy,
-    LS: LeafStrategy<A, (), SS, K, B>,
-{
-    /// Creates a `KdTree` with no stored item values (`T = ()`).
-    ///
-    /// Leaf item slices will have the correct length but contain only `()`.
-    /// LLVM can generally optimize the `Vec<()>` storage away.
-    #[cfg_attr(not(feature = "no_inline"), inline)]
-    pub fn new_from_slice_no_items(source: &[[A; K]]) -> Self {
-        Self::new_from_slice_with(source, |leaf_items: &mut Vec<()>, _src_idx: usize| {
-            leaf_items.push(());
-        })
-    }
-}
-
-impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
-where
-    A: AxisUnified<Coord = A>,
-    T: Basics,
-    SS: StemStrategy,
-    LS: LeafStrategy<A, T, SS, K, B>,
-{
     #[cfg(not(feature = "unreliable_select_nth_unstable"))]
     #[cfg_attr(not(feature = "no_inline"), inline)]
     fn update_pivot(

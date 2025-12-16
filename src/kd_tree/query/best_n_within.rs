@@ -34,9 +34,18 @@ where
             results: BinaryHeap::with_capacity(max_qty),
         };
 
-        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf, req_ctx| {
-            leaf.best_n_within::<D>(query, max_dist, &mut req_ctx.results);
-        });
+        match self.stem_leaf_resolution.uses_arithmetic() {
+            true => {
+                self.backtracking_query_immutable::<_, _, D>(&mut req_ctx, |leaf, req_ctx| {
+                    leaf.best_n_within::<D>(query, max_dist, &mut req_ctx.results);
+                });
+            }
+            false => {
+                self.backtracking_query_mutable::<_, _, D>(&mut req_ctx, |leaf, req_ctx| {
+                    leaf.best_n_within::<D>(query, max_dist, &mut req_ctx.results);
+                });
+            }
+        }
 
         req_ctx.results
     }

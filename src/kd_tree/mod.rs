@@ -14,6 +14,52 @@ mod traits;
 use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::{AVec, CACHELINE_ALIGN};
+use std::num::NonZeroUsize;
+
+/// Strategy for resolving stem indices to leaf indices during traversal.
+///
+/// Different variants optimize for different tree usage patterns:
+/// - `Arithmetic`: For immutable trees where all leaves are at the same depth
+/// - `Pristine`: For mutable trees that haven't had structural mutations yet
+/// - `Mapped`: For mutable trees after leaf splits/merges have occurred
+#[derive(Clone, Debug, PartialEq)]
+pub enum StemLeafResolution {
+    /// Immutable strategies: leaf index can be calculated arithmetically.
+    ///
+    /// All leaves are guaranteed to be at the same depth, so leaf indices
+    /// can be computed directly from stem indices.
+    Arithmetic {
+        stems_depth: usize,
+        leaf_count: usize,
+    },
+    /// Mutable strategies in pristine state: no structural mutations yet.
+    ///
+    /// Uses arithmetic resolution like `Arithmetic`, but can transition
+    /// to `Mapped` when the first leaf split/merge occurs.
+    Pristine {
+        stems_depth: usize,
+        leaf_count: usize,
+    },
+    /// Mutable strategies after structural mutations (split/merge).
+    ///
+    /// Requires explicit mapping from terminal stem indices to leaf indices
+    /// because leaves may be at different depths.
+    Mapped {
+        /// Index of the first stem that might point to a leaf
+        min_stem_leaf_idx: usize,
+        /// Maps stem indices to leaf indices.
+        /// `None` means the stem has children, `Some(idx)` means it points to leaf `idx`.
+        leaf_idx_map: Vec<Option<NonZeroUsize>>,
+    },
+}
+
+impl StemLeafResolution {
+    /// Returns true if this resolution strategy uses arithmetic (fast path).
+    #[inline(always)]
+    pub fn uses_arithmetic(&self) -> bool {
+        matches!(self, Self::Arithmetic { .. } | Self::Pristine { .. })
+    }
+}
 
 /// A k-d tree for efficient spatial queries.
 ///
@@ -35,6 +81,7 @@ pub struct KdTree<
 > {
     stems: AVec<A>,
     leaves: LS,
+    stem_leaf_resolution: StemLeafResolution,
 
     size: usize,
     max_stem_level: i32,
@@ -51,7 +98,11 @@ where
     fn default() -> Self {
         Self {
             stems: AVec::new(CACHELINE_ALIGN),
-            leaves: LS::new_with_capacity(32),
+            leaves: LS::new_with_empty_leaf(),
+            stem_leaf_resolution: StemLeafResolution::Arithmetic {
+                stems_depth: 0,
+                leaf_count: 0,
+            },
             size: 0,
             max_stem_level: -1,
             _phantom: std::marker::PhantomData,

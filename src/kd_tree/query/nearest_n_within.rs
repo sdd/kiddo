@@ -69,9 +69,18 @@ where
             _phantom: std::marker::PhantomData,
         };
 
-        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf, req_ctx| {
-            leaf.nearest_n_within::<D, R>(query, max_dist, &mut req_ctx.results);
-        });
+        match self.stem_leaf_resolution.uses_arithmetic() {
+            true => {
+                self.backtracking_query_immutable::<_, _, D>(&mut req_ctx, |leaf, req_ctx| {
+                    leaf.nearest_n_within::<D, R>(query, max_dist, &mut req_ctx.results);
+                });
+            }
+            false => {
+                self.backtracking_query_mutable::<_, _, D>(&mut req_ctx, |leaf, req_ctx| {
+                    leaf.nearest_n_within::<D, R>(query, max_dist, &mut req_ctx.results);
+                });
+            }
+        }
 
         if sorted {
             req_ctx.results.into_sorted_vec()

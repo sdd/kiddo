@@ -1,5 +1,5 @@
 use crate::kd_tree::leaf_view::LeafView;
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
+use crate::traits_unified_2::{AxisUnified, Basics, Immutable, LeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::AVec;
 
@@ -17,8 +17,13 @@ where
     SS: StemStrategy,
 {
     type Num = ();
+    type Mutability = Immutable;
 
     fn new_with_capacity(_capacity: usize) -> Self {
+        unimplemented!()
+    }
+
+    fn new_with_empty_leaf() -> Self {
         unimplemented!()
     }
 
