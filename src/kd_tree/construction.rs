@@ -1,8 +1,9 @@
-use crate::kd_tree::KdTree;
+use crate::kd_tree::{KdTree, StemLeafResolution};
 use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy, Mutability, MutableLeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::{avec, AVec, ConstAlign, CACHELINE_ALIGN};
 use az::{Az, Cast};
+use std::num::NonZeroUsize;
 use std::ptr::NonNull;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
@@ -16,19 +17,9 @@ where
     ///
     /// If the target leaf is full, it will be split before insertion.
     pub fn add(&mut self, point: &[A; K], item: T) {
-        // get matching leaf idx by traversal
-
-        // is leaf full?
-        // * perform split, getting a new stem_idx
-        // * traverse from that new stem_idx to update leaf_idx to new match
-
-        // Get leaf. Insert point & item.
-        // Update leaf and tree size
-
-        let leaf_idx = match self.stem_leaf_resolution.uses_arithmetic() {
-            true => self.get_leaf_idx_immutable(point),
-            false => self.get_leaf_idx_mutable(point),
-        };
+        // Find the target leaf
+        let (leaf_idx, split_dim, parent_stem_idx, is_left_child) =
+            self.find_leaf_with_context(point);
 
         if !self.leaves.is_leaf_full(leaf_idx) {
             self.leaves.add_to_leaf(leaf_idx, point, item);
@@ -36,9 +27,11 @@ where
             return;
         }
 
-        self.leaves.split_leaf(leaf_idx);
+        // Leaf is full, need to split
+        let new_leaf_idx = self.split_leaf(leaf_idx, split_dim, parent_stem_idx, is_left_child);
 
-        // TODO: more efficient to navigate from leaf_idx rather than root
+        // Re-traverse to find the correct leaf for the new point
+        // TODO: more efficient to navigate from parent_stem_idx rather than root
         let leaf_idx = match self.stem_leaf_resolution.uses_arithmetic() {
             true => self.get_leaf_idx_immutable(point),
             false => self.get_leaf_idx_mutable(point),
@@ -46,6 +39,125 @@ where
 
         self.leaves.add_to_leaf(leaf_idx, point, item);
         self.size += 1;
+    }
+
+    /// Find the leaf for a query point, along with context needed for splitting.
+    /// Returns: (leaf_idx, split_dim, parent_stem_idx, is_left_child)
+    fn find_leaf_with_context(&self, query: &[A; K]) -> (usize, usize, Option<usize>, bool) {
+        let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
+        let mut stem_strat: SS = SS::new(stems_ptr);
+        let mut parent_stem_idx: Option<usize> = None;
+        let mut is_left_child = false;
+
+        while stem_strat.level() <= self.max_stem_level {
+            let stem_idx = stem_strat.stem_idx();
+
+            // Check if this stem points directly to a leaf (only for Mapped)
+            if let Some(leaf_idx) = self.resolve_terminal_stem(stem_idx) {
+                let split_dim = stem_strat.dim();
+                return (leaf_idx, split_dim, parent_stem_idx, is_left_child);
+            }
+
+            parent_stem_idx = Some(stem_idx);
+            let pivot = unsafe { self.stems.get_unchecked(stem_idx) };
+            is_left_child = unsafe { *query.get_unchecked(stem_strat.dim()) } < *pivot;
+            stem_strat.traverse(is_left_child);
+        }
+
+        let leaf_idx = stem_strat.leaf_idx();
+        let split_dim = stem_strat.dim();
+        (leaf_idx, split_dim, parent_stem_idx, is_left_child)
+    }
+
+    /// Helper for Mapped resolution only
+    // fn resolve_terminal_stem(&self, stem_idx: usize) -> Option<usize> {
+    //     match &self.stem_leaf_resolution {
+    //         crate::kd_tree::StemLeafResolution::Mapped { min_stem_leaf_idx, leaf_idx_map } => {
+    //             if stem_idx >= *min_stem_leaf_idx {
+    //                 let map_idx = stem_idx - *min_stem_leaf_idx;
+    //                 leaf_idx_map.get(map_idx).and_then(|opt| opt.map(|n| n.get()))
+    //             } else {
+    //                 None
+    //             }
+    //         }
+    //         _ => None,
+    //     }
+    // }
+
+    /// Split a full leaf into two leaves
+    fn split_leaf(
+        &mut self,
+        leaf_idx: usize,
+        split_dim: usize,
+        parent_stem_idx: Option<usize>,
+        is_left_child: bool,
+    ) -> usize {
+        // Split the leaf
+        let (split_val, new_leaf_idx) = self.leaves.split_leaf(leaf_idx, split_dim);
+
+        // Add new stem pointing to old and new leaves
+        let new_stem_idx = self.stems.len();
+        self.stems.push(split_val);
+
+        // Transition to Mapped state if we're currently in Pristine
+        self.taint_if_pristine(new_stem_idx, leaf_idx, new_leaf_idx, parent_stem_idx, is_left_child);
+
+        new_leaf_idx
+    }
+
+    /// Transition from Pristine to Mapped state on first split
+    fn taint_if_pristine(
+        &mut self,
+        new_stem_idx: usize,
+        left_leaf_idx: usize,
+        right_leaf_idx: usize,
+        parent_stem_idx: Option<usize>,
+        is_left_child: bool,
+    ) {
+        match &self.stem_leaf_resolution {
+            StemLeafResolution::Pristine { stems_depth, leaf_count } => {
+                // Transition to Mapped
+                let min_stem_leaf_idx = 1 << *stems_depth;
+                let mut leaf_idx_map = vec![None; self.stems.len()];
+
+                // Map all existing leaves using arithmetic
+                for i in 0..*leaf_count {
+                    let stem_idx = min_stem_leaf_idx + i;
+                    if stem_idx < leaf_idx_map.len() {
+                        leaf_idx_map[stem_idx - min_stem_leaf_idx] = NonZeroUsize::new(i);
+                    }
+                }
+
+                // Update mapping for the new stem and leaves
+                if let Some(parent_idx) = parent_stem_idx {
+                    // Clear parent's mapping (it now has children)
+                    if parent_idx >= min_stem_leaf_idx {
+                        leaf_idx_map[parent_idx - min_stem_leaf_idx] = None;
+                    }
+                }
+
+                // New stem points to the two leaves
+                if new_stem_idx >= min_stem_leaf_idx {
+                    let idx = new_stem_idx - min_stem_leaf_idx;
+                    if idx >= leaf_idx_map.len() {
+                        leaf_idx_map.resize(idx + 1, None);
+                    }
+                }
+
+                self.stem_leaf_resolution = StemLeafResolution::Mapped {
+                    min_stem_leaf_idx,
+                    leaf_idx_map,
+                };
+            }
+            StemLeafResolution::Mapped { min_stem_leaf_idx, leaf_idx_map } => {
+                // Already mapped, just update the mapping
+                // TODO: implement mapping updates
+            }
+            _ => {
+                // Arithmetic/Immutable - should not be calling this
+                panic!("Cannot split leaves in immutable tree");
+            }
+        }
     }
 
     /// Removes a point and associated item from the tree.

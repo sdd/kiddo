@@ -178,8 +178,17 @@ where
     /// Returns true if the specified leaf is full.
     fn is_leaf_full(&self, leaf_idx: usize) -> bool;
 
-    /// Splits a full leaf, returning the index of the new leaf.
-    fn split_leaf(&mut self, leaf_idx: usize) -> usize;
+    /// Splits a full leaf, returning the pivot index where the split occurred.
+    /// The leaf will be sorted by `split_dim` and partitioned at the midpoint.
+    /// The left half stays in the original leaf, the right half will be moved to a new leaf.
+    fn split_leaf(&mut self, leaf_idx: usize, split_dim: usize) -> usize;
+
+    /// Get the split value (coordinate on split_dim) at the pivot index in a leaf.
+    fn get_split_value(&self, leaf_idx: usize, pivot_idx: usize, split_dim: usize) -> AX;
+
+    /// Move the right half of a split leaf to a new leaf.
+    /// Called after split_leaf to create the new leaf with the right half of the data.
+    fn move_split_data_to_new_leaf(&mut self, leaf_idx: usize, pivot_idx: usize);
 }
 
 /// Trait for distance metrics used in spatial queries.
