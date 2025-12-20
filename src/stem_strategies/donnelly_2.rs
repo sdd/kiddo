@@ -257,6 +257,10 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
             stems.truncate(so.stem_idx() + 1);
         }
     }
+
+    fn child_indices(&self) -> (usize, usize) {
+        unimplemented!("child_indices not yet implemented for Donnelly")
+    }
 }
 
 #[inline(always)]

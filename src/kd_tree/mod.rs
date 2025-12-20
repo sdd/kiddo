@@ -96,15 +96,45 @@ where
     SS: StemStrategy,
 {
     fn default() -> Self {
-        Self {
-            stems: AVec::new(CACHELINE_ALIGN),
-            leaves: LS::new_with_empty_leaf(),
-            stem_leaf_resolution: StemLeafResolution::Arithmetic {
+        use crate::traits_unified_2::Mutability;
+        use std::ptr::NonNull;
+
+        // For mutable trees, initialize with sentinel stem at root
+        let (stems, max_stem_level, stem_leaf_resolution) = if LS::Mutability::is_mutable() {
+            // Get the root index for this stem strategy
+            let root_idx = SS::new(NonNull::dangling()).stem_idx();
+
+            // Create stems array with sentinel value at root
+            let mut stems = AVec::new(CACHELINE_ALIGN);
+            stems.resize(root_idx + 1, A::max_value());
+
+            // Start in Mapped state - map root directly to the single initial leaf
+            let mut leaf_idx_map = vec![None; root_idx + 1];
+            leaf_idx_map[root_idx] = std::num::NonZeroUsize::new(0);
+
+            let stem_leaf_resolution = crate::kd_tree::StemLeafResolution::Mapped {
+                min_stem_leaf_idx: 0,
+                leaf_idx_map,
+            };
+
+            (stems, 0, stem_leaf_resolution)
+        } else {
+            // Immutable trees start empty
+            let stems = AVec::new(CACHELINE_ALIGN);
+            let stem_leaf_resolution = StemLeafResolution::Arithmetic {
                 stems_depth: 0,
                 leaf_count: 0,
-            },
+            };
+
+            (stems, -1, stem_leaf_resolution)
+        };
+
+        Self {
+            stems,
+            leaves: LS::new_with_empty_leaf(),
+            stem_leaf_resolution,
             size: 0,
-            max_stem_level: -1,
+            max_stem_level,
             _phantom: std::marker::PhantomData,
         }
     }
@@ -153,6 +183,103 @@ where
     fn from_iter<I: IntoIterator<Item = (usize, [A; K])>>(_iter: I) -> Self {
         // TODO: Proper impl
         Self::default()
+    }
+}
+
+// Display implementation for debugging
+impl<A, T, SS, LS, const K: usize, const B: usize> std::fmt::Display for KdTree<A, T, SS, LS, K, B>
+where
+    A: AxisUnified<Coord = A> + std::fmt::Display,
+    T: Basics + std::fmt::Display,
+    LS: LeafStrategy<A, T, SS, K, B>,
+    SS: StemStrategy,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "KdTree {{")?;
+        writeln!(f, "  Summary:")?;
+        writeln!(f, "    size: {}", self.size)?;
+        writeln!(f, "    max_stem_level: {}", self.max_stem_level)?;
+        writeln!(f, "    stem len: {}", self.stems.len())?;
+        writeln!(f, "    leaf count: {}", self.leaves.leaf_count())?;
+        writeln!(f)?;
+
+        // Display stems array
+        writeln!(f, "  Stems (len={}):", self.stems.len())?;
+        write!(f, "    [")?;
+        for (i, stem) in self.stems.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{:.3}", stem)?;
+        }
+        writeln!(f, "]")?;
+        writeln!(f)?;
+
+        // Display stem_leaf_resolution
+        writeln!(f, "  StemLeafResolution:")?;
+        match &self.stem_leaf_resolution {
+            StemLeafResolution::Arithmetic {
+                stems_depth,
+                leaf_count,
+            } => {
+                writeln!(f, "    Arithmetic {{")?;
+                writeln!(f, "      stems_depth: {}", stems_depth)?;
+                writeln!(f, "      leaf_count: {}", leaf_count)?;
+                writeln!(f, "    }}")?;
+            }
+            StemLeafResolution::Pristine {
+                stems_depth,
+                leaf_count,
+            } => {
+                writeln!(f, "    Pristine {{")?;
+                writeln!(f, "      stems_depth: {}", stems_depth)?;
+                writeln!(f, "      leaf_count: {}", leaf_count)?;
+                writeln!(f, "    }}")?;
+            }
+            StemLeafResolution::Mapped {
+                min_stem_leaf_idx,
+                leaf_idx_map,
+            } => {
+                writeln!(f, "    Mapped {{")?;
+                writeln!(f, "      min_stem_leaf_idx: {}", min_stem_leaf_idx)?;
+                writeln!(f, "      leaf_idx_map (len={}): [", leaf_idx_map.len())?;
+                for (i, entry) in leaf_idx_map.iter().enumerate() {
+                    match entry {
+                        Some(idx) => writeln!(f, "        {}: Some({})", i, idx)?,
+                        None => writeln!(f, "        {}: None", i)?,
+                    }
+                }
+                writeln!(f, "      ]")?;
+                writeln!(f, "    }}")?;
+            }
+        }
+        writeln!(f)?;
+
+        // Display leaves
+        writeln!(f, "  Leaves (count={}):", self.leaves.leaf_count())?;
+        for leaf_idx in 0..self.leaves.leaf_count() {
+            let leaf_view = self.leaves.leaf_view(leaf_idx);
+            let (points, items) = leaf_view.into_parts();
+
+            write!(f, "    Leaf {}: [", leaf_idx)?;
+            for i in 0..items.len() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "(")?;
+                for dim in 0..K {
+                    if dim > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{:.3}", points[dim][i])?;
+                }
+                write!(f, "): {}", items[i])?;
+            }
+            writeln!(f, "]")?;
+        }
+
+        writeln!(f, "}}")?;
+        Ok(())
     }
 }
 

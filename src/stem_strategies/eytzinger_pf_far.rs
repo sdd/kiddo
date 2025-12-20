@@ -92,6 +92,10 @@ impl<const K: usize, const VB: usize> StemStrategy for EytzingerPfFar<K, VB> {
         1
     }
     fn trim_unneeded_stems<A>(_stems: &mut AVec<A>, _max_stem_level: usize) {}
+
+    fn child_indices(&self) -> (usize, usize) {
+        unimplemented!("child_indices not yet implemented for EytzingerPfFar")
+    }
 }
 
 impl<const K: usize, const VB: usize> EytzingerPfFar<K, VB> {

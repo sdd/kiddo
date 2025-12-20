@@ -19,6 +19,9 @@ impl<T> Basics for T where T: Copy + Debug + Default + Send + Sync + 'static {}
 /// This trait is used to enable type-level distinction between mutable and
 /// immutable leaf strategies, allowing for optimized monomorphization.
 pub trait Mutability: 'static {
+    /// Returns true if this is a mutable strategy
+    fn is_mutable() -> bool;
+
     /// Creates the appropriate StemLeafResolution for this mutability type
     fn initial_stem_leaf_resolution(
         stems_depth: usize,
@@ -33,6 +36,10 @@ pub trait Mutability: 'static {
 #[derive(Debug, Clone, Copy)]
 pub struct Immutable;
 impl Mutability for Immutable {
+    fn is_mutable() -> bool {
+        false
+    }
+
     fn initial_stem_leaf_resolution(
         stems_depth: usize,
         leaf_count: usize,
@@ -51,13 +58,35 @@ impl Mutability for Immutable {
 #[derive(Debug, Clone, Copy)]
 pub struct Mutable;
 impl Mutability for Mutable {
+    fn is_mutable() -> bool {
+        true
+    }
+
     fn initial_stem_leaf_resolution(
         stems_depth: usize,
         leaf_count: usize,
     ) -> crate::kd_tree::StemLeafResolution {
-        crate::kd_tree::StemLeafResolution::Pristine {
-            stems_depth,
-            leaf_count,
+        // Start in Mapped state with min_stem_leaf_idx = 0 for simplicity.
+        // TODO: Optimize later with Pristine state and dynamic min_stem_leaf_idx
+        let min_stem_leaf_idx = 0;
+        let stem_count = if stems_depth == 0 {
+            0
+        } else {
+            1 << stems_depth
+        };
+        let first_leaf_stem = stem_count;
+
+        // Initialize mapping: None for interior stems, Some(leaf_idx) for terminal stems
+        let mut leaf_idx_map = vec![None; stem_count + leaf_count];
+        for i in 0..leaf_count {
+            if first_leaf_stem + i < leaf_idx_map.len() {
+                leaf_idx_map[first_leaf_stem + i] = std::num::NonZeroUsize::new(i);
+            }
+        }
+
+        crate::kd_tree::StemLeafResolution::Mapped {
+            min_stem_leaf_idx,
+            leaf_idx_map,
         }
     }
 }
@@ -178,17 +207,9 @@ where
     /// Returns true if the specified leaf is full.
     fn is_leaf_full(&self, leaf_idx: usize) -> bool;
 
-    /// Splits a full leaf, returning the pivot index where the split occurred.
-    /// The leaf will be sorted by `split_dim` and partitioned at the midpoint.
-    /// The left half stays in the original leaf, the right half will be moved to a new leaf.
-    fn split_leaf(&mut self, leaf_idx: usize, split_dim: usize) -> usize;
-
-    /// Get the split value (coordinate on split_dim) at the pivot index in a leaf.
-    fn get_split_value(&self, leaf_idx: usize, pivot_idx: usize, split_dim: usize) -> AX;
-
-    /// Move the right half of a split leaf to a new leaf.
-    /// Called after split_leaf to create the new leaf with the right half of the data.
-    fn move_split_data_to_new_leaf(&mut self, leaf_idx: usize, pivot_idx: usize);
+    /// Splits a full leaf, returning the pivot value and the index of
+    /// the new leaf that the leaf was split into.
+    fn split_leaf(&mut self, leaf_idx: usize, split_dim: usize) -> (AX, usize);
 }
 
 /// Trait for distance metrics used in spatial queries.

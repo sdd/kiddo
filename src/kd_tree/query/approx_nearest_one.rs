@@ -126,6 +126,50 @@ mod tests {
     }
 
     #[test]
+    fn approx_nearest_one_vec_of_arrays_mutated_one_split_f32() {
+        let mut rng = StdRng::seed_from_u64(RNG_SEED);
+
+        // Add 33 points to trigger exactly one split (bucket size is 32)
+        let mut points: Vec<[f32; 3]> = vec![];
+        for _ in 0..33 {
+            let x = rng.random_range(0.0..1.0);
+            let y = rng.random_range(0.0..1.0);
+            let z = rng.random_range(0.0..1.0);
+            points.push([x, y, z]);
+        }
+
+        let mut tree: KdTree<f32, u32, Eytzinger<3>, VecOfArrays<f32, u32, 3, 32>, 3, 32> =
+            KdTree::default();
+
+        for (idx, point) in points.iter().enumerate() {
+            tree.add(point, idx as u32)
+        }
+
+        // Print tree state for debugging
+        println!("\nTree state after adding 33 points:");
+        println!("{}", tree);
+
+        assert!(!tree.is_empty());
+        assert_eq!(tree.size(), 33);
+        assert_eq!(tree.leaf_count(), 2); // Should have split into 2 leaves
+
+        // Check that the root stem value was updated from max_value to a reasonable pivot
+        let root_stem_value = tree.stems[1]; // Eytzinger root is at index 1
+        assert!(
+            root_stem_value < f32::MAX,
+            "Root stem should be updated from max_value"
+        );
+        assert!(
+            root_stem_value >= 0.0 && root_stem_value <= 1.0,
+            "Root stem should be a reasonable value in [0, 1]"
+        );
+
+        // Just verify the tree queries successfully - we'll verify correctness later
+        let query_point = [0.5, 0.5, 0.5];
+        let _results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
+    }
+
+    #[test]
     fn approx_nearest_one_vec_of_arrays_mutated_f32() {
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 

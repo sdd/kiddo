@@ -18,8 +18,8 @@ where
     /// If the target leaf is full, it will be split before insertion.
     pub fn add(&mut self, point: &[A; K], item: T) {
         // Find the target leaf
-        let (leaf_idx, split_dim, parent_stem_idx, is_left_child) =
-            self.find_leaf_with_context(point);
+        let (stem_strat, parent_stem_idx, is_right_child) = self.find_leaf_with_context(point);
+        let leaf_idx = stem_strat.leaf_idx();
 
         if !self.leaves.is_leaf_full(leaf_idx) {
             self.leaves.add_to_leaf(leaf_idx, point, item);
@@ -28,13 +28,15 @@ where
         }
 
         // Leaf is full, need to split
-        let new_leaf_idx = self.split_leaf(leaf_idx, split_dim, parent_stem_idx, is_left_child);
+        let is_first_split = self.leaves.leaf_count() == 1;
+        let (pivot_val, split_dim, new_leaf_idx) =
+            self.split_leaf(stem_strat, parent_stem_idx, is_right_child, is_first_split);
 
-        // Re-traverse to find the correct leaf for the new point
-        // TODO: more efficient to navigate from parent_stem_idx rather than root
-        let leaf_idx = match self.stem_leaf_resolution.uses_arithmetic() {
-            true => self.get_leaf_idx_immutable(point),
-            false => self.get_leaf_idx_mutable(point),
+        // determine which leaf we belong in after the split
+        let leaf_idx = if point[split_dim] >= pivot_val {
+            new_leaf_idx
+        } else {
+            leaf_idx
         };
 
         self.leaves.add_to_leaf(leaf_idx, point, item);
@@ -42,31 +44,28 @@ where
     }
 
     /// Find the leaf for a query point, along with context needed for splitting.
-    /// Returns: (leaf_idx, split_dim, parent_stem_idx, is_left_child)
-    fn find_leaf_with_context(&self, query: &[A; K]) -> (usize, usize, Option<usize>, bool) {
+    /// Returns: (stem_strategy, parent_stem_idx, is_right_child)
+    fn find_leaf_with_context(&self, query: &[A; K]) -> (SS, Option<usize>, bool) {
         let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
         let mut stem_strat: SS = SS::new(stems_ptr);
         let mut parent_stem_idx: Option<usize> = None;
-        let mut is_left_child = false;
+        let mut is_right_child = false;
 
         while stem_strat.level() <= self.max_stem_level {
             let stem_idx = stem_strat.stem_idx();
 
             // Check if this stem points directly to a leaf (only for Mapped)
-            if let Some(leaf_idx) = self.resolve_terminal_stem(stem_idx) {
-                let split_dim = stem_strat.dim();
-                return (leaf_idx, split_dim, parent_stem_idx, is_left_child);
+            if let Some(_leaf_idx) = self.resolve_terminal_stem(stem_idx) {
+                return (stem_strat, parent_stem_idx, is_right_child);
             }
 
             parent_stem_idx = Some(stem_idx);
             let pivot = unsafe { self.stems.get_unchecked(stem_idx) };
-            is_left_child = unsafe { *query.get_unchecked(stem_strat.dim()) } < *pivot;
-            stem_strat.traverse(is_left_child);
+            is_right_child = unsafe { *query.get_unchecked(stem_strat.dim()) } >= *pivot;
+            stem_strat.traverse(is_right_child);
         }
 
-        let leaf_idx = stem_strat.leaf_idx();
-        let split_dim = stem_strat.dim();
-        (leaf_idx, split_dim, parent_stem_idx, is_left_child)
+        (stem_strat, parent_stem_idx, is_right_child)
     }
 
     /// Helper for Mapped resolution only
@@ -84,25 +83,70 @@ where
     //     }
     // }
 
-    /// Split a full leaf into two leaves
+    /// Split a full leaf, moving some of the points in the existing leaf to a new one.
+    /// Updates the stem tree to contain the new pivot value, pointing to the existing and
+    /// split-off leaf.
+    ///
+    /// Returns the dimension along which the split occurred and the value of the pivot, as well
+    /// as the new leaf index.
     fn split_leaf(
         &mut self,
-        leaf_idx: usize,
-        split_dim: usize,
-        parent_stem_idx: Option<usize>,
-        is_left_child: bool,
-    ) -> usize {
+        stem_strategy: SS,
+        _parent_stem_idx: Option<usize>,
+        _is_right_child: bool,
+        is_first_split: bool,
+    ) -> (A, usize, usize) {
+        let old_leaf_idx = stem_strategy.leaf_idx();
+        let split_dim = stem_strategy.dim();
+
         // Split the leaf
-        let (split_val, new_leaf_idx) = self.leaves.split_leaf(leaf_idx, split_dim);
+        let (pivot_val, new_leaf_idx) = self.leaves.split_leaf(old_leaf_idx, split_dim);
 
-        // Add new stem pointing to old and new leaves
-        let new_stem_idx = self.stems.len();
-        self.stems.push(split_val);
+        // Get the child indices where the two leaves will be pointed to
+        let (left_child_idx, right_child_idx) = stem_strategy.child_indices();
 
-        // Transition to Mapped state if we're currently in Pristine
-        self.taint_if_pristine(new_stem_idx, leaf_idx, new_leaf_idx, parent_stem_idx, is_left_child);
+        // Check if this is the first split
+        if is_first_split {
+            // First split: update the root stem from max_value to the actual pivot
+            // Use parent_stem_idx if available, otherwise get the root index
+            let stem_idx =
+                _parent_stem_idx.unwrap_or_else(|| SS::new(NonNull::dangling()).stem_idx());
 
-        new_leaf_idx
+            // Ensure stems array is large enough for root and children
+            let max_stem_idx = left_child_idx.max(right_child_idx).max(stem_idx);
+            if self.stems.len() <= max_stem_idx {
+                self.stems.resize(max_stem_idx + 1, A::max_value());
+            }
+            self.stems[stem_idx] = pivot_val;
+
+            // Update the leaf_idx_map to point children to the two leaves
+            if let StemLeafResolution::Mapped {
+                min_stem_leaf_idx: _,
+                leaf_idx_map,
+            } = &mut self.stem_leaf_resolution
+            {
+                // Ensure the map is large enough
+                let max_idx = left_child_idx.max(right_child_idx);
+                if leaf_idx_map.len() <= max_idx {
+                    leaf_idx_map.resize(max_idx + 1, None);
+                }
+
+                // Clear the root's mapping (it's now an interior node, not a leaf)
+                leaf_idx_map[stem_idx] = None;
+
+                // Map left child to old leaf, right child to new leaf
+                leaf_idx_map[left_child_idx] = NonZeroUsize::new(old_leaf_idx);
+                leaf_idx_map[right_child_idx] = NonZeroUsize::new(new_leaf_idx);
+            }
+
+            // Increment max_stem_level since we now have children
+            self.max_stem_level += 1;
+
+            (pivot_val, split_dim, new_leaf_idx)
+        } else {
+            // TODO: Handle subsequent splits
+            unimplemented!("Subsequent splits not yet implemented");
+        }
     }
 
     /// Transition from Pristine to Mapped state on first split
@@ -112,10 +156,12 @@ where
         left_leaf_idx: usize,
         right_leaf_idx: usize,
         parent_stem_idx: Option<usize>,
-        is_left_child: bool,
     ) {
         match &self.stem_leaf_resolution {
-            StemLeafResolution::Pristine { stems_depth, leaf_count } => {
+            StemLeafResolution::Pristine {
+                stems_depth,
+                leaf_count,
+            } => {
                 // Transition to Mapped
                 let min_stem_leaf_idx = 1 << *stems_depth;
                 let mut leaf_idx_map = vec![None; self.stems.len()];
@@ -149,7 +195,10 @@ where
                     leaf_idx_map,
                 };
             }
-            StemLeafResolution::Mapped { min_stem_leaf_idx, leaf_idx_map } => {
+            StemLeafResolution::Mapped {
+                min_stem_leaf_idx,
+                leaf_idx_map,
+            } => {
                 // Already mapped, just update the mapping
                 // TODO: implement mapping updates
             }
