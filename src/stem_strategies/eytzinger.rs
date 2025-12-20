@@ -80,6 +80,12 @@ impl<const K: usize> StemStrategy for Eytzinger<K> {
         }
     }
 
+    fn child_indices(&self) -> (usize, usize) {
+        let left = (self.stem_idx << 1) as usize;
+        let right = left | 1;
+        (left, right)
+    }
+
     fn get_stem_node_count_from_leaf_node_count(leaf_node_count: usize) -> usize {
         if leaf_node_count < 2 {
             0

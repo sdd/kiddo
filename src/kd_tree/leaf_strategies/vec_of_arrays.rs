@@ -1,9 +1,8 @@
 use crate::kd_tree::leaf_view::LeafView;
+use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
 use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy, Mutable, MutableLeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::AVec;
-use az::Az;
-use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
 
 /// A leaf storage strategy using vectors of fixed-size arrays.
 ///
@@ -151,6 +150,67 @@ where
     }
 }
 
+impl<AX, T, const K: usize, const B: usize> VecOfArrays<AX, T, K, B>
+where
+    AX: AxisUnified<Coord = AX>,
+    T: Basics + PartialEq,
+{
+    fn get_split_value(&self, leaf_idx: usize, pivot_idx: usize, split_dim: usize) -> AX {
+        debug_assert!(leaf_idx < self.leaves.len(), "leaf_idx out of bounds");
+        let leaf = unsafe { self.leaves.get_unchecked(leaf_idx) };
+        debug_assert!(pivot_idx < leaf.size, "pivot_idx out of bounds");
+
+        leaf.content_points[split_dim][pivot_idx]
+    }
+
+    fn copy_split_data_to_new_leaf(
+        &mut self,
+        old_leaf: &LeafNode<AX, T, K, B>,
+        pivot_idx: usize,
+    ) -> usize {
+        debug_assert!(pivot_idx < B, "pivot_idx out of bounds");
+
+        // Create a new empty leaf
+        let mut new_leaf = LeafNode {
+            content_points: [[AX::zero(); B]; K],
+            content_items: [T::default(); B],
+            size: 0,
+        };
+
+        // Copy the right half to the new leaf
+        let num_items = B - pivot_idx;
+        unsafe {
+            // Copy each dimension's data
+            for dim in 0..K {
+                new_leaf
+                    .content_points
+                    .get_unchecked_mut(dim)
+                    .get_unchecked_mut(..num_items)
+                    .copy_from_slice(
+                        old_leaf
+                            .content_points
+                            .get_unchecked(dim)
+                            .get_unchecked(pivot_idx..B),
+                    );
+            }
+            // Copy items
+            new_leaf
+                .content_items
+                .get_unchecked_mut(..num_items)
+                .copy_from_slice(old_leaf.content_items.get_unchecked(pivot_idx..B));
+        }
+
+        // set new leaf size
+        new_leaf.size = num_items;
+
+        // Add the new leaf
+        self.leaves.push(new_leaf);
+
+        // return the new leaf index
+        self.leaves.len() - 1
+    }
+}
+
 impl<AX, T, SS, const K: usize, const B: usize> MutableLeafStrategy<AX, T, SS, K, B>
     for VecOfArrays<AX, T, K, B>
 where
@@ -216,179 +276,159 @@ where
     /// * moving items from the midpoint onwards to the new leaf
     ///
     /// Returns: A tuple of (split_value, new_leaf_idx)
-    unsafe fn split_leaf(&mut self, leaf_idx: usize, split_dim: usize) -> (AX, usize) {
+    fn split_leaf(&mut self, leaf_idx: usize, split_dim: usize) -> (AX, usize) {
         debug_assert!(leaf_idx < self.leaves.len(), "leaf_idx out of bounds");
-        let orig = self.leaves.get_unchecked_mut(leaf_idx);
+        unsafe {
+            let orig = self.leaves.get_unchecked_mut(leaf_idx);
 
-        let mut pivot_idx: usize = B / 2;
+            let mut pivot_idx: usize = orig.size / 2;
 
-        mirror_select_nth_unstable_by(
-            &mut orig.content_points,
-            &mut orig.content_items,
-            pivot_idx,
-            |a, b| unsafe {
-                a.get_unchecked(split_dim)
-                    .partial_cmp(b.get_unchecked(split_dim))
-                    .expect("Leaf node sort failed.")
-            },
-        );
+            // Create a mirror array to track the permutation
+            let mut mirror: [usize; B] = array_init::array_init(|i| i);
 
-        let mut split_val = *orig
-            .content_points
-            .get_unchecked(pivot_idx)
-            .get_unchecked(split_dim);
+            // Sort the split dimension and track the permutation in mirror
+            mirror_select_nth_unstable_by(
+                &mut orig.content_points[split_dim][..orig.size],
+                &mut mirror[..orig.size],
+                pivot_idx,
+                |a, b| a.partial_cmp(b).expect("Leaf node sort failed."),
+            );
 
-        // At this point we hava a candidate position at which to split the leaf, that
-        // being the midpoint. This may not be a valid location, however. Take this 1D case
-        // as an example. We've sorted our leaf and it looks like this:
-        //
-        // [1, 2, 2, 4, 5]
-        //
-        // If we choose the actual midpoint and move it, and everything to the right of it,
-        // to a new leaf, and we choose 2 as the new stem value, what about the 2 that was to the
-        // left of it? It is now in the wrong bucket. So, we need to adjust our split point by
-        // moving it one place to the left.
-        //
-        // What about in this situation though?
-        //
-        // [2, 2, 2, 4, 5]
-        //
-        // If we follow the same algorithm, we end up with a split that has zero items in the
-        // left bucket and 5 on the right. This is no good! If we're splitting so that we can add
-        // a 4, for example, once the split completes, we still can't add it!
-        //
-        // So, if we've tried to adjust the split point leftwards, and got all the way to the
-        // start of the bucket, we reset back to the midpoint and start moving rightwards.
-        // In the above case this ends up with us splitting into [2, 2, 2] and [4, 5], with
-        // the pivot value being 4.
-        //
-        // But what if we had a bucket that looked like this?
-        //
-        // [2, 2, 2, 2, 2]
-        //
-        // Well then, to put it bluntly, we're fucked. This VecOfArrays leaf strategy has
-        // fixed-size buckets by design, to avoid the extra layer of indirection that would result
-        // from using a Vec for the bucket. There is no way to store another 2 in the tree - you need
-        // to either increase the bucket size or switch to a different, more permissive leaf strategy.
-
-        // if the pivot point choice results in some items whose position on the split
-        // dimension is the same as the split value being on the wrong side of the split:
-        if *orig
-            .content_points
-            .get_unchecked(pivot_idx - 1)
-            .get_unchecked(split_dim)
-            == split_val
-        {
-            let orig_pivot_idx = pivot_idx;
-
-            // Ensure that if pivot index would result in items that share the same co-ordinate
-            // on the splitting dimension would end up on different sides of the split, that we
-            // move the pivot to prevent this. We first try moving down, since that's the only
-            // part of the bucket that was sorted by mirror_select_nth_unstable_by
-            while pivot_idx > 0
-                && *orig
-                .content_points
-                .get_unchecked(pivot_idx - 1)
-                .get_unchecked(split_dim)
-                == split_val
-            {
-                pivot_idx -= 1;
-            }
-
-            // If the attempt to move the pivot point above would have resulted in the pivot
-            // point moving to the start of the bucket, search forwards from the original
-            // pivot point instead. We need to first ensure the upper half of the bucket
-            // is sorted
-            if pivot_idx == 0 {
-                mirror_select_nth_unstable_by(
-                    &mut orig.content_points,
-                    &mut orig.content_items,
-                    B - 1,
-                    |a, b| unsafe {
-                        a.get_unchecked(split_dim)
-                            .partial_cmp(b.get_unchecked(split_dim))
-                            .expect("Leaf node sort failed.")
-                    },
-                );
-
-                pivot_idx = orig_pivot_idx;
-                while *orig
-                    .content_points
-                    .get_unchecked(pivot_idx)
-                    .get_unchecked(split_dim)
-                    == split_val
-                {
-                    pivot_idx += 1;
-
-                    if pivot_idx == B {
-                        // TODO: should no longer panic here. Changing addition to be fallible
-                        // is quite a wide-ranging change though
-                        panic!("Too many items with the same position on one axis. Bucket size must be increased to at least 1 more than the number of items with the same position on one axis.");
+            // Apply the permutation to all other dimensions and items
+            for dim in 0..K {
+                if dim != split_dim {
+                    let temp = orig.content_points[dim];
+                    for i in 0..orig.size {
+                        orig.content_points[dim][i] = temp[mirror[i]];
                     }
                 }
             }
+            let temp_items = orig.content_items;
+            for i in 0..orig.size {
+                orig.content_items[i] = temp_items[mirror[i]];
+            }
 
-
-            split_val = *orig
+            let mut split_val = *orig
                 .content_points
-                .get_unchecked(pivot_idx)
-                .get_unchecked(split_dim);
+                .get_unchecked(split_dim)
+                .get_unchecked(pivot_idx);
+
+            // At this point we hava a candidate position at which to split the leaf, that
+            // being the midpoint. This may not be a valid location, however. Take this 1D case
+            // as an example. We've sorted our leaf and it looks like this:
+            //
+            // [1, 2, 2, 4, 5]
+            //
+            // If we choose the actual midpoint and move it, and everything to the right of it,
+            // to a new leaf, and we choose 2 as the new stem value, what about the 2 that was to the
+            // left of it? It is now in the wrong bucket. So, we need to adjust our split point by
+            // moving it one place to the left.
+            //
+            // What about in this situation though?
+            //
+            // [2, 2, 2, 4, 5]
+            //
+            // If we follow the same algorithm, we end up with a split that has zero items in the
+            // left bucket and 5 on the right. This is no good! If we're splitting so that we can add
+            // a 4, for example, once the split completes, we still can't add it!
+            //
+            // So, if we've tried to adjust the split point leftwards, and got all the way to the
+            // start of the bucket, we reset back to the midpoint and start moving rightwards.
+            // In the above case this ends up with us splitting into [2, 2, 2] and [4, 5], with
+            // the pivot value being 4.
+            //
+            // But what if we had a bucket that looked like this?
+            //
+            // [2, 2, 2, 2, 2]
+            //
+            // Well then, to put it bluntly, we're fucked. This VecOfArrays leaf strategy has
+            // fixed-size buckets by design, to avoid the extra layer of indirection that would result
+            // from using a Vec for the bucket. There is no way to store another 2 in the tree - you need
+            // to either increase the bucket size or switch to a different, more permissive leaf strategy.
+
+            // if the pivot point choice results in some items whose position on the split
+            // dimension is the same as the split value being on the wrong side of the split:
+            if *orig
+                .content_points
+                .get_unchecked(split_dim)
+                .get_unchecked(pivot_idx - 1)
+                == split_val
+            {
+                let orig_pivot_idx = pivot_idx;
+
+                // Ensure that if pivot index would result in items that share the same co-ordinate
+                // on the splitting dimension would end up on different sides of the split, that we
+                // move the pivot to prevent this. We first try moving down, since that's the only
+                // part of the bucket that was sorted by mirror_select_nth_unstable_by
+                while pivot_idx > 0
+                    && *orig
+                        .content_points
+                        .get_unchecked(split_dim)
+                        .get_unchecked(pivot_idx - 1)
+                        == split_val
+                {
+                    pivot_idx -= 1;
+                }
+
+                // If the attempt to move the pivot point above would have resulted in the pivot
+                // point moving to the start of the bucket, search forwards from the original
+                // pivot point instead. We need to first ensure the upper half of the bucket
+                // is sorted
+                if pivot_idx == 0 {
+                    // Re-sort to ensure the entire array is sorted
+                    mirror_select_nth_unstable_by(
+                        &mut orig.content_points[split_dim][..orig.size],
+                        &mut mirror[..orig.size],
+                        orig.size - 1,
+                        |a, b| a.partial_cmp(b).expect("Leaf node sort failed."),
+                    );
+
+                    // Re-apply the permutation to all other dimensions and items
+                    for dim in 0..K {
+                        if dim != split_dim {
+                            let temp = orig.content_points[dim];
+                            for i in 0..orig.size {
+                                orig.content_points[dim][i] = temp[mirror[i]];
+                            }
+                        }
+                    }
+                    let temp_items = orig.content_items;
+                    for i in 0..orig.size {
+                        orig.content_items[i] = temp_items[mirror[i]];
+                    }
+
+                    pivot_idx = orig_pivot_idx;
+                    while *orig
+                        .content_points
+                        .get_unchecked(split_dim)
+                        .get_unchecked(pivot_idx)
+                        == split_val
+                    {
+                        pivot_idx += 1;
+
+                        if pivot_idx == B {
+                            // TODO: should no longer panic here. Changing addition to be fallible
+                            // is quite a wide-ranging change though
+                            panic!("Too many items with the same position on one axis. Bucket size must be increased to at least 1 more than the number of items with the same position on one axis.");
+                        }
+                    }
+                }
+
+                split_val = *orig
+                    .content_points
+                    .get_unchecked(split_dim)
+                    .get_unchecked(pivot_idx);
+            }
+
+            // At this point, we have a valid index at which we can split the bucket.
+            // We need to copy the old leaf data before we can borrow self again
+            let old_leaf_copy = orig.clone();
+            orig.size = pivot_idx;
+
+            let new_leaf_idx = self.copy_split_data_to_new_leaf(&old_leaf_copy, pivot_idx);
+
+            (split_val, new_leaf_idx)
         }
-
-        // At this point, we have a valid index at which we can split the bucket.
-        let new_leaf_idx = self.copy_split_data_to_new_leaf(
-            orig,
-            pivot_idx
-        );
-
-        orig.size = pivot_idx;
-
-        (split_val, new_leaf_idx)
-    }
-
-    fn get_split_value(&self, leaf_idx: usize, pivot_idx: usize, split_dim: usize) -> AX {
-        debug_assert!(leaf_idx < self.leaves.len(), "leaf_idx out of bounds");
-        let leaf = unsafe { self.leaves.get_unchecked(leaf_idx) };
-        debug_assert!(pivot_idx < leaf.size, "pivot_idx out of bounds");
-
-        leaf.content_points[split_dim][pivot_idx]
-    }
-
-    fn copy_split_data_to_new_leaf(&mut self, old_leaf: &LeafNode, pivot_idx: usize) -> usize {
-        debug_assert!(pivot_idx < B, "pivot_idx out of bounds");
-
-        // Create a new empty leaf
-        let mut new_leaf = LeafNode {
-            content_points: [[AX::zero(); B]; K],
-            content_items: [T::default(); B],
-            size: 0,
-        };
-
-        // Copy the right half to the new leaf
-        let dest_slice_end = B - pivot_idx;
-        new_leaf
-            .content_points
-            .get_unchecked_mut(..dest_slice_end)
-            .copy_from_slice(
-                old_leaf.content_points
-                    .get_unchecked(pivot_idx..),
-            );
-        new_leaf
-            .content_items
-            .get_unchecked_mut(..dest_slice_end)
-            .copy_from_slice(
-                old_leaf.content_items
-                    .get_unchecked(pivot_idx..),
-            );
-
-        // set new leaf size
-        new_leaf.size = dest_slice_end;
-
-        // Add the new leaf
-        self.leaves.push(new_leaf);
-
-        // return the new leaf index
-        self.leaves.size() - 1
     }
 }
 

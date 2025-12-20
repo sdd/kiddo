@@ -245,6 +245,10 @@ pub trait StemStrategy: Clone + Sync + Send {
         }
     }
 
+    /// Get the stem indices where the left and right children would be located.
+    /// Returns (left_child_stem_idx, right_child_stem_idx).
+    fn child_indices(&self) -> (usize, usize);
+
     /// Calculate the stem node count for a given leaf node count.
     fn get_stem_node_count_from_leaf_node_count(leaf_node_count: usize) -> usize;
 

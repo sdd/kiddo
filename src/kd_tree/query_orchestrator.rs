@@ -2,7 +2,7 @@ use crate::kd_tree::leaf_view::LeafView;
 use crate::kd_tree::query_stack::{QueryStack, QueryStackContext};
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
-use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, Immutable, LeafStrategy, Mutable};
+use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, LeafStrategy};
 use crate::StemStrategy;
 use std::ptr::NonNull;
 
@@ -106,17 +106,27 @@ where
             stem_strat.traverse(is_right_child);
         }
 
-        stem_strat.leaf_idx()
+        match &self.stem_leaf_resolution {
+            crate::kd_tree::StemLeafResolution::Mapped { leaf_idx_map, .. } => {
+                leaf_idx_map[stem_strat.stem_idx()].unwrap().get()
+            }
+            _ => unreachable!(),
+        }
     }
 
     /// Check if a stem points directly to a leaf
     #[inline(always)]
     pub(crate) fn resolve_terminal_stem(&self, stem_idx: usize) -> Option<usize> {
         match &self.stem_leaf_resolution {
-            crate::kd_tree::StemLeafResolution::Mapped { min_stem_leaf_idx, leaf_idx_map } => {
+            crate::kd_tree::StemLeafResolution::Mapped {
+                min_stem_leaf_idx,
+                leaf_idx_map,
+            } => {
                 if stem_idx >= *min_stem_leaf_idx {
                     let map_idx = stem_idx - *min_stem_leaf_idx;
-                    leaf_idx_map.get(map_idx).and_then(|opt| opt.map(|n| n.get()))
+                    leaf_idx_map
+                        .get(map_idx)
+                        .and_then(|opt| opt.map(|n| n.get()))
                 } else {
                     None
                 }
@@ -165,7 +175,11 @@ where
         D: DistanceMetricUnified<A, K, Output = O>,
     {
         let mut stack = QueryStack::new();
-        self.backtracking_query_with_stack_immutable::<QC, O, D>(query_ctx, &mut stack, process_leaf);
+        self.backtracking_query_with_stack_immutable::<QC, O, D>(
+            query_ctx,
+            &mut stack,
+            process_leaf,
+        );
     }
 
     /// Backtracking query with explicit stack (immutable path)
@@ -398,9 +412,7 @@ where
                 query, query_wide, stem_strat, off, dim, rd, stack,
             )
         } else {
-            self.traverse_to_leaf_mapped::<O, D>(
-                query, query_wide, stem_strat, off, dim, rd, stack,
-            )
+            self.traverse_to_leaf_mapped::<O, D>(query, query_wide, stem_strat, off, dim, rd, stack)
         }
     }
 
