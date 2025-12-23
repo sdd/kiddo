@@ -155,14 +155,6 @@ where
     AX: AxisUnified<Coord = AX>,
     T: Basics + PartialEq,
 {
-    fn get_split_value(&self, leaf_idx: usize, pivot_idx: usize, split_dim: usize) -> AX {
-        debug_assert!(leaf_idx < self.leaves.len(), "leaf_idx out of bounds");
-        let leaf = unsafe { self.leaves.get_unchecked(leaf_idx) };
-        debug_assert!(pivot_idx < leaf.size, "pivot_idx out of bounds");
-
-        leaf.content_points[split_dim][pivot_idx]
-    }
-
     fn copy_split_data_to_new_leaf(
         &mut self,
         old_leaf: &LeafNode<AX, T, K, B>,

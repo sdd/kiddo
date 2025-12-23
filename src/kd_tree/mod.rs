@@ -14,7 +14,7 @@ mod traits;
 use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::{AVec, CACHELINE_ALIGN};
-use std::num::NonZeroUsize;
+use nonmax::NonMaxUsize;
 
 /// Strategy for resolving stem indices to leaf indices during traversal.
 ///
@@ -29,7 +29,9 @@ pub enum StemLeafResolution {
     /// All leaves are guaranteed to be at the same depth, so leaf indices
     /// can be computed directly from stem indices.
     Arithmetic {
+        /// how many levels deep the stem tree is
         stems_depth: usize,
+        /// how many leaves there are
         leaf_count: usize,
     },
     /// Mutable strategies in pristine state: no structural mutations yet.
@@ -37,7 +39,9 @@ pub enum StemLeafResolution {
     /// Uses arithmetic resolution like `Arithmetic`, but can transition
     /// to `Mapped` when the first leaf split/merge occurs.
     Pristine {
+        /// initial stem depth
         stems_depth: usize,
+        /// how many leaves there are initially
         leaf_count: usize,
     },
     /// Mutable strategies after structural mutations (split/merge).
@@ -49,7 +53,7 @@ pub enum StemLeafResolution {
         min_stem_leaf_idx: usize,
         /// Maps stem indices to leaf indices.
         /// `None` means the stem has children, `Some(idx)` means it points to leaf `idx`.
-        leaf_idx_map: Vec<Option<NonZeroUsize>>,
+        leaf_idx_map: Vec<Option<NonMaxUsize>>,
     },
 }
 
@@ -110,7 +114,7 @@ where
 
             // Start in Mapped state - map root directly to the single initial leaf
             let mut leaf_idx_map = vec![None; root_idx + 1];
-            leaf_idx_map[root_idx] = std::num::NonZeroUsize::new(0);
+            leaf_idx_map[root_idx] = NonMaxUsize::new(0);
 
             let stem_leaf_resolution = crate::kd_tree::StemLeafResolution::Mapped {
                 min_stem_leaf_idx: 0,
