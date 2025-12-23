@@ -3,7 +3,7 @@ use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy, Mutability, Mut
 use crate::StemStrategy;
 use aligned_vec::{avec, AVec, ConstAlign, CACHELINE_ALIGN};
 use az::{Az, Cast};
-use std::num::NonZeroUsize;
+use nonmax::NonMaxUsize;
 use std::ptr::NonNull;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
@@ -45,10 +45,10 @@ where
 
     /// Find the leaf for a query point, along with context needed for splitting.
     /// Returns: (stem_strategy, parent_stem_idx, is_right_child)
-    fn find_leaf_with_context(&self, query: &[A; K]) -> (SS, Option<usize>, bool) {
+    fn find_leaf_with_context(&self, query: &[A; K]) -> (SS, Option<NonMaxUsize>, bool) {
         let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
         let mut stem_strat: SS = SS::new(stems_ptr);
-        let mut parent_stem_idx: Option<usize> = None;
+        let mut parent_stem_idx: Option<NonMaxUsize> = None;
         let mut is_right_child = false;
 
         while stem_strat.level() <= self.max_stem_level {
@@ -59,7 +59,7 @@ where
                 return (stem_strat, parent_stem_idx, is_right_child);
             }
 
-            parent_stem_idx = Some(stem_idx);
+            parent_stem_idx = Some(NonMaxUsize::new(stem_idx).unwrap());
             let pivot = unsafe { self.stems.get_unchecked(stem_idx) };
             is_right_child = unsafe { *query.get_unchecked(stem_strat.dim()) } >= *pivot;
             stem_strat.traverse(is_right_child);
@@ -77,8 +77,8 @@ where
     fn split_leaf(
         &mut self,
         stem_strategy: SS,
-        _parent_stem_idx: Option<usize>,
-        _is_right_child: bool,
+        parent_stem_idx: Option<NonMaxUsize>,
+        is_right_child: bool,
         is_first_split: bool,
     ) -> (A, usize, usize) {
         let old_leaf_idx = stem_strategy.leaf_idx();
@@ -90,51 +90,43 @@ where
         // Get the child indices where the two leaves will be pointed to
         let (left_child_idx, right_child_idx) = stem_strategy.child_indices();
 
-        // Check if this is the first split
-        if is_first_split {
+        let stem_idx = if is_first_split {
             // First split: update the root stem from max_value to the actual pivot
             // Use parent_stem_idx if available, otherwise get the root index
-            let stem_idx =
-                _parent_stem_idx.unwrap_or_else(|| SS::new(NonNull::dangling()).stem_idx());
 
-            // Ensure stems array is large enough for root and children
-            let max_stem_idx = left_child_idx.max(right_child_idx).max(stem_idx);
-            if self.stems.len() <= max_stem_idx {
-                self.stems.resize(max_stem_idx + 1, A::max_value());
-            }
-            self.stems[stem_idx] = pivot_val;
-
-            // Update the leaf_idx_map to point children to the two leaves
-            if let StemLeafResolution::Mapped {
-                min_stem_leaf_idx: _,
-                leaf_idx_map,
-            } = &mut self.stem_leaf_resolution
-            {
-                // Ensure the map is large enough
-                let max_idx = left_child_idx.max(right_child_idx);
-                if leaf_idx_map.len() <= max_idx {
-                    leaf_idx_map.resize(max_idx + 1, None);
-                }
-
-                // Clear the root's mapping (it's now an interior node, not a leaf)
-                leaf_idx_map[stem_idx] = None;
-
-                // Map left child to old leaf, right child to new leaf
-                leaf_idx_map[left_child_idx] = NonZeroUsize::new(old_leaf_idx);
-                leaf_idx_map[right_child_idx] = NonZeroUsize::new(new_leaf_idx);
-            }
-
-            // Increment max_stem_level since we now have children
-            self.max_stem_level += 1;
-
-            (pivot_val, split_dim, new_leaf_idx)
+            // Overwrite the initial dummy pivot value with the actual pivot
+            // (We use a dummy pivot value like this so that the branching logic needed to
+            // deal with an empty stem tree is only needed on a split rather than on a query)
+            SS::new(NonNull::dangling()).stem_idx()
         } else {
-            // TODO: Handle subsequent splits
-            unimplemented!("Subsequent splits not yet implemented");
+            stem_strategy.stem_idx()
+        };
+
+        self.stems[stem_idx] = pivot_val;
+
+        // Update the leaf_idx_map to point children to the two leaves
+        if let StemLeafResolution::Mapped { leaf_idx_map, .. } = &mut self.stem_leaf_resolution {
+            // Ensure the map is large enough
+            if leaf_idx_map.len() < right_child_idx + 1 {
+                leaf_idx_map.resize(right_child_idx + 1, None);
+            }
+
+            // Clear the root's mapping (it's now an interior node, not a leaf)
+            leaf_idx_map[stem_idx] = None;
+
+            // Map left child to old leaf, right child to new leaf
+            leaf_idx_map[left_child_idx] = NonMaxUsize::new(old_leaf_idx);
+            leaf_idx_map[right_child_idx] = NonMaxUsize::new(new_leaf_idx);
         }
+
+        // Increment max_stem_level since we now have children
+        self.max_stem_level += 1;
+
+        (pivot_val, split_dim, new_leaf_idx)
     }
 
     /// Transition from Pristine to Mapped state on first split
+    #[allow(unused)]
     fn taint_if_pristine(
         &mut self,
         new_stem_idx: usize,
@@ -155,7 +147,7 @@ where
                 for i in 0..*leaf_count {
                     let stem_idx = min_stem_leaf_idx + i;
                     if stem_idx < leaf_idx_map.len() {
-                        leaf_idx_map[stem_idx - min_stem_leaf_idx] = NonZeroUsize::new(i);
+                        leaf_idx_map[stem_idx - min_stem_leaf_idx] = NonMaxUsize::new(i);
                     }
                 }
 

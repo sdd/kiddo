@@ -7,6 +7,7 @@ use aligned_vec::AVec;
 use fixed::traits::LossyFrom;
 use fixed::types::extra::{U0, U16, U8};
 use fixed::{FixedI32, FixedU16};
+use nonmax::NonMaxUsize;
 use ordered_float::Float;
 use std::fmt::{Debug, Display};
 use std::ops::{AddAssign, Sub};
@@ -143,7 +144,7 @@ impl Mutability for Mutable {
         let mut leaf_idx_map = vec![None; stem_count + leaf_count];
         for i in 0..leaf_count {
             if first_leaf_stem + i < leaf_idx_map.len() {
-                leaf_idx_map[first_leaf_stem + i] = std::num::NonZeroUsize::new(i);
+                leaf_idx_map[first_leaf_stem + i] = NonMaxUsize::new(i);
             }
         }
 
@@ -240,6 +241,7 @@ where
     /// Create a builder with an intended capacity (in points).
     fn new_with_capacity(capacity: usize) -> Self;
 
+    /// Create a new LeafStrategy with a single, empty leaf
     fn new_with_empty_leaf() -> Self;
 
     /// Bulk-build from a slice of points. Implementations should:
