@@ -23,26 +23,9 @@ where
             best_item: T::default(),
         };
 
-        match self.stem_leaf_resolution.uses_arithmetic() {
-            true => {
-                self.backtracking_query_immutable::<_, _, D>(&mut req_ctx, |leaf, query_ctx| {
-                    leaf.nearest_one::<D>(
-                        query,
-                        &mut query_ctx.best_dist,
-                        &mut query_ctx.best_item,
-                    );
-                });
-            }
-            false => {
-                self.backtracking_query_mutable::<_, _, D>(&mut req_ctx, |leaf, query_ctx| {
-                    leaf.nearest_one::<D>(
-                        query,
-                        &mut query_ctx.best_dist,
-                        &mut query_ctx.best_item,
-                    );
-                });
-            }
-        }
+        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf, query_ctx| {
+            leaf.nearest_one::<D>(query, &mut query_ctx.best_dist, &mut query_ctx.best_item);
+        });
 
         (req_ctx.best_dist, req_ctx.best_item)
     }

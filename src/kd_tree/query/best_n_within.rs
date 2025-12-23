@@ -24,7 +24,6 @@ where
     ) -> BinaryHeap<BestNeighbour<<D as DistanceMetricUnified<A, K>>::Output, T>>
     where
         D: DistanceMetricUnified<A, K>,
-        // <D as DistanceMetricUnified<A, K>>::Output: Ord,
     {
         let max_qty = max_qty.into();
         let mut req_ctx = BestNWithinReqCtx::<A, T, <D as DistanceMetricUnified<A, K>>::Output, K> {
@@ -34,18 +33,9 @@ where
             results: BinaryHeap::with_capacity(max_qty),
         };
 
-        match self.stem_leaf_resolution.uses_arithmetic() {
-            true => {
-                self.backtracking_query_immutable::<_, _, D>(&mut req_ctx, |leaf, req_ctx| {
-                    leaf.best_n_within::<D>(query, max_dist, &mut req_ctx.results);
-                });
-            }
-            false => {
-                self.backtracking_query_mutable::<_, _, D>(&mut req_ctx, |leaf, req_ctx| {
-                    leaf.best_n_within::<D>(query, max_dist, &mut req_ctx.results);
-                });
-            }
-        }
+        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf, req_ctx| {
+            leaf.best_n_within::<D>(query, max_dist, &mut req_ctx.results);
+        });
 
         req_ctx.results
     }

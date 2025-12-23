@@ -1,6 +1,7 @@
 //! Definitions and implementations for some traits that are used by KdTree, LeafStrategies, StemStrategies and DistanceMEtrics
 
 use crate::kd_tree::leaf_view::LeafView;
+use crate::kd_tree::KdTree;
 use crate::StemStrategy;
 use aligned_vec::AVec;
 use fixed::traits::LossyFrom;
@@ -10,15 +11,29 @@ use ordered_float::Float;
 use std::fmt::{Debug, Display};
 use std::ops::{AddAssign, Sub};
 
+pub const LEAF_STRAT_IMMUTABLE: u8 = 0;
+pub const LEAF_STRAT_MUTABLE: u8 = 1;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
+pub enum LeafStratMutability {
+    Immutable = LEAF_STRAT_IMMUTABLE,
+    Mutable = LEAF_STRAT_MUTABLE,
+}
+
 /// Basic type requirements for items stored in the tree.
 pub trait Basics: Copy + Debug + Default + Send + Sync + 'static {}
 impl<T> Basics for T where T: Copy + Debug + Default + Send + Sync + 'static {}
+
+mod sealed {
+    pub trait Sealed {}
+}
 
 /// Marker trait indicating whether a leaf strategy supports mutation.
 ///
 /// This trait is used to enable type-level distinction between mutable and
 /// immutable leaf strategies, allowing for optimized monomorphization.
-pub trait Mutability: 'static {
+pub trait Mutability: sealed::Sealed + 'static {
     /// Returns true if this is a mutable strategy
     fn is_mutable() -> bool;
 
@@ -27,6 +42,26 @@ pub trait Mutability: 'static {
         stems_depth: usize,
         leaf_count: usize,
     ) -> crate::kd_tree::StemLeafResolution;
+
+    fn get_leaf_idx<A, T, SS, LS, const K: usize, const B: usize>(
+        tree: &KdTree<A, T, SS, LS, K, B>,
+        query: &[A; K],
+    ) -> usize
+    where
+        A: AxisUnified<Coord = A>,
+        T: Basics + Copy + Default + PartialOrd + PartialEq,
+        SS: StemStrategy,
+        LS: LeafStrategy<A, T, SS, K, B>;
+
+    fn resolve_terminal_stem_idx<A, T, SS, LS, const K: usize, const B: usize>(
+        tree: &KdTree<A, T, SS, LS, K, B>,
+        stem_idx: usize,
+    ) -> Option<usize>
+    where
+        A: AxisUnified<Coord = A>,
+        T: Basics + Copy + Default + PartialOrd + PartialEq,
+        SS: StemStrategy,
+        LS: LeafStrategy<A, T, SS, K, B>;
 }
 
 /// Marker type for immutable leaf strategies.
@@ -35,6 +70,7 @@ pub trait Mutability: 'static {
 /// allowing for simpler and faster traversal logic.
 #[derive(Debug, Clone, Copy)]
 pub struct Immutable;
+impl sealed::Sealed for Immutable {}
 impl Mutability for Immutable {
     fn is_mutable() -> bool {
         false
@@ -49,6 +85,32 @@ impl Mutability for Immutable {
             leaf_count,
         }
     }
+
+    fn get_leaf_idx<A, T, SS, LS, const K: usize, const B: usize>(
+        tree: &KdTree<A, T, SS, LS, K, B>,
+        query: &[A; K],
+    ) -> usize
+    where
+        A: AxisUnified<Coord = A>,
+        T: Basics + Copy + Default + PartialOrd + PartialEq,
+        SS: StemStrategy,
+        LS: LeafStrategy<A, T, SS, K, B>,
+    {
+        tree.get_leaf_idx_unmapped(query)
+    }
+
+    fn resolve_terminal_stem_idx<A, T, SS, LS, const K: usize, const B: usize>(
+        _tree: &KdTree<A, T, SS, LS, K, B>,
+        _stem_idx: usize,
+    ) -> Option<usize>
+    where
+        A: AxisUnified<Coord = A>,
+        T: Basics + Copy + Default + PartialOrd + PartialEq,
+        SS: StemStrategy,
+        LS: LeafStrategy<A, T, SS, K, B>,
+    {
+        None
+    }
 }
 
 /// Marker type for mutable leaf strategies.
@@ -57,6 +119,7 @@ impl Mutability for Immutable {
 /// requiring more complex traversal logic to handle non-uniform tree depths.
 #[derive(Debug, Clone, Copy)]
 pub struct Mutable;
+impl sealed::Sealed for Mutable {}
 impl Mutability for Mutable {
     fn is_mutable() -> bool {
         true
@@ -87,6 +150,40 @@ impl Mutability for Mutable {
         crate::kd_tree::StemLeafResolution::Mapped {
             min_stem_leaf_idx,
             leaf_idx_map,
+        }
+    }
+
+    fn get_leaf_idx<A, T, SS, LS, const K: usize, const B: usize>(
+        tree: &KdTree<A, T, SS, LS, K, B>,
+        query: &[A; K],
+    ) -> usize
+    where
+        A: AxisUnified<Coord = A>,
+        T: Basics + Copy + Default + PartialOrd + PartialEq,
+        SS: StemStrategy,
+        LS: LeafStrategy<A, T, SS, K, B>,
+    {
+        if tree.stem_leaf_resolution.uses_arithmetic() {
+            tree.get_leaf_idx_unmapped(query)
+        } else {
+            tree.get_leaf_idx_mapped(query)
+        }
+    }
+
+    fn resolve_terminal_stem_idx<A, T, SS, LS, const K: usize, const B: usize>(
+        tree: &KdTree<A, T, SS, LS, K, B>,
+        stem_idx: usize,
+    ) -> Option<usize>
+    where
+        A: AxisUnified<Coord = A>,
+        T: Basics + Copy + Default + PartialOrd + PartialEq,
+        SS: StemStrategy,
+        LS: LeafStrategy<A, T, SS, K, B>,
+    {
+        if tree.stem_leaf_resolution.uses_arithmetic() {
+            None
+        } else {
+            tree.resolve_terminal_stem(stem_idx)
         }
     }
 }
@@ -184,7 +281,7 @@ where
 
 /// Trait for leaf strategies that support mutation (adding/removing points).
 pub trait MutableLeafStrategy<AX, T, SS, const K: usize, const B: usize>:
-    LeafStrategy<AX, T, SS, K, B, Mutability = Mutable>
+    LeafStrategy<AX, T, SS, K, B>
 where
     AX: AxisUnified,
     T: Basics,
