@@ -68,21 +68,6 @@ where
         (stem_strat, parent_stem_idx, is_right_child)
     }
 
-    /// Helper for Mapped resolution only
-    // fn resolve_terminal_stem(&self, stem_idx: usize) -> Option<usize> {
-    //     match &self.stem_leaf_resolution {
-    //         crate::kd_tree::StemLeafResolution::Mapped { min_stem_leaf_idx, leaf_idx_map } => {
-    //             if stem_idx >= *min_stem_leaf_idx {
-    //                 let map_idx = stem_idx - *min_stem_leaf_idx;
-    //                 leaf_idx_map.get(map_idx).and_then(|opt| opt.map(|n| n.get()))
-    //             } else {
-    //                 None
-    //             }
-    //         }
-    //         _ => None,
-    //     }
-    // }
-
     /// Split a full leaf, moving some of the points in the existing leaf to a new one.
     /// Updates the stem tree to contain the new pivot value, pointing to the existing and
     /// split-off leaf.
@@ -153,8 +138,8 @@ where
     fn taint_if_pristine(
         &mut self,
         new_stem_idx: usize,
-        left_leaf_idx: usize,
-        right_leaf_idx: usize,
+        _left_leaf_idx: usize,
+        _right_leaf_idx: usize,
         parent_stem_idx: Option<usize>,
     ) {
         match &self.stem_leaf_resolution {
@@ -195,10 +180,7 @@ where
                     leaf_idx_map,
                 };
             }
-            StemLeafResolution::Mapped {
-                min_stem_leaf_idx,
-                leaf_idx_map,
-            } => {
+            StemLeafResolution::Mapped { .. } => {
                 // Already mapped, just update the mapping
                 // TODO: implement mapping updates
             }
@@ -213,10 +195,8 @@ where
     ///
     /// Note: This does not rebalance the tree.
     pub fn remove(&mut self, point: &[A; K], item: T) {
-        let leaf_idx = match self.stem_leaf_resolution.uses_arithmetic() {
-            true => self.get_leaf_idx_immutable(point),
-            false => self.get_leaf_idx_mutable(point),
-        };
+        let leaf_idx = self.get_leaf_idx(point);
+
         self.leaves.remove_from_leaf(leaf_idx, point, item);
 
         // TODO: attempt to prune leaf if now empty

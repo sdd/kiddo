@@ -81,7 +81,7 @@ pub struct KdTree<
 > {
     stems: AVec<A>,
     leaves: LS,
-    stem_leaf_resolution: StemLeafResolution,
+    pub(crate) stem_leaf_resolution: StemLeafResolution,
 
     size: usize,
     max_stem_level: i32,
@@ -144,7 +144,7 @@ impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: AxisUnified<Coord = A>,
     T: Basics,
-    LS: LeafStrategy<A, T, SS, K, B>, // + Default,
+    LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
     /// Returns `true` if the tree contains no points.

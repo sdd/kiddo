@@ -26,18 +26,9 @@ where
         let mut best_dist = D::Output::max_value();
         let mut best_item = T::default();
 
-        match self.stem_leaf_resolution.uses_arithmetic() {
-            true => {
-                self.straight_query_immutable(req_ctx, |leaf| {
-                    leaf.nearest_one::<D>(query, &mut best_dist, &mut best_item);
-                });
-            }
-            false => {
-                self.straight_query_mutable(req_ctx, |leaf| {
-                    leaf.nearest_one::<D>(query, &mut best_dist, &mut best_item);
-                });
-            }
-        }
+        self.straight_query(req_ctx, |leaf| {
+            leaf.nearest_one::<D>(query, &mut best_dist, &mut best_item);
+        });
 
         (best_dist, best_item)
     }
