@@ -265,7 +265,7 @@ where
             let leaf_view = self.leaves.leaf_view(leaf_idx);
             let (points, items) = leaf_view.into_parts();
 
-            write!(f, "    Leaf {}: [", leaf_idx)?;
+            write!(f, "    Leaf {} (count={}): [", leaf_idx, items.len())?;
             for i in 0..items.len() {
                 if i > 0 {
                     write!(f, ", ")?;

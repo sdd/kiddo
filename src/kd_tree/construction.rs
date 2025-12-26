@@ -19,7 +19,12 @@ where
     pub fn add(&mut self, point: &[A; K], item: T) {
         // Find the target leaf
         let (stem_strat, parent_stem_idx, is_right_child) = self.find_leaf_with_context(point);
-        let leaf_idx = stem_strat.leaf_idx();
+        let leaf_idx = match &self.stem_leaf_resolution {
+            StemLeafResolution::Mapped { leaf_idx_map, .. } => {
+                leaf_idx_map[stem_strat.stem_idx()].unwrap().get()
+            }
+            _ => stem_strat.leaf_idx(),
+        };
 
         if !self.leaves.is_leaf_full(leaf_idx) {
             self.leaves.add_to_leaf(leaf_idx, point, item);
@@ -29,8 +34,13 @@ where
 
         // Leaf is full, need to split
         let is_first_split = self.leaves.leaf_count() == 1;
-        let (pivot_val, split_dim, new_leaf_idx) =
-            self.split_leaf(stem_strat, parent_stem_idx, is_right_child, is_first_split);
+        let (pivot_val, split_dim, new_leaf_idx) = self.split_leaf(
+            leaf_idx,
+            stem_strat,
+            parent_stem_idx,
+            is_right_child,
+            is_first_split,
+        );
 
         // determine which leaf we belong in after the split
         let leaf_idx = if point[split_dim] >= pivot_val {
@@ -76,31 +86,38 @@ where
     /// as the new leaf index.
     fn split_leaf(
         &mut self,
+        leaf_idx: usize,
         stem_strategy: SS,
-        parent_stem_idx: Option<NonMaxUsize>,
-        is_right_child: bool,
+        _parent_stem_idx: Option<NonMaxUsize>,
+        _is_right_child: bool,
         is_first_split: bool,
     ) -> (A, usize, usize) {
-        let old_leaf_idx = stem_strategy.leaf_idx();
+        let old_leaf_idx = leaf_idx; // stem_strategy.leaf_idx();
         let split_dim = stem_strategy.dim();
 
         // Split the leaf
         let (pivot_val, new_leaf_idx) = self.leaves.split_leaf(old_leaf_idx, split_dim);
 
-        // Get the child indices where the two leaves will be pointed to
+        // Get the indices of the children of the stem at which the split occurs
         let (left_child_idx, right_child_idx) = stem_strategy.child_indices();
 
-        let stem_idx = if is_first_split {
-            // First split: update the root stem from max_value to the actual pivot
-            // Use parent_stem_idx if available, otherwise get the root index
+        // let stem_idx = if is_first_split {
+        //     // First split: update the root stem from max_value to the actual pivot
+        //     // Use parent_stem_idx if available, otherwise get the root index
+        //
+        //     // Overwrite the initial dummy pivot value with the actual pivot
+        //     // (We use a dummy pivot value like this so that the branching logic needed to
+        //     // deal with an empty stem tree is only needed on a split rather than on a query)
+        //     SS::new(NonNull::dangling()).stem_idx()
+        // } else {
+        //     stem_strategy.stem_idx()
+        // };
+        let stem_idx = stem_strategy.stem_idx();
 
-            // Overwrite the initial dummy pivot value with the actual pivot
-            // (We use a dummy pivot value like this so that the branching logic needed to
-            // deal with an empty stem tree is only needed on a split rather than on a query)
-            SS::new(NonNull::dangling()).stem_idx()
-        } else {
-            stem_strategy.stem_idx()
-        };
+        // Ensure the stem array is large enough
+        if self.stems.len() < stem_idx + 1 {
+            self.stems.resize(stem_idx + 1, A::max_value());
+        }
 
         self.stems[stem_idx] = pivot_val;
 
@@ -111,11 +128,11 @@ where
                 leaf_idx_map.resize(right_child_idx + 1, None);
             }
 
+            // Map left child to old leaf
+            leaf_idx_map[left_child_idx] = leaf_idx_map[stem_idx];
             // Clear the root's mapping (it's now an interior node, not a leaf)
             leaf_idx_map[stem_idx] = None;
-
-            // Map left child to old leaf, right child to new leaf
-            leaf_idx_map[left_child_idx] = NonMaxUsize::new(old_leaf_idx);
+            // Map right child to new leaf
             leaf_idx_map[right_child_idx] = NonMaxUsize::new(new_leaf_idx);
         }
 

@@ -12,16 +12,6 @@ use ordered_float::Float;
 use std::fmt::{Debug, Display};
 use std::ops::{AddAssign, Sub};
 
-pub const LEAF_STRAT_IMMUTABLE: u8 = 0;
-pub const LEAF_STRAT_MUTABLE: u8 = 1;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[repr(u8)]
-pub enum LeafStratMutability {
-    Immutable = LEAF_STRAT_IMMUTABLE,
-    Mutable = LEAF_STRAT_MUTABLE,
-}
-
 /// Basic type requirements for items stored in the tree.
 pub trait Basics: Copy + Debug + Default + Send + Sync + 'static {}
 impl<T> Basics for T where T: Copy + Debug + Default + Send + Sync + 'static {}
@@ -34,7 +24,7 @@ mod sealed {
 ///
 /// This trait is used to enable type-level distinction between mutable and
 /// immutable leaf strategies, allowing for optimized monomorphization.
-pub trait Mutability: sealed::Sealed + 'static {
+pub(crate) trait Mutability: sealed::Sealed + 'static {
     /// Returns true if this is a mutable strategy
     fn is_mutable() -> bool;
 

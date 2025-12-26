@@ -179,11 +179,12 @@ mod tests {
             KdTree::default();
 
         for (idx, point) in points.iter().enumerate() {
+            // println!("Tree at item {}: {}", idx, tree);
             tree.add(point, idx as u32)
         }
 
         // Print tree state for debugging
-        println!("\nTree state after adding 65 points:");
+        // println!("\nTree state after adding 65 points:");
         println!("{}", tree);
 
         assert!(!tree.is_empty());
@@ -233,7 +234,8 @@ mod tests {
             KdTree::default();
 
         for (idx, point) in points.iter().enumerate() {
-            tree.add(point, idx as u32)
+            // println!("Tree at item {}: {}", idx, tree);
+            tree.add(point, idx as u32);
         }
 
         assert!(!tree.is_empty());
