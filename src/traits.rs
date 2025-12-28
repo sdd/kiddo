@@ -177,8 +177,18 @@ pub trait DistanceMetricFixed<A, const K: usize, R = A> {
 /// Trait that needs to be implemented by any potential stem ordering
 /// algorithm used by a KdTree.
 pub trait StemStrategy: Clone + Sync + Send {
+    /// The stem index of the root node of the tree
+    const ROOT_IDX: usize = 0;
+
     /// Create a new instance of this strategy at the root.
     fn new(stems_ptr: NonNull<u8>) -> Self;
+
+    /// Create a new instance of this strategy at the root, with a dangling pointer.
+    ///
+    /// Useful for generating traversal indices without performing prefetches
+    fn new_no_ptr() -> Self {
+        Self::new(NonNull::dangling())
+    }
 
     /// Get the current stem index this strategy points to.
     fn stem_idx(&self) -> usize;
@@ -256,7 +266,12 @@ pub trait StemStrategy: Clone + Sync + Send {
     fn stem_node_padding_factor() -> usize;
 
     /// Trim unneeded stem nodes.
-    fn trim_unneeded_stems<A: AxisUnified<Coord = A>>(stems: &mut AVec<A>, max_stem_level: usize);
+    fn trim_unneeded_stems<A: AxisUnified<Coord = A>>(
+        _stems: &mut AVec<A>,
+        _max_stem_level: usize,
+    ) {
+        // Default: no-op
+    }
 
     #[cfg(feature = "simulator")]
     fn simulate_traverse(

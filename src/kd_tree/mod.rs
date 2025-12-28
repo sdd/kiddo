@@ -101,12 +101,11 @@ where
 {
     fn default() -> Self {
         use crate::traits_unified_2::Mutability;
-        use std::ptr::NonNull;
 
         // For mutable trees, initialize with sentinel stem at root
         let (stems, max_stem_level, stem_leaf_resolution) = if LS::Mutability::is_mutable() {
             // Get the root index for this stem strategy
-            let root_idx = SS::new(NonNull::dangling()).stem_idx();
+            let root_idx = SS::new_no_ptr().stem_idx();
 
             // Create stems array with sentinel value at root
             let mut stems = AVec::new(CACHELINE_ALIGN);

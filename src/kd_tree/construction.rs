@@ -4,12 +4,13 @@ use crate::StemStrategy;
 use aligned_vec::{avec, AVec, ConstAlign, CACHELINE_ALIGN};
 use az::{Az, Cast};
 use nonmax::NonMaxUsize;
+use std::fmt::Display;
 use std::ptr::NonNull;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: AxisUnified<Coord = A>,
-    T: Basics + Copy + Default + PartialOrd + PartialEq,
+    T: Basics + Copy + Default + PartialOrd + PartialEq + Display,
     SS: StemStrategy,
     LS: MutableLeafStrategy<A, T, SS, K, B>,
 {
@@ -32,15 +33,11 @@ where
             return;
         }
 
+        // println!("Leaf {leaf_idx} is full, splitting. {self}");
+
         // Leaf is full, need to split
-        let is_first_split = self.leaves.leaf_count() == 1;
-        let (pivot_val, split_dim, new_leaf_idx) = self.split_leaf(
-            leaf_idx,
-            stem_strat,
-            parent_stem_idx,
-            is_right_child,
-            is_first_split,
-        );
+        let (pivot_val, split_dim, new_leaf_idx) =
+            self.split_leaf(leaf_idx, stem_strat, parent_stem_idx, is_right_child);
 
         // determine which leaf we belong in after the split
         let leaf_idx = if point[split_dim] >= pivot_val {
@@ -78,7 +75,7 @@ where
         (stem_strat, parent_stem_idx, is_right_child)
     }
 
-    /// Split a full leaf, moving some of the points in the existing leaf to a new one.
+    /// Split a full leaf, moving some points in the existing leaf to a new one.
     /// Updates the stem tree to contain the new pivot value, pointing to the existing and
     /// split-off leaf.
     ///
@@ -90,7 +87,6 @@ where
         stem_strategy: SS,
         _parent_stem_idx: Option<NonMaxUsize>,
         _is_right_child: bool,
-        is_first_split: bool,
     ) -> (A, usize, usize) {
         let old_leaf_idx = leaf_idx; // stem_strategy.leaf_idx();
         let split_dim = stem_strategy.dim();
@@ -268,7 +264,7 @@ where
         let mut leaves = LS::new_with_capacity(item_count);
         let mut sort_index = Vec::from_iter(0..item_count);
 
-        if stem_node_count == 0 {
+        let stem_leaf_resolution = if stem_node_count == 0 {
             // Special case: no stems needed, so we can just write the leaf directly.
             let leaf_len = sort_index.len();
             let mut leaf_points: [Vec<A>; K] =
@@ -286,6 +282,8 @@ where
                 array_init::array_init(|dim| leaf_points[dim].as_slice());
 
             leaves.append_leaf(&leaf_points_refs, leaf_items.as_slice());
+
+            LS::Mutability::initial_stem_leaf_resolution::<SS>(0, leaf_node_count)
         } else {
             Self::populate_recursive_with(
                 &mut stems,
@@ -300,12 +298,14 @@ where
 
             // TODO: eliminate the need for this
             SS::trim_unneeded_stems(&mut stems, max_stem_level as usize);
-        }
 
-        // Initialize stem-to-leaf resolution strategy based on leaf mutability
-        let stem_leaf_resolution =
-            LS::Mutability::initial_stem_leaf_resolution(max_stem_level as usize, leaf_node_count);
+            LS::Mutability::initial_stem_leaf_resolution::<SS>(
+                max_stem_level as usize + 1,
+                leaf_node_count,
+            )
+        };
 
+        // println!("Stems: {:?}", &stems);
         Self {
             stems,
             leaves,

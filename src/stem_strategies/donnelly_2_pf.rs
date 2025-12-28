@@ -37,13 +37,15 @@ unsafe impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Sync
 impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
     for DonnellyPf<L, CL, VB, K>
 {
+    const ROOT_IDX: usize = 0;
+
     #[inline]
     fn new(stems_ptr: NonNull<u8>) -> Self {
         debug_assert!(L >= 2 && L <= 8);
         debug_assert!(CL > VB); // item wider than cache line would break layout
 
         Self {
-            stem_idx: 0,
+            stem_idx: Self::ROOT_IDX as u32,
             dim: 0,
             level: 0,
             minor_level: 0,
@@ -470,7 +472,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellyPf<L, C
 
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
-pub fn calc_child_idx(
+pub fn calc_child_idx_hook(
     curr_idx: u32,
     minor_index: u32,
     is_right_child: bool,
@@ -481,13 +483,13 @@ pub fn calc_child_idx(
 
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
-pub fn both_children_pure(curr_idx: u32, minor_index: u32) -> (u32, u32) {
+pub fn both_children_pure_hook(curr_idx: u32, minor_index: u32) -> (u32, u32) {
     DonnellyPf::<3, 64, 8, 3>::both_children_pure(curr_idx, minor_index)
 }
 
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
-pub fn test_traverse(is_right_child: bool, stems: *mut u8) -> usize {
+pub fn test_traverse_hook(is_right_child: bool, stems: *mut u8) -> usize {
     let stems_ptr = NonNull::new(stems).unwrap();
 
     let mut stem_strat = DonnellyPf::<3, 64, 8, 3>::new(stems_ptr);
