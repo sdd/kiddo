@@ -238,6 +238,52 @@ mod tests {
         }
     }
 
+    #[test]
+    fn v6_nearest_n_within_f32_eytzinger_large_vec_of_arrays_mutated_f32() {
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(RNG_SEED);
+
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 100;
+        const RADIUS: f32 = 0.2;
+
+        let max_qty: NonZero<usize> = NonZero::new(3).unwrap();
+
+        let content_to_add: Vec<[f32; 4]> =
+            (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
+
+        let mut tree: KdTree<f32, u32, Eytzinger<4>, VecOfArrays<f32, u32, 4, 32>, 4, 32> =
+            KdTree::default();
+
+        for (idx, point) in content_to_add.iter().enumerate() {
+            tree.add(point, idx as u32);
+        }
+
+        assert_eq!(tree.size(), TREE_SIZE);
+
+        let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)
+            .map(|_| rng.random::<[f32; 4]>()) // Use the seeded rng
+            .collect();
+
+        for (_i, query_point) in query_points.iter().enumerate() {
+            let expected = linear_search(&content_to_add, &query_point, RADIUS)
+                .into_iter()
+                .take(max_qty.into())
+                .collect::<Vec<_>>();
+
+            let mut result: Vec<_> = tree
+                .nearest_n_within::<SquaredEuclidean<f32>>(&query_point, RADIUS, max_qty, true)
+                .into_sorted_vec()
+                .into_iter()
+                .map(|n| (n.distance, n.item))
+                .collect();
+
+            stabilize_sort(&mut result);
+
+            // println!("Query #{}", i);
+            assert_eq!(result, expected);
+        }
+    }
+
     fn linear_search<A: Axis, const K: usize>(
         content: &[[A; K]],
         query_point: &[A; K],

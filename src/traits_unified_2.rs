@@ -29,7 +29,7 @@ pub(crate) trait Mutability: sealed::Sealed + 'static {
     fn is_mutable() -> bool;
 
     /// Creates the appropriate StemLeafResolution for this mutability type
-    fn initial_stem_leaf_resolution(
+    fn initial_stem_leaf_resolution<SS: StemStrategy>(
         stems_depth: usize,
         leaf_count: usize,
     ) -> crate::kd_tree::StemLeafResolution;
@@ -67,7 +67,7 @@ impl Mutability for Immutable {
         false
     }
 
-    fn initial_stem_leaf_resolution(
+    fn initial_stem_leaf_resolution<SS: StemStrategy>(
         stems_depth: usize,
         leaf_count: usize,
     ) -> crate::kd_tree::StemLeafResolution {
@@ -116,26 +116,32 @@ impl Mutability for Mutable {
         true
     }
 
-    fn initial_stem_leaf_resolution(
+    fn initial_stem_leaf_resolution<SS: StemStrategy>(
         stems_depth: usize,
         leaf_count: usize,
     ) -> crate::kd_tree::StemLeafResolution {
         // Start in Mapped state with min_stem_leaf_idx = 0 for simplicity.
         // TODO: Optimize later with Pristine state and dynamic min_stem_leaf_idx
-        let min_stem_leaf_idx = 0;
-        let stem_count = if stems_depth == 0 {
-            0
-        } else {
-            1 << stems_depth
-        };
-        let first_leaf_stem = stem_count;
 
-        // Initialize mapping: None for interior stems, Some(leaf_idx) for terminal stems
-        let mut leaf_idx_map = vec![None; stem_count + leaf_count];
-        for i in 0..leaf_count {
-            if first_leaf_stem + i < leaf_idx_map.len() {
-                leaf_idx_map[first_leaf_stem + i] = NonMaxUsize::new(i);
+        let min_stem_leaf_idx = 0;
+
+        // determine idx for highest numbered leaf so we can size the leaf_idx_map array
+        let mut stem_strategy = SS::new_no_ptr();
+        for bit_idx in (0..stems_depth).rev() {
+            let is_right = (leaf_count - 1) & (1 << bit_idx) != 0;
+            stem_strategy.traverse(is_right);
+        }
+
+        let mut leaf_idx_map: Vec<Option<NonMaxUsize>> = vec![None; stem_strategy.stem_idx() + 1];
+
+        for leaf_idx in 0..leaf_count {
+            let mut stem_strategy = SS::new_no_ptr();
+            for bit_idx in (0..stems_depth).rev() {
+                let is_right = leaf_idx & (1 << bit_idx) != 0;
+                stem_strategy.traverse(is_right);
             }
+            leaf_idx_map[stem_strategy.stem_idx()] =
+                Some(NonMaxUsize::new(leaf_idx).expect("stem_idx overflow"));
         }
 
         crate::kd_tree::StemLeafResolution::Mapped {
@@ -224,6 +230,7 @@ where
     type Num;
 
     /// Marker type indicating whether this strategy supports mutation.
+    #[allow(private_bounds)]
     type Mutability: Mutability;
 
     // ---- Construction ----

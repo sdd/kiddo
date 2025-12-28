@@ -247,6 +247,6 @@ mod tests {
 
         let results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
 
-        assert_eq!(results, (0.0014114721, 19074));
+        assert_eq!(results, (0.0003201659, 21996));
     }
 }

@@ -179,6 +179,42 @@ mod tests {
         }
     }
 
+    #[test]
+    fn v6_query_best_n_within_large_vec_of_arrays_mutated_f64() {
+        let mut rng = StdRng::seed_from_u64(RNG_SEED);
+
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 100;
+        let max_qty = NonZero::new(2).unwrap();
+
+        let content_to_add: Vec<_> = (0..TREE_SIZE).map(|_| rng.random::<[f64; 2]>()).collect();
+
+        let mut tree: KdTree<f64, u32, Eytzinger<2>, VecOfArrays<f64, u32, 2, 32>, 2, 32> =
+            KdTree::default();
+
+        for (idx, point) in content_to_add.iter().enumerate() {
+            tree.add(point, idx as u32);
+        }
+
+        assert_eq!(tree.size(), TREE_SIZE);
+
+        let query_points: Vec<_> = (0..NUM_QUERIES)
+            .map(|_| rng.random::<_>()) // Use the seeded rng
+            .collect();
+
+        for query_point in query_points {
+            let radius = 100000f64;
+            let expected = linear_search(&content_to_add, &query_point, radius, max_qty.into());
+
+            let result: Vec<_> = tree
+                .best_n_within::<SquaredEuclidean<f64>>(&query_point, radius, max_qty)
+                .into_iter()
+                .collect();
+
+            assert_eq!(result, expected);
+        }
+    }
+
     fn linear_search(
         content: &[[f64; 2]],
         query: &[f64; 2],

@@ -2,7 +2,6 @@
 
 use crate::stem_strategies::prefetch::prefetch_t0;
 use crate::StemStrategy;
-use aligned_vec::AVec;
 use std::ptr::NonNull;
 
 /// Eytzinger Stem Ordering
@@ -20,9 +19,11 @@ unsafe impl<const K: usize, const VB: usize> Send for EytzingerPf<K, VB> {}
 unsafe impl<const K: usize, const VB: usize> Sync for EytzingerPf<K, VB> {}
 
 impl<const K: usize, const VB: usize> StemStrategy for EytzingerPf<K, VB> {
+    const ROOT_IDX: usize = 1;
+
     fn new(stems_ptr: NonNull<u8>) -> Self {
         Self {
-            stem_idx: 1,
+            stem_idx: Self::ROOT_IDX as u32,
             dim: 0,
             level: 0,
             stems_ptr,
@@ -91,7 +92,6 @@ impl<const K: usize, const VB: usize> StemStrategy for EytzingerPf<K, VB> {
     fn stem_node_padding_factor() -> usize {
         1
     }
-    fn trim_unneeded_stems<A>(_stems: &mut AVec<A>, _max_stem_level: usize) {}
 
     fn child_indices(&self) -> (usize, usize) {
         unimplemented!("child_indices not yet implemented for EytzingerPf")

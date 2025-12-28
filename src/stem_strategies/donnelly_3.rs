@@ -41,13 +41,15 @@ unsafe impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Sync
 impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
     for DonnellySwPre<L, CL, VB, K>
 {
+    const ROOT_IDX: usize = 0;
+
     #[inline]
     fn new(stems_ptr: NonNull<u8>) -> Self {
         debug_assert!(L >= 2 && L <= 8);
         debug_assert!(CL > VB); // item wider than cache line would break layout
 
         Self {
-            stem_idx: 0,
+            stem_idx: Self::ROOT_IDX as u32,
             dim: 0,
             level: 0,
             minor_level: 0,
@@ -231,7 +233,8 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
     }
 
     fn child_indices(&self) -> (usize, usize) {
-        unimplemented!("child_indices not yet implemented for DonnellySwPre")
+        let res = both_children_pure_hook(self.stem_idx, self.minor_level);
+        (res.0 as usize, res.1 as usize)
     }
 }
 
@@ -453,7 +456,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellySwPre<L
 
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
-pub fn calc_child_idx(
+pub fn calc_child_idx_hook(
     curr_idx: u32,
     minor_index: u32,
     is_right_child: bool,
@@ -464,14 +467,14 @@ pub fn calc_child_idx(
 
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
-pub fn both_children_pure(curr_idx: u32, minor_index: u32) -> (u32, u32) {
+pub fn both_children_pure_hook(curr_idx: u32, minor_index: u32) -> (u32, u32) {
     DonnellySwPre::<3, 64, 8, 3>::both_children_pure(curr_idx, minor_index)
 }
 
 /// Exposed pure function for use with cargo-asm
 #[cfg(feature = "rkyv_08")]
 #[inline(never)]
-pub fn test_traverse(is_right_child: bool, stems: AlignedVec) -> usize {
+pub fn test_traverse_hook(is_right_child: bool, stems: AlignedVec) -> usize {
     let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
 
     let mut stem_strat = DonnellySwPre::<3, 64, 8, 3>::new(stems_ptr);
