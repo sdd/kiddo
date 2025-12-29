@@ -190,6 +190,13 @@ pub trait StemStrategy: Clone + Sync + Send {
         Self::new(NonNull::dangling())
     }
 
+    /// Returns the block size of this strategy
+    ///
+    /// The default is 1, which means that the strategy is not block-based.
+    fn block_size() -> usize {
+        1
+    }
+
     /// Get the current stem index this strategy points to.
     fn stem_idx(&self) -> usize;
 

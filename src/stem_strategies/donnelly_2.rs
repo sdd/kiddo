@@ -57,6 +57,11 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
     }
 
     #[inline]
+    fn block_size() -> usize {
+        L as usize
+    }
+
+    #[inline]
     fn stem_idx(&self) -> usize {
         self.stem_idx as usize
     }
