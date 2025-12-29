@@ -96,18 +96,6 @@ where
 
         // Get the indices of the children of the stem at which the split occurs
         let (left_child_idx, right_child_idx) = stem_strategy.child_indices();
-
-        // let stem_idx = if is_first_split {
-        //     // First split: update the root stem from max_value to the actual pivot
-        //     // Use parent_stem_idx if available, otherwise get the root index
-        //
-        //     // Overwrite the initial dummy pivot value with the actual pivot
-        //     // (We use a dummy pivot value like this so that the branching logic needed to
-        //     // deal with an empty stem tree is only needed on a split rather than on a query)
-        //     SS::new(NonNull::dangling()).stem_idx()
-        // } else {
-        //     stem_strategy.stem_idx()
-        // };
         let stem_idx = stem_strategy.stem_idx();
 
         // Ensure the stem array is large enough
@@ -251,59 +239,50 @@ where
     {
         let item_count = source.len();
         let leaf_node_count = item_count.div_ceil(B);
-        let stem_node_count = SS::get_stem_node_count_from_leaf_node_count(leaf_node_count);
-        let max_stem_level: i32 = leaf_node_count.next_power_of_two().ilog2() as i32 - 1;
 
-        // TODO: It would be nice to be able to determine the exact required length up-front.
-        //  Instead, we just trim the stems afterwards by traversing right-child non-inf nodes
-        //  till we hit max level to get the max used stem
-        let stem_node_count = stem_node_count * SS::stem_node_padding_factor();
+        if leaf_node_count < 2 {
+            return Self::new_from_slice_no_stems_with(source, push_item);
+        }
+
+        let mut stems_depth: usize = leaf_node_count.next_power_of_two().ilog2() as usize;
+
+        // Pad stem tree height to the next block boundary for block-based strategies
+        let padding_level_count = stems_depth % SS::block_size();
+        stems_depth += padding_level_count;
+
+        // Padding levels will be placed at the root of the tree. Pre-traverse any padding levels
+        // so that stem_strat is set to the location where the true root will be
+        let mut stem_strat = SS::new_no_ptr();
+        for _ in 0..padding_level_count {
+            stem_strat.traverse(false);
+        }
+        let root_stem_strat = stem_strat.clone();
+
+        // Traverse to the right-most leaf to determine the max used stem index
+        let rightmost_leaf_idx = leaf_node_count - 1;
+        for bit_idx in (1..stems_depth).rev() {
+            let is_right = rightmost_leaf_idx & (1 << bit_idx) != 0;
+            stem_strat.traverse(is_right);
+        }
+        let stem_node_count = stem_strat.stem_idx() + 1;
 
         let mut stems = avec![A::max_value(); stem_node_count];
-        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         let mut leaves = LS::new_with_capacity(item_count);
         let mut sort_index = Vec::from_iter(0..item_count);
 
-        let stem_leaf_resolution = if stem_node_count == 0 {
-            // Special case: no stems needed, so we can just write the leaf directly.
-            let leaf_len = sort_index.len();
-            let mut leaf_points: [Vec<A>; K] =
-                array_init::array_init(|_| Vec::with_capacity(leaf_len));
-            let mut leaf_items: Vec<T> = Vec::with_capacity(leaf_len);
+        Self::populate_recursive_with(
+            &mut stems,
+            source,
+            &mut sort_index,
+            root_stem_strat,
+            stem_strat.level(),
+            leaf_node_count * B,
+            &mut leaves,
+            &mut push_item,
+        );
 
-            for &src_idx in sort_index.iter() {
-                for dim in 0..K {
-                    leaf_points[dim].push(source[src_idx][dim]);
-                }
-                push_item(&mut leaf_items, src_idx);
-            }
-
-            let leaf_points_refs: [&[A]; K] =
-                array_init::array_init(|dim| leaf_points[dim].as_slice());
-
-            leaves.append_leaf(&leaf_points_refs, leaf_items.as_slice());
-
-            LS::Mutability::initial_stem_leaf_resolution::<SS>(0, leaf_node_count)
-        } else {
-            Self::populate_recursive_with(
-                &mut stems,
-                source,
-                &mut sort_index,
-                SS::new(stems_ptr),
-                max_stem_level,
-                leaf_node_count * B,
-                &mut leaves,
-                &mut push_item,
-            );
-
-            // TODO: eliminate the need for this
-            SS::trim_unneeded_stems(&mut stems, max_stem_level as usize);
-
-            LS::Mutability::initial_stem_leaf_resolution::<SS>(
-                max_stem_level as usize + 1,
-                leaf_node_count,
-            )
-        };
+        let stem_leaf_resolution =
+            LS::Mutability::initial_stem_leaf_resolution::<SS>(stems_depth, leaf_node_count);
 
         // println!("Stems: {:?}", &stems);
         Self {
@@ -311,7 +290,46 @@ where
             leaves,
             stem_leaf_resolution,
             size: item_count,
-            max_stem_level,
+            max_stem_level: stem_strat.level(),
+            _phantom: Default::default(),
+        }
+    }
+
+    fn new_from_slice_no_stems_with<F>(source: &[[A; K]], mut push_item: F) -> Self
+    where
+        F: FnMut(&mut Vec<T>, usize),
+    {
+        let item_count = source.len();
+
+        if item_count == 0 {
+            return Self::default();
+        }
+
+        let mut leaf_points: [Vec<A>; K] =
+            array_init::array_init(|_| Vec::with_capacity(item_count));
+        let mut leaf_items: Vec<T> = Vec::with_capacity(item_count);
+
+        for idx in 0..item_count {
+            for dim in 0..K {
+                leaf_points[dim].push(source[idx][dim]);
+            }
+            push_item(&mut leaf_items, idx);
+        }
+
+        let leaf_points_refs: [&[A]; K] = array_init::array_init(|dim| leaf_points[dim].as_slice());
+
+        let mut leaves = LS::new_with_capacity(item_count);
+        leaves.append_leaf(&leaf_points_refs, leaf_items.as_slice());
+
+        let stem_leaf_resolution =
+            LS::Mutability::initial_stem_leaf_resolution::<SS>(0, leaves.leaf_count());
+
+        Self {
+            stems: avec![A::max_value(); 0],
+            leaves,
+            stem_leaf_resolution,
+            size: item_count,
+            max_stem_level: -1,
             _phantom: Default::default(),
         }
     }
@@ -403,10 +421,29 @@ where
                 "Wrote to stem #{stem_index:?} for a second time",
             );
 
+            debug_assert!(
+                right_capacity >= chunk_length.saturating_sub(pivot),
+                "right_capacity ({right_capacity}) should be greater than chunk_length - pivot ({chunk_length} - {pivot})"
+            );
+
             stems[stem_index] = source[sort_index[pivot]][dim];
         }
 
         let right_stem_ordering = stem_ordering.branch();
+
+        if pivot == chunk_length {
+            return Self::populate_recursive_with(
+                stems,
+                source,
+                sort_index,
+                stem_ordering,
+                max_stem_level,
+                left_capacity,
+                leaves,
+                push_item,
+            );
+        }
+
         let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
 
         Self::populate_recursive_with(
@@ -420,16 +457,18 @@ where
             push_item,
         );
 
-        Self::populate_recursive_with(
-            stems,
-            source,
-            upper_sort_index,
-            right_stem_ordering,
-            max_stem_level,
-            right_capacity,
-            leaves,
-            push_item,
-        );
+        if right_capacity > 0 {
+            Self::populate_recursive_with(
+                stems,
+                source,
+                upper_sort_index,
+                right_stem_ordering,
+                max_stem_level,
+                right_capacity,
+                leaves,
+                push_item,
+            );
+        }
     }
 
     #[cfg(not(feature = "unreliable_select_nth_unstable"))]
@@ -462,7 +501,10 @@ where
         pivot
     }
 
-    fn calc_pivot(chunk_length: usize, _stem_index: usize, _right_capacity: usize) -> usize {
-        chunk_length >> 1
+    fn calc_pivot(chunk_length: usize, _stem_index: usize, right_capacity: usize) -> usize {
+        chunk_length
+            .saturating_sub(right_capacity)
+            .next_multiple_of(B)
+            .min(chunk_length)
     }
 }

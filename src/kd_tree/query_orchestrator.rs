@@ -192,33 +192,40 @@ where
             }
 
             let pivot = *unsafe { self.stems.get_unchecked(stem_strat.stem_idx()) };
-            let query_elem = *unsafe { query.get_unchecked(*dim) };
-            let is_right_child = query_elem >= pivot;
 
-            let far_ctx = stem_strat.branch_relative(is_right_child);
+            // if the pivot is Inf or MAX_VAL, we can never hit the right branch, so
+            // we will never need to backtrack to where we are now.
+            if pivot < A::max_value() {
+                let query_elem = *unsafe { query.get_unchecked(*dim) };
+                let is_right_child = query_elem >= pivot;
 
-            let pivot_wide: O = D::widen_coord(pivot);
-            let query_elem_wide = *unsafe { query_wide.get_unchecked(*dim) };
+                let far_ctx = stem_strat.branch_relative(is_right_child);
 
-            let new_off = O::saturating_dist(query_elem_wide, pivot_wide);
-            let old_off = *unsafe { off.get_unchecked(*dim) };
-            let rd_far = O::saturating_add(rd, D::dist1(new_off, old_off));
+                let pivot_wide: O = D::widen_coord(pivot);
+                let query_elem_wide = *unsafe { query_wide.get_unchecked(*dim) };
 
-            tracing::trace!(
-                "new_off = dist({}, {}) = {}. rd = {}, rd_far = {}, off = {:?}",
-                query_elem_wide,
-                pivot_wide,
-                new_off,
-                rd,
-                rd_far,
-                off,
-            );
+                let new_off = O::saturating_dist(query_elem_wide, pivot_wide);
+                let old_off = *unsafe { off.get_unchecked(*dim) };
+                let rd_far = O::saturating_add(rd, D::dist1(new_off, old_off));
 
-            stack.push(QueryStackContext {
-                stem_strat: far_ctx,
-                old_off: new_off,
-                rd: rd_far,
-            });
+                tracing::trace!(
+                    "new_off = dist({}, {}) = {}. rd = {}, rd_far = {}, off = {:?}",
+                    query_elem_wide,
+                    pivot_wide,
+                    new_off,
+                    rd,
+                    rd_far,
+                    off,
+                );
+
+                stack.push(QueryStackContext {
+                    stem_strat: far_ctx,
+                    old_off: new_off,
+                    rd: rd_far,
+                });
+            } else {
+                stem_strat.traverse(false);
+            }
 
             *dim = stem_strat.dim();
         }
