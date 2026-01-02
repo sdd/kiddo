@@ -288,6 +288,28 @@ pub trait StemStrategy: Clone + Sync + Send {
     ) {
         unimplemented!();
     }
+
+    /// Get leaf index for a query point. Default uses simple while loop.
+    /// Block-based strategies override with unrolled loops.
+    fn get_leaf_idx<A: AxisUnified, const K: usize>(
+        stems: &[A],
+        query: &[A; K],
+        max_stem_level: i32,
+    ) -> usize
+    where
+        Self: Sized,
+    {
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let mut stem_strat = Self::new(stems_ptr);
+
+        while stem_strat.level() <= max_stem_level {
+            let pivot = unsafe { stems.get_unchecked(stem_strat.stem_idx()) };
+            let is_right = unsafe { *query.get_unchecked(stem_strat.dim()) } >= *pivot;
+            stem_strat.traverse(is_right);
+        }
+
+        stem_strat.leaf_idx()
+    }
 }
 
 /*/// Structs defining this trait can perform nearest neighbour queries

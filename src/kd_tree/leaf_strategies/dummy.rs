@@ -1,7 +1,6 @@
 use crate::kd_tree::leaf_view::LeafView;
 use crate::traits_unified_2::{AxisUnified, Basics, Immutable, LeafStrategy};
 use crate::StemStrategy;
-use aligned_vec::AVec;
 
 /// A dummy leaf strategy used for testing.
 ///
@@ -24,24 +23,6 @@ where
     }
 
     fn new_with_empty_leaf() -> Self {
-        unimplemented!()
-    }
-
-    fn bulk_build_from_slice(
-        &mut self,
-        _source: &[[Self::Num; K]],
-        _stems: &mut AVec<Self::Num>,
-        _stem_strategy: SS,
-    ) -> i32 {
-        unimplemented!()
-    }
-
-    fn finalize(
-        &mut self,
-        _stems: &mut AVec<Self::Num>,
-        _stem_strategy: &mut SS,
-        _max_stem_level: i32,
-    ) {
         unimplemented!()
     }
 

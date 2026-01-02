@@ -3,7 +3,6 @@
 use crate::kd_tree::leaf_view::LeafView;
 use crate::kd_tree::KdTree;
 use crate::StemStrategy;
-use aligned_vec::AVec;
 use fixed::traits::LossyFrom;
 use fixed::types::extra::{U0, U16, U8};
 use fixed::{FixedI32, FixedU16};
@@ -240,25 +239,6 @@ where
 
     /// Create a new LeafStrategy with a single, empty leaf
     fn new_with_empty_leaf() -> Self;
-
-    /// Bulk-build from a slice of points. Implementations should:
-    /// - write split values into `stems` at indices determined by `stem_strategy`,
-    /// - lay out leaf storage according to the strategy,
-    /// - return the max stem level reached (for later traversal).
-    fn bulk_build_from_slice(
-        &mut self,
-        source: &[[Self::Num; K]],
-        stems: &mut AVec<Self::Num>,
-        stem_strategy: SS,
-    ) -> i32;
-
-    /// Finalization hook (e.g., trim stems or compact internal buffers).
-    fn finalize(
-        &mut self,
-        stems: &mut AVec<Self::Num>,
-        stem_strategy: &mut SS,
-        max_stem_level: i32,
-    );
 
     // ---- Introspection / minimal accessors ----
 
