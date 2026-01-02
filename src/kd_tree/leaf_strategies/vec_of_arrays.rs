@@ -2,7 +2,6 @@ use crate::kd_tree::leaf_view::LeafView;
 use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
 use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy, Mutable, MutableLeafStrategy};
 use crate::StemStrategy;
-use aligned_vec::AVec;
 
 /// A leaf storage strategy using vectors of fixed-size arrays.
 ///
@@ -55,24 +54,6 @@ where
         result.leaves.push(leaf);
 
         result
-    }
-
-    fn bulk_build_from_slice(
-        &mut self,
-        _source: &[[Self::Num; K]],
-        _stems: &mut AVec<Self::Num>,
-        _stem_strategy: SS,
-    ) -> i32 {
-        todo!()
-    }
-
-    fn finalize(
-        &mut self,
-        _stems: &mut AVec<Self::Num>,
-        _stem_strategy: &mut SS,
-        _max_stem_level: i32,
-    ) {
-        todo!()
     }
 
     fn size(&self) -> usize {

@@ -12,7 +12,7 @@ where
 {
     /// Finds an approximate nearest point to the query point.
     ///
-    /// This is faster than `nearest_one` but may not return the true nearest neighbor.
+    /// This is faster than `nearest_one` but may not return the true nearest neighbour.
     /// It searches only the leaf that the query point falls into.
     pub fn approx_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
@@ -57,13 +57,14 @@ mod tests {
 
     use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
     use crate::kd_tree::KdTree;
+    use crate::stem_strategies::{Block4, Donnelly, DonnellyMarkerPf};
     use crate::traits_unified_2::SquaredEuclidean;
     use crate::Eytzinger;
 
     const RNG_SEED: u64 = 42;
 
     #[test]
-    fn approx_nearest_one_flat_vec_f32() {
+    fn v6_approx_nearest_one_flat_vec_f32() {
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
         let mut points: Vec<[f32; 3]> = vec![];
@@ -90,7 +91,7 @@ mod tests {
     }
 
     #[test]
-    fn approx_nearest_one_vec_of_arrays_f32() {
+    fn v6_approx_nearest_one_vec_of_arrays_f32() {
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
         let mut points: Vec<[f32; 3]> = vec![];
@@ -117,7 +118,7 @@ mod tests {
     }
 
     #[test]
-    fn approx_nearest_one_vec_of_arrays_mutated_one_split_f32() {
+    fn v6_approx_nearest_one_vec_of_arrays_mutated_one_split_f32() {
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
         // Add 33 points to trigger exactly one split (bucket size is 32)
@@ -161,7 +162,7 @@ mod tests {
     }
 
     #[test]
-    fn approx_nearest_one_vec_of_arrays_mutated_two_splits_f32() {
+    fn v6_approx_nearest_one_vec_of_arrays_mutated_two_splits_f32() {
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
         // Add 65 points to trigger exactly two splits (bucket size is 32)
@@ -206,7 +207,7 @@ mod tests {
         let left_child_stem = tree.stems[2]; // Eytzinger left child at index 2
         let right_child_stem = tree.stems[3]; // Eytzinger right child at index 3
 
-        // At least one child should have been split (not max_value anymore)
+        // At least one child should have been split (not max_value any more)
         let has_initialized_child = (left_child_stem < f32::MAX) || (right_child_stem < f32::MAX);
         assert!(
             has_initialized_child,
@@ -219,7 +220,7 @@ mod tests {
     }
 
     #[test]
-    fn approx_nearest_one_vec_of_arrays_mutated_f32() {
+    fn v6_approx_nearest_one_vec_of_arrays_mutated_f32() {
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
         let mut points: Vec<[f32; 3]> = vec![];
@@ -248,5 +249,210 @@ mod tests {
         let results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
 
         assert_eq!(results, (0.0003201659, 21996));
+    }
+
+    #[test]
+    fn v6_approx_nearest_one_flat_vec_f32_donnelly_marker() {
+        let mut rng = StdRng::seed_from_u64(RNG_SEED);
+
+        let mut points: Vec<[f32; 4]> = vec![];
+        for _ in 0..131_072 {
+            let x = rng.random_range(0.0..1.0);
+            let y = rng.random_range(0.0..1.0);
+            let z = rng.random_range(0.0..1.0);
+            let w = rng.random_range(0.0..1.0);
+            points.push([x, y, z, w]);
+        }
+
+        // Use DonnellyMarkerPf with Block4 (4 levels per block, matching 16 f32s per 64-byte cache line)
+        let tree: KdTree<
+            f32,
+            u32,
+            DonnellyMarkerPf<Block4, 64, 4, 4>,
+            FlatVec<f32, u32, 4, 32>,
+            4,
+            32,
+        > = KdTree::new_from_slice(&points);
+
+        assert!(!tree.is_empty());
+        assert_eq!(tree.size(), 131_072);
+
+        let query_point = [0.5, 0.5, 0.5, 0.5];
+
+        let results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
+
+        assert!(results.0 < 0.1, "Distance should be reasonably small");
+        assert!(results.1 < 131_072, "Item index should be valid");
+    }
+
+    #[test]
+    fn v6_approx_nearest_one_donnelly_marker_matches_eytzinger() {
+        // Verify that DonnellyMarkerPf produces the same results as Eytzinger
+        // for the same input data
+        let mut rng = StdRng::seed_from_u64(RNG_SEED);
+
+        let points: Vec<[f32; 4]> = (0..8_192)
+            .map(|_| {
+                [
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                ]
+            })
+            .collect();
+
+        let tree_eytz: KdTree<f32, u32, Eytzinger<4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
+            KdTree::new_from_slice(&points);
+
+        let tree_donnelly: KdTree<
+            f32,
+            u32,
+            DonnellyMarkerPf<Block4, 64, 4, 4>,
+            FlatVec<f32, u32, 4, 32>,
+            4,
+            32,
+        > = KdTree::new_from_slice(&points);
+
+        // Test multiple query points
+        let query_points: Vec<[f32; 4]> = (0..100)
+            .map(|_| {
+                [
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                ]
+            })
+            .collect();
+
+        for (idx, query_point) in query_points.iter().enumerate() {
+            let result_eytz = tree_eytz.approx_nearest_one::<SquaredEuclidean<f32>>(query_point);
+            let result_donnelly =
+                tree_donnelly.approx_nearest_one::<SquaredEuclidean<f32>>(query_point);
+
+            // The results should be identical since both use the same construction
+            // and the approximate query just returns the best match in the target leaf
+            assert_eq!(
+                result_eytz, result_donnelly,
+                "DonnellyMarkerPf should produce same results as Eytzinger for query #{} ({:?})",
+                idx, query_point
+            );
+        }
+    }
+
+    #[test]
+    fn v6_approx_nearest_one_donnelly_matches_eytzinger() {
+        let mut rng = StdRng::seed_from_u64(RNG_SEED);
+
+        let points: Vec<[f32; 4]> = (0..8_192)
+            .map(|_| {
+                [
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                ]
+            })
+            .collect();
+
+        let tree_eytz: KdTree<f32, u32, Eytzinger<4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
+            KdTree::new_from_slice(&points);
+
+        let tree_donnelly: KdTree<
+            f32,
+            u32,
+            Donnelly<4, 64, 4, 4>,
+            FlatVec<f32, u32, 4, 32>,
+            4,
+            32,
+        > = KdTree::new_from_slice(&points);
+
+        // Test multiple query points
+        let query_points: Vec<[f32; 4]> = (0..100)
+            .map(|_| {
+                [
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                ]
+            })
+            .collect();
+
+        for (idx, query_point) in query_points.iter().enumerate() {
+            let result_eytz = tree_eytz.approx_nearest_one::<SquaredEuclidean<f32>>(query_point);
+            let result_donnelly =
+                tree_donnelly.approx_nearest_one::<SquaredEuclidean<f32>>(query_point);
+
+            assert_eq!(
+                result_eytz, result_donnelly,
+                "Donnelly should produce same results as Eytzinger for query #{} ({:?})",
+                idx, query_point
+            );
+        }
+    }
+
+    #[test]
+    fn v6_approx_nearest_one_donnelly_marker_matches_donnelly() {
+        // Verify that DonnellyMarkerPf produces the same results as Donnelly
+        // for the same input data
+        let mut rng = StdRng::seed_from_u64(RNG_SEED);
+
+        let points: Vec<[f32; 4]> = (0..8_192)
+            .map(|_| {
+                [
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                ]
+            })
+            .collect();
+
+        let tree_donnelly: KdTree<
+            f32,
+            u32,
+            Donnelly<4, 64, 4, 4>,
+            FlatVec<f32, u32, 4, 32>,
+            4,
+            32,
+        > = KdTree::new_from_slice(&points);
+
+        let tree_donnelly_marker: KdTree<
+            f32,
+            u32,
+            DonnellyMarkerPf<Block4, 64, 4, 4>,
+            FlatVec<f32, u32, 4, 32>,
+            4,
+            32,
+        > = KdTree::new_from_slice(&points);
+
+        // Test multiple query points
+        let query_points: Vec<[f32; 4]> = (0..100)
+            .map(|_| {
+                [
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                ]
+            })
+            .collect();
+
+        for (idx, query_point) in query_points.iter().enumerate() {
+            let result_eytz =
+                tree_donnelly.approx_nearest_one::<SquaredEuclidean<f32>>(query_point);
+            let result_donnelly =
+                tree_donnelly_marker.approx_nearest_one::<SquaredEuclidean<f32>>(query_point);
+
+            // The results should be identical since both use the same construction
+            // and the approximate query just returns the best match in the target leaf
+            assert_eq!(
+                result_eytz, result_donnelly,
+                "DonnellyMarkerPf should produce same results as Donnelly for query #{} ({:?})",
+                idx, query_point
+            );
+        }
     }
 }

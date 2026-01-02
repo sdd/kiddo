@@ -38,16 +38,7 @@ where
     /// Get the leaf index for a query (unmapped leaves)
     #[inline]
     pub(crate) fn get_leaf_idx_unmapped(&self, query: &[A; K]) -> usize {
-        let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
-        let mut stem_strat: SS = SS::new(stems_ptr);
-
-        while stem_strat.level() <= self.max_stem_level {
-            let pivot = unsafe { self.stems.get_unchecked(stem_strat.stem_idx()) };
-            let is_right_child: bool = *unsafe { query.get_unchecked(stem_strat.dim()) } >= *pivot;
-            stem_strat.traverse(is_right_child);
-        }
-
-        stem_strat.leaf_idx()
+        SS::get_leaf_idx(&self.stems, query, self.max_stem_level)
     }
 
     /// Get the leaf index for a query (mapped leaves)
