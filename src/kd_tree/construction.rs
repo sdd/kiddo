@@ -247,8 +247,13 @@ where
         let mut stems_depth: usize = leaf_node_count.next_power_of_two().ilog2() as usize;
 
         // Pad stem tree height to the next block boundary for block-based strategies
-        let padding_level_count = stems_depth % SS::block_size();
-        stems_depth += padding_level_count;
+        let padding_level_count = if (stems_depth % SS::block_size()) != 0 {
+            let padding_level_count = SS::block_size() - (stems_depth % SS::block_size());
+            stems_depth += padding_level_count;
+            padding_level_count
+        } else {
+            0
+        };
 
         // Padding levels will be placed at the root of the tree. Pre-traverse any padding levels
         // so that stem_strat is set to the location where the true root will be
@@ -275,7 +280,7 @@ where
             source,
             &mut sort_index,
             root_stem_strat,
-            stem_strat.level(),
+            stems_depth as i32 - 1,
             leaf_node_count * B,
             &mut leaves,
             &mut push_item,
@@ -290,7 +295,7 @@ where
             leaves,
             stem_leaf_resolution,
             size: item_count,
-            max_stem_level: stem_strat.level(),
+            max_stem_level: stems_depth as i32 - 1,
             _phantom: Default::default(),
         }
     }
@@ -376,7 +381,7 @@ where
         F: FnMut(&mut Vec<T>, usize),
     {
         let chunk_length = sort_index.len();
-        let dim = stem_ordering.dim();
+        let dim = stem_ordering.construction_dim();
 
         if stem_ordering.level() > max_stem_level {
             // Write leaf and terminate recursion

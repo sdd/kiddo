@@ -180,21 +180,27 @@ pub trait StemStrategy: Clone + Sync + Send {
     /// The stem index of the root node of the tree
     const ROOT_IDX: usize = 0;
 
+    /// The block size of this strategy
+    ///
+    /// The default is 1, which means that the strategy is not block-based.
+
+    const BLOCK_SIZE: usize = 1;
+
     /// Create a new instance of this strategy at the root.
     fn new(stems_ptr: NonNull<u8>) -> Self;
 
     /// Create a new instance of this strategy at the root, with a dangling pointer.
     ///
     /// Useful for generating traversal indices without performing prefetches
+    #[inline(always)]
     fn new_no_ptr() -> Self {
         Self::new(NonNull::dangling())
     }
 
     /// Returns the block size of this strategy
-    ///
-    /// The default is 1, which means that the strategy is not block-based.
+    #[inline(always)]
     fn block_size() -> usize {
-        1
+        Self::BLOCK_SIZE
     }
 
     /// Get the current stem index this strategy points to.
@@ -203,8 +209,13 @@ pub trait StemStrategy: Clone + Sync + Send {
     /// Get the current leaf index this strategy points to.
     fn leaf_idx(&self) -> usize;
 
-    /// Get the current dimension
+    /// Get the current dimension (query time)
     fn dim(&self) -> usize;
+
+    /// Get the current dimension (construction time)
+    fn construction_dim(&self) -> usize {
+        self.dim()
+    }
 
     /// Get the current level
     fn level(&self) -> i32;
@@ -214,12 +225,14 @@ pub trait StemStrategy: Clone + Sync + Send {
 
     /// Advance `self` down to a child in-place. Specialized for use as one
     /// of the non-final stages when loop-unrolling to the level of a minor tri height
+    #[inline(always)]
     fn traverse_head(&mut self, is_right: bool) {
         self.traverse(is_right);
     }
 
     /// Advance `self` down to a child in-place. Specialized for use as the
     /// last stage when loop-unrolled to the level of a minor tri height
+    #[inline(always)]
     fn traverse_tail(&mut self, is_right: bool) {
         self.traverse(is_right);
     }
@@ -230,6 +243,7 @@ pub trait StemStrategy: Clone + Sync + Send {
     fn branch(&mut self) -> Self;
 
     /// Advance `self` to the "closer" child, returning the "further" one.
+    #[inline(always)]
     fn branch_relative(&mut self, is_right: bool) -> Self {
         if is_right {
             let mut right = self.branch();
@@ -267,10 +281,14 @@ pub trait StemStrategy: Clone + Sync + Send {
     fn child_indices(&self) -> (usize, usize);
 
     /// Calculate the stem node count for a given leaf node count.
-    fn get_stem_node_count_from_leaf_node_count(leaf_node_count: usize) -> usize;
+    fn get_stem_node_count_from_leaf_node_count(_leaf_node_count: usize) -> usize {
+        unimplemented!()
+    }
 
     /// Factor by which to pad the stem node allocation.
-    fn stem_node_padding_factor() -> usize;
+    fn stem_node_padding_factor() -> usize {
+        1
+    }
 
     /// Trim unneeded stem nodes.
     fn trim_unneeded_stems<A: AxisUnified<Coord = A>>(

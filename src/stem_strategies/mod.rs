@@ -13,8 +13,16 @@ pub mod eytzinger_pf_far;
 
 mod block_size;
 mod donnelly_2_pf_blockmarker;
-mod donnelly_core;
+
+/// Donnelly Stem Ordering core logic
+pub mod donnelly_core;
 mod prefetch;
+
+#[cfg(feature = "simd")]
+mod donnelly_2_blockmarker_simd;
+
+#[cfg(feature = "simd")]
+pub use donnelly_2_blockmarker_simd::{CompareBlock3, DonnellyMarkerSimd};
 
 pub use donnelly_2::Donnelly;
 pub use donnelly_2_pf_blockmarker::DonnellyMarkerPf;
