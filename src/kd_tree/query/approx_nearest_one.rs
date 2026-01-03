@@ -58,6 +58,9 @@ mod tests {
     use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
     use crate::kd_tree::KdTree;
     use crate::stem_strategies::{Block4, Donnelly, DonnellyMarkerPf};
+
+    #[cfg(feature = "simd")]
+    use crate::stem_strategies::DonnellyMarkerSimd;
     use crate::traits_unified_2::SquaredEuclidean;
     use crate::Eytzinger;
 
@@ -454,5 +457,112 @@ mod tests {
                 idx, query_point
             );
         }
+    }
+
+    #[test]
+    #[cfg(feature = "simd")]
+    #[cfg(target_arch = "x86_64")]
+    fn v6_approx_nearest_one_donnelly_marker_simd_f64() {
+        // Test DonnellyMarkerSimd with f64 data
+        let mut rng = StdRng::seed_from_u64(RNG_SEED);
+
+        // Use 8192 points which with bucket size 32 gives 256 leaves
+        // 256 leaves = 2^8, so tree depth = 8
+        // With Block3, depth 8 is not divisible by 3, so tree will be padded to depth 9
+        let points: Vec<[f64; 3]> = (0..8_192)
+            .map(|_| {
+                [
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                ]
+            })
+            .collect();
+
+        let tree: KdTree<
+            f64,
+            u32,
+            DonnellyMarkerSimd<Block3, 64, 8, 3>,
+            FlatVec<f64, u32, 3, 32>,
+            3,
+            32,
+        > = KdTree::new_from_slice(&points);
+
+        assert!(!tree.is_empty());
+        assert_eq!(tree.size(), 8_192);
+        assert_eq!(tree.leaf_count(), 256);
+
+        // Verify max_stem_level is padded to multiple of block size (3)
+        // 256 leaves = depth 8, padded to 9
+        assert_eq!((tree.max_stem_level() + 1) % 3, 0);
+        assert_eq!(tree.max_stem_level(), 8);
+
+        // Test multiple query points to ensure queries work correctly
+        let query_points: Vec<[f64; 3]> = (0..100)
+            .map(|_| {
+                [
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                ]
+            })
+            .collect();
+
+        for query_point in query_points.iter() {
+            let result = tree.approx_nearest_one::<SquaredEuclidean<f64>>(query_point);
+
+            // Verify result is valid
+            assert!(result.0 >= 0.0, "Distance should be non-negative");
+            assert!(result.1 < 8_192, "Item index should be valid");
+
+            // Verify the returned item is actually close to the query
+            // (approximate query returns best in target leaf, so should be reasonably close)
+            assert!(
+                result.0 < 1.0,
+                "Distance should be reasonable for unit cube"
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "simd")]
+    #[cfg(target_arch = "x86_64")]
+    fn v6_approx_nearest_one_donnelly_marker_simd_f32() {
+        // Test DonnellyMarkerSimd with f32 data
+        let mut rng = StdRng::seed_from_u64(RNG_SEED);
+
+        let points: Vec<[f32; 4]> = (0..2_097_152)
+            .map(|_| {
+                [
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                    rng.random_range(0.0..1.0),
+                ]
+            })
+            .collect();
+
+        // 2_097_152 points with bucket size 32 = 65_536 leaves = 2^16, depth = 16
+        // Block4 divides evenly into 16
+        let tree: KdTree<
+            f32,
+            u32,
+            DonnellyMarkerSimd<Block4, 64, 4, 4>,
+            FlatVec<f32, u32, 4, 32>,
+            4,
+            32,
+        > = KdTree::new_from_slice(&points);
+
+        assert!(!tree.is_empty());
+        assert_eq!(tree.size(), 2_097_152);
+        assert_eq!(tree.leaf_count(), 65_536);
+        // Verify max_stem_level is padded to multiple of block size
+        assert_eq!((tree.max_stem_level() + 1) % 4, 0);
+
+        let query_point = [0.5, 0.5, 0.5, 0.5];
+        let results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
+
+        assert!(results.0 < 0.2, "Distance should be reasonably small");
+        assert!(results.1 < 2_097_152, "Item index should be valid");
     }
 }
