@@ -39,7 +39,9 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
 {
     const ROOT_IDX: usize = 0;
 
-    #[inline]
+    type StackContext<A> = crate::kd_tree::query_stack::QueryStackContext<A, Self>;
+    type Stack<A> = crate::kd_tree::query_stack::QueryStack<A, Self>;
+
     fn new(stems_ptr: NonNull<u8>) -> Self {
         debug_assert!(L >= 2 && L <= 8);
         debug_assert!(CL > VB); // item wider than cache line would break layout
@@ -54,27 +56,22 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         }
     }
 
-    #[inline]
     fn stem_idx(&self) -> usize {
         self.stem_idx as usize
     }
 
-    #[inline]
     fn leaf_idx(&self) -> usize {
         self.leaf_idx
     }
 
-    #[inline]
     fn dim(&self) -> usize {
         self.dim
     }
 
-    #[inline]
     fn level(&self) -> i32 {
         self.level
     }
 
-    #[inline]
     fn traverse(&mut self, is_right: bool) {
         let (idx, lvl) = Self::step_pure(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
         self.stem_idx = idx;
@@ -90,7 +87,6 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
 
     /// When running loop-unrolled, traverse_head operates under the assumption that
     /// we stay within a minor triangle and don't hit the bottom level of the tree as a whole
-    #[inline]
     fn traverse_head(&mut self, is_right: bool) {
         let (idx, lvl) =
             Self::step_pure_head(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
@@ -107,7 +103,6 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
 
     /// When running loop-unrolled, traverse_head operates under the assumption that
     /// we are on the bottom level of a minor triangle
-    #[inline]
     fn traverse_tail(&mut self, is_right: bool) {
         let (idx, lvl) =
             Self::step_pure_tail(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
@@ -142,7 +137,6 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         let _ = event_tx.send(Event::Working(5));
     }
 
-    #[inline]
     fn branch(&mut self) -> Self {
         let (left, right) = Self::both_children_pure(self.stem_idx, self.minor_level);
 
@@ -166,7 +160,6 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         }
     }
 
-    #[inline]
     fn branch_relative(&mut self, is_right: bool) -> Self {
         // precompute both children (left,right) at current (stem_idx, minor_level)
         let (left, right) = Self::both_children_pure(self.stem_idx, self.minor_level);

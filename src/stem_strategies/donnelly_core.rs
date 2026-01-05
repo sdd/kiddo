@@ -25,7 +25,9 @@ unsafe impl<const CL: u32, const VB: u32, const K: usize> Sync for DonnellyCore<
 impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellyCore<CL, VB, K> {
     const ROOT_IDX: usize = 0;
 
-    #[inline(always)]
+    type StackContext<A> = crate::kd_tree::query_stack::QueryStackContext<A, Self>;
+    type Stack<A> = crate::kd_tree::query_stack::QueryStack<A, Self>;
+
     fn new(stems_ptr: NonNull<u8>) -> Self {
         debug_assert!(CL > VB); // item wider than cache line would break layout
 

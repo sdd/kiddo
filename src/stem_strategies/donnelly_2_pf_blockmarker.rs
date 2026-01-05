@@ -31,6 +31,9 @@ macro_rules! impl_donnelly_stem_strategy {
         {
             const ROOT_IDX: usize = 0;
 
+            type StackContext<A> = crate::kd_tree::query_stack::QueryStackContext<A, Self>;
+            type Stack<A> = crate::kd_tree::query_stack::QueryStack<A, Self>;
+
             #[inline(always)]
             fn new(stems_ptr: NonNull<u8>) -> Self {
                 Self {

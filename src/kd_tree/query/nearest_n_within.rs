@@ -1,3 +1,4 @@
+use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::result_collection::ResultCollection;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
@@ -29,6 +30,7 @@ where
     ) -> Vec<NearestNeighbour<D::Output, T>>
     where
         D: DistanceMetricUnified<A, K>,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
         let max_qty: usize = max_qty.get();
 
@@ -59,6 +61,7 @@ where
     where
         D: DistanceMetricUnified<A, K>,
         R: ResultCollection<D::Output, T>,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
         let mut req_ctx = NearestNWithinReqCtx {
             query,

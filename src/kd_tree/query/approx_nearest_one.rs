@@ -57,7 +57,7 @@ mod tests {
 
     use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
     use crate::kd_tree::KdTree;
-    use crate::stem_strategies::{Block4, Donnelly, DonnellyMarkerPf};
+    use crate::stem_strategies::{Block3, Block4, Donnelly, DonnellyMarkerPf};
 
     #[cfg(feature = "simd")]
     use crate::stem_strategies::DonnellyMarkerSimd;

@@ -1,3 +1,4 @@
+use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::KdTree;
 use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, LeafStrategy};
 use crate::{NearestNeighbour, StemStrategy};
@@ -21,6 +22,7 @@ where
     ) -> Vec<NearestNeighbour<D::Output, T>>
     where
         D: DistanceMetricUnified<A, K>,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
         self.nearest_n_within::<D>(query, max_dist, NonZeroUsize::MAX, false)
     }

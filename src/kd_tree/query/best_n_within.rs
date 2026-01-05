@@ -1,3 +1,4 @@
+use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, LeafStrategy};
@@ -24,6 +25,7 @@ where
     ) -> BinaryHeap<BestNeighbour<<D as DistanceMetricUnified<A, K>>::Output, T>>
     where
         D: DistanceMetricUnified<A, K>,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
         let max_qty = max_qty.into();
         let mut req_ctx = BestNWithinReqCtx::<A, T, <D as DistanceMetricUnified<A, K>>::Output, K> {

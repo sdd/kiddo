@@ -21,6 +21,9 @@ unsafe impl<const K: usize, const VB: usize> Sync for EytzingerPf<K, VB> {}
 impl<const K: usize, const VB: usize> StemStrategy for EytzingerPf<K, VB> {
     const ROOT_IDX: usize = 1;
 
+    type StackContext<A> = crate::kd_tree::query_stack::QueryStackContext<A, Self>;
+    type Stack<A> = crate::kd_tree::query_stack::QueryStack<A, Self>;
+
     fn new(stems_ptr: NonNull<u8>) -> Self {
         Self {
             stem_idx: Self::ROOT_IDX as u32,

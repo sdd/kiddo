@@ -7,9 +7,11 @@ pub mod leaf_strategies;
 pub mod leaf_view;
 mod query;
 mod query_orchestrator;
-mod query_stack;
+pub(crate) mod query_stack;
+#[cfg(feature = "simd")]
+pub(crate) mod query_stack_simd;
 mod result_collection;
-mod traits;
+pub(crate) mod traits;
 
 use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
 use crate::StemStrategy;
