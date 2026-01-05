@@ -1,3 +1,4 @@
+use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, LeafStrategy};
@@ -16,6 +17,7 @@ where
     pub fn nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         D: DistanceMetricUnified<A, K>,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
         let mut req_ctx = NearestOneReqCtx {
             query,
@@ -296,6 +298,141 @@ mod tests {
         NearestNeighbour {
             distance: best_dist,
             item: best_item,
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "simd")]
+    #[cfg(target_arch = "x86_64")]
+    fn v6_query_nearest_one_donnelly_marker_simd_f64() {
+        use crate::stem_strategies::{Block3, DonnellyMarkerSimd};
+
+        // Test DonnellyMarkerSimd with f64 data using exact nearest_one query
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+
+        // Use 8192 points which with bucket size 32 gives 256 leaves
+        // 256 leaves = 2^8, so tree depth = 8
+        // With Block3, depth 8 is not divisible by 3, so tree will be padded to depth 9
+        let points: Vec<[f64; 3]> = (0..8_192)
+            .map(|_| {
+                [
+                    rng.random::<f64>(),
+                    rng.random::<f64>(),
+                    rng.random::<f64>(),
+                ]
+            })
+            .collect();
+
+        let tree: KdTree<
+            f64,
+            u32,
+            DonnellyMarkerSimd<Block3, 64, 8, 3>,
+            FlatVec<f64, u32, 3, 32>,
+            3,
+            32,
+        > = KdTree::new_from_slice(&points);
+
+        assert!(!tree.is_empty());
+        assert_eq!(tree.size(), 8_192);
+        assert_eq!(tree.leaf_count(), 256);
+
+        // Verify max_stem_level is padded to multiple of block size (3)
+        // 256 leaves = depth 8, padded to 9
+        assert_eq!((tree.max_stem_level() + 1) % 3, 0);
+        assert_eq!(tree.max_stem_level(), 8);
+
+        // Test multiple query points to ensure backtracking queries work correctly
+        let query_points: Vec<[f64; 3]> = (0..50)
+            .map(|_| {
+                [
+                    rng.random::<f64>(),
+                    rng.random::<f64>(),
+                    rng.random::<f64>(),
+                ]
+            })
+            .collect();
+
+        for query_point in query_points.iter() {
+            let expected = linear_search(&points, query_point);
+            let result = tree.nearest_one::<SquaredEuclidean<f64>>(query_point);
+
+            assert_eq!(
+                result.0, expected.distance,
+                "Distance mismatch for query {:?}",
+                query_point
+            );
+            assert_eq!(
+                result.1 as usize, expected.item,
+                "Item mismatch for query {:?}",
+                query_point
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "simd")]
+    #[cfg(target_arch = "x86_64")]
+    fn v6_query_nearest_one_donnelly_marker_simd_f32() {
+        use crate::stem_strategies::{Block4, DonnellyMarkerSimd};
+
+        // Test DonnellyMarkerSimd with f32 data using exact nearest_one query
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+
+        // Use smaller dataset for faster test (16384 points = 512 leaves = 2^9, depth = 9)
+        // Block4 doesn't divide evenly into 9, will be padded to 12
+        let points: Vec<[f32; 4]> = (0..16_384)
+            .map(|_| {
+                [
+                    rng.random::<f32>(),
+                    rng.random::<f32>(),
+                    rng.random::<f32>(),
+                    rng.random::<f32>(),
+                ]
+            })
+            .collect();
+
+        let tree: KdTree<
+            f32,
+            u32,
+            DonnellyMarkerSimd<Block4, 64, 4, 4>,
+            FlatVec<f32, u32, 4, 32>,
+            4,
+            32,
+        > = KdTree::new_from_slice(&points);
+
+        assert!(!tree.is_empty());
+        assert_eq!(tree.size(), 16_384);
+        assert_eq!(tree.leaf_count(), 512);
+
+        // Verify max_stem_level is padded to multiple of block size (4)
+        assert_eq!((tree.max_stem_level() + 1) % 4, 0);
+
+        // Test multiple query points to ensure backtracking queries work correctly
+        let query_points: Vec<[f32; 4]> = (0..50)
+            .map(|_| {
+                [
+                    rng.random::<f32>(),
+                    rng.random::<f32>(),
+                    rng.random::<f32>(),
+                    rng.random::<f32>(),
+                ]
+            })
+            .collect();
+
+        for query_point in query_points.iter() {
+            let expected = linear_search(&points, query_point);
+            let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
+
+            assert_eq!(
+                result.0, expected.distance,
+                "Distance mismatch for query {:?}",
+                query_point
+            );
+            assert_eq!(
+                result.1 as usize, expected.item,
+                "Item mismatch for query {:?}",
+                query_point
+            );
         }
     }
 }

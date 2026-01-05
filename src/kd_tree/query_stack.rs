@@ -1,16 +1,43 @@
 use crate::traits_unified_2::AxisUnified;
 
-#[derive(Debug, Default)]
-pub(crate) struct QueryStack<A, SS> {
-    stack: Vec<QueryStackContext<A, SS>>,
+/// Trait for query stack types to enable generic backtracking implementations
+pub trait StackTrait<A, SS> {
+    type Context;
+    fn push(&mut self, item: Self::Context);
+    fn pop(&mut self) -> Option<Self::Context>;
 }
 
 #[derive(Debug)]
-pub(crate) struct QueryStackContext<A, SS> {
+pub struct QueryStack<A, SS> {
+    stack: Vec<QueryStackContext<A, SS>>,
+}
+
+impl<A, SS> Default for QueryStack<A, SS> {
+    fn default() -> Self {
+        Self { stack: Vec::new() }
+    }
+}
+
+#[derive(Debug)]
+pub struct QueryStackContext<A, SS> {
     pub stem_strat: SS,
     // pub dim: usize,
     pub old_off: A,
     pub rd: A,
+}
+
+impl<A, SS> StackTrait<A, SS> for QueryStack<A, SS> {
+    type Context = QueryStackContext<A, SS>;
+
+    #[inline]
+    fn push(&mut self, item: Self::Context) {
+        self.stack.push(item);
+    }
+
+    #[inline]
+    fn pop(&mut self) -> Option<Self::Context> {
+        self.stack.pop()
+    }
 }
 
 impl<A, SS> QueryStack<A, SS> {

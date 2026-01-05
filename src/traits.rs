@@ -10,6 +10,7 @@ use num_traits::{PrimInt, Unsigned, Zero};
 use std::fmt::Debug;
 use std::iter::Sum;
 // use std::num::NonZero;
+use crate::kd_tree::query_stack::StackTrait;
 use crate::traits_unified_2::AxisUnified;
 use std::ptr::NonNull;
 
@@ -186,6 +187,22 @@ pub trait StemStrategy: Clone + Sync + Send {
 
     const BLOCK_SIZE: usize = 1;
 
+    /// Query stack context type for backtracking queries.
+    ///
+    /// Non-block strategies use simple scalar stack context (QueryStackContext).
+    /// Block-based SIMD strategies use SimdQueryStackContext.
+    type StackContext<A>: Sized
+    where
+        Self: Sized;
+
+    /// Query stack type for backtracking queries.
+    ///
+    /// Non-block strategies use simple scalar stack (QueryStack).
+    /// Block-based SIMD strategies use SimdQueryStack.
+    type Stack<A>: Default + crate::kd_tree::query_stack::StackTrait<A, Self>
+    where
+        Self: Sized;
+
     /// Create a new instance of this strategy at the root.
     fn new(stems_ptr: NonNull<u8>) -> Self;
 
@@ -327,6 +344,110 @@ pub trait StemStrategy: Clone + Sync + Send {
         }
 
         stem_strat.leaf_idx()
+    }
+
+    /// Single step of backtracking traversal.
+    ///
+    /// Default implementation handles level-by-level traversal with one pivot per step.
+    /// Block-based strategies override to handle multiple levels at once with SIMD.
+    ///
+    /// Returns true if traversal should continue (more levels to go), false if at leaf.
+    #[inline(always)]
+    fn backtracking_traverse_step<A, O, D, const K: usize>(
+        &mut self,
+        stems: &[A],
+        query: &[A; K],
+        query_wide: &[O; K],
+        off: &mut [O; K],
+        dim: &mut usize,
+        rd: O,
+        max_stem_level: i32,
+        best_dist: O,
+        stack: &mut Self::Stack<O>,
+    ) -> bool
+    where
+        Self: Sized,
+        A: AxisUnified<Coord = A>,
+        O: AxisUnified<Coord = O>,
+        D: crate::traits_unified_2::DistanceMetricUnified<A, K, Output = O>,
+        Self::Stack<O>: StackTrait<O, Self>,
+    {
+        // Default implementation for scalar strategies
+        // SIMD strategies override this entire method
+        if self.level() > max_stem_level {
+            return false;
+        }
+
+        let pivot = *unsafe { stems.get_unchecked(self.stem_idx()) };
+
+        if pivot < A::max_value() {
+            let query_elem = *unsafe { query.get_unchecked(*dim) };
+            let is_right_child = query_elem >= pivot;
+
+            let far_ctx = self.branch_relative(is_right_child);
+
+            let pivot_wide: O = D::widen_coord(pivot);
+            let query_elem_wide = *unsafe { query_wide.get_unchecked(*dim) };
+
+            let new_off = O::saturating_dist(query_elem_wide, pivot_wide);
+            let old_off = *unsafe { off.get_unchecked(*dim) };
+            let rd_far = O::saturating_add(rd, D::dist1(new_off, old_off));
+
+            // Only push if the sibling is worth exploring
+            if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
+                use crate::kd_tree::query_stack::{QueryStackContext, StackTrait as _};
+                // Safety: This default implementation is only used by scalar strategies
+                // which use QueryStack with QueryStackContext. SIMD strategies override
+                // this entire method.
+                let ctx = QueryStackContext {
+                    stem_strat: far_ctx,
+                    old_off: new_off,
+                    rd: rd_far,
+                };
+                let ctx_any: <Self::Stack<O> as StackTrait<O, Self>>::Context =
+                    unsafe { std::mem::transmute_copy(&ctx) };
+                stack.push(ctx_any);
+                std::mem::forget(ctx);
+            }
+        } else {
+            self.traverse(false);
+        }
+
+        *dim = self.dim();
+        true
+    }
+
+    /// Execute backtracking query with explicit stack.
+    ///
+    /// Default implementation delegates to KdTree's backtracking_query_with_stack_impl.
+    /// Block-based SIMD strategies can override to use SIMD stack with block pruning.
+    ///
+    /// This method exists to allow strategies to customize backtracking behavior at compile time.
+    #[allow(clippy::too_many_arguments)]
+    fn backtracking_query_with_stack<A, T, O, D, QC, LS, const K2: usize, const B: usize>(
+        tree: &crate::kd_tree::KdTree<A, T, Self, LS, K2, B>,
+        query_ctx: &mut QC,
+        stack: &mut Self::Stack<O>,
+        process_leaf: impl FnMut(&crate::kd_tree::leaf_view::LeafView<A, T, K2, B>, &mut QC),
+    ) where
+        Self: Sized,
+        A: crate::traits_unified_2::AxisUnified<Coord = A>,
+        T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
+        O: crate::traits_unified_2::AxisUnified<Coord = O>,
+        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
+        QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
+        LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
+        Self::Stack<O>: StackTrait<O, Self>,
+    {
+        // Default implementation - delegates to KdTree's scalar implementation
+        // Requires Stack = QueryStack. SIMD strategies must fully override this method.
+        // Safety: This default implementation is only used by scalar strategies which use QueryStack.
+        // SIMD strategies override this entire method.
+        let stack_ref = unsafe {
+            &mut *(stack as *mut Self::Stack<O>
+                as *mut crate::kd_tree::query_stack::QueryStack<O, Self>)
+        };
+        tree.backtracking_query_with_stack_impl::<QC, O, D>(query_ctx, stack_ref, process_leaf);
     }
 }
 

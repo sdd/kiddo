@@ -34,6 +34,16 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
     const ROOT_IDX: usize = 0;
     const BLOCK_SIZE: usize = 3;
 
+    #[cfg(feature = "simd")]
+    type StackContext<A> = crate::kd_tree::query_stack_simd::SimdQueryStackContext<A, Self>;
+    #[cfg(feature = "simd")]
+    type Stack<A> = crate::kd_tree::query_stack_simd::SimdQueryStack<A, Self>;
+
+    #[cfg(not(feature = "simd"))]
+    type StackContext<A> = crate::kd_tree::query_stack::QueryStackContext<A, Self>;
+    #[cfg(not(feature = "simd"))]
+    type Stack<A> = crate::kd_tree::query_stack::QueryStack<A, Self>;
+
     #[inline]
     fn new(stems_ptr: NonNull<u8>) -> Self {
         debug_assert!(64 >= VB); // item wider than cache line would break layout
@@ -116,6 +126,176 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
 
         strat.leaf_idx()
     }
+
+    #[inline(always)]
+    fn backtracking_traverse_step<A, O, D, const K2: usize>(
+        &mut self,
+        stems: &[A],
+        query: &[A; K2],
+        query_wide: &[O; K2],
+        off: &mut [O; K2],
+        dim: &mut usize,
+        rd: O,
+        max_stem_level: i32,
+        best_dist: O,
+        stack: &mut Self::Stack<O>,
+    ) -> bool
+    where
+        Self: Sized,
+        A: AxisUnified<Coord = A> + CompareBlock3,
+        O: AxisUnified<Coord = O>,
+        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
+    {
+        // Check if traversing this block would exceed max_stem_level
+        // For block strategies, we traverse multiple levels at once, so we need to check
+        // if the level AFTER traversing would be beyond the limit
+        if self.level() + Self::BLOCK_SIZE as i32 > max_stem_level {
+            return false;
+        }
+
+        let dim_val = *dim;
+        let query_val = unsafe { *query.get_unchecked(dim_val) };
+        let query_wide_val = unsafe { *query_wide.get_unchecked(dim_val) };
+        let old_off_val = unsafe { *off.get_unchecked(dim_val) };
+        let block_base_idx = self.stem_idx();
+
+        // SIMD comparison to get child index
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let child_idx = CompareBlock3::compare_block3_impl(stems_ptr, query_val, block_base_idx);
+
+        // SIMD distance check to get backtrack mask
+        // Dispatch based on axis type size, similar to compare_block3_impl
+        let backtrack_mask = if std::mem::size_of::<A>() == 8 {
+            // f64 path
+            let query_wide_f64: f64 = unsafe { std::mem::transmute_copy(&query_wide_val) };
+            let old_off_f64: f64 = unsafe { std::mem::transmute_copy(&old_off_val) };
+            let rd_f64: f64 = unsafe { std::mem::transmute_copy(&rd) };
+            let best_dist_f64: f64 = unsafe { std::mem::transmute_copy(&best_dist) };
+
+            #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
+            {
+                D::simd_backtrack_check_block3_f64_avx512(
+                    unsafe { std::mem::transmute_copy(&query_wide_f64) },
+                    stems_ptr.as_ptr(),
+                    block_base_idx,
+                    unsafe { std::mem::transmute_copy(&old_off_f64) },
+                    unsafe { std::mem::transmute_copy(&rd_f64) },
+                    unsafe { std::mem::transmute_copy(&best_dist_f64) },
+                )
+            }
+            #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
+            {
+                D::simd_backtrack_check_block3_f64_avx2(
+                    unsafe { std::mem::transmute_copy(&query_wide_f64) },
+                    stems_ptr.as_ptr(),
+                    block_base_idx,
+                    unsafe { std::mem::transmute_copy(&old_off_f64) },
+                    unsafe { std::mem::transmute_copy(&rd_f64) },
+                    unsafe { std::mem::transmute_copy(&best_dist_f64) },
+                )
+            }
+        } else if std::mem::size_of::<A>() == 4 {
+            // f32 path
+            let query_wide_f32: f32 = unsafe { std::mem::transmute_copy(&query_wide_val) };
+            let old_off_f32: f32 = unsafe { std::mem::transmute_copy(&old_off_val) };
+            let rd_f32: f32 = unsafe { std::mem::transmute_copy(&rd) };
+            let best_dist_f32: f32 = unsafe { std::mem::transmute_copy(&best_dist) };
+
+            #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
+            {
+                D::simd_backtrack_check_block3_f32_avx512(
+                    unsafe { std::mem::transmute_copy(&query_wide_f32) },
+                    stems_ptr.as_ptr(),
+                    block_base_idx,
+                    unsafe { std::mem::transmute_copy(&old_off_f32) },
+                    unsafe { std::mem::transmute_copy(&rd_f32) },
+                    unsafe { std::mem::transmute_copy(&best_dist_f32) },
+                )
+            }
+            #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
+            {
+                D::simd_backtrack_check_block3_f32_avx2(
+                    unsafe { std::mem::transmute_copy(&query_wide_f32) },
+                    stems_ptr.as_ptr(),
+                    block_base_idx,
+                    unsafe { std::mem::transmute_copy(&old_off_f32) },
+                    unsafe { std::mem::transmute_copy(&rd_f32) },
+                    unsafe { std::mem::transmute_copy(&best_dist_f32) },
+                )
+            }
+        } else {
+            panic!("Unsupported axis type size");
+        };
+
+        // Remove the path we're taking from backtrack candidates
+        let backtrack_mask = backtrack_mask & !(1 << child_idx);
+
+        // If any siblings need exploration, push them as a Block entry
+        if backtrack_mask != 0 {
+            use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
+
+            // Calculate all sibling contexts and their rd_far values
+            let mut siblings = [self.clone(); 8];
+            let mut rd_values = [O::zero(); 8];
+
+            for sibling_idx in 0..8 {
+                // Create context for this sibling
+                siblings[sibling_idx]
+                    .core
+                    .traverse_block(sibling_idx as u8, Self::BLOCK_SIZE as u32);
+
+                // Calculate rd_far for this sibling
+                let pivot_idx = block_base_idx + sibling_idx;
+                let pivot = unsafe { *stems.get_unchecked(pivot_idx) };
+                let pivot_wide = D::widen_coord(pivot);
+                let new_off = O::saturating_dist(query_wide_val, pivot_wide);
+                rd_values[sibling_idx] = O::saturating_add(rd, D::dist1(new_off, old_off_val));
+            }
+
+            // Push single Block entry containing all siblings
+            stack.push(SimdQueryStackContext::Block {
+                siblings,
+                rd_values,
+                sibling_mask: backtrack_mask,
+                dim: dim_val,
+                old_off: old_off_val,
+            });
+        }
+
+        // Update off[dim] with the new_off for the path we're taking
+        let pivot_idx = block_base_idx + child_idx as usize;
+        let pivot = unsafe { *stems.get_unchecked(pivot_idx) };
+        let pivot_wide = D::widen_coord(pivot);
+        let new_off = O::saturating_dist(query_wide_val, pivot_wide);
+        unsafe { *off.get_unchecked_mut(dim_val) = new_off };
+
+        // Traverse to the chosen child
+        self.core.traverse_block(child_idx, Self::BLOCK_SIZE as u32);
+
+        // Update dim
+        *dim = self.dim();
+
+        true
+    }
+
+    #[cfg(feature = "simd")]
+    fn backtracking_query_with_stack<A, T, O, D, QC, LS, const K2: usize, const B: usize>(
+        tree: &crate::kd_tree::KdTree<A, T, Self, LS, K2, B>,
+        query_ctx: &mut QC,
+        stack: &mut Self::Stack<O>,
+        process_leaf: impl FnMut(&crate::kd_tree::leaf_view::LeafView<A, T, K2, B>, &mut QC),
+    ) where
+        Self: Sized,
+        A: crate::traits_unified_2::AxisUnified<Coord = A> + CompareBlock3,
+        T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
+        O: crate::traits_unified_2::AxisUnified<Coord = O>,
+        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
+        QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
+        LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
+    {
+        // Delegate to KdTree's SIMD implementation which has access to private fields
+        tree.backtracking_query_with_simd_stack_impl::<QC, O, D>(query_ctx, stack, process_leaf);
+    }
 }
 
 // x86_64 4-level (eg with f32)
@@ -124,6 +304,16 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
 impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 64, VB, K> {
     const ROOT_IDX: usize = 0;
     const BLOCK_SIZE: usize = 4;
+
+    #[cfg(feature = "simd")]
+    type StackContext<A> = crate::kd_tree::query_stack_simd::SimdQueryStackContext<A, Self>;
+    #[cfg(feature = "simd")]
+    type Stack<A> = crate::kd_tree::query_stack_simd::SimdQueryStack<A, Self>;
+
+    #[cfg(not(feature = "simd"))]
+    type StackContext<A> = crate::kd_tree::query_stack::QueryStackContext<A, Self>;
+    #[cfg(not(feature = "simd"))]
+    type Stack<A> = crate::kd_tree::query_stack::QueryStack<A, Self>;
 
     #[inline]
     fn new(stems_ptr: NonNull<u8>) -> Self {
@@ -206,6 +396,203 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
         }
 
         strat.leaf_idx()
+    }
+
+    #[inline(always)]
+    fn backtracking_traverse_step<A, O, D, const K2: usize>(
+        &mut self,
+        stems: &[A],
+        query: &[A; K2],
+        query_wide: &[O; K2],
+        off: &mut [O; K2],
+        dim: &mut usize,
+        rd: O,
+        max_stem_level: i32,
+        best_dist: O,
+        stack: &mut Self::Stack<O>,
+    ) -> bool
+    where
+        Self: Sized,
+        A: AxisUnified<Coord = A> + CompareBlock4,
+        O: AxisUnified<Coord = O>,
+        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
+    {
+        // Check if traversing this block would exceed max_stem_level
+        // For block strategies, we traverse multiple levels at once, so we need to check
+        // if the level AFTER traversing would be beyond the limit
+        if self.level() + Self::BLOCK_SIZE as i32 > max_stem_level {
+            return false;
+        }
+
+        let dim_val = *dim;
+        let query_val = unsafe { *query.get_unchecked(dim_val) };
+        let query_wide_val = unsafe { *query_wide.get_unchecked(dim_val) };
+        let old_off_val = unsafe { *off.get_unchecked(dim_val) };
+        let block_base_idx = self.stem_idx();
+
+        // SIMD comparison to get child index
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let child_idx = CompareBlock4::compare_block4_impl(stems_ptr, query_val, block_base_idx);
+
+        // SIMD distance check to get backtrack mask
+        let backtrack_mask = if std::mem::size_of::<A>() == 8 {
+            // f64 path
+            let query_wide_f64: f64 = unsafe { std::mem::transmute_copy(&query_wide_val) };
+            let old_off_f64: f64 = unsafe { std::mem::transmute_copy(&old_off_val) };
+            let rd_f64: f64 = unsafe { std::mem::transmute_copy(&rd) };
+            let best_dist_f64: f64 = unsafe { std::mem::transmute_copy(&best_dist) };
+
+            #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
+            {
+                D::simd_backtrack_check_block4_f64_avx512(
+                    unsafe { std::mem::transmute_copy(&query_wide_f64) },
+                    stems_ptr.as_ptr(),
+                    block_base_idx,
+                    unsafe { std::mem::transmute_copy(&old_off_f64) },
+                    unsafe { std::mem::transmute_copy(&rd_f64) },
+                    unsafe { std::mem::transmute_copy(&best_dist_f64) },
+                )
+            }
+            #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
+            {
+                D::simd_backtrack_check_block4_f64_avx2(
+                    unsafe { std::mem::transmute_copy(&query_wide_f64) },
+                    stems_ptr.as_ptr(),
+                    block_base_idx,
+                    unsafe { std::mem::transmute_copy(&old_off_f64) },
+                    unsafe { std::mem::transmute_copy(&rd_f64) },
+                    unsafe { std::mem::transmute_copy(&best_dist_f64) },
+                )
+            }
+        } else if std::mem::size_of::<A>() == 4 {
+            // f32 path
+            let query_wide_f32: f32 = unsafe { std::mem::transmute_copy(&query_wide_val) };
+            let old_off_f32: f32 = unsafe { std::mem::transmute_copy(&old_off_val) };
+            let rd_f32: f32 = unsafe { std::mem::transmute_copy(&rd) };
+            let best_dist_f32: f32 = unsafe { std::mem::transmute_copy(&best_dist) };
+
+            #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
+            {
+                D::simd_backtrack_check_block4_f32_avx512(
+                    unsafe { std::mem::transmute_copy(&query_wide_f32) },
+                    stems_ptr.as_ptr(),
+                    block_base_idx,
+                    unsafe { std::mem::transmute_copy(&old_off_f32) },
+                    unsafe { std::mem::transmute_copy(&rd_f32) },
+                    unsafe { std::mem::transmute_copy(&best_dist_f32) },
+                )
+            }
+            #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
+            {
+                D::simd_backtrack_check_block4_f32_avx2(
+                    unsafe { std::mem::transmute_copy(&query_wide_f32) },
+                    stems_ptr.as_ptr(),
+                    block_base_idx,
+                    unsafe { std::mem::transmute_copy(&old_off_f32) },
+                    unsafe { std::mem::transmute_copy(&rd_f32) },
+                    unsafe { std::mem::transmute_copy(&best_dist_f32) },
+                )
+            }
+        } else {
+            panic!("Unsupported axis type size");
+        };
+
+        // Remove the path we're taking from backtrack candidates
+        let backtrack_mask = backtrack_mask & !(1 << child_idx);
+
+        // If any siblings need exploration, push them as Block entries
+        // Block4 has 16 siblings, so push two blocks of 8
+        if backtrack_mask != 0 {
+            use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
+
+            // Calculate all sibling contexts and their rd_far values
+            let mut siblings = [self.clone(); 16];
+            let mut rd_values = [O::zero(); 16];
+
+            for sibling_idx in 0..16 {
+                // Create context for this sibling
+                siblings[sibling_idx]
+                    .core
+                    .traverse_block(sibling_idx as u8, Self::BLOCK_SIZE as u32);
+
+                // Calculate rd_far for this sibling
+                let pivot_idx = block_base_idx + sibling_idx;
+                let pivot = unsafe { *stems.get_unchecked(pivot_idx) };
+                let pivot_wide = D::widen_coord(pivot);
+                let new_off = O::saturating_dist(query_wide_val, pivot_wide);
+                rd_values[sibling_idx] = O::saturating_add(rd, D::dist1(new_off, old_off_val));
+            }
+
+            // Push high block (siblings 8-15) first, since stack is LIFO
+            let high_mask = (backtrack_mask >> 8) as u8;
+            if high_mask != 0 {
+                let mut high_siblings = [self.clone(); 8];
+                let mut high_rd_values = [O::zero(); 8];
+                for i in 0..8 {
+                    high_siblings[i] = siblings[i + 8].clone();
+                    high_rd_values[i] = rd_values[i + 8];
+                }
+                stack.push(SimdQueryStackContext::Block {
+                    siblings: high_siblings,
+                    rd_values: high_rd_values,
+                    sibling_mask: high_mask,
+                    dim: dim_val,
+                    old_off: old_off_val,
+                });
+            }
+
+            // Push low block (siblings 0-7)
+            let low_mask = backtrack_mask as u8;
+            if low_mask != 0 {
+                let mut low_siblings = [self.clone(); 8];
+                let mut low_rd_values = [O::zero(); 8];
+                for i in 0..8 {
+                    low_siblings[i] = siblings[i].clone();
+                    low_rd_values[i] = rd_values[i];
+                }
+                stack.push(SimdQueryStackContext::Block {
+                    siblings: low_siblings,
+                    rd_values: low_rd_values,
+                    sibling_mask: low_mask,
+                    dim: dim_val,
+                    old_off: old_off_val,
+                });
+            }
+        }
+
+        // Update off[dim] with the new_off for the path we're taking
+        let pivot_idx = block_base_idx + child_idx as usize;
+        let pivot = unsafe { *stems.get_unchecked(pivot_idx) };
+        let pivot_wide = D::widen_coord(pivot);
+        let new_off = O::saturating_dist(query_wide_val, pivot_wide);
+        unsafe { *off.get_unchecked_mut(dim_val) = new_off };
+
+        // Traverse to the chosen child
+        self.core.traverse_block(child_idx, Self::BLOCK_SIZE as u32);
+
+        // Update dim
+        *dim = self.dim();
+
+        true
+    }
+
+    #[cfg(feature = "simd")]
+    fn backtracking_query_with_stack<A, T, O, D, QC, LS, const K2: usize, const B: usize>(
+        tree: &crate::kd_tree::KdTree<A, T, Self, LS, K2, B>,
+        query_ctx: &mut QC,
+        stack: &mut Self::Stack<O>,
+        process_leaf: impl FnMut(&crate::kd_tree::leaf_view::LeafView<A, T, K2, B>, &mut QC),
+    ) where
+        Self: Sized,
+        A: crate::traits_unified_2::AxisUnified<Coord = A> + CompareBlock4,
+        T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
+        O: crate::traits_unified_2::AxisUnified<Coord = O>,
+        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
+        QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
+        LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
+    {
+        // Delegate to KdTree's SIMD implementation which has access to private fields
+        tree.backtracking_query_with_simd_stack_impl::<QC, O, D>(query_ctx, stack, process_leaf);
     }
 }
 
