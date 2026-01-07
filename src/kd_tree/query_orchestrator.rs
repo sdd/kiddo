@@ -318,7 +318,10 @@ where
                         continue;
                     }
 
-                    tracing::trace!(%surviving_mask, "Some siblings survive");
+                    tracing::trace!(
+                        surviving_mask = format!("{:08b}", surviving_mask),
+                        "Some siblings survive"
+                    );
 
                     // Save the current off state before processing siblings
                     let saved_off = off;
@@ -404,6 +407,13 @@ where
                 self.max_stem_level,
                 best_dist,
                 stack_ref,
+            );
+
+            tracing::trace!(
+                stem_idx = %stem_strat.stem_idx(),
+                level = %stem_strat.level(),
+                dim = %stem_strat.dim(),
+                "Descended one block"
             );
 
             if !should_continue {

@@ -57,7 +57,7 @@ mod tests {
 
     use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
     use crate::kd_tree::KdTree;
-    use crate::stem_strategies::{Block3, Block4, Donnelly, DonnellyMarkerPf};
+    use crate::stem_strategies::{Donnelly, DonnellyMarkerPf};
 
     #[cfg(feature = "simd")]
     use crate::stem_strategies::DonnellyMarkerSimd;
@@ -256,6 +256,8 @@ mod tests {
 
     #[test]
     fn v6_approx_nearest_one_flat_vec_f32_donnelly_marker() {
+        use crate::stem_strategies::Block4;
+
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
         let mut points: Vec<[f32; 4]> = vec![];
@@ -290,6 +292,8 @@ mod tests {
 
     #[test]
     fn v6_approx_nearest_one_donnelly_marker_matches_eytzinger() {
+        use crate::stem_strategies::Block4;
+
         // Verify that DonnellyMarkerPf produces the same results as Eytzinger
         // for the same input data
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
@@ -398,6 +402,8 @@ mod tests {
 
     #[test]
     fn v6_approx_nearest_one_donnelly_marker_matches_donnelly() {
+        use crate::stem_strategies::Block4;
+
         // Verify that DonnellyMarkerPf produces the same results as Donnelly
         // for the same input data
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
@@ -463,6 +469,8 @@ mod tests {
     #[cfg(feature = "simd")]
     #[cfg(target_arch = "x86_64")]
     fn v6_approx_nearest_one_donnelly_marker_simd_f64() {
+        use crate::stem_strategies::Block3;
+
         // Test DonnellyMarkerSimd with f64 data
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
@@ -528,6 +536,8 @@ mod tests {
     #[cfg(feature = "simd")]
     #[cfg(target_arch = "x86_64")]
     fn v6_approx_nearest_one_donnelly_marker_simd_f32() {
+        use crate::stem_strategies::Block4;
+
         // Test DonnellyMarkerSimd with f32 data
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 

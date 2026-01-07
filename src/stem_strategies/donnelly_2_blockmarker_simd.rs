@@ -234,6 +234,12 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
         if backtrack_mask != 0 {
             use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
 
+            // TODO: this is too slow. Need to:
+            //   * Just store a clone of self, rather than creating all the siblings and traversing them
+            //     all here. We should only create the sibling and traverse it after we perform the SIMD prune.
+            //   * In cases where D == O, widen is a no-op. In this case we can use SIMD ops to calc new_off
+            //     and rd_values in parallel for all siblings.
+
             // Calculate all sibling contexts and their rd_far values
             let mut siblings = [self.clone(); 8];
             let mut rd_values = [O::zero(); 8];
