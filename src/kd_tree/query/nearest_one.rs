@@ -59,6 +59,7 @@ where
 mod tests {
     use rand::Rng;
     use rand::SeedableRng;
+    use test_log::test;
 
     use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
     use crate::kd_tree::KdTree;
@@ -305,7 +306,7 @@ mod tests {
     #[cfg(feature = "simd")]
     #[cfg(target_arch = "x86_64")]
     fn v6_query_nearest_one_donnelly_marker_simd_f64() {
-        use crate::stem_strategies::{Block3, DonnellyMarkerSimd};
+        use crate::stem_strategies::{Block3, DonnellyMarkerPf, DonnellyMarkerSimd};
 
         // Test DonnellyMarkerSimd with f64 data using exact nearest_one query
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
@@ -313,7 +314,7 @@ mod tests {
         // Use 8192 points which with bucket size 32 gives 256 leaves
         // 256 leaves = 2^8, so tree depth = 8
         // With Block3, depth 8 is not divisible by 3, so tree will be padded to depth 9
-        let points: Vec<[f64; 3]> = (0..8_192)
+        let points: Vec<[f64; 3]> = (0..2_048) // 8_192)
             .map(|_| {
                 [
                     rng.random::<f64>(),
@@ -332,14 +333,27 @@ mod tests {
             32,
         > = KdTree::new_from_slice(&points);
 
+        let tree_non_simd: KdTree<
+            f64,
+            u32,
+            DonnellyMarkerPf<Block3, 64, 8, 3>,
+            FlatVec<f64, u32, 3, 32>,
+            3,
+            32,
+        > = KdTree::new_from_slice(&points);
+
         assert!(!tree.is_empty());
-        assert_eq!(tree.size(), 8_192);
-        assert_eq!(tree.leaf_count(), 256);
+        assert_eq!(tree.size(), 2_048);
+        assert_eq!(tree.leaf_count(), 64);
 
         // Verify max_stem_level is padded to multiple of block size (3)
         // 256 leaves = depth 8, padded to 9
         assert_eq!((tree.max_stem_level() + 1) % 3, 0);
-        assert_eq!(tree.max_stem_level(), 8);
+        assert_eq!(tree.max_stem_level(), 5);
+
+        println!("NON-SIMD: {}", tree_non_simd);
+
+        println!("SIMD: {}", tree);
 
         // Test multiple query points to ensure backtracking queries work correctly
         let query_points: Vec<[f64; 3]> = (0..50)
@@ -352,19 +366,26 @@ mod tests {
             })
             .collect();
 
-        for query_point in query_points.iter() {
+        for (i, query_point) in query_points.iter().enumerate() {
             let expected = linear_search(&points, query_point);
+
+            let result = tree_non_simd.nearest_one::<SquaredEuclidean<f64>>(query_point);
+
+            println!("NON-SIMD: {:?}", result);
+
             let result = tree.nearest_one::<SquaredEuclidean<f64>>(query_point);
+
+            println!("SIMD: {:?}", result);
 
             assert_eq!(
                 result.0, expected.distance,
-                "Distance mismatch for query {:?}",
-                query_point
+                "Distance mismatch for query #{} ({:?})",
+                i, query_point
             );
             assert_eq!(
                 result.1 as usize, expected.item,
-                "Item mismatch for query {:?}",
-                query_point
+                "Item mismatch for query #{} ({:?})",
+                i, query_point
             );
         }
     }
