@@ -146,10 +146,9 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
         O: AxisUnified<Coord = O>,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
     {
-        // Check if traversing this block would exceed max_stem_level
-        // For block strategies, we traverse multiple levels at once, so we need to check
-        // if the level AFTER traversing would be beyond the limit
-        if self.level() + Self::BLOCK_SIZE as i32 > max_stem_level {
+        // Check if we've finished traversing (reached or passed max_stem_level)
+        // For block strategies, we traverse multiple levels at once
+        if self.level() > max_stem_level {
             return false;
         }
 
@@ -228,7 +227,8 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
         };
 
         // Remove the path we're taking from backtrack candidates
-        let backtrack_mask = backtrack_mask & !(1 << child_idx);
+        let child_idx_mask = 1 << child_idx;
+        let backtrack_mask = backtrack_mask & !child_idx_mask;
 
         // If any siblings need exploration, push them as a Block entry
         if backtrack_mask != 0 {
@@ -423,10 +423,9 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
         O: AxisUnified<Coord = O>,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
     {
-        // Check if traversing this block would exceed max_stem_level
-        // For block strategies, we traverse multiple levels at once, so we need to check
-        // if the level AFTER traversing would be beyond the limit
-        if self.level() + Self::BLOCK_SIZE as i32 > max_stem_level {
+        // Check if we've finished traversing (reached or passed max_stem_level)
+        // For block strategies, we traverse multiple levels at once
+        if self.level() > max_stem_level {
             return false;
         }
 

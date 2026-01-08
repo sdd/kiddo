@@ -31,6 +31,7 @@ where
     {
         let leaf_idx = LS::Mutability::get_leaf_idx(self, query_ctx.query());
 
+        tracing::trace!(%leaf_idx, "processing leaf");
         let leaf_view = self.leaves.leaf_view(leaf_idx);
         process_leaf(&leaf_view);
     }
@@ -155,11 +156,11 @@ where
             tracing::trace!(%dim, %old_off, %rd, ?off, "Popped stack context");
 
             let max_dist = query_ctx.max_dist();
-            if O::cmp(rd, max_dist) == std::cmp::Ordering::Greater {
-                tracing::trace!(%rd, %max_dist, "Prune check: PRUNE");
+            if O::cmp(rd, max_dist) != std::cmp::Ordering::Less {
+                tracing::trace!(%rd, %max_dist, "SCALAR Prune check: PRUNE");
                 continue;
             }
-            tracing::trace!(%rd, %max_dist, "Prune check: VISIT");
+            tracing::trace!(%rd, %max_dist, "SCALAR Prune check: VISIT");
 
             tracing::trace!("Restoring off[{}]. was {}, now {}", dim, off[dim], old_off);
             off[dim] = old_off;
@@ -274,11 +275,11 @@ where
                     tracing::trace!(%dim, %old_off, %rd, ?off, "Popped single context");
 
                     let max_dist = query_ctx.max_dist();
-                    if O::cmp(rd, max_dist) == std::cmp::Ordering::Greater {
+                    if O::cmp(rd, max_dist) != std::cmp::Ordering::Less {
                         tracing::trace!(%rd, %max_dist, "Prune check: PRUNE");
                         continue;
                     }
-                    tracing::trace!(%rd, %max_dist, "Prune check: VISIT");
+                    tracing::trace!(%rd, %max_dist, "SIMD Prune check: VISIT");
 
                     tracing::trace!("Restoring off[{}]. was {}, now {}", dim, off[dim], old_off);
                     off[dim] = old_off;
@@ -462,7 +463,43 @@ where
             let mask_low = _mm256_movemask_pd(cmp_low) as u8;
             let mask_high = _mm256_movemask_pd(cmp_high) as u8;
 
-            (mask_low | (mask_high << 4)) & sibling_mask
+            let mask = mask_low | (mask_high << 4);
+
+            // We need to account for the fact that the ordering of stem pivots within
+            // a 3-block is triangular. e.g.:
+            //
+            //                               #0 (0.5)
+            //            #1 (0.25)                             #2 (0.75)
+            // #3 (0.125)          #4 (0.375)        #5 (0.625)          #6 (0.875)
+
+            //  Child Idx |      Val Range      |  Pivot Idx
+            //     0      |           x < 0.125 |      3
+            //     1      |  0.125 <= x < 0.250 |      1
+            //     2      |  0.250 <= x < 0.375 |      4
+            //     3      |  0.375 <= x < 0.500 |      0
+            //     4      |  0.500 <= x < 0.625 |      5
+            //     5      |  0.625 <= x < 0.750 |      2
+            //     6      |  0.750 <= x < 0.875 |      6
+            //     7      |  0.875 <= x         |
+
+
+            // Map pivot idx to child idx by permuting the mask
+
+            // Source: https://programming.sirrida.de/calcperm.php
+            // Config: LSB First, Origin 0, Base 10, indices refer to source bits
+            // Input: "7 3 1 4 0 5 2 6  # bswap"
+            // allow all
+            // Method used: Bit Group Moving
+            let permuted_mask = (mask & 0x20)
+                | ((mask & 0x42) << 1)
+                | ((mask & 0x05) << 4)
+                | ((mask & 0x80) >> 7)
+                | ((mask & 0x08) >> 2)
+                | ((mask & 0x10) >> 1);
+
+            let masked_permuted_mask = permuted_mask & sibling_mask;
+
+            masked_permuted_mask
         }
     }
 

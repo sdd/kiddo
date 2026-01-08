@@ -117,6 +117,8 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
         if *leaf_best_dist < *best_dist {
             *best_dist = *leaf_best_dist;
             *best_item = items[leaf_best_item];
+
+            tracing::trace!("Found new best dist: item {:?}, dist={:?}", *best_item, *best_dist);
         }
     }
 

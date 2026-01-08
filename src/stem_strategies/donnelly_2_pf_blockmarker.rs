@@ -48,8 +48,22 @@ macro_rules! impl_donnelly_stem_strategy {
             #[inline(always)]
             fn leaf_idx(&self) -> usize { self.core.leaf_idx() }
 
+            // TODO: I temporarily changed this strat so that
+            //  it only changes dim once every 3 levels. This
+            //  meant I could compare how it processed and backtracked
+            //  to the newer SIMD variant so I could see where the
+            //  SIMD one was going wrong.
+            //  Revert these once happy with SIMD behaviour
+            // #[inline(always)]
+            // fn dim(&self) -> usize { self.core.dim() }
             #[inline(always)]
-            fn dim(&self) -> usize { self.core.dim() }
+            fn dim(&self) -> usize {
+                self.core.level() as usize / 3 % K
+            }
+            #[inline(always)]
+            fn construction_dim(&self) -> usize {
+                self.core.level() as usize / 3 % K
+            }
 
             #[inline(always)]
             fn level(&self) -> i32 { self.core.level() }
