@@ -351,9 +351,8 @@ mod tests {
         assert_eq!((tree.max_stem_level() + 1) % 3, 0);
         assert_eq!(tree.max_stem_level(), 5);
 
-        println!("NON-SIMD: {}", tree_non_simd);
-
-        println!("SIMD: {}", tree);
+        // println!("NON-SIMD: {}", tree_non_simd);
+        // println!("SIMD: {}", tree);
 
         // Test multiple query points to ensure backtracking queries work correctly
         let query_points: Vec<[f64; 3]> = (0..50)
@@ -366,7 +365,9 @@ mod tests {
             })
             .collect();
 
-        for (i, query_point) in query_points.iter().enumerate() {
+        for (i, query_point) in query_points.iter().enumerate() {//.skip(1) {
+            tracing::debug!("Query point: #{i} ({query_point:?})");
+
             let expected = linear_search(&points, query_point);
 
             let result = tree_non_simd.nearest_one::<SquaredEuclidean<f64>>(query_point);
