@@ -271,7 +271,10 @@ where
         }
         let stem_node_count = stem_strat.stem_idx() + 1;
 
-        let mut stems = avec![A::max_value(); stem_node_count];
+        // rounded up to the nearest multiple of 8 if not a multiple of 8 already
+        let stem_node_count_padded = ((stem_node_count + 7) / 8) * 8;
+        let mut stems = avec![A::max_value(); stem_node_count_padded];
+
         let mut leaves = LS::new_with_capacity(item_count);
         let mut sort_index = Vec::from_iter(0..item_count);
 
