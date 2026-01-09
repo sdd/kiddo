@@ -70,6 +70,15 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
     {
         let n = self.len();
 
+        // TODO: this function is called once for every leaf visit in a query
+        //       but it allocates fresh Vecs every time.
+        //       query_wide especially is an easy fix as it can be created once in the
+        //       query function and passed down.
+        //       `acc` and `coord_wide` can also be reused across leaf visits but thread-local
+        //       is probably the most efficient approach.
+
+        // TODO:
+
         // accumulator of widened distance type
         let mut acc: Vec<D::Output> = vec![D::Output::zero(); n];
 

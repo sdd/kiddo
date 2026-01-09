@@ -210,14 +210,22 @@ where
 
         // Display stems array
         writeln!(f, "  Stems (len={}):", self.stems.len())?;
-        write!(f, "    [")?;
+        writeln!(f, "    [")?;
         for (i, stem) in self.stems.iter().enumerate() {
-            if i > 0 {
-                write!(f, ", ")?;
+            if i % 8 == 0 {
+                write!(f, "     ")?;
             }
-            write!(f, "{:.3}", stem)?;
+            write!(f, "{:8.3}", stem)?;
+            if i < self.stems.len() - 1 {
+                write!(f, ",")?;
+            }
+            if (i + 1) % 8 == 0 || i == self.stems.len() - 1 {
+                writeln!(f)?;
+            } else {
+                write!(f, "\t")?;
+            }
         }
-        writeln!(f, "]")?;
+        writeln!(f, "    ]")?;
         writeln!(f)?;
 
         // Display stem_leaf_resolution
