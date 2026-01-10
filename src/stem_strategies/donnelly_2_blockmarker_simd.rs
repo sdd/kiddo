@@ -10,6 +10,75 @@ use crate::StemStrategy;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
+/// Block3 child-to-pivot mapping encoded as a u32 literal.
+/// Each 3-bit segment maps child index to pivot offset within the block.
+/// Mapping: [3, 1, 4, 0, 5, 2, 6, 7] packed as 3-bit values (LSB = child 0)
+/// Binary: 0b111_110_010_101_000_100_001_011
+const CHILD_TO_PIVOT_BLOCK3: u32 = 0xF9510B;
+
+/// Extract pivot offset for a given child index from the packed Block3 mapping.
+#[inline(always)]
+const fn child_to_pivot_block3(child_idx: usize) -> usize {
+    ((CHILD_TO_PIVOT_BLOCK3 >> (child_idx * 3)) & 0b111) as usize
+}
+
+/// Block3 interval lower bounds encoded as u64 literal.
+/// Each 8-bit segment contains the lower bound pivot offset for a child (255 = -∞).
+/// Lower bounds: [255, 3, 1, 4, 0, 5, 2, 6] for children 0-7
+const CHILD_LOWER_BOUNDS_BLOCK3: u64 = 0x06_02_05_00_04_01_03_FF;
+
+/// Block3 interval upper bounds encoded as u64 literal.
+/// Each 8-bit segment contains the upper bound pivot offset for a child (255 = +∞).
+/// Upper bounds: [3, 1, 4, 0, 5, 2, 6, 255] for children 0-7
+const CHILD_UPPER_BOUNDS_BLOCK3: u64 = 0xFF_06_02_05_00_04_01_03;
+
+/// Returns the interval bounds [lower, upper) for a Block3 child in a given dimension.
+///
+/// Block3 has 8 children arranged in a triangular layout, where all levels in the block
+/// split on the same dimension. Each child occupies an interval [lower, upper) in that dimension.
+///
+/// Returns (lower_pivot_offset, upper_pivot_offset) where:
+/// - Offset refers to the pivot within the block (0-6 are actual pivots, 7 is padding)
+/// - 255 represents ±∞ (child 0 extends to -∞, child 7 extends to +∞)
+///
+/// # Example
+/// ```text
+/// Block structure:
+///           pivot[0]
+///      pivot[1]    pivot[2]
+///   p[3] p[4]   p[5] p[6]
+/// ch0 ch1 ch2 ch3 ch4 ch5 ch6 ch7
+///
+/// Child 0: [-∞, pivot[3]) → (255, 3)
+/// Child 1: [pivot[3], pivot[1]) → (3, 1)
+/// Child 2: [pivot[1], pivot[4]) → (1, 4)
+/// ...etc
+/// ```
+#[inline(always)]
+const fn child_interval_bounds_block3(child_idx: usize) -> (u8, u8) {
+    let lower = ((CHILD_LOWER_BOUNDS_BLOCK3 >> (child_idx * 8)) & 0xFF) as u8;
+    let upper = ((CHILD_UPPER_BOUNDS_BLOCK3 >> (child_idx * 8)) & 0xFF) as u8;
+    (lower, upper)
+}
+
+/// Computes absolute distance from a query point to an interval [lower, upper).
+///
+/// Branchless implementation for performance.
+///
+/// TODO: This is hardcoded for SquaredEuclidean metric. Generalize to Manhattan and other
+///       metrics once we confirm this interval-based approach works correctly.
+///
+/// Returns:
+/// - If query < lower: lower - query
+/// - If query >= upper: query - upper
+/// - If lower <= query < upper: 0 (query is inside the interval)
+#[inline(always)]
+fn interval_distance_1d(query: f64, lower: f64, upper: f64) -> f64 {
+    let below_dist = (lower - query).max(0.0);
+    let above_dist = (query - upper).max(0.0);
+    below_dist + above_dist
+}
+
 /// Donnelly SIMD Strategy
 ///
 /// Donnelly ordering, block-at-once evaluation.
@@ -161,6 +230,7 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
         // SIMD comparison to get child index
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         let child_idx = CompareBlock3::compare_block3_impl(stems_ptr, query_val, block_base_idx);
+        tracing::trace!("child_idx = {}", child_idx);
 
         // SIMD distance check to get backtrack mask
         // Dispatch based on axis type size, similar to compare_block3_impl
@@ -184,7 +254,7 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
             }
             #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
             {
-                D::simd_backtrack_check_block3_f64_avx2(
+                D::simd_backtrack_check_block3_interval_f64_avx2(
                     unsafe { std::mem::transmute_copy(&query_wide_f64) },
                     stems_ptr.as_ptr(),
                     block_base_idx,
@@ -243,6 +313,7 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
             // Calculate all sibling contexts and their rd_far values
             let mut siblings = [self.clone(); 8];
             let mut rd_values = [O::zero(); 8];
+            let mut new_off_values = [O::zero(); 8];
 
             for sibling_idx in 0..8 {
                 // Create context for this sibling
@@ -250,18 +321,63 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
                     .core
                     .traverse_block(sibling_idx as u8, Self::BLOCK_SIZE as u32);
 
-                // Calculate rd_far for this sibling
-                let pivot_idx = block_base_idx + sibling_idx;
-                let pivot = unsafe { *stems.get_unchecked(pivot_idx) };
-                let pivot_wide = D::widen_coord(pivot);
-                let new_off = O::saturating_dist(query_wide_val, pivot_wide);
-                rd_values[sibling_idx] = O::saturating_add(rd, D::dist1(new_off, old_off_val));
+                // Calculate rd_far for this sibling using interval distance
+                let (lower_offset, upper_offset) = child_interval_bounds_block3(sibling_idx);
+
+                // Get lower bound (-∞ if offset is 255)
+                let lower = if lower_offset == 255 {
+                    A::min_value()
+                } else {
+                    unsafe { *stems.get_unchecked(block_base_idx + lower_offset as usize) }
+                };
+
+                // Get upper bound (+∞ if offset is 255)
+                let upper = if upper_offset == 255 {
+                    A::max_value()
+                } else {
+                    unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
+                };
+
+                // Compute interval distance
+                let query_val = unsafe { *query.get_unchecked(*dim) };
+                let query_wide_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(query_val)) };
+                let lower_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(lower)) };
+                let upper_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(upper)) };
+
+                let interval_dist = interval_distance_1d(query_wide_f64, lower_f64, upper_f64);
+                let new_off: O = unsafe { std::mem::transmute_copy(&interval_dist) };
+                new_off_values[sibling_idx] = new_off;
+
+                // rd_far = rd + dist1(new_off, old_off) = rd + (new_off - old_off)²
+                // Using the standard backtracking formula from traits.rs:394
+                let delta = D::dist1(new_off, old_off_val);
+                let rd_far = O::saturating_add(rd, delta);
+                rd_values[sibling_idx] = rd_far;
+
+                tracing::debug!(
+                    sibling_idx,
+                    lower_offset,
+                    upper_offset,
+                    ?lower,
+                    ?upper,
+                    lower_f64,
+                    upper_f64,
+                    query_val_f64 = query_wide_f64,
+                    interval_dist,
+                    ?new_off,
+                    ?old_off_val,
+                    ?rd,
+                    ?delta,
+                    ?rd_far,
+                    "SIMD: interval distance calc"
+                );
             }
 
             // Push single Block entry containing all siblings
             stack.push(SimdQueryStackContext::Block {
                 siblings,
                 rd_values,
+                new_off_values,
                 sibling_mask: backtrack_mask,
                 dim: dim_val,
                 old_off: old_off_val,
@@ -269,10 +385,29 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
         }
 
         // Update off[dim] with the new_off for the path we're taking
-        let pivot_idx = block_base_idx + child_idx as usize;
-        let pivot = unsafe { *stems.get_unchecked(pivot_idx) };
-        let pivot_wide = D::widen_coord(pivot);
-        let new_off = O::saturating_dist(query_wide_val, pivot_wide);
+        // Use the same interval distance formula as for siblings for consistency
+        let (lower_offset, upper_offset) = child_interval_bounds_block3(child_idx as usize);
+
+        let lower = if lower_offset == 255 {
+            A::min_value()
+        } else {
+            unsafe { *stems.get_unchecked(block_base_idx + lower_offset as usize) }
+        };
+
+        let upper = if upper_offset == 255 {
+            A::max_value()
+        } else {
+            unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
+        };
+
+        // Compute interval distance for the chosen child (should be 0 or very small)
+        let query_val = unsafe { *query.get_unchecked(dim_val) };
+        let query_wide_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(query_val)) };
+        let lower_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(lower)) };
+        let upper_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(upper)) };
+
+        let interval_dist = interval_distance_1d(query_wide_f64, lower_f64, upper_f64);
+        let new_off: O = unsafe { std::mem::transmute_copy(&interval_dist) };
         unsafe { *off.get_unchecked_mut(dim_val) = new_off };
 
         // Traverse to the chosen child
@@ -513,6 +648,7 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
             // Calculate all sibling contexts and their rd_far values
             let mut siblings = [self.clone(); 16];
             let mut rd_values = [O::zero(); 16];
+            let mut new_off_values = [O::zero(); 16];
 
             for sibling_idx in 0..16 {
                 // Create context for this sibling
@@ -525,6 +661,7 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
                 let pivot = unsafe { *stems.get_unchecked(pivot_idx) };
                 let pivot_wide = D::widen_coord(pivot);
                 let new_off = O::saturating_dist(query_wide_val, pivot_wide);
+                new_off_values[sibling_idx] = new_off;
                 rd_values[sibling_idx] = O::saturating_add(rd, D::dist1(new_off, old_off_val));
             }
 
@@ -533,13 +670,16 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
             if high_mask != 0 {
                 let mut high_siblings = [self.clone(); 8];
                 let mut high_rd_values = [O::zero(); 8];
+                let mut high_new_off_values = [O::zero(); 8];
                 for i in 0..8 {
                     high_siblings[i] = siblings[i + 8].clone();
                     high_rd_values[i] = rd_values[i + 8];
+                    high_new_off_values[i] = new_off_values[i + 8];
                 }
                 stack.push(SimdQueryStackContext::Block {
                     siblings: high_siblings,
                     rd_values: high_rd_values,
+                    new_off_values: high_new_off_values,
                     sibling_mask: high_mask,
                     dim: dim_val,
                     old_off: old_off_val,
@@ -551,13 +691,16 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
             if low_mask != 0 {
                 let mut low_siblings = [self.clone(); 8];
                 let mut low_rd_values = [O::zero(); 8];
+                let mut low_new_off_values = [O::zero(); 8];
                 for i in 0..8 {
                     low_siblings[i] = siblings[i].clone();
                     low_rd_values[i] = rd_values[i];
+                    low_new_off_values[i] = new_off_values[i];
                 }
                 stack.push(SimdQueryStackContext::Block {
                     siblings: low_siblings,
                     rd_values: low_rd_values,
+                    new_off_values: low_new_off_values,
                     sibling_mask: low_mask,
                     dim: dim_val,
                     old_off: old_off_val,
@@ -855,3 +998,178 @@ impl<T: AxisUnified> CompareBlock4 for T {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_child_interval_bounds_block3() {
+        // Verify all 8 children have correct interval bounds
+        // Expected bounds based on triangular structure:
+        //           pivot[0]
+        //      pivot[1]    pivot[2]
+        //   p[3] p[4]   p[5] p[6]
+        // ch0 ch1 ch2 ch3 ch4 ch5 ch6 ch7
+        
+        assert_eq!(child_interval_bounds_block3(0), (255, 3)); // [-∞, pivot[3])
+        assert_eq!(child_interval_bounds_block3(1), (3, 1));   // [pivot[3], pivot[1])
+        assert_eq!(child_interval_bounds_block3(2), (1, 4));   // [pivot[1], pivot[4])
+        assert_eq!(child_interval_bounds_block3(3), (4, 0));   // [pivot[4], pivot[0])
+        assert_eq!(child_interval_bounds_block3(4), (0, 5));   // [pivot[0], pivot[5])
+        assert_eq!(child_interval_bounds_block3(5), (5, 2));   // [pivot[5], pivot[2])
+        assert_eq!(child_interval_bounds_block3(6), (2, 6));   // [pivot[2], pivot[6])
+        assert_eq!(child_interval_bounds_block3(7), (6, 255)); // [pivot[6], +∞)
+    }
+
+    #[test]
+    fn test_interval_distance_1d_inside() {
+        // Query inside interval should return 0
+        assert_eq!(interval_distance_1d(5.0, 3.0, 7.0), 0.0);
+        assert_eq!(interval_distance_1d(3.0, 3.0, 7.0), 0.0); // At lower bound
+        assert_eq!(interval_distance_1d(6.999, 3.0, 7.0), 0.0); // Just below upper bound
+    }
+
+    #[test]
+    fn test_interval_distance_1d_below() {
+        // Query below lower bound
+        assert_eq!(interval_distance_1d(2.0, 5.0, 10.0), 3.0); // |5 - 2| = 3
+        assert_eq!(interval_distance_1d(0.0, 3.0, 10.0), 3.0); // |3 - 0| = 3
+        assert_eq!(interval_distance_1d(-1.0, 1.0, 10.0), 2.0); // |1 - (-1)| = 2
+    }
+
+    #[test]
+    fn test_interval_distance_1d_above() {
+        // Query above upper bound
+        assert_eq!(interval_distance_1d(12.0, 5.0, 10.0), 2.0); // |12 - 10| = 2
+        assert_eq!(interval_distance_1d(10.0, 5.0, 10.0), 0.0); // Exactly at upper bound (excluded)
+        assert_eq!(interval_distance_1d(15.0, 5.0, 10.0), 5.0); // |15 - 10| = 5
+    }
+
+    #[test]
+    fn test_interval_distance_1d_edge_cases() {
+        // Test with infinity bounds
+        assert_eq!(interval_distance_1d(-100.0, f64::NEG_INFINITY, 5.0), 0.0); // Below but no lower bound
+        assert_eq!(interval_distance_1d(100.0, 5.0, f64::INFINITY), 0.0); // Above but no upper bound
+        assert_eq!(interval_distance_1d(0.0, f64::NEG_INFINITY, f64::INFINITY), 0.0); // Unbounded
+    }
+
+    #[test]
+    fn test_interval_distance_1d_branchless_correctness() {
+        // Test that branchless impl gives same results as branching version
+        for query in [-10.0, -1.0, 0.0, 1.0, 5.0, 7.5, 10.0, 15.0, 100.0] {
+            let lower = 0.0;
+            let upper = 10.0;
+
+            let result = interval_distance_1d(query, lower, upper);
+
+            // Compute expected with explicit branches
+            let expected = if query < lower {
+                lower - query
+            } else if query >= upper {
+                query - upper
+            } else {
+                0.0
+            };
+
+            assert_eq!(result, expected, "Failed for query={}", query);
+        }
+    }
+}
+
+    #[test]
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+    fn test_simd_backtrack_vs_scalar() {
+        use crate::traits_unified_2::SquaredEuclidean;
+        use crate::traits_unified_2::DistanceMetricUnified;
+        
+        // Create test pivots: [pivot0, pivot1, ..., pivot6, +∞]
+        let pivots = [0.2, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f64::INFINITY];
+        
+        let query = 0.25;
+        let old_off = 0.0;
+        let rd = 0.0;
+        let best_dist = f64::INFINITY;
+        
+        // Compute scalar version for each child
+        let mut scalar_results = [false; 8];
+        for child_idx in 0..8 {
+            let (lower_offset, upper_offset) = child_interval_bounds_block3(child_idx);
+
+            let lower = if lower_offset == 255 {
+                f64::NEG_INFINITY
+            } else {
+                pivots[lower_offset as usize]
+            };
+
+            let upper = if upper_offset == 255 {
+                f64::INFINITY
+            } else {
+                pivots[upper_offset as usize]
+            };
+
+            let interval_dist = interval_distance_1d(query, lower, upper);
+            // rd_far = rd + (interval_dist - old_off)²
+            let delta = (interval_dist - old_off) * (interval_dist - old_off);
+            let rd_far = rd + delta;
+
+            scalar_results[child_idx] = rd_far <= best_dist;
+        }
+        
+        // Compute SIMD version
+        let pivots_ptr = pivots.as_ptr() as *const u8;
+// Replace the test with a simpler version
+let simd_mask = <SquaredEuclidean<f64> as DistanceMetricUnified<f64, 3>>::simd_backtrack_check_block3_interval_f64_avx2(
+    query, pivots_ptr, 0, old_off, rd, best_dist
+);
+        
+        // Compare
+        for child_idx in 0..8 {
+            let scalar_pass = scalar_results[child_idx];
+            let simd_pass = (simd_mask & (1 << child_idx)) != 0;
+            assert_eq!(
+                scalar_pass, simd_pass,
+                "Mismatch for child {}: scalar={}, simd={}, query={}, lower={:?}, upper={:?}",
+                child_idx, scalar_pass, simd_pass, query,
+                if child_interval_bounds_block3(child_idx).0 == 255 { f64::NEG_INFINITY } else { pivots[child_interval_bounds_block3(child_idx).0 as usize] },
+                if child_interval_bounds_block3(child_idx).1 == 255 { f64::INFINITY } else { pivots[child_interval_bounds_block3(child_idx).1 as usize] },
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+    fn debug_query_12_interval_distances() {
+        // This test manually computes what should happen for query #12
+        // Query point: [0.8947785353168005, 0.678720516865904, 0.6048091301041568]
+        // We're interested in the second block pop (dim=0, old_off=0)
+        
+        // From the log, the pivots that would be in a block starting at some block_base_idx
+        // Let's trace through what the interval distances should be
+        
+        // rd_values from log: [0.5638408493966387, 0.3959802548889544, 0.25295146890380843, 
+        //                       0.14310568836537063, 0.06606798320124753, 0.0170270603870678, 
+        //                       0.00021225610203875987, 0.0]
+        
+        // For each child, let's print what the intervals should be
+        println!("Query value in dim 0: 0.8947785353168005");
+        println!("\nChild interval bounds and expected distances:");
+        
+        for child_idx in 0..8 {
+            let (lower_off, upper_off) = child_interval_bounds_block3(child_idx);
+            println!("Child {}: lower_offset={}, upper_offset={}", child_idx, lower_off, upper_off);
+        }
+        
+        // The issue is: why does child 6 pass but not child 4?
+        // best_dist at that point should be 0.0036181109111460682
+        println!("\nbest_dist would be: 0.0036181109111460682");
+        println!("Child 4 rd_value: 0.06606798320124753 > best_dist? {}", 0.06606798320124753 > 0.0036181109111460682);
+        println!("Child 6 rd_value: 0.00021225610203875987 > best_dist? {}", 0.00021225610203875987 > 0.0036181109111460682);
+        
+        // So child 6 should indeed survive and child 4 should be pruned based on rd_values
+        // But non-SIMD found the answer in leaf 52 (child 4's leaf)
+        // This suggests either:
+        // 1. The interval distance calculation is wrong
+        // 2. The non-SIMD uses different logic
+        // 3. There's something about the tree structure we're missing
+    }
