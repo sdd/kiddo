@@ -22,6 +22,7 @@ pub enum SimdQueryStackContext<A, SS> {
     Block {
         siblings: [SS; 8],
         rd_values: [A; 8],
+        new_off_values: [A; 8],  // Per-sibling offset values (e.g., interval distances)
         sibling_mask: u8,
         dim: usize,
         old_off: A,
@@ -71,6 +72,7 @@ impl<A: AxisUnified<Coord = A>, SS> SimdQueryStackContext<A, SS> {
     pub fn new_block(
         siblings: [SS; 8],
         rd_values: [A; 8],
+        new_off_values: [A; 8],
         sibling_mask: u8,
         dim: usize,
         old_off: A,
@@ -78,6 +80,7 @@ impl<A: AxisUnified<Coord = A>, SS> SimdQueryStackContext<A, SS> {
         Self::Block {
             siblings,
             rd_values,
+            new_off_values,
             sibling_mask,
             dim,
             old_off,

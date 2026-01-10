@@ -303,6 +303,7 @@ where
                 SimdQueryStackContext::Block {
                     siblings,
                     rd_values,
+                    new_off_values,
                     sibling_mask,
                     dim: dim_val,
                     old_off,
@@ -332,17 +333,20 @@ where
                         if surviving_mask & (1 << sibling_idx) != 0 {
                             let mut ss = siblings[sibling_idx].clone();
                             let rd = rd_values[sibling_idx];
+                            let new_off = new_off_values[sibling_idx];
                             let mut dim = dim_val;
 
                             // Restore off array to saved state, then update the split dimension
+                            // Use the per-sibling new_off value (e.g., interval distance)
                             off = saved_off;
                             tracing::trace!(
-                                "Restoring off[{}]. was {}, now {}",
+                                "Restoring off[{}]. was {}, now {} (interval dist for sibling {})",
                                 dim,
                                 off[dim],
-                                old_off
+                                new_off,
+                                sibling_idx
                             );
-                            off[dim] = old_off;
+                            off[dim] = new_off;
 
                             let best_dist = query_ctx.max_dist();
                             let leaf_idx = self.traverse_to_leaf_simd::<O, D>(
@@ -490,16 +494,18 @@ where
             // Input: "7 3 1 4 0 5 2 6  # bswap"
             // allow all
             // Method used: Bit Group Moving
-            let permuted_mask = (mask & 0x20)
-                | ((mask & 0x42) << 1)
-                | ((mask & 0x05) << 4)
-                | ((mask & 0x80) >> 7)
-                | ((mask & 0x08) >> 2)
-                | ((mask & 0x10) >> 1);
+            // let permuted_mask = (mask & 0x20)
+            //     | ((mask & 0x42) << 1)
+            //     | ((mask & 0x05) << 4)
+            //     | ((mask & 0x80) >> 7)
+            //     | ((mask & 0x08) >> 2)
+            //     | ((mask & 0x10) >> 1);
+            //
+            // let masked_permuted_mask = permuted_mask & sibling_mask;
+            //
+            // masked_permuted_mask
 
-            let masked_permuted_mask = permuted_mask & sibling_mask;
-
-            masked_permuted_mask
+            mask & sibling_mask
         }
     }
 

@@ -200,6 +200,9 @@ pub trait AxisUnified:
     /// Maximum coord value.
     fn max_value() -> Self::Coord;
 
+    /// Minimum coord value.
+    fn min_value() -> Self::Coord;
+
     /// If coord is max value or not.
     fn is_max_value(coord: Self::Coord) -> bool;
 
@@ -373,6 +376,23 @@ pub trait DistanceMetricUnified<A: Copy, const K: usize> {
         panic!("SIMD backtrack check not implemented for this metric/type combination");
     }
 
+    /// SIMD distance check for block3 traversal using interval-based distance (AVX2).
+    ///
+    /// Experimental: Uses interval distance to correctly handle multi-level same-dimension splits.
+    /// TODO: Remove this and old implementation once validated.
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+    #[allow(unused_variables)]
+    fn simd_backtrack_check_block3_interval_f64_avx2(
+        query_wide: Self::Output,
+        pivots_ptr: *const u8,
+        cache_line_base: usize,
+        old_off: Self::Output,
+        rd: Self::Output,
+        best_dist: Self::Output,
+    ) -> u8 {
+        panic!("SIMD interval backtrack check not implemented for this metric/type combination");
+    }
+
     /// SIMD distance check for block3 traversal with f64 pivots (AVX-512).
     #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
     #[allow(unused_variables)]
@@ -476,8 +496,13 @@ macro_rules! impl_axis_float {
             }
 
             #[inline(always)]
+            fn min_value() -> Self::Coord {
+                <$t>::neg_infinity()
+            }
+
+            #[inline(always)]
             fn is_max_value(coord: Self::Coord) -> bool {
-                coord.is_infinite()
+                coord.is_infinite() && coord.is_sign_positive()
             }
 
             #[inline(always)]
@@ -522,6 +547,11 @@ macro_rules! impl_axis_fixed {
             #[inline(always)]
             fn max_value() -> Self::Coord {
                 <Self::Coord>::MAX
+            }
+
+            #[inline(always)]
+            fn min_value() -> Self::Coord {
+                unimplemented!("min_value not yet implemented for fixed point types")
             }
 
             #[inline(always)]
@@ -638,6 +668,114 @@ where
             let mask_low = _mm256_movemask_pd(cmp_low) as u8;
             let mask_high = _mm256_movemask_pd(cmp_high) as u8;
             let mask = mask_low | (mask_high << 4);
+
+            // Permute from pivot-indexed to child-indexed
+            // Child-to-pivot mapping: [3, 1, 4, 0, 5, 2, 6, 7]
+            // We need the inverse: pivot i -> which child uses it
+            // Pivot-to-child mapping: [3, 1, 5, 0, 2, 4, 6, 7]
+            // Source: https://programming.sirrida.de/calcperm.php
+            // Config: LSB First, Origin 0, Base 10, indices refer to source bits
+            // Input: "3 1 5 0 2 4 6 7"
+            // Method used: Bit Group Moving
+            let permuted_mask = (mask & 0x20)
+                | ((mask & 0x42) << 1)
+                | ((mask & 0x05) << 4)
+                | ((mask & 0x80) >> 7)
+                | ((mask & 0x08) >> 2)
+                | ((mask & 0x10) >> 1);
+
+            permuted_mask
+        }
+    }
+
+    /// SIMD distance check for block3 traversal using interval-based distance calculation.
+    ///
+    /// This is an improved version that correctly handles the fact that Block3 creates 8 regions
+    /// in a single dimension, not just 2. Each child corresponds to an interval [lower, upper)
+    /// and we need to compute distance to that interval, accounting for directionality.
+    ///
+    /// TODO: This is hardcoded for SquaredEuclidean. Generalize to other metrics once validated.
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    fn simd_backtrack_check_block3_interval_f64_avx2(
+        query_wide: Self::Output,
+        pivots_ptr: *const u8,
+        cache_line_base: usize,
+        old_off: Self::Output,
+        rd: Self::Output,
+        best_dist: Self::Output,
+    ) -> u8
+    where
+        Self::Output: core::ops::Sub<Output = Self::Output> + PartialOrd,
+    {
+        unsafe {
+            use std::arch::x86_64::*;
+
+            let ptr = pivots_ptr.add(cache_line_base * 8) as *const f64;
+
+            // Broadcast values
+            let query_vec = _mm256_set1_pd(std::mem::transmute_copy(&query_wide));
+            let old_off_vec = _mm256_set1_pd(std::mem::transmute_copy(&old_off));
+            let rd_vec = _mm256_set1_pd(std::mem::transmute_copy(&rd));
+            let best_dist_vec = _mm256_set1_pd(std::mem::transmute_copy(&best_dist));
+
+            // Gather indices for interval bounds
+            // Lower bounds for children 0-7: [-∞, pivot[3], pivot[1], pivot[4], pivot[0], pivot[5], pivot[2], pivot[6]]
+            // Transmute arrays to __m128i at compile time
+            const LOWER_INDICES_0_3: __m128i = unsafe { std::mem::transmute([0i32, 3, 1, 4]) };
+            const LOWER_INDICES_4_7: __m128i = unsafe { std::mem::transmute([0i32, 5, 2, 6]) };
+
+            // Upper bounds for children 0-7: [pivot[3], pivot[1], pivot[4], pivot[0], pivot[5], pivot[2], pivot[6], +∞]
+            const UPPER_INDICES_0_3: __m128i = unsafe { std::mem::transmute([3i32, 1, 4, 0]) };
+            const UPPER_INDICES_4_7: __m128i = unsafe { std::mem::transmute([5i32, 2, 6, 7]) }; // pivot[7] is padding +∞
+
+            // Load interval bounds using gather
+            let mut lower_0_3 = _mm256_i32gather_pd(ptr, LOWER_INDICES_0_3, 8);
+            lower_0_3 = _mm256_blend_pd(lower_0_3, _mm256_set1_pd(f64::NEG_INFINITY), 0b0001); // Fix child 0
+
+            let lower_4_7 = _mm256_i32gather_pd(ptr, LOWER_INDICES_4_7, 8);
+            let upper_0_3 = _mm256_i32gather_pd(ptr, UPPER_INDICES_0_3, 8);
+            let upper_4_7 = _mm256_i32gather_pd(ptr, UPPER_INDICES_4_7, 8); // pivot[7] = +∞ already
+
+            // Compute interval distances for all children (absolute distance, not squared)
+            // For each child: distance = max(0, lower - query) + max(0, query - upper)
+
+            // Children 0-3
+            let below_delta_0_3 = _mm256_sub_pd(lower_0_3, query_vec);
+            let below_clamped_0_3 = _mm256_max_pd(below_delta_0_3, _mm256_setzero_pd());
+
+            let above_delta_0_3 = _mm256_sub_pd(query_vec, upper_0_3);
+            let above_clamped_0_3 = _mm256_max_pd(above_delta_0_3, _mm256_setzero_pd());
+
+            let interval_dist_0_3 = _mm256_add_pd(below_clamped_0_3, above_clamped_0_3);
+
+            // Children 4-7
+            let below_delta_4_7 = _mm256_sub_pd(lower_4_7, query_vec);
+            let below_clamped_4_7 = _mm256_max_pd(below_delta_4_7, _mm256_setzero_pd());
+
+            let above_delta_4_7 = _mm256_sub_pd(query_vec, upper_4_7);
+            let above_clamped_4_7 = _mm256_max_pd(above_delta_4_7, _mm256_setzero_pd());
+
+            let interval_dist_4_7 = _mm256_add_pd(below_clamped_4_7, above_clamped_4_7);
+
+            // Compute rd_far = rd + (interval_dist - old_off)²
+            // This matches the standard backtracking formula: rd_far = rd + dist1(new_off, old_off)
+            let delta_0_3 = _mm256_sub_pd(interval_dist_0_3, old_off_vec);
+            let delta_sq_0_3 = _mm256_mul_pd(delta_0_3, delta_0_3);
+            let rd_far_0_3 = _mm256_add_pd(rd_vec, delta_sq_0_3);
+
+            let delta_4_7 = _mm256_sub_pd(interval_dist_4_7, old_off_vec);
+            let delta_sq_4_7 = _mm256_mul_pd(delta_4_7, delta_4_7);
+            let rd_far_4_7 = _mm256_add_pd(rd_vec, delta_sq_4_7);
+
+            // Compare rd_far <= best_dist
+            let cmp_0_3 = _mm256_cmp_pd(rd_far_0_3, best_dist_vec, _CMP_LE_OQ);
+            let cmp_4_7 = _mm256_cmp_pd(rd_far_4_7, best_dist_vec, _CMP_LE_OQ);
+
+            // Extract masks
+            let mask_0_3 = _mm256_movemask_pd(cmp_0_3) as u8;
+            let mask_4_7 = _mm256_movemask_pd(cmp_4_7) as u8;
+            let mask = mask_0_3 | (mask_4_7 << 4);
 
             mask
         }

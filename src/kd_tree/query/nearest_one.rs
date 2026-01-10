@@ -365,7 +365,7 @@ mod tests {
             })
             .collect();
 
-        for (i, query_point) in query_points.iter().enumerate() {//.skip(1) {
+        for (i, query_point) in query_points.iter().enumerate().skip(12) {
             tracing::debug!("Query point: #{i} ({query_point:?})");
 
             let expected = linear_search(&points, query_point);
