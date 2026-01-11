@@ -384,7 +384,19 @@ pub trait StemStrategy: Clone + Sync + Send {
             let query_elem = *unsafe { query.get_unchecked(*dim) };
             let is_right_child = query_elem >= pivot;
 
+            let old_stem_idx = self.stem_idx();
             let far_ctx = self.branch_relative(is_right_child);
+
+            tracing::trace!(
+                %pivot,
+                dim = %self.dim(),
+                %query_elem,
+                %is_right_child,
+                %old_stem_idx,
+                new_stem_idx = %self.stem_idx(),
+                level = self.level(),
+                "Traverse down one level"
+            );
 
             let pivot_wide: O = D::widen_coord(pivot);
             let query_elem_wide = *unsafe { query_wide.get_unchecked(*dim) };

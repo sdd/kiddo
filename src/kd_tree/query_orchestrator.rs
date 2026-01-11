@@ -340,11 +340,13 @@ where
                             // Use the per-sibling new_off value (e.g., interval distance)
                             off = saved_off;
                             tracing::trace!(
-                                "Restoring off[{}]. was {}, now {} (interval dist for sibling {})",
+                                "Restoring off[{}]. was {}, now {} (interval dist for sibling {}). Parent dim was {}, sibling dim is {}",
                                 dim,
                                 off[dim],
                                 new_off,
-                                sibling_idx
+                                sibling_idx,
+                                dim_val,
+                                dim
                             );
                             off[dim] = new_off;
 
