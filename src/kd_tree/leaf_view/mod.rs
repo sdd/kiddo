@@ -46,7 +46,13 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
         D: DistanceMetricUnified<AX, K>,
     {
         let dists = self.dists_for_slice::<D>(query);
-        Self::update_nearest_dist(dists.as_slice(), self.items, best_dist, best_item);
+        Self::update_nearest_dist(
+            dists.as_slice(),
+            self.items,
+            best_dist,
+            best_item,
+            &self.points,
+        );
     }
 
     #[inline]
@@ -111,6 +117,7 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
         items: &[T],
         best_dist: &mut O,
         best_item: &mut T,
+        points: &[&[AX]; K],
     ) where
         O: AxisUnified<Coord = O>,
     {
@@ -127,7 +134,17 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
             *best_dist = *leaf_best_dist;
             *best_item = items[leaf_best_item];
 
-            tracing::trace!("Found new best dist: item {:?}, dist={:?}", *best_item, *best_dist);
+            // TODO: remove
+            let mut coords: [AX; K] = [AX::zero(); K];
+            for (i, coord) in coords.iter_mut().enumerate() {
+                *coord = points[i][leaf_best_item];
+            }
+
+            tracing::trace!(
+                "Found new best dist: item {:?}, dist={:?}, {coords:?}",
+                *best_item,
+                *best_dist
+            );
         }
     }
 

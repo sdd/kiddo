@@ -488,7 +488,6 @@ where
             //     6      |  0.750 <= x < 0.875 |      6
             //     7      |  0.875 <= x         |
 
-
             // Map pivot idx to child idx by permuting the mask
 
             // Source: https://programming.sirrida.de/calcperm.php

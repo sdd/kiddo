@@ -645,8 +645,8 @@ where
             // let abs_diff_high = _mm256_andnot_pd(_mm256_set1_pd(-0.0), diff_high);
 
             // new_off² (SquaredEuclidean dist1)
-            let new_off_sq_low = _mm256_mul_pd(/*abs_*/diff_low, /*abs_*/diff_low);
-            let new_off_sq_high = _mm256_mul_pd(/*abs_*/diff_high, /*abs_*/diff_high);
+            let new_off_sq_low = _mm256_mul_pd(/*abs_*/ diff_low, /*abs_*/ diff_low);
+            let new_off_sq_high = _mm256_mul_pd(/*abs_*/ diff_high, /*abs_*/ diff_high);
 
             // WE DON'T DO THIS IN SCALAR. SKIP IT HERE
             // old_off²
@@ -654,8 +654,8 @@ where
 
             // WAS rd_far = rd + (new_off² - old_off²) for SquaredEuclidean
             // NOW rd_far = rd + (new_off² - old_off) for SquaredEuclidean. DONT SQUARE OLD AGAIN!
-            let delta_low = _mm256_sub_pd(new_off_sq_low, old_off_vec);//old_off_sq_vec);
-            let delta_high = _mm256_sub_pd(new_off_sq_high, old_off_vec);//old_off_sq_vec)
+            let delta_low = _mm256_sub_pd(new_off_sq_low, old_off_vec); //old_off_sq_vec);
+            let delta_high = _mm256_sub_pd(new_off_sq_high, old_off_vec); //old_off_sq_vec)
 
             let rd_far_low = _mm256_add_pd(rd_vec, delta_low);
             let rd_far_high = _mm256_add_pd(rd_vec, delta_high);

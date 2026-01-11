@@ -54,16 +54,16 @@ macro_rules! impl_donnelly_stem_strategy {
             //  to the newer SIMD variant so I could see where the
             //  SIMD one was going wrong.
             //  Revert these once happy with SIMD behaviour
+            #[inline(always)]
+            fn dim(&self) -> usize { self.core.dim() }
             // #[inline(always)]
-            // fn dim(&self) -> usize { self.core.dim() }
-            #[inline(always)]
-            fn dim(&self) -> usize {
-                self.core.level() as usize / 3 % K
-            }
-            #[inline(always)]
-            fn construction_dim(&self) -> usize {
-                self.core.level() as usize / 3 % K
-            }
+            // fn dim(&self) -> usize {
+            //     self.core.level() as usize / 3 % K
+            // }
+            // #[inline(always)]
+            // fn construction_dim(&self) -> usize {
+            //     self.core.level() as usize / 3 % K
+            // }
 
             #[inline(always)]
             fn level(&self) -> i32 { self.core.level() }
