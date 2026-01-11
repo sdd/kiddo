@@ -66,7 +66,10 @@ macro_rules! generate_fixed_nearest_n {
                 rd,
             );
 
-            rd = AxisFixed::rd_update(rd, D::dist1(new_off, old_off));
+            // Correct formula: rd_new = rd - old_off² + new_off²
+            let new_sq = D::dist1(new_off, A::default());
+            let old_sq = D::dist1(old_off, A::default());
+            rd = rd - old_sq + new_sq;
 
             if Self::dist_belongs_in_heap(rd, results) {
                 off[split_dim] = new_off;
