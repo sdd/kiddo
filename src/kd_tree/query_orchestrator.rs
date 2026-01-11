@@ -334,7 +334,7 @@ where
                             let mut ss = siblings[sibling_idx].clone();
                             let rd = rd_values[sibling_idx];
                             let new_off = new_off_values[sibling_idx];
-                            let mut dim = dim_val;
+                            let mut dim = ss.dim();
 
                             // Restore off array to saved state, then update the split dimension
                             // Use the per-sibling new_off value (e.g., interval distance)
