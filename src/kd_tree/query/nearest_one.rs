@@ -365,18 +365,19 @@ mod tests {
             })
             .collect();
 
-        for (i, query_point) in query_points.iter().enumerate().skip(12) {
-            tracing::debug!("Query point: #{i} ({query_point:?})");
+        for (i, query_point) in query_points.iter().enumerate() {
+            // tracing::debug!("Query point: #{i} ({query_point:?})");
 
             let expected = linear_search(&points, query_point);
+            // println!("\n========== QUERY #{i} ==========");
+            // println!("Query point: {:?}", query_point);
+            // println!("Expected: item={}, dist²={}", expected.item, expected.distance);
 
             let result = tree_non_simd.nearest_one::<SquaredEuclidean<f64>>(query_point);
-
-            println!("NON-SIMD: {:?}", result);
+            // println!("NON-SIMD: item={}, dist²={}", result.1, result.0);
 
             let result = tree.nearest_one::<SquaredEuclidean<f64>>(query_point);
-
-            println!("SIMD: {:?}", result);
+            // println!("SIMD: item={}, dist²={}", result.1, result.0);
 
             assert_eq!(
                 result.0, expected.distance,

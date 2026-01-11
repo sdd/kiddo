@@ -10,18 +10,6 @@ use crate::StemStrategy;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
-/// Block3 child-to-pivot mapping encoded as a u32 literal.
-/// Each 3-bit segment maps child index to pivot offset within the block.
-/// Mapping: [3, 1, 4, 0, 5, 2, 6, 7] packed as 3-bit values (LSB = child 0)
-/// Binary: 0b111_110_010_101_000_100_001_011
-const CHILD_TO_PIVOT_BLOCK3: u32 = 0xF9510B;
-
-/// Extract pivot offset for a given child index from the packed Block3 mapping.
-#[inline(always)]
-const fn child_to_pivot_block3(child_idx: usize) -> usize {
-    ((CHILD_TO_PIVOT_BLOCK3 >> (child_idx * 3)) & 0b111) as usize
-}
-
 /// Block3 interval lower bounds encoded as u64 literal.
 /// Each 8-bit segment contains the lower bound pivot offset for a child (255 = -∞).
 /// Lower bounds: [255, 3, 1, 4, 0, 5, 2, 6] for children 0-7
@@ -300,6 +288,22 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
         let child_idx_mask = 1 << child_idx;
         let backtrack_mask = backtrack_mask & !child_idx_mask;
 
+        // Log all 7 pivots for debugging
+        let pivots: Vec<A> = (0..7)
+            .map(|i| unsafe { *stems.get_unchecked(block_base_idx + i) })
+            .collect();
+
+        tracing::trace!(
+            child_idx,
+            stem_idx = self.core.stem_idx(),
+            dim = *dim,
+            backtrack_mask_before = backtrack_mask | child_idx_mask,
+            backtrack_mask_after = backtrack_mask,
+            taking_path = format!("child {}", child_idx),
+            pivots = ?pivots,
+            "Block3: backtrack mask"
+        );
+
         // If any siblings need exploration, push them as a Block entry
         if backtrack_mask != 0 {
             use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
@@ -356,6 +360,8 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
 
                 tracing::debug!(
                     sibling_idx,
+                    stem_idx = self.core.stem_idx(),
+                    dim = *dim,
                     lower_offset,
                     upper_offset,
                     ?lower,
@@ -369,7 +375,10 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
                     ?rd,
                     ?delta,
                     ?rd_far,
-                    "SIMD: interval distance calc"
+                    ?best_dist,
+                    passes_threshold = rd_far <= best_dist,
+                    in_backtrack_mask = (backtrack_mask & (1 << sibling_idx)) != 0,
+                    "SIMD Block3: sibling interval calc"
                 );
             }
 
