@@ -403,7 +403,11 @@ pub trait StemStrategy: Clone + Sync + Send {
 
             let new_off = O::saturating_dist(query_elem_wide, pivot_wide);
             let old_off = *unsafe { off.get_unchecked(*dim) };
-            let rd_far = O::saturating_add(rd, D::dist1(new_off, old_off));
+            // Correct formula: rd_new = rd - old_off² + new_off²
+            // NOT: rd + (new_off - old_off)²
+            let new_sq = D::dist1(new_off, O::zero());
+            let old_sq = D::dist1(old_off, O::zero());
+            let rd_far = O::saturating_add(rd - old_sq, new_sq);
 
             // Only push if the sibling is worth exploring
             if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
