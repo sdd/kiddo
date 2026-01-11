@@ -19,11 +19,11 @@ where
     type Mutability = Immutable;
 
     fn new_with_capacity(_capacity: usize) -> Self {
-        unimplemented!()
+        Self::default()
     }
 
     fn new_with_empty_leaf() -> Self {
-        unimplemented!()
+        Self::default()
     }
 
     fn size(&self) -> usize {

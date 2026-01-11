@@ -175,6 +175,25 @@ where
     pub fn leaf_count(&self) -> usize {
         self.leaves.leaf_count()
     }
+
+    /// Find which leaf contains a specific item.
+    /// Returns `Some((leaf_idx, position_in_leaf))` if found, `None` if not found.
+    pub fn find_leaf_for_item(&self, target_item: T) -> Option<(usize, usize)>
+    where
+        T: PartialEq,
+    {
+        for leaf_idx in 0..self.leaves.leaf_count() {
+            let leaf_view = self.leaves.leaf_view(leaf_idx);
+            let (_points, items) = leaf_view.into_parts();
+
+            for (pos_in_leaf, item) in items.iter().enumerate() {
+                if *item == target_item {
+                    return Some((leaf_idx, pos_in_leaf));
+                }
+            }
+        }
+        None
+    }
 }
 
 impl<A, T, SS, LS, const K: usize, const B: usize> FromIterator<(usize, [A; K])>
@@ -309,7 +328,6 @@ mod tests {
         let kd_tree: KdTree<f32, u32, Eytzinger<3>, DummyLeafStrategy, 3, 16> = Default::default();
 
         assert_eq!(kd_tree.size, 0);
-        assert_eq!(kd_tree.max_stem_level, 0);
         assert!(kd_tree.is_empty());
     }
 

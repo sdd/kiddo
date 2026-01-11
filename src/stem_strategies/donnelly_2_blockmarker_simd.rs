@@ -344,7 +344,8 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
 
                 // Compute interval distance
                 let query_val = unsafe { *query.get_unchecked(*dim) };
-                let query_wide_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(query_val)) };
+                let query_wide_f64: f64 =
+                    unsafe { std::mem::transmute_copy(&D::widen_coord(query_val)) };
                 let lower_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(lower)) };
                 let upper_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(upper)) };
 
@@ -1020,14 +1021,14 @@ mod tests {
         //      pivot[1]    pivot[2]
         //   p[3] p[4]   p[5] p[6]
         // ch0 ch1 ch2 ch3 ch4 ch5 ch6 ch7
-        
+
         assert_eq!(child_interval_bounds_block3(0), (255, 3)); // [-∞, pivot[3])
-        assert_eq!(child_interval_bounds_block3(1), (3, 1));   // [pivot[3], pivot[1])
-        assert_eq!(child_interval_bounds_block3(2), (1, 4));   // [pivot[1], pivot[4])
-        assert_eq!(child_interval_bounds_block3(3), (4, 0));   // [pivot[4], pivot[0])
-        assert_eq!(child_interval_bounds_block3(4), (0, 5));   // [pivot[0], pivot[5])
-        assert_eq!(child_interval_bounds_block3(5), (5, 2));   // [pivot[5], pivot[2])
-        assert_eq!(child_interval_bounds_block3(6), (2, 6));   // [pivot[2], pivot[6])
+        assert_eq!(child_interval_bounds_block3(1), (3, 1)); // [pivot[3], pivot[1])
+        assert_eq!(child_interval_bounds_block3(2), (1, 4)); // [pivot[1], pivot[4])
+        assert_eq!(child_interval_bounds_block3(3), (4, 0)); // [pivot[4], pivot[0])
+        assert_eq!(child_interval_bounds_block3(4), (0, 5)); // [pivot[0], pivot[5])
+        assert_eq!(child_interval_bounds_block3(5), (5, 2)); // [pivot[5], pivot[2])
+        assert_eq!(child_interval_bounds_block3(6), (2, 6)); // [pivot[2], pivot[6])
         assert_eq!(child_interval_bounds_block3(7), (6, 255)); // [pivot[6], +∞)
     }
 
@@ -1060,7 +1061,10 @@ mod tests {
         // Test with infinity bounds
         assert_eq!(interval_distance_1d(-100.0, f64::NEG_INFINITY, 5.0), 0.0); // Below but no lower bound
         assert_eq!(interval_distance_1d(100.0, 5.0, f64::INFINITY), 0.0); // Above but no upper bound
-        assert_eq!(interval_distance_1d(0.0, f64::NEG_INFINITY, f64::INFINITY), 0.0); // Unbounded
+        assert_eq!(
+            interval_distance_1d(0.0, f64::NEG_INFINITY, f64::INFINITY),
+            0.0
+        ); // Unbounded
     }
 
     #[test]
@@ -1086,99 +1090,120 @@ mod tests {
     }
 }
 
-    #[test]
-    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-    fn test_simd_backtrack_vs_scalar() {
-        use crate::traits_unified_2::SquaredEuclidean;
-        use crate::traits_unified_2::DistanceMetricUnified;
-        
-        // Create test pivots: [pivot0, pivot1, ..., pivot6, +∞]
-        let pivots = [0.2, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f64::INFINITY];
-        
-        let query = 0.25;
-        let old_off = 0.0;
-        let rd = 0.0;
-        let best_dist = f64::INFINITY;
-        
-        // Compute scalar version for each child
-        let mut scalar_results = [false; 8];
-        for child_idx in 0..8 {
-            let (lower_offset, upper_offset) = child_interval_bounds_block3(child_idx);
+#[test]
+#[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+fn test_simd_backtrack_vs_scalar() {
+    use crate::traits_unified_2::DistanceMetricUnified;
+    use crate::traits_unified_2::SquaredEuclidean;
 
-            let lower = if lower_offset == 255 {
-                f64::NEG_INFINITY
-            } else {
-                pivots[lower_offset as usize]
-            };
+    // Create test pivots: [pivot0, pivot1, ..., pivot6, +∞]
+    let pivots = [0.2, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f64::INFINITY];
 
-            let upper = if upper_offset == 255 {
-                f64::INFINITY
-            } else {
-                pivots[upper_offset as usize]
-            };
+    let query = 0.25;
+    let old_off = 0.0;
+    let rd = 0.0;
+    let best_dist = f64::INFINITY;
 
-            let interval_dist = interval_distance_1d(query, lower, upper);
-            // rd_far = rd + (interval_dist - old_off)²
-            let delta = (interval_dist - old_off) * (interval_dist - old_off);
-            let rd_far = rd + delta;
+    // Compute scalar version for each child
+    let mut scalar_results = [false; 8];
+    for child_idx in 0..8 {
+        let (lower_offset, upper_offset) = child_interval_bounds_block3(child_idx);
 
-            scalar_results[child_idx] = rd_far <= best_dist;
-        }
-        
-        // Compute SIMD version
-        let pivots_ptr = pivots.as_ptr() as *const u8;
-// Replace the test with a simpler version
-let simd_mask = <SquaredEuclidean<f64> as DistanceMetricUnified<f64, 3>>::simd_backtrack_check_block3_interval_f64_avx2(
+        let lower = if lower_offset == 255 {
+            f64::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+
+        let upper = if upper_offset == 255 {
+            f64::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+
+        let interval_dist = interval_distance_1d(query, lower, upper);
+        // rd_far = rd + (interval_dist - old_off)²
+        let delta = (interval_dist - old_off) * (interval_dist - old_off);
+        let rd_far = rd + delta;
+
+        scalar_results[child_idx] = rd_far <= best_dist;
+    }
+
+    // Compute SIMD version
+    let pivots_ptr = pivots.as_ptr() as *const u8;
+    // Replace the test with a simpler version
+    let simd_mask = <SquaredEuclidean<f64> as DistanceMetricUnified<f64, 3>>::simd_backtrack_check_block3_interval_f64_avx2(
     query, pivots_ptr, 0, old_off, rd, best_dist
 );
-        
-        // Compare
-        for child_idx in 0..8 {
-            let scalar_pass = scalar_results[child_idx];
-            let simd_pass = (simd_mask & (1 << child_idx)) != 0;
-            assert_eq!(
-                scalar_pass, simd_pass,
-                "Mismatch for child {}: scalar={}, simd={}, query={}, lower={:?}, upper={:?}",
-                child_idx, scalar_pass, simd_pass, query,
-                if child_interval_bounds_block3(child_idx).0 == 255 { f64::NEG_INFINITY } else { pivots[child_interval_bounds_block3(child_idx).0 as usize] },
-                if child_interval_bounds_block3(child_idx).1 == 255 { f64::INFINITY } else { pivots[child_interval_bounds_block3(child_idx).1 as usize] },
-            );
-        }
+
+    // Compare
+    for child_idx in 0..8 {
+        let scalar_pass = scalar_results[child_idx];
+        let simd_pass = (simd_mask & (1 << child_idx)) != 0;
+        assert_eq!(
+            scalar_pass,
+            simd_pass,
+            "Mismatch for child {}: scalar={}, simd={}, query={}, lower={:?}, upper={:?}",
+            child_idx,
+            scalar_pass,
+            simd_pass,
+            query,
+            if child_interval_bounds_block3(child_idx).0 == 255 {
+                f64::NEG_INFINITY
+            } else {
+                pivots[child_interval_bounds_block3(child_idx).0 as usize]
+            },
+            if child_interval_bounds_block3(child_idx).1 == 255 {
+                f64::INFINITY
+            } else {
+                pivots[child_interval_bounds_block3(child_idx).1 as usize]
+            },
+        );
+    }
+}
+
+#[test]
+#[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+fn debug_query_12_interval_distances() {
+    // This test manually computes what should happen for query #12
+    // Query point: [0.8947785353168005, 0.678720516865904, 0.6048091301041568]
+    // We're interested in the second block pop (dim=0, old_off=0)
+
+    // From the log, the pivots that would be in a block starting at some block_base_idx
+    // Let's trace through what the interval distances should be
+
+    // rd_values from log: [0.5638408493966387, 0.3959802548889544, 0.25295146890380843,
+    //                       0.14310568836537063, 0.06606798320124753, 0.0170270603870678,
+    //                       0.00021225610203875987, 0.0]
+
+    // For each child, let's print what the intervals should be
+    println!("Query value in dim 0: 0.8947785353168005");
+    println!("\nChild interval bounds and expected distances:");
+
+    for child_idx in 0..8 {
+        let (lower_off, upper_off) = child_interval_bounds_block3(child_idx);
+        println!(
+            "Child {}: lower_offset={}, upper_offset={}",
+            child_idx, lower_off, upper_off
+        );
     }
 
-    #[test]
-    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-    fn debug_query_12_interval_distances() {
-        // This test manually computes what should happen for query #12
-        // Query point: [0.8947785353168005, 0.678720516865904, 0.6048091301041568]
-        // We're interested in the second block pop (dim=0, old_off=0)
-        
-        // From the log, the pivots that would be in a block starting at some block_base_idx
-        // Let's trace through what the interval distances should be
-        
-        // rd_values from log: [0.5638408493966387, 0.3959802548889544, 0.25295146890380843, 
-        //                       0.14310568836537063, 0.06606798320124753, 0.0170270603870678, 
-        //                       0.00021225610203875987, 0.0]
-        
-        // For each child, let's print what the intervals should be
-        println!("Query value in dim 0: 0.8947785353168005");
-        println!("\nChild interval bounds and expected distances:");
-        
-        for child_idx in 0..8 {
-            let (lower_off, upper_off) = child_interval_bounds_block3(child_idx);
-            println!("Child {}: lower_offset={}, upper_offset={}", child_idx, lower_off, upper_off);
-        }
-        
-        // The issue is: why does child 6 pass but not child 4?
-        // best_dist at that point should be 0.0036181109111460682
-        println!("\nbest_dist would be: 0.0036181109111460682");
-        println!("Child 4 rd_value: 0.06606798320124753 > best_dist? {}", 0.06606798320124753 > 0.0036181109111460682);
-        println!("Child 6 rd_value: 0.00021225610203875987 > best_dist? {}", 0.00021225610203875987 > 0.0036181109111460682);
-        
-        // So child 6 should indeed survive and child 4 should be pruned based on rd_values
-        // But non-SIMD found the answer in leaf 52 (child 4's leaf)
-        // This suggests either:
-        // 1. The interval distance calculation is wrong
-        // 2. The non-SIMD uses different logic
-        // 3. There's something about the tree structure we're missing
-    }
+    // The issue is: why does child 6 pass but not child 4?
+    // best_dist at that point should be 0.0036181109111460682
+    println!("\nbest_dist would be: 0.0036181109111460682");
+    println!(
+        "Child 4 rd_value: 0.06606798320124753 > best_dist? {}",
+        0.06606798320124753 > 0.0036181109111460682
+    );
+    println!(
+        "Child 6 rd_value: 0.00021225610203875987 > best_dist? {}",
+        0.00021225610203875987 > 0.0036181109111460682
+    );
+
+    // So child 6 should indeed survive and child 4 should be pruned based on rd_values
+    // But non-SIMD found the answer in leaf 52 (child 4's leaf)
+    // This suggests either:
+    // 1. The interval distance calculation is wrong
+    // 2. The non-SIMD uses different logic
+    // 3. There's something about the tree structure we're missing
+}

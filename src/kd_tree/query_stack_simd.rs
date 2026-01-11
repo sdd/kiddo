@@ -22,7 +22,7 @@ pub enum SimdQueryStackContext<A, SS> {
     Block {
         siblings: [SS; 8],
         rd_values: [A; 8],
-        new_off_values: [A; 8],  // Per-sibling offset values (e.g., interval distances)
+        new_off_values: [A; 8], // Per-sibling offset values (e.g., interval distances)
         sibling_mask: u8,
         dim: usize,
         old_off: A,

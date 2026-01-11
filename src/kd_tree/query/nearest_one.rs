@@ -178,7 +178,7 @@ mod tests {
             .map(|_| rng.random::<[f32; 4]>()) // Use the seeded rng
             .collect();
 
-        println!("Tree: {}", &tree);
+        // println!("Tree: {}", &tree);
 
         for (_i, query_point) in query_points.iter().enumerate() {
             let expected = linear_search(&content_to_add, query_point);
@@ -212,12 +212,18 @@ mod tests {
             .map(|_| rng.random::<[f32; 4]>()) // Use the seeded rng
             .collect();
 
-        for (_i, query_point) in query_points.iter().enumerate() {
+        for (i, query_point) in query_points.iter().enumerate() {
             let expected = linear_search(&content_to_add, query_point);
             let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
 
-            assert_eq!(result.0, expected.distance);
-            assert_eq!(result.1 as usize, expected.item);
+            assert_eq!(
+                result.0, expected.distance,
+                "Incorrect distance, query index: {i}"
+            );
+            assert_eq!(
+                result.1 as usize, expected.item,
+                "Incorrect item, query index: {i}"
+            );
         }
     }
 
