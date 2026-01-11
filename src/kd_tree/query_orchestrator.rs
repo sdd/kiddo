@@ -156,7 +156,7 @@ where
             tracing::trace!(%dim, %old_off, %rd, ?off, "Popped stack context");
 
             let max_dist = query_ctx.max_dist();
-            if O::cmp(rd, max_dist) != std::cmp::Ordering::Less {
+            if O::cmp(rd, max_dist) == std::cmp::Ordering::Greater {
                 tracing::trace!(%rd, %max_dist, "SCALAR Prune check: PRUNE");
                 continue;
             }
@@ -275,7 +275,7 @@ where
                     tracing::trace!(%dim, %old_off, %rd, ?off, "Popped single context");
 
                     let max_dist = query_ctx.max_dist();
-                    if O::cmp(rd, max_dist) != std::cmp::Ordering::Less {
+                    if O::cmp(rd, max_dist) == std::cmp::Ordering::Greater {
                         tracing::trace!(%rd, %max_dist, "Prune check: PRUNE");
                         continue;
                     }
