@@ -414,7 +414,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL,
             const BYTES_PER_LINE: usize = 64;
             let base_ptr = stems_ptr.as_ptr().add((next_base as usize) * VB as usize);
 
-            let ptr_1 = base_ptr.add(1 * BYTES_PER_LINE);
+            let ptr_1 = base_ptr.add(BYTES_PER_LINE);
             let ptr_2 = base_ptr.add(2 * BYTES_PER_LINE);
             let ptr_3 = base_ptr.add(3 * BYTES_PER_LINE);
             let ptr_4 = base_ptr.add(4 * BYTES_PER_LINE);

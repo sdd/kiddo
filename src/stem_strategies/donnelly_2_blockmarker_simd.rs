@@ -242,14 +242,16 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
             }
             #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
             {
-                D::simd_backtrack_check_block3_interval_f64_avx2(
-                    unsafe { std::mem::transmute_copy(&query_wide_f64) },
-                    stems_ptr.as_ptr(),
-                    block_base_idx,
-                    unsafe { std::mem::transmute_copy(&old_off_f64) },
-                    unsafe { std::mem::transmute_copy(&rd_f64) },
-                    unsafe { std::mem::transmute_copy(&best_dist_f64) },
-                )
+                unsafe {
+                    D::simd_backtrack_check_block3_interval_f64_avx2(
+                        std::mem::transmute_copy(&query_wide_f64),
+                        stems_ptr.as_ptr(),
+                        block_base_idx,
+                        std::mem::transmute_copy(&old_off_f64),
+                        std::mem::transmute_copy(&rd_f64),
+                        std::mem::transmute_copy(&best_dist_f64),
+                    )
+                }
             }
         } else if std::mem::size_of::<A>() == 4 {
             // f32 path
@@ -260,25 +262,29 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
 
             #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
             {
-                D::simd_backtrack_check_block3_f32_avx512(
-                    unsafe { std::mem::transmute_copy(&query_wide_f32) },
-                    stems_ptr.as_ptr(),
-                    block_base_idx,
-                    unsafe { std::mem::transmute_copy(&old_off_f32) },
-                    unsafe { std::mem::transmute_copy(&rd_f32) },
-                    unsafe { std::mem::transmute_copy(&best_dist_f32) },
-                )
+                unsafe {
+                    D::simd_backtrack_check_block3_f32_avx512(
+                        std::mem::transmute_copy(&query_wide_f32),
+                        stems_ptr.as_ptr(),
+                        block_base_idx,
+                        std::mem::transmute_copy(&old_off_f32),
+                        std::mem::transmute_copy(&rd_f32),
+                        std::mem::transmute_copy(&best_dist_f32),
+                    )
+                }
             }
             #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
             {
-                D::simd_backtrack_check_block3_f32_avx2(
-                    unsafe { std::mem::transmute_copy(&query_wide_f32) },
-                    stems_ptr.as_ptr(),
-                    block_base_idx,
-                    unsafe { std::mem::transmute_copy(&old_off_f32) },
-                    unsafe { std::mem::transmute_copy(&rd_f32) },
-                    unsafe { std::mem::transmute_copy(&best_dist_f32) },
-                )
+                unsafe {
+                    D::simd_backtrack_check_block3_f32_avx2(
+                        std::mem::transmute_copy(&query_wide_f32),
+                        stems_ptr.as_ptr(),
+                        block_base_idx,
+                        std::mem::transmute_copy(&old_off_f32),
+                        std::mem::transmute_copy(&rd_f32),
+                        std::mem::transmute_copy(&best_dist_f32),
+                    )
+                }
             }
         } else {
             panic!("Unsupported axis type size");
@@ -344,13 +350,15 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
 
                 // Compute interval distance
                 let query_val = unsafe { *query.get_unchecked(*dim) };
+
+                // TODO: this only works for f64! need a refactor to work for any AxisUnified
                 let query_wide_f64: f64 =
                     unsafe { std::mem::transmute_copy(&D::widen_coord(query_val)) };
                 let lower_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(lower)) };
                 let upper_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(upper)) };
-
                 let interval_dist = interval_distance_1d(query_wide_f64, lower_f64, upper_f64);
                 let new_off: O = unsafe { std::mem::transmute_copy(&interval_dist) };
+
                 new_off_values[sibling_idx] = new_off;
 
                 // rd_far = rd + dist1(new_off, old_off) = rd + (new_off - old_off)²
@@ -594,25 +602,29 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
 
             #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
             {
-                D::simd_backtrack_check_block4_f64_avx512(
-                    unsafe { std::mem::transmute_copy(&query_wide_f64) },
-                    stems_ptr.as_ptr(),
-                    block_base_idx,
-                    unsafe { std::mem::transmute_copy(&old_off_f64) },
-                    unsafe { std::mem::transmute_copy(&rd_f64) },
-                    unsafe { std::mem::transmute_copy(&best_dist_f64) },
-                )
+                unsafe {
+                    D::simd_backtrack_check_block4_f64_avx512(
+                        std::mem::transmute_copy(&query_wide_f64),
+                        stems_ptr.as_ptr(),
+                        block_base_idx,
+                        std::mem::transmute_copy(&old_off_f64),
+                        std::mem::transmute_copy(&rd_f64),
+                        std::mem::transmute_copy(&best_dist_f64),
+                    )
+                }
             }
             #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
             {
-                D::simd_backtrack_check_block4_f64_avx2(
-                    unsafe { std::mem::transmute_copy(&query_wide_f64) },
-                    stems_ptr.as_ptr(),
-                    block_base_idx,
-                    unsafe { std::mem::transmute_copy(&old_off_f64) },
-                    unsafe { std::mem::transmute_copy(&rd_f64) },
-                    unsafe { std::mem::transmute_copy(&best_dist_f64) },
-                )
+                unsafe {
+                    D::simd_backtrack_check_block4_f64_avx2(
+                        std::mem::transmute_copy(&query_wide_f64),
+                        stems_ptr.as_ptr(),
+                        block_base_idx,
+                        std::mem::transmute_copy(&old_off_f64),
+                        std::mem::transmute_copy(&rd_f64),
+                        std::mem::transmute_copy(&best_dist_f64),
+                    )
+                }
             }
         } else if std::mem::size_of::<A>() == 4 {
             // f32 path
@@ -623,25 +635,29 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
 
             #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
             {
-                D::simd_backtrack_check_block4_f32_avx512(
-                    unsafe { std::mem::transmute_copy(&query_wide_f32) },
-                    stems_ptr.as_ptr(),
-                    block_base_idx,
-                    unsafe { std::mem::transmute_copy(&old_off_f32) },
-                    unsafe { std::mem::transmute_copy(&rd_f32) },
-                    unsafe { std::mem::transmute_copy(&best_dist_f32) },
-                )
+                unsafe {
+                    D::simd_backtrack_check_block4_f32_avx512(
+                        std::mem::transmute_copy(&query_wide_f32),
+                        stems_ptr.as_ptr(),
+                        block_base_idx,
+                        std::mem::transmute_copy(&old_off_f32),
+                        std::mem::transmute_copy(&rd_f32),
+                        std::mem::transmute_copy(&best_dist_f32),
+                    )
+                }
             }
             #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
             {
-                D::simd_backtrack_check_block4_f32_avx2(
-                    unsafe { std::mem::transmute_copy(&query_wide_f32) },
-                    stems_ptr.as_ptr(),
-                    block_base_idx,
-                    unsafe { std::mem::transmute_copy(&old_off_f32) },
-                    unsafe { std::mem::transmute_copy(&rd_f32) },
-                    unsafe { std::mem::transmute_copy(&best_dist_f32) },
-                )
+                unsafe {
+                    D::simd_backtrack_check_block4_f32_avx2(
+                        std::mem::transmute_copy(&query_wide_f32),
+                        stems_ptr.as_ptr(),
+                        block_base_idx,
+                        std::mem::transmute_copy(&old_off_f32),
+                        std::mem::transmute_copy(&rd_f32),
+                        std::mem::transmute_copy(&best_dist_f32),
+                    )
+                }
             }
         } else {
             panic!("Unsupported axis type size");
@@ -1132,9 +1148,11 @@ fn test_simd_backtrack_vs_scalar() {
     // Compute SIMD version
     let pivots_ptr = pivots.as_ptr() as *const u8;
     // Replace the test with a simpler version
-    let simd_mask = <SquaredEuclidean<f64> as DistanceMetricUnified<f64, 3>>::simd_backtrack_check_block3_interval_f64_avx2(
-    query, pivots_ptr, 0, old_off, rd, best_dist
-);
+    let simd_mask = unsafe {
+        <SquaredEuclidean<f64> as DistanceMetricUnified<f64, 3>>::simd_backtrack_check_block3_interval_f64_avx2(
+        query, pivots_ptr, 0, old_off, rd, best_dist
+    )
+    };
 
     // Compare
     for child_idx in 0..8 {

@@ -5,8 +5,11 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::broken_intra_doc_links)]
 #![warn(rustdoc::private_intra_doc_links)]
-#![doc(html_root_url = "https://docs.rs/kiddo/5.2.0")]
+#![doc(html_root_url = "https://docs.rs/kiddo/6.0.0")]
 #![doc(issue_tracker_base_url = "https://github.com/sdd/kiddo/issues/")]
+#![allow(clippy::pointers_in_nomem_asm_block)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::needless_range_loop)]
 
 //! # Kiddo
 //!

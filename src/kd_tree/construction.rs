@@ -247,7 +247,7 @@ where
         let mut stems_depth: usize = leaf_node_count.next_power_of_two().ilog2() as usize;
 
         // Pad stem tree height to the next block boundary for block-based strategies
-        let padding_level_count = if (stems_depth % SS::block_size()) != 0 {
+        let padding_level_count = if !stems_depth.is_multiple_of(SS::block_size()) {
             let padding_level_count = SS::block_size() - (stems_depth % SS::block_size());
             stems_depth += padding_level_count;
             padding_level_count
@@ -272,7 +272,7 @@ where
         let stem_node_count = stem_strat.stem_idx() + 1;
 
         // rounded up to the nearest multiple of 8 if not a multiple of 8 already
-        let stem_node_count_padded = ((stem_node_count + 7) / 8) * 8;
+        let stem_node_count_padded = stem_node_count.div_ceil(8) * 8;
         let mut stems = avec![A::max_value(); stem_node_count_padded];
 
         let mut leaves = LS::new_with_capacity(item_count);
@@ -429,10 +429,12 @@ where
                 "Wrote to stem #{stem_index:?} for a second time",
             );
 
-            debug_assert!(
-                right_capacity >= chunk_length.saturating_sub(pivot),
-                "right_capacity ({right_capacity}) should be greater than chunk_length - pivot ({chunk_length} - {pivot})"
-            );
+            // TODO: we want this here for Leaf Strategies whose bucket size is a hard limit.
+            // That's not the case for flat_vec but it is for vec_of_arrays
+            // debug_assert!(
+            //     right_capacity >= chunk_length.saturating_sub(pivot),
+            //     "right_capacity ({right_capacity}) should be greater than chunk_length - pivot ({chunk_length} - {pivot})"
+            // );
 
             stems[stem_index] = source[sort_index[pivot]][dim];
         }
