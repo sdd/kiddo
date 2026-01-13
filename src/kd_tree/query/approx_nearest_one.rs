@@ -471,13 +471,9 @@ mod tests {
     fn v6_approx_nearest_one_donnelly_marker_simd_f64() {
         use crate::stem_strategies::Block3;
 
-        // Test DonnellyMarkerSimd with f64 data
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
-        // Use 8192 points which with bucket size 32 gives 256 leaves
-        // 256 leaves = 2^8, so tree depth = 8
-        // With Block3, depth 8 is not divisible by 3, so tree will be padded to depth 9
-        let points: Vec<[f64; 3]> = (0..8_192)
+        let points: Vec<[f64; 3]> = (0..2_097_152)
             .map(|_| {
                 [
                     rng.random_range(0.0..1.0),
@@ -497,13 +493,11 @@ mod tests {
         > = KdTree::new_from_slice(&points);
 
         assert!(!tree.is_empty());
-        assert_eq!(tree.size(), 8_192);
-        assert_eq!(tree.leaf_count(), 256);
+        assert_eq!(tree.size(), 2_097_152);
+        assert_eq!(tree.leaf_count(), 65_536);
 
-        // Verify max_stem_level is padded to multiple of block size (3)
-        // 256 leaves = depth 8, padded to 9
         assert_eq!((tree.max_stem_level() + 1) % 3, 0);
-        assert_eq!(tree.max_stem_level(), 8);
+        assert_eq!(tree.max_stem_level(), 17);
 
         // Test multiple query points to ensure queries work correctly
         let query_points: Vec<[f64; 3]> = (0..100)
@@ -521,7 +515,7 @@ mod tests {
 
             // Verify result is valid
             assert!(result.0 >= 0.0, "Distance should be non-negative");
-            assert!(result.1 < 8_192, "Item index should be valid");
+            assert!(result.1 < 2_097_152, "Item index should be valid");
 
             // Verify the returned item is actually close to the query
             // (approximate query returns best in target leaf, so should be reasonably close)

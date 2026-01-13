@@ -184,7 +184,6 @@ pub trait StemStrategy: Clone + Sync + Send {
     /// The block size of this strategy
     ///
     /// The default is 1, which means that the strategy is not block-based.
-
     const BLOCK_SIZE: usize = 1;
 
     /// Query stack context type for backtracking queries.
