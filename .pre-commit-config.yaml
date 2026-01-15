@@ -1,0 +1,26 @@
+repos:
+  - repo: builtin
+    hooks:
+      # File checking hooks
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-case-conflict
+      - id: check-json
+        exclude: '^renovate\.json$'
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-xml
+      - id: check-yaml
+      - id: check-executables-have-shebangs
+      - id: check-symlinks
+
+      # Security hooks
+      - id: detect-private-key
+
+      # File fixing hooks
+      - id: end-of-file-fixer
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: trailing-whitespace
+        args: ['--markdown-linebreak-ext=md']
