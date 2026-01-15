@@ -20,7 +20,7 @@ Kiddo provides:
  - An [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) with space and performance advantages over the standard
    k-d tree, for situations where the tree does not need to be modified after creation
  - **Integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) crate;
- - **`f16` support** via the [`half`](https://docs.rs/half/latest/half/) crate; 
+ - **`f16` support** via the [`half`](https://docs.rs/half/latest/half/) crate;
  - **Instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
 
 ## Usage
@@ -68,7 +68,7 @@ See the [examples documentation](https://github.com/sdd/kiddo/tree/master/exampl
 
 The Kiddo crate exposes the following features. Any labelled as **(NIGHTLY)** are not available on `stable` Rust as they require some unstable features. You'll need to build with `nightly` in order to user them.
 * `fixed`: enables the fixed module, which provides a version of KdTree that supports fixed-point types via the [`fixed`](https://docs.rs/fixed/latest/fixed) crate
-* `rkyv` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.7. 
+* `rkyv` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.7.
 * `rkyv_08` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.8.
 * `serde` - serialization / deserialization via [`Serde`](https://docs.rs/serde/latest/serde/)
 * `simd` **(NIGHTLY)** - enables some handwritten SIMD intrinsic code within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) that may improve performance (currently only on the nearest_one method when using `f64`)
@@ -173,7 +173,7 @@ The following activities are benchmarked (where implemented):
 * Querying the nearest one, ten, or one hundred points to a given query point
 * Querying all points within a set radius of a given point (both unsorted results, and results sorted by distance)
 * Querying the nearest n items within a specified radius (sorted and unsorted)
-* 
+*
 Each action is benchmarked against trees that contain 100, 1,000, 10,000, 100,000, 1,000,000 and in some cases 10,000,000 nodes.
 
 The benchmarks are repeated against 2d, 3d and 4d trees, as well as with points that are both of type `f32` and of type `f64`, as well as a 16-bit fixed point use case for Kiddo v2.

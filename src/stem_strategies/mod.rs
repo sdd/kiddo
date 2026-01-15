@@ -22,7 +22,7 @@ mod prefetch;
 mod donnelly_2_blockmarker_simd;
 
 #[cfg(feature = "simd")]
-pub use donnelly_2_blockmarker_simd::{CompareBlock3, DonnellyMarkerSimd};
+pub use donnelly_2_blockmarker_simd::{CompareBlock3, CompareBlock4, DonnellyMarkerSimd};
 
 pub use donnelly_2::Donnelly;
 pub use donnelly_2_pf_blockmarker::DonnellyMarkerPf;

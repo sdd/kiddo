@@ -59,7 +59,7 @@ macro_rules! generate_immutable_within_unsorted_iter {
                     gen_scope = self.within_unsorted_iter_recurse::<D>(
                         query,
                         radius,
-                        stem_ordering,       
+                        stem_ordering,
                         gen_scope,
                         off,
                         rd,
@@ -75,7 +75,7 @@ macro_rules! generate_immutable_within_unsorted_iter {
                         gen_scope = self.within_unsorted_iter_recurse::<D>(
                             query,
                             radius,
-                            farther_so,       
+                            farther_so,
                             gen_scope,
                             off,
                             rd,
