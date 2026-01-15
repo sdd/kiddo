@@ -50,7 +50,7 @@ total elapsed: 50.53 μs
 
 * Serde-based serialization to gzipped bincode
 * Serde-based deserialization from gzipped bincode
-* 
+*
 ### Prerequisites
 
 This example uses the larger GeoNames database, created by geonames and downloadable from Kaggle. You'll need to download it into this `examples` folder and unzip it in order to use these examples. You can find it here: [https://www.kaggle.com/datasets/geonames/geonames-database](https://www.kaggle.com/datasets/geonames/geonames-database).

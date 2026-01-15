@@ -8,6 +8,9 @@ use crate::traits_unified_2::{
 use crate::StemStrategy;
 use std::ptr::NonNull;
 
+#[cfg(feature = "simd")]
+mod simd;
+
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: AxisUnified<Coord = A>,
@@ -313,7 +316,7 @@ where
                     // SIMD pruning: check which siblings pass the backtrack test
                     let max_dist = query_ctx.max_dist();
                     let surviving_mask =
-                        Self::simd_prune_block::<O>(&rd_values, max_dist, sibling_mask);
+                        simd::simd_prune_block::<O>(&rd_values, max_dist, sibling_mask);
 
                     if surviving_mask == 0 {
                         tracing::trace!("All siblings pruned");
@@ -431,98 +434,4 @@ where
         stem_strat.leaf_idx()
     }
 
-    /// SIMD prune block helper
-    #[cfg(feature = "simd")]
-    #[inline(always)]
-    fn simd_prune_block<O>(rd_values: &[O; 8], max_dist: O, sibling_mask: u8) -> u8
-    where
-        O: AxisUnified<Coord = O>,
-    {
-        if std::mem::size_of::<O>() == 8 {
-            // f64 path
-            let max_dist_f64: f64 = unsafe { std::mem::transmute_copy(&max_dist) };
-            let rd_f64: [f64; 8] = unsafe { std::mem::transmute_copy(rd_values) };
-            Self::simd_prune_block_f64(&rd_f64, max_dist_f64, sibling_mask)
-        } else if std::mem::size_of::<O>() == 4 {
-            // f32 path
-            let max_dist_f32: f32 = unsafe { std::mem::transmute_copy(&max_dist) };
-            let rd_f32: [f32; 8] = unsafe { std::mem::transmute_copy(rd_values) };
-            Self::simd_prune_block_f32(&rd_f32, max_dist_f32, sibling_mask)
-        } else {
-            panic!("Unsupported output type size");
-        }
-    }
-
-    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
-    #[inline(always)]
-    fn simd_prune_block_f64(rd_values: &[f64; 8], max_dist: f64, sibling_mask: u8) -> u8 {
-        unsafe {
-            use std::arch::x86_64::*;
-
-            let max_dist_vec = _mm256_set1_pd(max_dist);
-            let rd_low = _mm256_loadu_pd(rd_values.as_ptr());
-            let rd_high = _mm256_loadu_pd(rd_values.as_ptr().add(4));
-
-            let cmp_low = _mm256_cmp_pd(rd_low, max_dist_vec, _CMP_LE_OQ);
-            let cmp_high = _mm256_cmp_pd(rd_high, max_dist_vec, _CMP_LE_OQ);
-
-            let mask_low = _mm256_movemask_pd(cmp_low) as u8;
-            let mask_high = _mm256_movemask_pd(cmp_high) as u8;
-
-            let mask = mask_low | (mask_high << 4);
-
-            // We need to account for the fact that the ordering of stem pivots within
-            // a 3-block is triangular. e.g.:
-            //
-            //                               #0 (0.5)
-            //            #1 (0.25)                             #2 (0.75)
-            // #3 (0.125)          #4 (0.375)        #5 (0.625)          #6 (0.875)
-
-            //  Child Idx |      Val Range      |  Pivot Idx
-            //     0      |           x < 0.125 |      3
-            //     1      |  0.125 <= x < 0.250 |      1
-            //     2      |  0.250 <= x < 0.375 |      4
-            //     3      |  0.375 <= x < 0.500 |      0
-            //     4      |  0.500 <= x < 0.625 |      5
-            //     5      |  0.625 <= x < 0.750 |      2
-            //     6      |  0.750 <= x < 0.875 |      6
-            //     7      |  0.875 <= x         |
-
-            // Map pivot idx to child idx by permuting the mask
-
-            // Source: https://programming.sirrida.de/calcperm.php
-            // Config: LSB First, Origin 0, Base 10, indices refer to source bits
-            // Input: "7 3 1 4 0 5 2 6  # bswap"
-            // allow all
-            // Method used: Bit Group Moving
-            // let permuted_mask = (mask & 0x20)
-            //     | ((mask & 0x42) << 1)
-            //     | ((mask & 0x05) << 4)
-            //     | ((mask & 0x80) >> 7)
-            //     | ((mask & 0x08) >> 2)
-            //     | ((mask & 0x10) >> 1);
-            //
-            // let masked_permuted_mask = permuted_mask & sibling_mask;
-            //
-            // masked_permuted_mask
-
-            mask & sibling_mask
-        }
-    }
-
-    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
-    #[inline(always)]
-    fn simd_prune_block_f32(rd_values: &[f32; 8], max_dist: f32, sibling_mask: u8) -> u8 {
-        unsafe {
-            use std::arch::x86_64::*;
-
-            let max_dist_vec = _mm256_set1_ps(max_dist);
-            let rd_vec = _mm256_loadu_ps(rd_values.as_ptr());
-
-            let cmp = _mm256_cmp_ps(rd_vec, max_dist_vec, _CMP_LE_OQ);
-            let mask = _mm256_movemask_ps(cmp) as u8;
-
-            mask & sibling_mask
-        }
-    }
 }

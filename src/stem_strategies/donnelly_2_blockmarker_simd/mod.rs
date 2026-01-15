@@ -1,14 +1,20 @@
 //! Donnelly SIMD + Prefetch Stem Strategy
+//!
+//! This module provides SIMD-optimized block-at-once traversal strategies for kd-trees.
+//! Architecture-specific implementations are in submodules.
 
-use crate::stem_strategies::donnelly_2_blockmarker_simd::avx2_impl::{
-    compare_block3_f32_avx2, compare_block3_f64_avx2, compare_block4_f32_avx2,
-};
 use crate::stem_strategies::donnelly_core::DonnellyCore;
 use crate::stem_strategies::{Block3, Block4, BlockSizeMarker};
 use crate::traits_unified_2::AxisUnified;
-use crate::StemStrategy;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
+
+// Architecture-specific modules
+#[cfg(target_arch = "x86_64")]
+pub mod x86_64;
+
+#[cfg(target_arch = "aarch64")]
+pub mod aarch64;
 
 /// Block3 interval lower bounds encoded as u64 literal.
 /// Each 8-bit segment contains the lower bound pivot offset for a child (255 = -∞).
@@ -43,7 +49,7 @@ const CHILD_UPPER_BOUNDS_BLOCK3: u64 = 0xFF_06_02_05_00_04_01_03;
 /// ...etc
 /// ```
 #[inline(always)]
-const fn child_interval_bounds_block3(child_idx: usize) -> (u8, u8) {
+pub(crate) const fn child_interval_bounds_block3(child_idx: usize) -> (u8, u8) {
     let lower = ((CHILD_LOWER_BOUNDS_BLOCK3 >> (child_idx * 8)) & 0xFF) as u8;
     let upper = ((CHILD_UPPER_BOUNDS_BLOCK3 >> (child_idx * 8)) & 0xFF) as u8;
     (lower, upper)
@@ -61,7 +67,7 @@ const fn child_interval_bounds_block3(child_idx: usize) -> (u8, u8) {
 /// - If query >= upper: query - upper
 /// - If lower <= query < upper: 0 (query is inside the interval)
 #[inline(always)]
-fn interval_distance_1d(query: f64, lower: f64, upper: f64) -> f64 {
+pub(crate) fn interval_distance_1d(query: f64, lower: f64, upper: f64) -> f64 {
     let below_dist = (lower - query).max(0.0);
     let above_dist = (query - upper).max(0.0);
     below_dist + above_dist
@@ -84,10 +90,178 @@ pub struct DonnellyMarkerSimd<BS: BlockSizeMarker, const CL: u32, const VB: u32,
     _marker: PhantomData<BS>,
 }
 
-// x86_64 3-level (eg with f64)
-// (All x86_64 processors have a cache line size of 64 bytes)
-#[cfg(target_arch = "x86_64")]
-impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 64, VB, K> {
+/// Perform all comparisons in a 3-level block, dispatching to the appropriate SIMD implementation
+/// based on the axis type A. Monomorphized at compile time.
+#[inline(always)]
+pub(crate) fn compare_block3<A>(stems: &[A], query_val: A, block_base_idx: usize) -> u8
+where
+    A: AxisUnified + CompareBlock3,
+{
+    let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+
+    // Type-based dispatch via trait specialization pattern
+    CompareBlock3::compare_block3_impl(stems_ptr, query_val, block_base_idx)
+}
+
+/// Trait for SIMD block comparison support.
+///
+/// This trait is automatically implemented for all `AxisUnified` types.
+/// Specialized SIMD implementations exist for:
+/// - `f32` - uses AVX2 or AVX-512 (x86_64) / NEON (aarch64)
+/// - `f64` - uses AVX2 or AVX-512 (x86_64) / NEON (aarch64)
+///
+/// Users should not implement this trait directly. If you try to use `DonnellyMarkerSimd`
+/// with an unsupported type, you'll get a runtime panic.
+pub trait CompareBlock3: AxisUnified {
+    #[doc(hidden)]
+    fn compare_block3_impl(stems_ptr: NonNull<u8>, query_val: Self, block_base_idx: usize) -> u8;
+}
+
+// Blanket implementation that dispatches based on type and architecture
+impl<T: AxisUnified> CompareBlock3 for T {
+    #[inline(always)]
+    fn compare_block3_impl(stems_ptr: NonNull<u8>, query_val: Self, block_base_idx: usize) -> u8 {
+        // Type-based dispatch using size_of and transmute
+        // This is monomorphized away at compile time
+        if std::mem::size_of::<Self>() == 8 {
+            // f64 path
+            let query_f64: f64 = unsafe { std::mem::transmute_copy(&query_val) };
+
+            #[cfg(target_arch = "x86_64")]
+            {
+                #[cfg(target_feature = "avx512f")]
+                {
+                    unsafe { x86_64::compare_block3_f64_avx512(stems_ptr, block_base_idx, query_f64) }
+                }
+
+                #[cfg(not(target_feature = "avx512f"))]
+                {
+                    unsafe { x86_64::compare_block3_f64_avx2(stems_ptr, block_base_idx, query_f64) }
+                }
+            }
+
+            #[cfg(target_arch = "aarch64")]
+            {
+                unsafe { aarch64::compare_block3_f64_neon(stems_ptr, block_base_idx, query_f64) }
+            }
+
+            #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+            {
+                compile_error!("DonnellyMarkerSimd only supports x86_64 and aarch64")
+            }
+        } else if std::mem::size_of::<Self>() == 4 {
+            // f32 path
+            let query_f32: f32 = unsafe { std::mem::transmute_copy(&query_val) };
+
+            #[cfg(target_arch = "x86_64")]
+            {
+                #[cfg(target_feature = "avx512f")]
+                {
+                    unsafe { x86_64::compare_block3_f32_avx512(stems_ptr, block_base_idx, query_f32) }
+                }
+
+                #[cfg(not(target_feature = "avx512f"))]
+                {
+                    unsafe { x86_64::compare_block3_f32_avx2(stems_ptr, block_base_idx, query_f32) }
+                }
+            }
+
+            #[cfg(target_arch = "aarch64")]
+            {
+                unsafe { aarch64::compare_block3_f32_neon(stems_ptr, block_base_idx, query_f32) }
+            }
+
+            #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+            {
+                compile_error!("DonnellyMarkerSimd only supports x86_64 and aarch64")
+            }
+        } else {
+            panic!(
+                "DonnellyMarkerSimd only supports f32 (4 bytes) and f64 (8 bytes) axis types. \
+                    Type {} with size {} is not supported.",
+                std::any::type_name::<Self>(),
+                std::mem::size_of::<Self>()
+            )
+        }
+    }
+}
+
+/// Perform all comparisons in a 4-level block, dispatching to the appropriate SIMD implementation
+/// based on the axis type A. Monomorphized at compile time.
+#[inline(always)]
+pub(crate) fn compare_block4<A>(stems: &[A], query_val: A, block_base_idx: usize) -> u8
+where
+    A: AxisUnified + CompareBlock4,
+{
+    let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+
+    // Type-based dispatch via trait specialization pattern
+    CompareBlock4::compare_block4_impl(stems_ptr, query_val, block_base_idx)
+}
+
+/// Trait for SIMD 4-level block comparison support.
+///
+/// This trait is automatically implemented for all `AxisUnified` types.
+/// Specialized SIMD implementations exist for:
+/// - `f32` - uses AVX2 or AVX-512 (x86_64) / NEON (aarch64)
+/// - `f64` - uses AVX2 or AVX-512 (x86_64) / NEON (aarch64)
+///
+/// Users should not implement this trait directly. If you try to use `DonnellyMarkerSimd`
+/// with an unsupported type, you'll get a runtime panic.
+pub trait CompareBlock4: AxisUnified {
+    #[doc(hidden)]
+    fn compare_block4_impl(stems_ptr: NonNull<u8>, query_val: Self, block_base_idx: usize) -> u8;
+}
+
+// Blanket implementation that dispatches based on type and architecture
+impl<T: AxisUnified> CompareBlock4 for T {
+    #[inline(always)]
+    fn compare_block4_impl(stems_ptr: NonNull<u8>, query_val: Self, block_base_idx: usize) -> u8 {
+        // Type-based dispatch using size_of and transmute
+        // This is monomorphized away at compile time
+        if std::mem::size_of::<Self>() == 4 {
+            // f32 path
+            let query_f32: f32 = unsafe { std::mem::transmute_copy(&query_val) };
+
+            #[cfg(target_arch = "x86_64")]
+            {
+                #[cfg(target_feature = "avx512f")]
+                {
+                    unsafe { x86_64::compare_block4_f32_avx512(stems_ptr, block_base_idx, query_f32) }
+                }
+
+                #[cfg(not(target_feature = "avx512f"))]
+                {
+                    unsafe { x86_64::compare_block4_f32_avx2(stems_ptr, block_base_idx, query_f32) }
+                }
+            }
+
+            #[cfg(target_arch = "aarch64")]
+            {
+                unsafe { aarch64::compare_block4_f32_neon(stems_ptr, block_base_idx, query_f32) }
+            }
+
+            #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+            {
+                compile_error!("DonnellyMarkerSimd only supports x86_64 and aarch64")
+            }
+        } else {
+            panic!(
+                "DonnellyMarkerSimd only supports f32 (4 bytes) axis types for Block4. \
+                    Type {} with size {} is not supported.",
+                std::any::type_name::<Self>(),
+                std::mem::size_of::<Self>()
+            )
+        }
+    }
+}
+
+// ====================================================================================
+// StemStrategy Implementations (architecture-agnostic, dispatch through traits)
+// ====================================================================================
+
+// Block3 implementation (3-level blocks, 64-byte cache lines)
+impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<Block3, 64, VB, K> {
     const ROOT_IDX: usize = 0;
     const BLOCK_SIZE: usize = 3;
 
@@ -102,12 +276,12 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
     type Stack<A> = crate::kd_tree::query_stack::QueryStack<A, Self>;
 
     #[inline]
-    fn new(stems_ptr: NonNull<u8>) -> Self {
+    fn new(stems_ptr: std::ptr::NonNull<u8>) -> Self {
         debug_assert!(64 >= VB); // item wider than cache line would break layout
 
         Self {
-            core: DonnellyCore::new(stems_ptr),
-            _marker: PhantomData,
+            core: crate::stem_strategies::donnelly_core::DonnellyCore::new(stems_ptr),
+            _marker: std::marker::PhantomData,
         }
     }
 
@@ -145,7 +319,7 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
     fn branch(&mut self) -> Self {
         Self {
             core: self.core.branch(),
-            _marker: PhantomData,
+            _marker: std::marker::PhantomData,
         }
     }
 
@@ -162,13 +336,9 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
     where
         Self: Sized,
     {
-        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let stems_ptr = std::ptr::NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         let mut strat = Self::new(stems_ptr);
 
-        // Note: a precondition of this approach is that the tree must have been constructed
-        // so that the stem height is an exact multiple of the block size, and that the stems
-        // all terminate on that same max level. This invariant is guaranteed at construction
-        // time.
         while strat.level() <= max_stem_level {
             let dim = strat.dim();
             let query_val = unsafe { *query.get_unchecked(dim) };
@@ -203,8 +373,6 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
         O: AxisUnified<Coord = O>,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
     {
-        // Check if we've finished traversing (reached or passed max_stem_level)
-        // For block strategies, we traverse multiple levels at once
         if self.level() > max_stem_level {
             return false;
         }
@@ -216,12 +384,12 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
         let block_base_idx = self.stem_idx();
 
         // SIMD comparison to get child index
-        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let stems_ptr = std::ptr::NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         let child_idx = CompareBlock3::compare_block3_impl(stems_ptr, query_val, block_base_idx);
         tracing::trace!("child_idx = {}", child_idx);
 
         // SIMD distance check to get backtrack mask
-        // Dispatch based on axis type size, similar to compare_block3_impl
+        #[cfg(target_arch = "x86_64")]
         let backtrack_mask = if std::mem::size_of::<A>() == 8 {
             // f64 path
             let query_wide_f64: f64 = unsafe { std::mem::transmute_copy(&query_wide_val) };
@@ -229,7 +397,7 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
             let rd_f64: f64 = unsafe { std::mem::transmute_copy(&rd) };
             let best_dist_f64: f64 = unsafe { std::mem::transmute_copy(&best_dist) };
 
-            #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
+            #[cfg(target_feature = "avx512f")]
             {
                 D::simd_backtrack_check_block3_f64_avx512(
                     unsafe { std::mem::transmute_copy(&query_wide_f64) },
@@ -240,7 +408,7 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
                     unsafe { std::mem::transmute_copy(&best_dist_f64) },
                 )
             }
-            #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
+            #[cfg(not(target_feature = "avx512f"))]
             {
                 unsafe {
                     D::simd_backtrack_check_block3_interval_f64_avx2(
@@ -260,7 +428,7 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
             let rd_f32: f32 = unsafe { std::mem::transmute_copy(&rd) };
             let best_dist_f32: f32 = unsafe { std::mem::transmute_copy(&best_dist) };
 
-            #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
+            #[cfg(target_feature = "avx512f")]
             {
                 unsafe {
                     D::simd_backtrack_check_block3_f32_avx512(
@@ -273,7 +441,7 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
                     )
                 }
             }
-            #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
+            #[cfg(not(target_feature = "avx512f"))]
             {
                 unsafe {
                     D::simd_backtrack_check_block3_f32_avx2(
@@ -290,11 +458,14 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
             panic!("Unsupported axis type size");
         };
 
-        // Remove the path we're taking from backtrack candidates
+        #[cfg(not(target_arch = "x86_64"))]
+        let backtrack_mask: u8 = {
+            unimplemented!("SIMD backtrack checking not yet implemented for non-x86_64 architectures")
+        };
+
         let child_idx_mask = 1 << child_idx;
         let backtrack_mask = backtrack_mask & !child_idx_mask;
 
-        // Log all 7 pivots for debugging
         let pivots: Vec<A> = (0..7)
             .map(|i| unsafe { *stems.get_unchecked(block_base_idx + i) })
             .collect();
@@ -310,7 +481,6 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
             "Block3: backtrack mask"
         );
 
-        // If any siblings need exploration, push them as a Block entry
         if backtrack_mask != 0 {
             use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
 
@@ -320,35 +490,29 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
             //   * In cases where D == O, widen is a no-op. In this case we can use SIMD ops to calc new_off
             //     and rd_values in parallel for all siblings.
 
-            // Calculate all sibling contexts and their rd_far values
             let mut siblings = [self.clone(); 8];
             let mut rd_values = [O::zero(); 8];
             let mut new_off_values = [O::zero(); 8];
 
             for sibling_idx in 0..8 {
-                // Create context for this sibling
                 siblings[sibling_idx]
                     .core
                     .traverse_block(sibling_idx as u8, Self::BLOCK_SIZE as u32);
 
-                // Calculate rd_far for this sibling using interval distance
                 let (lower_offset, upper_offset) = child_interval_bounds_block3(sibling_idx);
 
-                // Get lower bound (-∞ if offset is 255)
                 let lower = if lower_offset == 255 {
                     A::min_value()
                 } else {
                     unsafe { *stems.get_unchecked(block_base_idx + lower_offset as usize) }
                 };
 
-                // Get upper bound (+∞ if offset is 255)
                 let upper = if upper_offset == 255 {
                     A::max_value()
                 } else {
                     unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
                 };
 
-                // Compute interval distance
                 let query_val = unsafe { *query.get_unchecked(*dim) };
 
                 // TODO: this only works for f64! need a refactor to work for any AxisUnified
@@ -361,8 +525,6 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
 
                 new_off_values[sibling_idx] = new_off;
 
-                // rd_far = rd + dist1(new_off, old_off) = rd + (new_off - old_off)²
-                // Using the standard backtracking formula from traits.rs:394
                 let delta = D::dist1(new_off, old_off_val);
                 let rd_far = O::saturating_add(rd, delta);
                 rd_values[sibling_idx] = rd_far;
@@ -391,7 +553,6 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
                 );
             }
 
-            // Push single Block entry containing all siblings
             stack.push(SimdQueryStackContext::Block {
                 siblings,
                 rd_values,
@@ -402,8 +563,6 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
             });
         }
 
-        // Update off[dim] with the new_off for the path we're taking
-        // Use the same interval distance formula as for siblings for consistency
         let (lower_offset, upper_offset) = child_interval_bounds_block3(child_idx as usize);
 
         let lower = if lower_offset == 255 {
@@ -418,7 +577,6 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
             unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
         };
 
-        // Compute interval distance for the chosen child (should be 0 or very small)
         let query_val = unsafe { *query.get_unchecked(dim_val) };
         let query_wide_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(query_val)) };
         let lower_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(lower)) };
@@ -428,10 +586,7 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
         let new_off: O = unsafe { std::mem::transmute_copy(&interval_dist) };
         unsafe { *off.get_unchecked_mut(dim_val) = new_off };
 
-        // Traverse to the chosen child
         self.core.traverse_block(child_idx, Self::BLOCK_SIZE as u32);
-
-        // Update dim
         *dim = self.dim();
 
         true
@@ -452,15 +607,12 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block3, 
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
         LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
     {
-        // Delegate to KdTree's SIMD implementation which has access to private fields
         tree.backtracking_query_with_simd_stack_impl::<QC, O, D>(query_ctx, stack, process_leaf);
     }
 }
 
-// x86_64 4-level (eg with f32)
-// (All x86_64 processors have a cache line size of 64 bytes)
-#[cfg(target_arch = "x86_64")]
-impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 64, VB, K> {
+// Block4 implementation (4-level blocks, 64-byte cache lines)
+impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<Block4, 64, VB, K> {
     const ROOT_IDX: usize = 0;
     const BLOCK_SIZE: usize = 4;
 
@@ -475,12 +627,12 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
     type Stack<A> = crate::kd_tree::query_stack::QueryStack<A, Self>;
 
     #[inline]
-    fn new(stems_ptr: NonNull<u8>) -> Self {
-        debug_assert!(64 >= VB); // item wider than cache line would break layout
+    fn new(stems_ptr: std::ptr::NonNull<u8>) -> Self {
+        debug_assert!(64 >= VB);
 
         Self {
-            core: DonnellyCore::new(stems_ptr),
-            _marker: PhantomData,
+            core: crate::stem_strategies::donnelly_core::DonnellyCore::new(stems_ptr),
+            _marker: std::marker::PhantomData,
         }
     }
 
@@ -518,7 +670,7 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
     fn branch(&mut self) -> Self {
         Self {
             core: self.core.branch(),
-            _marker: PhantomData,
+            _marker: std::marker::PhantomData,
         }
     }
 
@@ -535,13 +687,9 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
     where
         Self: Sized,
     {
-        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let stems_ptr = std::ptr::NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         let mut strat = Self::new(stems_ptr);
 
-        // Note: a precondition of this approach is that the tree must have been constructed
-        // so that the stem height is an exact multiple of the block size, and that the stems
-        // all terminate on that same max level. This invariant is guaranteed at construction
-        // time.
         while strat.level() <= max_stem_level {
             let dim = strat.dim();
             let query_val = unsafe { *query.get_unchecked(dim) };
@@ -576,8 +724,6 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
         O: AxisUnified<Coord = O>,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
     {
-        // Check if we've finished traversing (reached or passed max_stem_level)
-        // For block strategies, we traverse multiple levels at once
         if self.level() > max_stem_level {
             return false;
         }
@@ -588,19 +734,17 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
         let old_off_val = unsafe { *off.get_unchecked(dim_val) };
         let block_base_idx = self.stem_idx();
 
-        // SIMD comparison to get child index
-        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let stems_ptr = std::ptr::NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         let child_idx = CompareBlock4::compare_block4_impl(stems_ptr, query_val, block_base_idx);
 
-        // SIMD distance check to get backtrack mask
+        #[cfg(target_arch = "x86_64")]
         let backtrack_mask = if std::mem::size_of::<A>() == 8 {
-            // f64 path
             let query_wide_f64: f64 = unsafe { std::mem::transmute_copy(&query_wide_val) };
             let old_off_f64: f64 = unsafe { std::mem::transmute_copy(&old_off_val) };
             let rd_f64: f64 = unsafe { std::mem::transmute_copy(&rd) };
             let best_dist_f64: f64 = unsafe { std::mem::transmute_copy(&best_dist) };
 
-            #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
+            #[cfg(target_feature = "avx512f")]
             {
                 unsafe {
                     D::simd_backtrack_check_block4_f64_avx512(
@@ -613,7 +757,7 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
                     )
                 }
             }
-            #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
+            #[cfg(not(target_feature = "avx512f"))]
             {
                 unsafe {
                     D::simd_backtrack_check_block4_f64_avx2(
@@ -627,13 +771,12 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
                 }
             }
         } else if std::mem::size_of::<A>() == 4 {
-            // f32 path
             let query_wide_f32: f32 = unsafe { std::mem::transmute_copy(&query_wide_val) };
             let old_off_f32: f32 = unsafe { std::mem::transmute_copy(&old_off_val) };
             let rd_f32: f32 = unsafe { std::mem::transmute_copy(&rd) };
             let best_dist_f32: f32 = unsafe { std::mem::transmute_copy(&best_dist) };
 
-            #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
+            #[cfg(target_feature = "avx512f")]
             {
                 unsafe {
                     D::simd_backtrack_check_block4_f32_avx512(
@@ -646,7 +789,7 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
                     )
                 }
             }
-            #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
+            #[cfg(not(target_feature = "avx512f"))]
             {
                 unsafe {
                     D::simd_backtrack_check_block4_f32_avx2(
@@ -663,26 +806,25 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
             panic!("Unsupported axis type size");
         };
 
-        // Remove the path we're taking from backtrack candidates
+        #[cfg(not(target_arch = "x86_64"))]
+        let backtrack_mask: u16 = {
+            unimplemented!("SIMD backtrack checking not yet implemented for non-x86_64 architectures")
+        };
+
         let backtrack_mask = backtrack_mask & !(1 << child_idx);
 
-        // If any siblings need exploration, push them as Block entries
-        // Block4 has 16 siblings, so push two blocks of 8
         if backtrack_mask != 0 {
             use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
 
-            // Calculate all sibling contexts and their rd_far values
             let mut siblings = [self.clone(); 16];
             let mut rd_values = [O::zero(); 16];
             let mut new_off_values = [O::zero(); 16];
 
             for sibling_idx in 0..16 {
-                // Create context for this sibling
                 siblings[sibling_idx]
                     .core
                     .traverse_block(sibling_idx as u8, Self::BLOCK_SIZE as u32);
 
-                // Calculate rd_far for this sibling
                 let pivot_idx = block_base_idx + sibling_idx;
                 let pivot = unsafe { *stems.get_unchecked(pivot_idx) };
                 let pivot_wide = D::widen_coord(pivot);
@@ -691,7 +833,6 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
                 rd_values[sibling_idx] = O::saturating_add(rd, D::dist1(new_off, old_off_val));
             }
 
-            // Push high block (siblings 8-15) first, since stack is LIFO
             let high_mask = (backtrack_mask >> 8) as u8;
             if high_mask != 0 {
                 let mut high_siblings = [self.clone(); 8];
@@ -712,7 +853,6 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
                 });
             }
 
-            // Push low block (siblings 0-7)
             let low_mask = backtrack_mask as u8;
             if low_mask != 0 {
                 let mut low_siblings = [self.clone(); 8];
@@ -734,17 +874,13 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
             }
         }
 
-        // Update off[dim] with the new_off for the path we're taking
         let pivot_idx = block_base_idx + child_idx as usize;
         let pivot = unsafe { *stems.get_unchecked(pivot_idx) };
         let pivot_wide = D::widen_coord(pivot);
         let new_off = O::saturating_dist(query_wide_val, pivot_wide);
         unsafe { *off.get_unchecked_mut(dim_val) = new_off };
 
-        // Traverse to the chosen child
         self.core.traverse_block(child_idx, Self::BLOCK_SIZE as u32);
-
-        // Update dim
         *dim = self.dim();
 
         true
@@ -765,263 +901,7 @@ impl<const VB: u32, const K: usize> StemStrategy for DonnellyMarkerSimd<Block4, 
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
         LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
     {
-        // Delegate to KdTree's SIMD implementation which has access to private fields
         tree.backtracking_query_with_simd_stack_impl::<QC, O, D>(query_ctx, stack, process_leaf);
-    }
-}
-
-/// Perform all comparisons in a 3-level block, dispatching to the appropriate SIMD implementation
-/// based on the axis type A. Monomorphized at compile time.
-#[inline(always)]
-fn compare_block3<A>(stems: &[A], query_val: A, block_base_idx: usize) -> u8
-where
-    A: AxisUnified + CompareBlock3,
-{
-    let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
-
-    // Type-based dispatch via trait specialization pattern
-    CompareBlock3::compare_block3_impl(stems_ptr, query_val, block_base_idx)
-}
-
-/// Trait for SIMD block comparison support.
-///
-/// This trait is automatically implemented for all `AxisUnified` types.
-/// Specialized SIMD implementations exist for:
-/// - `f32` - uses AVX2 or AVX-512
-/// - `f64` - uses AVX2 or AVX-512
-///
-/// Users should not implement this trait directly. If you try to use `DonnellyMarkerSimd`
-/// with an unsupported type, you'll get a runtime panic.
-pub trait CompareBlock3: AxisUnified {
-    #[doc(hidden)]
-    fn compare_block3_impl(stems_ptr: NonNull<u8>, query_val: Self, block_base_idx: usize) -> u8;
-}
-
-// Blanket implementation that dispatches based on type
-impl<T: AxisUnified> CompareBlock3 for T {
-    #[inline(always)]
-    fn compare_block3_impl(stems_ptr: NonNull<u8>, query_val: Self, block_base_idx: usize) -> u8 {
-        // Type-based dispatch using size_of and transmute
-        // This is monomorphized away at compile time
-        if std::mem::size_of::<Self>() == 8 {
-            // f64 path
-            let query_f64: f64 = unsafe { std::mem::transmute_copy(&query_val) };
-
-            #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
-            {
-                unsafe { compare_block3_f64_avx512(stems_ptr, block_base_idx, query_f64) }
-            }
-
-            #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
-            {
-                unsafe { compare_block3_f64_avx2(stems_ptr, block_base_idx, query_f64) }
-            }
-
-            #[cfg(not(target_arch = "x86_64"))]
-            {
-                panic!("DonnellyMarkerSimd requires x86_64 with AVX2")
-            }
-        } else if std::mem::size_of::<Self>() == 4 {
-            // f32 path
-            let query_f32: f32 = unsafe { std::mem::transmute_copy(&query_val) };
-
-            #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
-            {
-                unsafe { compare_block3_f32_avx512(stems_ptr, block_base_idx, query_f32) }
-            }
-
-            #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
-            {
-                unsafe { compare_block3_f32_avx2(stems_ptr, block_base_idx, query_f32) }
-            }
-
-            #[cfg(not(target_arch = "x86_64"))]
-            {
-                panic!("DonnellyMarkerSimd requires x86_64 with AVX2")
-            }
-        } else {
-            panic!(
-                "DonnellyMarkerSimd only supports f32 (4 bytes) and f64 (8 bytes) axis types. \
-                    Type {} with size {} is not supported.",
-                std::any::type_name::<Self>(),
-                std::mem::size_of::<Self>()
-            )
-        }
-    }
-}
-
-#[cfg(target_arch = "x86_64")]
-mod avx2_impl {
-    use std::ptr::NonNull;
-
-    #[target_feature(enable = "avx2,popcnt")]
-    #[inline(always)]
-    pub unsafe fn compare_block3_f64_avx2(
-        stems_ptr: NonNull<u8>,
-        cache_line_base: usize,
-        query_val: f64,
-    ) -> u8 {
-        use std::arch::x86_64::*;
-
-        let ptr = stems_ptr.as_ptr().add(cache_line_base * 8) as *const f64;
-
-        let pivots_low = _mm256_loadu_pd(ptr);
-        let pivots_high = _mm256_loadu_pd(ptr.add(4));
-        let query_vec = _mm256_set1_pd(query_val);
-
-        let cmp_low = _mm256_cmp_pd(query_vec, pivots_low, _CMP_GE_OQ);
-        let cmp_high = _mm256_cmp_pd(query_vec, pivots_high, _CMP_GE_OQ);
-
-        let mask_low = _mm256_movemask_pd(cmp_low) as u32;
-        let mask_high = _mm256_movemask_pd(cmp_high) as u32;
-        let mask = mask_low | (mask_high << 4);
-
-        _popcnt32(mask as i32) as u8
-    }
-
-    #[target_feature(enable = "avx2,popcnt")]
-    #[inline(always)]
-    pub unsafe fn compare_block3_f32_avx2(
-        stems_ptr: NonNull<u8>,
-        cache_line_base: usize,
-        query_val: f32,
-    ) -> u8 {
-        use std::arch::x86_64::*;
-
-        let ptr = stems_ptr.as_ptr().add(cache_line_base * 4) as *const f32;
-
-        let pivots = _mm256_loadu_ps(ptr);
-        let query_vec = _mm256_set1_ps(query_val);
-
-        let cmp = _mm256_cmp_ps(query_vec, pivots, _CMP_GE_OQ);
-
-        let mask = _mm256_movemask_ps(cmp) as u32;
-
-        _popcnt32(mask as i32) as u8
-    }
-
-    #[target_feature(enable = "avx2,popcnt")]
-    #[inline(always)]
-    pub unsafe fn compare_block4_f32_avx2(
-        stems_ptr: NonNull<u8>,
-        cache_line_base: usize,
-        query_val: f32,
-    ) -> u8 {
-        use std::arch::x86_64::*;
-
-        let ptr = stems_ptr.as_ptr().add(cache_line_base * 4) as *const f32;
-
-        let pivots_low = _mm256_loadu_ps(ptr);
-        let pivots_high = _mm256_loadu_ps(ptr.add(8));
-        let query_vec = _mm256_set1_ps(query_val);
-
-        let cmp_low = _mm256_cmp_ps(query_vec, pivots_low, _CMP_GE_OQ);
-        let cmp_high = _mm256_cmp_ps(query_vec, pivots_high, _CMP_GE_OQ);
-
-        let mask_low = _mm256_movemask_ps(cmp_low) as u32;
-        let mask_high = _mm256_movemask_ps(cmp_high) as u32;
-        let mask = mask_low | (mask_high << 8);
-
-        _popcnt32(mask as i32) as u8
-    }
-}
-
-#[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
-mod avx512_impl {
-    #[target_feature(enable = "avx512f,avx512vl,popcnt")]
-    #[inline(always)]
-    pub unsafe fn compare_block3_f64_avx512(
-        stems_ptr: NonNull<u8>,
-        cache_line_base: usize,
-        query_val: f64,
-    ) -> u8 {
-        use std::arch::x86_64::*;
-
-        let ptr = stems_ptr.as_ptr().add(cache_line_base * 8) as *const f64;
-        let pivots = _mm512_loadu_pd(ptr);
-        let query_vec = _mm512_set1_pd(query_val);
-
-        let mask = _mm512_cmp_pd_mask(query_vec, pivots, _CMP_GE_OQ);
-        _popcnt32(mask as i32) as u8
-    }
-
-    #[target_feature(enable = "avx512f,avx512vl,popcnt")]
-    #[inline(always)]
-    pub unsafe fn compare_block4_f32_avx512(
-        stems_ptr: NonNull<u8>,
-        cache_line_base: usize,
-        query_val: f32,
-    ) -> u8 {
-        use std::arch::x86_64::*;
-
-        let ptr = stems_ptr.as_ptr().add(cache_line_base * 8) as *const f32;
-        let pivots = _mm512_loadu_ps(ptr);
-        let query_vec = _mm512_set1_ps(query_val);
-
-        let mask = _mm512_cmp_ps_mask(query_vec, pivots, _CMP_GE_OQ);
-        _popcnt32(mask as i32) as u8
-    }
-}
-
-/// Perform all comparisons in a 4-level block, dispatching to the appropriate SIMD implementation
-/// based on the axis type A. Monomorphized at compile time.
-#[inline(always)]
-fn compare_block4<A>(stems: &[A], query_val: A, block_base_idx: usize) -> u8
-where
-    A: AxisUnified + CompareBlock4,
-{
-    let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
-
-    // Type-based dispatch via trait specialization pattern
-    CompareBlock4::compare_block4_impl(stems_ptr, query_val, block_base_idx)
-}
-
-/// Trait for SIMD 4-level block comparison support.
-///
-/// This trait is automatically implemented for all `AxisUnified` types.
-/// Specialized SIMD implementations exist for:
-/// - `f32` - uses AVX2 or AVX-512
-/// - `f64` - uses AVX2 or AVX-512
-///
-/// Users should not implement this trait directly. If you try to use `DonnellyMarkerSimd`
-/// with an unsupported type, you'll get a runtime panic.
-pub trait CompareBlock4: AxisUnified {
-    #[doc(hidden)]
-    fn compare_block4_impl(stems_ptr: NonNull<u8>, query_val: Self, block_base_idx: usize) -> u8;
-}
-
-// Blanket implementation that dispatches based on type
-impl<T: AxisUnified> CompareBlock4 for T {
-    #[inline(always)]
-    fn compare_block4_impl(stems_ptr: NonNull<u8>, query_val: Self, block_base_idx: usize) -> u8 {
-        // Type-based dispatch using size_of and transmute
-        // This is monomorphized away at compile time
-        if std::mem::size_of::<Self>() == 4 {
-            // f32 path
-            let query_f32: f32 = unsafe { std::mem::transmute_copy(&query_val) };
-
-            #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
-            {
-                unsafe { compare_block4_f32_avx512(stems_ptr, block_base_idx, query_f32) }
-            }
-
-            #[cfg(all(target_arch = "x86_64", not(target_feature = "avx512f")))]
-            {
-                unsafe { compare_block4_f32_avx2(stems_ptr, block_base_idx, query_f32) }
-            }
-
-            #[cfg(not(target_arch = "x86_64"))]
-            {
-                panic!("DonnellyMarkerSimd requires x86_64 with AVX2")
-            }
-        } else {
-            panic!(
-                "DonnellyMarkerSimd only supports f32 (4 bytes) axis types. \
-                    Type {} with size {} is not supported.",
-                std::any::type_name::<Self>(),
-                std::mem::size_of::<Self>()
-            )
-        }
     }
 }
 
@@ -1104,124 +984,124 @@ mod tests {
             assert_eq!(result, expected, "Failed for query={}", query);
         }
     }
-}
 
-#[test]
-#[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-fn test_simd_backtrack_vs_scalar() {
-    use crate::traits_unified_2::DistanceMetricUnified;
-    use crate::traits_unified_2::SquaredEuclidean;
+    #[test]
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+    fn test_simd_backtrack_vs_scalar() {
+        use crate::traits_unified_2::DistanceMetricUnified;
+        use crate::traits_unified_2::SquaredEuclidean;
 
-    // Create test pivots: [pivot0, pivot1, ..., pivot6, +∞]
-    let pivots = [0.2, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f64::INFINITY];
+        // Create test pivots: [pivot0, pivot1, ..., pivot6, +∞]
+        let pivots = [0.2, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f64::INFINITY];
 
-    let query = 0.25;
-    let old_off = 0.0;
-    let rd = 0.0;
-    let best_dist = f64::INFINITY;
+        let query = 0.25;
+        let old_off = 0.0;
+        let rd = 0.0;
+        let best_dist = f64::INFINITY;
 
-    // Compute scalar version for each child
-    let mut scalar_results = [false; 8];
-    for child_idx in 0..8 {
-        let (lower_offset, upper_offset) = child_interval_bounds_block3(child_idx);
+        // Compute scalar version for each child
+        let mut scalar_results = [false; 8];
+        for child_idx in 0..8 {
+            let (lower_offset, upper_offset) = child_interval_bounds_block3(child_idx);
 
-        let lower = if lower_offset == 255 {
-            f64::NEG_INFINITY
-        } else {
-            pivots[lower_offset as usize]
-        };
-
-        let upper = if upper_offset == 255 {
-            f64::INFINITY
-        } else {
-            pivots[upper_offset as usize]
-        };
-
-        let interval_dist = interval_distance_1d(query, lower, upper);
-        // rd_far = rd + (interval_dist - old_off)²
-        let delta = (interval_dist - old_off) * (interval_dist - old_off);
-        let rd_far = rd + delta;
-
-        scalar_results[child_idx] = rd_far <= best_dist;
-    }
-
-    // Compute SIMD version
-    let pivots_ptr = pivots.as_ptr() as *const u8;
-    // Replace the test with a simpler version
-    let simd_mask = unsafe {
-        <SquaredEuclidean<f64> as DistanceMetricUnified<f64, 3>>::simd_backtrack_check_block3_interval_f64_avx2(
-        query, pivots_ptr, 0, old_off, rd, best_dist
-    )
-    };
-
-    // Compare
-    for child_idx in 0..8 {
-        let scalar_pass = scalar_results[child_idx];
-        let simd_pass = (simd_mask & (1 << child_idx)) != 0;
-        assert_eq!(
-            scalar_pass,
-            simd_pass,
-            "Mismatch for child {}: scalar={}, simd={}, query={}, lower={:?}, upper={:?}",
-            child_idx,
-            scalar_pass,
-            simd_pass,
-            query,
-            if child_interval_bounds_block3(child_idx).0 == 255 {
+            let lower = if lower_offset == 255 {
                 f64::NEG_INFINITY
             } else {
-                pivots[child_interval_bounds_block3(child_idx).0 as usize]
-            },
-            if child_interval_bounds_block3(child_idx).1 == 255 {
+                pivots[lower_offset as usize]
+            };
+
+            let upper = if upper_offset == 255 {
                 f64::INFINITY
             } else {
-                pivots[child_interval_bounds_block3(child_idx).1 as usize]
-            },
-        );
+                pivots[upper_offset as usize]
+            };
+
+            let interval_dist = interval_distance_1d(query, lower, upper);
+            // rd_far = rd + (interval_dist - old_off)²
+            let delta = (interval_dist - old_off) * (interval_dist - old_off);
+            let rd_far = rd + delta;
+
+            scalar_results[child_idx] = rd_far <= best_dist;
+        }
+
+        // Compute SIMD version
+        let pivots_ptr = pivots.as_ptr() as *const u8;
+        // Replace the test with a simpler version
+        let simd_mask = unsafe {
+            <SquaredEuclidean<f64> as DistanceMetricUnified<f64, 3>>::simd_backtrack_check_block3_interval_f64_avx2(
+                query, pivots_ptr, 0, old_off, rd, best_dist
+            )
+        };
+
+        // Compare
+        for child_idx in 0..8 {
+            let scalar_pass = scalar_results[child_idx];
+            let simd_pass = (simd_mask & (1 << child_idx)) != 0;
+            assert_eq!(
+                scalar_pass,
+                simd_pass,
+                "Mismatch for child {}: scalar={}, simd={}, query={}, lower={:?}, upper={:?}",
+                child_idx,
+                scalar_pass,
+                simd_pass,
+                query,
+                if child_interval_bounds_block3(child_idx).0 == 255 {
+                    f64::NEG_INFINITY
+                } else {
+                    pivots[child_interval_bounds_block3(child_idx).0 as usize]
+                },
+                if child_interval_bounds_block3(child_idx).1 == 255 {
+                    f64::INFINITY
+                } else {
+                    pivots[child_interval_bounds_block3(child_idx).1 as usize]
+                },
+            );
+        }
     }
-}
 
-#[test]
-#[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-fn debug_query_12_interval_distances() {
-    // This test manually computes what should happen for query #12
-    // Query point: [0.8947785353168005, 0.678720516865904, 0.6048091301041568]
-    // We're interested in the second block pop (dim=0, old_off=0)
+    #[test]
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+    fn debug_query_12_interval_distances() {
+        // This test manually computes what should happen for query #12
+        // Query point: [0.8947785353168005, 0.678720516865904, 0.6048091301041568]
+        // We're interested in the second block pop (dim=0, old_off=0)
 
-    // From the log, the pivots that would be in a block starting at some block_base_idx
-    // Let's trace through what the interval distances should be
+        // From the log, the pivots that would be in a block starting at some block_base_idx
+        // Let's trace through what the interval distances should be
 
-    // rd_values from log: [0.5638408493966387, 0.3959802548889544, 0.25295146890380843,
-    //                       0.14310568836537063, 0.06606798320124753, 0.0170270603870678,
-    //                       0.00021225610203875987, 0.0]
+        // rd_values from log: [0.5638408493966387, 0.3959802548889544, 0.25295146890380843,
+        //                       0.14310568836537063, 0.06606798320124753, 0.0170270603870678,
+        //                       0.00021225610203875987, 0.0]
 
-    // For each child, let's print what the intervals should be
-    println!("Query value in dim 0: 0.8947785353168005");
-    println!("\nChild interval bounds and expected distances:");
+        // For each child, let's print what the intervals should be
+        println!("Query value in dim 0: 0.8947785353168005");
+        println!("\nChild interval bounds and expected distances:");
 
-    for child_idx in 0..8 {
-        let (lower_off, upper_off) = child_interval_bounds_block3(child_idx);
+        for child_idx in 0..8 {
+            let (lower_off, upper_off) = child_interval_bounds_block3(child_idx);
+            println!(
+                "Child {}: lower_offset={}, upper_offset={}",
+                child_idx, lower_off, upper_off
+            );
+        }
+
+        // The issue is: why does child 6 pass but not child 4?
+        // best_dist at that point should be 0.0036181109111460682
+        println!("\nbest_dist would be: 0.0036181109111460682");
         println!(
-            "Child {}: lower_offset={}, upper_offset={}",
-            child_idx, lower_off, upper_off
+            "Child 4 rd_value: 0.06606798320124753 > best_dist? {}",
+            0.06606798320124753 > 0.0036181109111460682
         );
+        println!(
+            "Child 6 rd_value: 0.00021225610203875987 > best_dist? {}",
+            0.00021225610203875987 > 0.0036181109111460682
+        );
+
+        // So child 6 should indeed survive and child 4 should be pruned based on rd_values
+        // But non-SIMD found the answer in leaf 52 (child 4's leaf)
+        // This suggests either:
+        // 1. The interval distance calculation is wrong
+        // 2. The non-SIMD uses different logic
+        // 3. There's something about the tree structure we're missing
     }
-
-    // The issue is: why does child 6 pass but not child 4?
-    // best_dist at that point should be 0.0036181109111460682
-    println!("\nbest_dist would be: 0.0036181109111460682");
-    println!(
-        "Child 4 rd_value: 0.06606798320124753 > best_dist? {}",
-        0.06606798320124753 > 0.0036181109111460682
-    );
-    println!(
-        "Child 6 rd_value: 0.00021225610203875987 > best_dist? {}",
-        0.00021225610203875987 > 0.0036181109111460682
-    );
-
-    // So child 6 should indeed survive and child 4 should be pruned based on rd_values
-    // But non-SIMD found the answer in leaf 52 (child 4's leaf)
-    // This suggests either:
-    // 1. The interval distance calculation is wrong
-    // 2. The non-SIMD uses different logic
-    // 3. There's something about the tree structure we're missing
 }

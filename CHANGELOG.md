@@ -15,7 +15,7 @@ The major addition in this release is support for version 0.8 of Rkyv. Rkyv 0.8 
 and so this required quite a lot of changes.
 
 Right now, the pre-existing `rkyv` crate feature still provides support for
-Rkyv 0.7 as before, and so the introduction of Rkyv 0.8 is non-breaking. To use Rkyv 0.8, enable the crate feature that is 
+Rkyv 0.7 as before, and so the introduction of Rkyv 0.8 is non-breaking. To use Rkyv 0.8, enable the crate feature that is
 unsurprisingly named `rkyv_08`. There are some caveats to Rkyv 0.8 support:
 
 * The rkyv 0.8.x Archived structs are prefixed with `ArchivedR8` rather than `Archived` to avoid clashing with the pre-existing
@@ -28,7 +28,7 @@ unsurprisingly named `rkyv_08`. There are some caveats to Rkyv 0.8 support:
   going forward. As such, **this 5.2.0 version will be the only one that supports both Rkyv 0.7 and Rkyv 0.8. An upcoming version 6
   of Kiddo will remove support for Rkyv 0.7 entirely and only support Rkyv 0.8.** At this point the annoying non-standard `ArchivedR8`
   prefix for the rkyv 0.8 types will be dropped in favour of the default naming scheme.
-* 
+*
 ### ✨ Features
 
 - Add support for Rkyv v0.8
@@ -213,7 +213,7 @@ depended upon within the "half" examples and not as a core dependency)
 ## [4.0.0] - 2023-12-04
 
 Despite the major version bump, this is unlikely to be a breaking change for any users. The `within_unsorted_iter` method of `ImmutableKdTree` is now only present on x86_64 and Aarch64 targets.
-Considering that v3.0.0 would not even compile on these targets when the `immutable` crate feature was activated, 
+Considering that v3.0.0 would not even compile on these targets when the `immutable` crate feature was activated,
 it seems vanishingly unlikely that this breaks anyone.
 Additionally, the `immutable` feature has been removed and the `global_allocate` feature added. If you were using `ImmutableKdTree` and your build
 breaks because the `immutable` feature does not exist - don't worry, you don't need it anymore.
