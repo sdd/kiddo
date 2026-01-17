@@ -8,7 +8,6 @@ use crate::traits_unified_2::{
 use crate::StemStrategy;
 use std::ptr::NonNull;
 
-#[cfg(feature = "simd")]
 mod simd;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
@@ -239,7 +238,6 @@ where
 
     /// Implementation of backtracking query with SIMD stack.
     /// Called by DonnellyMarkerSimd's backtracking_query_with_stack override.
-    #[cfg(feature = "simd")]
     #[inline(always)]
     pub(crate) fn backtracking_query_with_simd_stack_impl<QC, O, D>(
         &self,
@@ -376,7 +374,6 @@ where
     }
 
     /// traverse to leaf with SIMD stack
-    #[cfg(feature = "simd")]
     #[inline(always)]
     fn traverse_to_leaf_simd<O, D>(
         &self,
@@ -433,5 +430,4 @@ where
 
         stem_strat.leaf_idx()
     }
-
 }

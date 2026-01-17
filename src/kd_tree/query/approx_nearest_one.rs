@@ -59,8 +59,6 @@ mod tests {
     use crate::kd_tree::KdTree;
     use crate::stem_strategies::{Donnelly, DonnellyMarkerPf};
 
-    #[cfg(feature = "simd")]
-    use crate::stem_strategies::DonnellyMarkerSimd;
     use crate::traits_unified_2::SquaredEuclidean;
     use crate::Eytzinger;
 
@@ -155,7 +153,7 @@ mod tests {
             "Root stem should be updated from max_value"
         );
         assert!(
-            root_stem_value >= 0.0 && root_stem_value <= 1.0,
+            (0.0..=1.0).contains(&root_stem_value),
             "Root stem should be a reasonable value in [0, 1]"
         );
 
@@ -202,7 +200,7 @@ mod tests {
             "Root stem should be updated from max_value"
         );
         assert!(
-            root_stem_value >= 0.0 && root_stem_value <= 1.0,
+            (0.0..=1.0).contains(&root_stem_value),
             "Root stem should be a reasonable value in [0, 1]"
         );
 

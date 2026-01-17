@@ -8,7 +8,6 @@ pub mod leaf_view;
 mod query;
 mod query_orchestrator;
 pub(crate) mod query_stack;
-#[cfg(feature = "simd")]
 pub(crate) mod query_stack_simd;
 mod result_collection;
 pub(crate) mod traits;

@@ -10,12 +10,10 @@ use rkyv_08::vec::ArchivedVec;
 
 use kiddo::cache_simulator::profiles;
 use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
-use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::stem_strategies::Eytzinger;
 
 const BUCKET_SIZE: usize = 2;
 
-type Tree = ImmutableKdTree<f32, usize, Eytzinger<4>, 4, BUCKET_SIZE>;
 type ArchivedTree = ArchivedR8ImmutableKdTree<f32, usize, Eytzinger<4>, 4, BUCKET_SIZE>;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -89,7 +87,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Avg cycles per query: {}", sim.cycle / total_queries as u64);
         println!(
             "L1 prefetch useful: {}, late: {}",
-            sim.pf_stats_l1.useful_lead_cycles_sum, sim.pf_stats_l1.late
+            sim.pf_stats.l1.useful_lead_cycles_sum, sim.pf_stats.l1.late
         );
 
         println!("{}", sim.stride_analyzer.render_histogram(60));

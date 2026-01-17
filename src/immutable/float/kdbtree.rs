@@ -34,7 +34,6 @@ use crate::traits::{Axis, Content, StemStrategy};
 use aligned_vec::{avec, AVec, ConstAlign, CACHELINE_ALIGN};
 use array_init::array_init;
 use az::{Az, Cast};
-use ordered_float::OrderedFloat;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "rkyv_08")]
@@ -363,7 +362,7 @@ where
         );
     }
 
-    #[cfg(not(feature = "unreliable_select_nth_unstable"))]
+    // #[cfg(not(feature = "unreliable_select_nth_unstable"))]
     #[cfg_attr(not(feature = "no_inline"), inline)]
     fn update_pivot(
         source: &[[A; K]],

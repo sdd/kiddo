@@ -3,16 +3,16 @@ use criterion::{
     criterion_group, criterion_main, measurement::WallTime, AxisScale, BatchSize, BenchmarkGroup,
     BenchmarkId, Criterion, PlotConfiguration, Throughput,
 };
+use kiddo::batch_benches;
 use kiddo::distance::float::SquaredEuclidean;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
-// use kiddo::stem_strategies::donnelly_4::DonnellyFullArith;
 use kiddo::stem_strategies::Donnelly;
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_immutable_float, process_queries_immutable_float,
 };
 use kiddo::traits::{Axis, Content};
-use kiddo::{batch_benches, Eytzinger};
+use kiddo::traits_unified_2::AxisUnified;
 use rand::distr::StandardUniform;
 use rand_distr::Distribution;
 
@@ -75,7 +75,7 @@ fn bench_query_nearest_one<A, T, Stem, const K: usize>(
     query_point_qty: usize,
     label: &str,
 ) where
-    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + 'static,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + AxisUnified<Coord = A> + 'static,
     T: Content + 'static,
     usize: Cast<T>,
     Stem: kiddo::StemStrategy + 'static,

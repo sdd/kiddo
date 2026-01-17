@@ -4,9 +4,7 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use elapsed::ElapsedDuration;
-use kiddo::distance::float::SquaredEuclidean;
 use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
-use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::stem_strategies::Donnelly;
 use memmap::MmapOptions;
 use rkyv_08::access_unchecked;
@@ -15,7 +13,6 @@ use rkyv_08::vec::ArchivedVec;
 const QUERY_POINT_QTY: usize = 20_000_000;
 const BUCKET_SIZE: usize = 2;
 
-type Tree = ImmutableKdTree<f64, usize, Donnelly<3, 64, 8, 4>, 4, BUCKET_SIZE>;
 type ArchivedTree = ArchivedR8ImmutableKdTree<f64, usize, Donnelly<3, 64, 8, 4>, 4, BUCKET_SIZE>;
 
 fn main() -> Result<(), Box<dyn Error>> {

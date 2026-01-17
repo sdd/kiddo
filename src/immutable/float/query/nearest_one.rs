@@ -59,6 +59,7 @@ where
         + Default
         + PartialOrd
         + Axis
+        + AxisUnified<Coord = A>
         + LeafSliceFloat<T>
         + LeafSliceFloatChunk<T, K>
         + rkyv_08::Archive,
@@ -85,7 +86,7 @@ pub mod cargo_asm {
     use crate::stem_strategies::*;
     use rand::{Rng, SeedableRng};
 
-    /// hook for cargo-asm to render a nearest-one call
+    // /// hook for cargo-asm to render a nearest-one call
     // pub fn nearest_one_donnelly() {
     //     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(3);
     //
@@ -308,7 +309,7 @@ mod tests {
             .map(|_| rng.random::<[f32; 4]>()) // Use the seeded rng
             .collect();
 
-        for (_i, query_point) in query_points.iter().enumerate() {
+        for query_point in query_points.iter() {
             let expected = linear_search(&content_to_add, query_point);
 
             // println!("query #{i:?} ({:?})", query_point);

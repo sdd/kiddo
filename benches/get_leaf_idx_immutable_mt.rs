@@ -10,10 +10,10 @@ use kiddo::test_utils::{
     build_populated_tree_and_query_points_immutable_float, process_queries_immutable_float,
 };
 use kiddo::traits::{Axis, Content};
+use kiddo::traits_unified_2::AxisUnified;
 use kiddo::{batch_benches, Eytzinger};
 use rand::distr::StandardUniform;
 use rand_distr::Distribution;
-use rayon::prelude::*;
 
 const BUCKET_SIZE: usize = 32;
 const QUERY_POINTS_PER_LOOP: usize = 1_000_000;
@@ -73,7 +73,7 @@ fn bench_query_leaf_idx<A, T, Stem, const K: usize>(
     query_point_qty: usize,
     label: &str,
 ) where
-    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + 'static,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + AxisUnified<Coord = A> + 'static,
     T: Content + 'static,
     usize: Cast<T>,
     Stem: kiddo::StemStrategy + 'static,

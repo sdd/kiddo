@@ -11,6 +11,7 @@ use kiddo::test_utils::{
     process_queries_immutable_float_single_threaded,
 };
 use kiddo::traits::{Axis, Content};
+use kiddo::traits_unified_2::AxisUnified;
 use kiddo::{batch_benches, Eytzinger};
 use rand::distr::StandardUniform;
 use rand_distr::Distribution;
@@ -76,7 +77,7 @@ fn bench_query_leaf_idx<A, T, Stem, const K: usize>(
     query_point_qty: usize,
     label: &str,
 ) where
-    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + 'static,
+    A: Axis + LeafSliceFloat<T> + LeafSliceFloatChunk<T, K> + AxisUnified<Coord = A> + 'static,
     T: Content + 'static,
     usize: Cast<T>,
     Stem: kiddo::StemStrategy + 'static,

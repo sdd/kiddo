@@ -18,10 +18,8 @@ mod donnelly_2_pf_blockmarker;
 pub mod donnelly_core;
 mod prefetch;
 
-#[cfg(feature = "simd")]
 mod donnelly_2_blockmarker_simd;
 
-#[cfg(feature = "simd")]
 pub use donnelly_2_blockmarker_simd::{CompareBlock3, CompareBlock4, DonnellyMarkerSimd};
 
 pub use donnelly_2::Donnelly;

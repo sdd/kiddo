@@ -363,7 +363,7 @@ where
         );
     }
 
-    #[cfg(not(feature = "unreliable_select_nth_unstable"))]
+    // #[cfg(not(feature = "unreliable_select_nth_unstable"))]
     #[cfg_attr(not(feature = "no_inline"), inline)]
     fn update_pivot(
         source: &[[A; K]],

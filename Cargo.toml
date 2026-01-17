@@ -242,12 +242,12 @@ required-features = ["test_utils", "rkyv_08"]
 [[example]]
 name = "immutable-large-ann-donnelly-swpre-deserialize-and-query"
 path = "examples/immutable-large-ann-donnelly-swpre-deserialize-and-query.rs"
-required-features = ["test_utils"]
+required-features = ["test_utils", "rkyv_08"]
 
 [[example]]
 name = "immutable-large-ann-eytzinger-deserialize-and-query"
 path = "examples/immutable-large-ann-eytzinger-deserialize-and-query.rs"
-required-features = ["test_utils"]
+required-features = ["test_utils", "rkyv_08"]
 
 [[example]]
 name = "immutable-large-donnelly-simulate-traverse-f32"

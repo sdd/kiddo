@@ -60,6 +60,7 @@ where
         + Default
         + PartialOrd
         + Axis
+        + AxisUnified<Coord = A>
         + LeafSliceFloat<T>
         + LeafSliceFloatChunk<T, K>
         + rkyv_08::Archive,

@@ -2,6 +2,8 @@ use crate::generate_immutable_get_leaf_node_idx;
 use crate::immutable::float::kdtree::ImmutableKdTree;
 #[allow(unused_imports)]
 use crate::leaf_slice::float::{LeafSliceFloat, LeafSliceFloatChunk};
+#[cfg(feature = "rkyv_08")]
+use crate::stem_strategies::Donnelly;
 use crate::traits::{Axis, Content, StemStrategy};
 use az::Cast;
 
