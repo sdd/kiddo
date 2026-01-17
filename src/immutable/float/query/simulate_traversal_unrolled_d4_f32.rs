@@ -7,7 +7,7 @@ use crate::traits::StemStrategy;
 
 impl ImmutableKdTree<f32, u32, Donnelly<4, 64, 4, 4>, 4, 32> {
     pub fn simulate_traversal_unrolled(&self, query: &[f32; 4], event_tx: &Sender<Event>) -> usize {
-        event_tx.send(Event::NewQuery);
+        let _ = event_tx.send(Event::NewQuery);
 
         let stems_ptr = std::ptr::NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
         let mut stem_ordering = Donnelly::<4, 64, 4, 4>::new(stems_ptr);
@@ -17,7 +17,7 @@ impl ImmutableKdTree<f32, u32, Donnelly<4, 64, 4, 4>, 4, 32> {
             let stem_idx = stem_ordering.stem_idx();
 
             let offset: usize = stem_idx * 4usize;
-            event_tx.send(Event::Access(offset));
+            let _ = event_tx.send(Event::Access(offset));
 
             let val = *unsafe { self.stems.get_unchecked(stem_idx) };
             let is_right_child = *unsafe { query.get_unchecked(stem_ordering.dim()) } >= val;
@@ -27,7 +27,7 @@ impl ImmutableKdTree<f32, u32, Donnelly<4, 64, 4, 4>, 4, 32> {
             let stem_idx = stem_ordering.stem_idx();
 
             let offset: usize = stem_idx * 4usize;
-            event_tx.send(Event::Access(offset));
+            let _ = event_tx.send(Event::Access(offset));
 
             let val = *unsafe { self.stems.get_unchecked(stem_idx) };
             let is_right_child = *unsafe { query.get_unchecked(stem_ordering.dim()) } >= val;
@@ -37,7 +37,7 @@ impl ImmutableKdTree<f32, u32, Donnelly<4, 64, 4, 4>, 4, 32> {
             let stem_idx = stem_ordering.stem_idx();
 
             let offset: usize = stem_idx * 4usize;
-            event_tx.send(Event::Access(offset));
+            let _ = event_tx.send(Event::Access(offset));
 
             let val = *unsafe { self.stems.get_unchecked(stem_idx) };
             let is_right_child = *unsafe { query.get_unchecked(stem_ordering.dim()) } >= val;
@@ -47,7 +47,7 @@ impl ImmutableKdTree<f32, u32, Donnelly<4, 64, 4, 4>, 4, 32> {
             let stem_idx = stem_ordering.stem_idx();
 
             let offset: usize = stem_idx * 4usize;
-            event_tx.send(Event::Access(offset));
+            let _ = event_tx.send(Event::Access(offset));
 
             let val = *unsafe { self.stems.get_unchecked(stem_idx) };
             let is_right_child = *unsafe { query.get_unchecked(stem_ordering.dim()) } >= val;

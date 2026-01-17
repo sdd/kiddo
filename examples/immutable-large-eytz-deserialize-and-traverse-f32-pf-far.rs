@@ -5,7 +5,6 @@ use std::time::Instant;
 
 use elapsed::ElapsedDuration;
 use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
-use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::stem_strategies::eytzinger_pf_far::EytzingerPfFar;
 use memmap::MmapOptions;
 use rkyv_08::access_unchecked;
@@ -14,7 +13,6 @@ use rkyv_08::vec::ArchivedVec;
 const QUERY_POINT_QTY: usize = 20_000_000;
 const BUCKET_SIZE: usize = 2;
 
-type Tree = ImmutableKdTree<f32, usize, EytzingerPfFar<4, 4>, 4, BUCKET_SIZE>;
 type ArchivedTree = ArchivedR8ImmutableKdTree<f32, usize, EytzingerPfFar<4, 4>, 4, BUCKET_SIZE>;
 
 fn main() -> Result<(), Box<dyn Error>> {

@@ -4,7 +4,7 @@ use std::io::Write;
 use std::time::Instant;
 
 use elapsed::ElapsedDuration;
-use rand::{rng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
 use rkyv_08::{rancor::Error as RkyvError, to_bytes};
 use ubyte::ToByteUnit;
 
@@ -12,8 +12,6 @@ use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::stem_strategies::Eytzinger;
 
 const TREE_SIZE: usize = 2usize.pow(25);
-// const QUERY_POINT_QTY: usize = 20_000_000;
-const QUERY_POINT_QTY: usize = 20_000;
 const BUCKET_SIZE: usize = 2;
 
 type Tree = ImmutableKdTree<f32, usize, Eytzinger<4>, 4, BUCKET_SIZE>;

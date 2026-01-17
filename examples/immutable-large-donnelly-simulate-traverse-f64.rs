@@ -8,15 +8,12 @@ use memmap::MmapOptions;
 use rkyv_08::access_unchecked;
 use rkyv_08::vec::ArchivedVec;
 
-use kiddo::cache_simulator::{profiles, AccessKind};
-use kiddo::distance::float::SquaredEuclidean;
+use kiddo::cache_simulator::profiles;
 use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
-use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::stem_strategies::Donnelly;
 
 const BUCKET_SIZE: usize = 2;
 
-type Tree = ImmutableKdTree<f64, usize, Donnelly<3, 64, 8, 4>, 4, BUCKET_SIZE>;
 type ArchivedTree = ArchivedR8ImmutableKdTree<f64, usize, Donnelly<3, 64, 8, 4>, 4, BUCKET_SIZE>;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -55,7 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             sim.step_event(event);
 
             count += 1;
-            if count % 10_000 == 0 {
+            if count.is_multiple_of(10_000) {
                 println!("{count} events processed...");
             }
         }

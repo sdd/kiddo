@@ -314,11 +314,15 @@ pub trait StemStrategy: Clone + Sync + Send {
         // Default: no-op
     }
 
+    /// Emit cache-simulation events while advancing one level in the stem tree.
+    ///
+    /// Implementations should mirror `traverse` behavior but also report memory
+    /// accesses via `event_tx` for the cache simulator.
     #[cfg(feature = "simulator")]
     fn simulate_traverse(
         &mut self,
-        is_right: bool,
-        event_tx: &std::sync::mpsc::Sender<crate::cache_simulator::Event>,
+        _is_right: bool,
+        _event_tx: &std::sync::mpsc::Sender<crate::cache_simulator::Event>,
     ) {
         unimplemented!();
     }

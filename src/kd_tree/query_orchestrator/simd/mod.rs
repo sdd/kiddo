@@ -7,11 +7,13 @@
 use crate::traits_unified_2::AxisUnified;
 
 // Architecture-specific modules
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(feature = "simd", target_arch = "x86_64"))]
 mod x86_64;
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(feature = "simd", target_arch = "aarch64"))]
 mod aarch64;
+
+mod autovec;
 
 /// SIMD prune block helper
 ///
@@ -30,38 +32,44 @@ where
         let max_dist_f64: f64 = unsafe { std::mem::transmute_copy(&max_dist) };
         let rd_f64: [f64; 8] = unsafe { std::mem::transmute_copy(rd_values) };
 
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
         {
             x86_64::simd_prune_block_f64(&rd_f64, max_dist_f64, sibling_mask)
         }
 
-        #[cfg(target_arch = "aarch64")]
+        #[cfg(all(feature = "simd", target_arch = "aarch64"))]
         {
             aarch64::simd_prune_block_f64(&rd_f64, max_dist_f64, sibling_mask)
         }
 
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        #[cfg(not(any(
+            all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"),
+            all(feature = "simd", target_arch = "aarch64")
+        )))]
         {
-            compile_error!("SIMD pruning only supports x86_64 and aarch64")
+            autovec::simd_prune_block_f64(&rd_f64, max_dist_f64, sibling_mask)
         }
     } else if std::mem::size_of::<O>() == 4 {
         // f32 path
         let max_dist_f32: f32 = unsafe { std::mem::transmute_copy(&max_dist) };
         let rd_f32: [f32; 8] = unsafe { std::mem::transmute_copy(rd_values) };
 
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
         {
             x86_64::simd_prune_block_f32(&rd_f32, max_dist_f32, sibling_mask)
         }
 
-        #[cfg(target_arch = "aarch64")]
+        #[cfg(all(feature = "simd", target_arch = "aarch64"))]
         {
             aarch64::simd_prune_block_f32(&rd_f32, max_dist_f32, sibling_mask)
         }
 
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        #[cfg(not(any(
+            all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"),
+            all(feature = "simd", target_arch = "aarch64")
+        )))]
         {
-            compile_error!("SIMD pruning only supports x86_64 and aarch64")
+            autovec::simd_prune_block_f32(&rd_f32, max_dist_f32, sibling_mask)
         }
     } else {
         panic!("Unsupported output type size for SIMD pruning");

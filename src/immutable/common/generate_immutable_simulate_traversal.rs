@@ -10,7 +10,7 @@ macro_rules! generate_immutable_simulate_traversal {
                 A: $crate::leaf_slice::float::LeafSliceFloat<T> + $crate::leaf_slice::float::LeafSliceFloatChunk<T, K>,
                 usize: Cast<T>,
             {
-                event_tx.send($crate::cache_simulator::Event::NewQuery);
+                let _ = event_tx.send($crate::cache_simulator::Event::NewQuery);
 
                 let stems_ptr = std::ptr::NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
                 let mut stem_ordering = SO::new(stems_ptr);
@@ -19,7 +19,7 @@ macro_rules! generate_immutable_simulate_traversal {
                     let stem_idx = stem_ordering.stem_idx();
 
                     let offset: usize = (stem_idx as usize) * 4usize;
-                    event_tx.send($crate::cache_simulator::Event::Access(offset));
+                    let _ = event_tx.send($crate::cache_simulator::Event::Access(offset));
 
                     let val = *unsafe { self.stems.get_unchecked(stem_idx) };
                     let is_right_child = *unsafe { query.get_unchecked(stem_ordering.dim()) } >= val;

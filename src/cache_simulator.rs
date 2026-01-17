@@ -1,4 +1,5 @@
 // src/cache_sim.rs
+#![allow(unused, missing_docs)]
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 
@@ -989,8 +990,8 @@ impl MemoryHierarchy {
                 if let Some((lvl, issue_cycle)) = self.prefetch_issue_time.remove(&line) {
                     // Add lead cycles only if the prefetch arrived in time
                     if self.l1.has_line(addr)
-                        || self.l2.as_ref().map_or(false, |l2| l2.has_line(addr))
-                        || self.l3.as_ref().map_or(false, |l3| l3.has_line(addr))
+                        || self.l2.as_ref().is_some_and(|l2| l2.has_line(addr))
+                        || self.l3.as_ref().is_some_and(|l3| l3.has_line(addr))
                     {
                         let lead = (before.max(self.cycle)) - issue_cycle;
                         self.pf_stats_for_level_mut(lvl).useful_lead_cycles_sum += lead;

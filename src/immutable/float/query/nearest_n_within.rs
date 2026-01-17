@@ -63,6 +63,7 @@ where
         + Default
         + PartialOrd
         + Axis
+        + AxisUnified<Coord = A>
         + LeafSliceFloat<T>
         + LeafSliceFloatChunk<T, K>
         + rkyv_08::Archive,
@@ -187,14 +188,14 @@ mod tests {
         let query_points: Vec<[f32; 4]> =
             (0..NUM_QUERIES).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        for (_i, query_point) in query_points.iter().enumerate() {
-            let expected = linear_search(&content_to_add, &query_point, RADIUS)
+        for query_point in query_points.iter() {
+            let expected = linear_search(&content_to_add, query_point, RADIUS)
                 .into_iter()
                 .take(max_qty.into())
                 .collect::<Vec<_>>();
 
             let mut result: Vec<_> = tree
-                .nearest_n_within::<SquaredEuclidean>(&query_point, RADIUS, max_qty, true)
+                .nearest_n_within::<SquaredEuclidean>(query_point, RADIUS, max_qty, true)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
