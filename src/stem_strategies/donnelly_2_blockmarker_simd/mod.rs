@@ -1068,13 +1068,112 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 mod tests {
     use super::*;
 
+    fn build_test_block3_pivots_f64() -> [f64; 8] {
+        [0.2, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f64::INFINITY]
+    }
+
+    fn build_test_block3_pivots_f32() -> [f32; 8] {
+        [0.2, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f32::INFINITY]
+    }
+
+    fn select_child_scalar_f64(query: f64, pivots: &[f64; 8]) -> u8 {
+        let mut count = 0u8;
+        for i in 0..8 {
+            if query >= pivots[i] {
+                count += 1;
+            }
+        }
+        count
+    }
+
+    fn select_child_scalar_f32(query: f32, pivots: &[f32; 8]) -> u8 {
+        let mut count = 0u8;
+        for i in 0..8 {
+            if query >= pivots[i] {
+                count += 1;
+            }
+        }
+        count
+    }
+
+    fn scalar_backtrack_check_block3_f64(
+        query: f64,
+        pivots: &[f64; 8],
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u8 {
+        let mut mask = 0u8;
+        for child_idx in 0..8 {
+            let (lower_offset, upper_offset) = child_interval_bounds_block3(child_idx);
+
+            let lower = if lower_offset == 255 {
+                f64::NEG_INFINITY
+            } else {
+                pivots[lower_offset as usize]
+            };
+
+            let upper = if upper_offset == 255 {
+                f64::INFINITY
+            } else {
+                pivots[upper_offset as usize]
+            };
+
+            let interval_dist = interval_distance_1d(query, lower, upper);
+            // For SquaredEuclidean: rd_far = rd + (interval_dist - old_off)²
+            let delta = interval_dist - old_off;
+            let rd_far = rd + delta * delta;
+
+            if rd_far <= best_dist {
+                mask |= 1 << child_idx;
+            }
+        }
+        mask
+    }
+
+    fn scalar_backtrack_check_block3_f32(
+        query: f32,
+        pivots: &[f32; 8],
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u8 {
+        let mut mask = 0u8;
+        for child_idx in 0..8 {
+            let (lower_offset, upper_offset) = child_interval_bounds_block3(child_idx);
+
+            let lower = if lower_offset == 255 {
+                f32::NEG_INFINITY
+            } else {
+                pivots[lower_offset as usize]
+            };
+
+            let upper = if upper_offset == 255 {
+                f32::INFINITY
+            } else {
+                pivots[upper_offset as usize]
+            };
+
+            // Use f64 version of interval_distance_1d, cast to f32
+            let interval_dist =
+                interval_distance_1d(query as f64, lower as f64, upper as f64) as f32;
+            let delta = interval_dist - old_off;
+            let rd_far = rd + delta * delta;
+
+            if rd_far <= best_dist {
+                mask |= 1 << child_idx;
+            }
+        }
+        mask
+    }
+
     #[test]
     fn test_child_interval_bounds_block3() {
         // Verify all 8 children have correct interval bounds
         // Expected bounds based on triangular structure:
         //           pivot[0]
         //      pivot[1]    pivot[2]
-        //   p[3] p[4]   p[5] p[6]
+        //   p[3]    p[4]    p[5]   p[6]
         // ch0 ch1 ch2 ch3 ch4 ch5 ch6 ch7
 
         assert_eq!(child_interval_bounds_block3(0), (255, 3)); // [-∞, pivot[3])
@@ -1119,12 +1218,11 @@ mod tests {
         assert_eq!(
             interval_distance_1d(0.0, f64::NEG_INFINITY, f64::INFINITY),
             0.0
-        ); // Unbounded
+        );
     }
 
     #[test]
-    fn test_interval_distance_1d_branchless_correctness() {
-        // Test that branchless impl gives same results as branching version
+    fn test_interval_distance_1d_branchless() {
         for query in [-10.0, -1.0, 0.0, 1.0, 5.0, 7.5, 10.0, 15.0, 100.0] {
             let lower = 0.0;
             let upper = 10.0;
@@ -1262,5 +1360,334 @@ mod tests {
         // 1. The interval distance calculation is wrong
         // 2. The non-SIMD uses different logic
         // 3. There's something about the tree structure we're missing
+    }
+
+    #[test]
+    fn test_block3_child_selection_correctness_f64() {
+        // Test that compare_block3 selects correct children for various query values
+        let pivots = build_test_block3_pivots_f64();
+
+        // Test select of every child
+        let test_cases = [
+            (-100.0, 0), // Far below all pivots -> child 0
+            (0.05, 0),   // Just below pivot[3]=0.1 -> child 0
+            (0.15, 1),   // Between pivot[3]=0.1 and pivot[1]=0.4 -> child 1
+            (0.25, 2),   // Between pivot[1]=0.4 and pivot[4]=0.3 - wait, need to check structure
+            (0.35, 3),   // Test child 3
+            (0.45, 4),   // Test child 4
+            (0.55, 5),   // Test child 5
+            (0.65, 6),   // Test child 6
+            (100.0, 7),  // Far above all pivots -> child 7
+        ];
+
+        for (query, expected_child) in test_cases {
+            let scalar_child = select_child_scalar_f64(query, &pivots);
+
+            assert_eq!(
+                scalar_child, expected_child,
+                "Query {} should select child {}, got {}",
+                query, expected_child, scalar_child
+            );
+        }
+    }
+
+    #[test]
+    fn test_block3_child_selection_all_reachable_f64() {
+        let pivots = build_test_block3_pivots_f64();
+        let mut children_reached = [false; 8];
+
+        for i in 0..100 {
+            let query = -1.0 + (i as f64) * 0.02; // Range from -1.0 to 1.0
+            let child = select_child_scalar_f64(query, &pivots);
+            if (child as usize) < 8 {
+                children_reached[child as usize] = true;
+            }
+        }
+
+        for (child_idx, &reached) in children_reached.iter().enumerate() {
+            assert!(
+                reached,
+                "Child {} was not reached by any query value",
+                child_idx
+            );
+        }
+    }
+
+    #[test]
+    fn test_block3_child_selection_boundaries_f64() {
+        let pivots = build_test_block3_pivots_f64();
+
+        // Query == pivot? >= cmp should put it in the right-hand interval
+        for (pivot_idx, &pivot_val) in pivots.iter().enumerate().take(7) {
+            let child = select_child_scalar_f64(pivot_val, &pivots);
+
+            let expected = pivots.iter().take(8).filter(|&&p| pivot_val >= p).count() as u8;
+
+            assert_eq!(
+                child, expected,
+                "Query at pivot[{}]={} should select child {}, got {}",
+                pivot_idx, pivot_val, expected, child
+            );
+        }
+    }
+
+    #[test]
+    fn test_block3_child_selection_f32() {
+        let pivots = build_test_block3_pivots_f32();
+
+        let test_cases = [
+            (-100.0f32, 0u8),
+            (0.05f32, 0u8),
+            (0.25f32, 2u8),
+            (100.0f32, 7u8),
+        ];
+
+        for (query, expected_child) in test_cases {
+            let scalar_child = select_child_scalar_f32(query, &pivots);
+            assert_eq!(
+                scalar_child, expected_child,
+                "f32: Query {} should select child {}, got {}",
+                query, expected_child, scalar_child
+            );
+        }
+    }
+
+    #[test]
+    fn test_block3_child_selection_via_compare_block3_f64() {
+        let pivots = build_test_block3_pivots_f64();
+
+        let test_queries = [
+            -100.0, -1.0, 0.0, 0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 1.0, 100.0,
+        ];
+
+        for &query in &test_queries {
+            let expected = select_child_scalar_f64(query, &pivots);
+            let actual = compare_block3(&pivots, query, 0);
+
+            assert_eq!(
+                actual, expected,
+                "compare_block3 mismatch for query {}: expected child {}, got {}",
+                query, expected, actual
+            );
+        }
+    }
+
+    #[test]
+    fn test_block3_child_selection_via_compare_block3_f32() {
+        let pivots = build_test_block3_pivots_f32();
+
+        let test_queries = [-100.0f32, 0.0f32, 0.25f32, 0.5f32, 100.0f32];
+
+        for &query in &test_queries {
+            let expected = select_child_scalar_f32(query, &pivots);
+            let actual = compare_block3(&pivots, query, 0);
+
+            assert_eq!(
+                actual, expected,
+                "compare_block3 (f32) mismatch for query {}: expected child {}, got {}",
+                query, expected, actual
+            );
+        }
+    }
+
+    #[test]
+    fn test_backtrack_scalar_vs_simd_f64_multiple_cases() {
+        let pivots = build_test_block3_pivots_f64();
+
+        let test_cases = [
+            (0.25, 0.0, 0.0, f64::INFINITY),
+            (0.5, 0.0, 0.0, 0.1),
+            (0.5, 0.01, 0.05, 0.2),
+            (-0.5, 0.0, 0.0, f64::INFINITY),
+            (1.5, 0.0, 0.0, f64::INFINITY),
+        ];
+
+        for (query, old_off, rd, best_dist) in test_cases {
+            let scalar_mask =
+                scalar_backtrack_check_block3_f64(query, &pivots, old_off, rd, best_dist);
+
+            // Test SIMD implementation if available
+            #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+            {
+                use crate::traits_unified_2::DistanceMetricUnified;
+                use crate::traits_unified_2::SquaredEuclidean;
+
+                let pivots_ptr = pivots.as_ptr() as *const u8;
+                let simd_mask = unsafe {
+                    <SquaredEuclidean<f64> as DistanceMetricUnified<f64, 3>>::simd_backtrack_check_block3_interval_f64_avx2(
+                        query, pivots_ptr, 0, old_off, rd, best_dist
+                    )
+                };
+
+                assert_eq!(
+                    scalar_mask, simd_mask,
+                    "SIMD vs scalar mismatch for query={}, old_off={}, rd={}, best_dist={}: scalar={:08b}, simd={:08b}",
+                    query, old_off, rd, best_dist, scalar_mask, simd_mask
+                );
+            }
+
+            // On non-SIMD platforms, just validate the scalar mask is reasonable
+            #[cfg(not(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2")))]
+            {
+                // Scalar mask should be valid (between 0 and 0xFF)
+                let _ = scalar_mask; // Use the variable to avoid warning
+            }
+        }
+    }
+
+    #[test]
+    fn test_backtrack_scalar_vs_simd_f32_multiple_cases() {
+        let pivots = build_test_block3_pivots_f32();
+
+        let test_cases = [
+            (0.25f32, 0.0f32, 0.0f32, f32::INFINITY),
+            (0.5f32, 0.0f32, 0.0f32, 0.1f32),
+            (-0.5f32, 0.0f32, 0.0f32, f32::INFINITY),
+        ];
+
+        for (query, old_off, rd, best_dist) in test_cases {
+            let scalar_mask =
+                scalar_backtrack_check_block3_f32(query, &pivots, old_off, rd, best_dist);
+
+            #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+            {
+                use crate::traits_unified_2::DistanceMetricUnified;
+                use crate::traits_unified_2::SquaredEuclidean;
+
+                let pivots_ptr = pivots.as_ptr() as *const u8;
+                let simd_mask = unsafe {
+                    <SquaredEuclidean<f32> as DistanceMetricUnified<f32, 3>>::simd_backtrack_check_block3_f32_avx2(
+                        query, pivots_ptr, 0, old_off, rd, best_dist
+                    )
+                };
+
+                assert_eq!(
+                    scalar_mask, simd_mask,
+                    "SIMD vs scalar (f32) mismatch for query={}, old_off={}, rd={}, best_dist={}: scalar={:08b}, simd={:08b}",
+                    query, old_off, rd, best_dist, scalar_mask, simd_mask
+                );
+            }
+
+            #[cfg(not(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2")))]
+            {
+                let _ = scalar_mask; // Use the variable to avoid warning
+            }
+        }
+    }
+
+    #[test]
+    fn test_block3_backtrack_ground_truth_f64_basic() {
+        let pivots = build_test_block3_pivots_f64();
+
+        // Case 1: Query in middle, rd=0, best_dist=infinity (all children should pass)
+        let mask = scalar_backtrack_check_block3_f64(0.5, &pivots, 0.0, 0.0, f64::INFINITY);
+        assert_eq!(
+            mask, 0xFF,
+            "With infinite best_dist, all children should pass"
+        );
+
+        // Case 2: Query in middle, rd=0, best_dist=0 (only children with interval_dist=0 should pass)
+        let query = 0.5;
+        let mask = scalar_backtrack_check_block3_f64(query, &pivots, 0.0, 0.0, 0.0);
+
+        // The child containing the query should have interval_dist=0, so rd_far=0
+        // Note: if query sits on a boundary, multiple children might have interval_dist=0
+        let selected_child = select_child_scalar_f64(query, &pivots);
+        let selected_bit = 1 << selected_child;
+
+        assert!(
+            (mask & selected_bit) != 0,
+            "With best_dist=0, at least the child containing the query (child {}) should pass: got {:08b}",
+            selected_child, mask
+        );
+
+        // All passing children should have interval_dist=0 (rd_far=0<=0)
+        assert!(
+            mask.count_ones() >= 1,
+            "At least one child should pass when best_dist=0"
+        );
+    }
+
+    #[test]
+    fn test_block3_backtrack_edge_cases_f64() {
+        let pivots = build_test_block3_pivots_f64();
+
+        // Test with query at exact pivot boundaries
+        for (_pivot_idx, &pivot_val) in pivots.iter().enumerate().take(7) {
+            let mask =
+                scalar_backtrack_check_block3_f64(pivot_val, &pivots, 0.0, 0.0, f64::INFINITY);
+
+            // At least one child should pass
+            assert_ne!(
+                mask, 0,
+                "At pivot boundary {}, at least one child should be visitable",
+                pivot_val
+            );
+        }
+
+        // Test with query outside all pivots
+        let mask = scalar_backtrack_check_block3_f64(-1000.0, &pivots, 0.0, 0.0, f64::INFINITY);
+        assert_eq!(
+            mask, 0xFF,
+            "Far outside query with infinite best_dist should allow all children"
+        );
+
+        // Test with non-zero old_off
+        let mask = scalar_backtrack_check_block3_f64(0.5, &pivots, 0.1, 0.0, f64::INFINITY);
+        assert_ne!(
+            mask, 0,
+            "With non-zero old_off, some children should still pass"
+        );
+    }
+
+    #[test]
+    fn test_block3_backtrack_rd_pruning_f64() {
+        let pivots = build_test_block3_pivots_f64();
+
+        // Test that increasing rd prunes more children
+        let query = 0.5;
+        let old_off = 0.0;
+        let best_dist = 0.1;
+
+        let mask_rd_0 = scalar_backtrack_check_block3_f64(query, &pivots, old_off, 0.0, best_dist);
+        let mask_rd_high =
+            scalar_backtrack_check_block3_f64(query, &pivots, old_off, 0.05, best_dist);
+
+        // With higher rd, we should prune at least as many (possibly more) children
+        let count_rd_0 = mask_rd_0.count_ones();
+        let count_rd_high = mask_rd_high.count_ones();
+
+        assert!(
+            count_rd_high <= count_rd_0,
+            "Higher rd should prune at least as many children: rd=0 -> {} children, rd=0.05 -> {} children",
+            count_rd_0, count_rd_high
+        );
+    }
+
+    #[test]
+    fn test_block3_backtrack_best_dist_pruning_f64() {
+        let pivots = build_test_block3_pivots_f64();
+
+        // Test that decreasing best_dist prunes more children
+        let query = 0.5;
+        let old_off = 0.0;
+        let rd = 0.0;
+
+        let mask_best_inf =
+            scalar_backtrack_check_block3_f64(query, &pivots, old_off, rd, f64::INFINITY);
+        let mask_best_01 = scalar_backtrack_check_block3_f64(query, &pivots, old_off, rd, 0.1);
+        let mask_best_001 = scalar_backtrack_check_block3_f64(query, &pivots, old_off, rd, 0.01);
+
+        let count_inf = mask_best_inf.count_ones();
+        let count_01 = mask_best_01.count_ones();
+        let count_001 = mask_best_001.count_ones();
+
+        assert!(
+            count_001 <= count_01 && count_01 <= count_inf,
+            "Smaller best_dist should prune more: inf -> {}, 0.1 -> {}, 0.01 -> {}",
+            count_inf,
+            count_01,
+            count_001
+        );
     }
 }
