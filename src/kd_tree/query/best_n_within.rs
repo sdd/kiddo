@@ -25,6 +25,7 @@ where
     ) -> BinaryHeap<BestNeighbour<<D as DistanceMetricUnified<A, K>>::Output, T>>
     where
         D: DistanceMetricUnified<A, K>,
+        D::Output: crate::stem_strategies::SimdPrune,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
         let max_qty = max_qty.into();

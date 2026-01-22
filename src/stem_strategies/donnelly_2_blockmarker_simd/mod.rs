@@ -18,6 +18,10 @@ pub mod aarch64;
 
 mod autovec;
 
+// Pruning traits for SIMD dispatch
+mod prune_traits;
+pub use prune_traits::SimdPrune;
+
 /// Block3 interval lower bounds encoded as u64 literal.
 /// Each 8-bit segment contains the lower bound pivot offset for a child (255 = -∞).
 /// Lower bounds: [255, 3, 1, 4, 0, 5, 2, 6] for children 0-7
@@ -701,7 +705,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
         Self: Sized,
         A: crate::traits_unified_2::AxisUnified<Coord = A> + CompareBlock3,
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
-        O: crate::traits_unified_2::AxisUnified<Coord = O>,
+        O: crate::traits_unified_2::AxisUnified<Coord = O> + crate::stem_strategies::SimdPrune,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
         LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
@@ -1055,7 +1059,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
         Self: Sized,
         A: crate::traits_unified_2::AxisUnified<Coord = A> + CompareBlock4,
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
-        O: crate::traits_unified_2::AxisUnified<Coord = O>,
+        O: crate::traits_unified_2::AxisUnified<Coord = O> + crate::stem_strategies::SimdPrune,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
         LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
@@ -1688,6 +1692,160 @@ mod tests {
             count_inf,
             count_01,
             count_001
+        );
+    }
+
+    #[test]
+    #[cfg(all(feature = "fixed", not(feature = "simd")))]
+    fn test_simd_prune_fixed_i32_u0() {
+        use crate::stem_strategies::donnelly_2_blockmarker_simd::SimdPrune;
+        use fixed::types::extra::U0;
+        use fixed::FixedI32;
+
+        type Fixed = FixedI32<U0>;
+
+        // Create test rd_values array - some pass, some fail
+        let rd_values: [Fixed; 8] = [
+            Fixed::from_num(1),
+            Fixed::from_num(5),
+            Fixed::from_num(10),
+            Fixed::from_num(15),
+            Fixed::from_num(3),
+            Fixed::from_num(7),
+            Fixed::from_num(12),
+            Fixed::from_num(2),
+        ];
+
+        let max_dist = Fixed::from_num(8);
+        let sibling_mask = 0xFF; // All siblings enabled
+
+        // Call pruning via trait
+        let mask = Fixed::simd_prune_block3(&rd_values, max_dist, sibling_mask);
+
+        // Expected: bits 0, 1, 4, 5, 7 should be set (values <= 8)
+        // Values: [1, 5, 10, 15, 3, 7, 12, 2]
+        //  Pass:  [T, T,  F,  F, T, T,  F, T]
+        let expected_mask = 0b10110011; // bits 0,1,4,5,7 set
+
+        assert_eq!(
+            mask, expected_mask,
+            "Fixed-point pruning mask mismatch: got {:08b}, expected {:08b}",
+            mask, expected_mask
+        );
+    }
+
+    #[test]
+    #[cfg(all(feature = "fixed", not(feature = "simd")))]
+    fn test_simd_prune_fixed_i32_u16() {
+        use crate::stem_strategies::donnelly_2_blockmarker_simd::SimdPrune;
+        use fixed::types::extra::U16;
+        use fixed::FixedI32;
+
+        type Fixed = FixedI32<U16>;
+
+        // Create test rd_values with fractional values
+        let rd_values: [Fixed; 8] = [
+            Fixed::from_num(0.5),
+            Fixed::from_num(1.5),
+            Fixed::from_num(2.5),
+            Fixed::from_num(3.5),
+            Fixed::from_num(0.25),
+            Fixed::from_num(1.75),
+            Fixed::from_num(2.75),
+            Fixed::from_num(0.1),
+        ];
+
+        let max_dist = Fixed::from_num(2.0);
+        let sibling_mask = 0xFF;
+
+        let mask = Fixed::simd_prune_block3(&rd_values, max_dist, sibling_mask);
+
+        // Expected: bits 0, 1, 4, 5, 7 should be set (values <= 2.0)
+        // Values: [0.5, 1.5, 2.5, 3.5, 0.25, 1.75, 2.75, 0.1]
+        //  Pass:  [ T,   T,   F,   F,   T,    T,    F,   T]
+        let expected_mask = 0b10110011;
+
+        assert_eq!(
+            mask, expected_mask,
+            "Fixed-point pruning mask mismatch: got {:08b}, expected {:08b}",
+            mask, expected_mask
+        );
+    }
+
+    #[test]
+    #[cfg(all(feature = "fixed", not(feature = "simd")))]
+    fn test_simd_prune_fixed_u16_u8() {
+        use crate::stem_strategies::donnelly_2_blockmarker_simd::SimdPrune;
+        use fixed::types::extra::U8;
+        use fixed::FixedU16;
+
+        type Fixed = FixedU16<U8>;
+
+        let rd_values: [Fixed; 8] = [
+            Fixed::from_num(0.1),
+            Fixed::from_num(0.5),
+            Fixed::from_num(1.0),
+            Fixed::from_num(1.5),
+            Fixed::from_num(0.2),
+            Fixed::from_num(0.8),
+            Fixed::from_num(1.2),
+            Fixed::from_num(0.3),
+        ];
+
+        let max_dist = Fixed::from_num(1.0);
+        let sibling_mask = 0xFF;
+
+        let mask = Fixed::simd_prune_block3(&rd_values, max_dist, sibling_mask);
+
+        // Expected: bits 0, 1, 2, 4, 5, 7 should be set (values <= 1.0)
+        // Values: [0.1, 0.5, 1.0, 1.5, 0.2, 0.8, 1.2, 0.3]
+        //  Pass:  [ T,   T,   T,   F,   T,   T,   F,   T]
+        let expected_mask = 0b10110111;
+
+        assert_eq!(
+            mask, expected_mask,
+            "Fixed-point pruning mask mismatch: got {:08b}, expected {:08b}",
+            mask, expected_mask
+        );
+    }
+
+    #[test]
+    fn test_simd_prune_sibling_mask_filtering() {
+        use crate::stem_strategies::donnelly_2_blockmarker_simd::SimdPrune;
+
+        // Test that sibling_mask correctly filters results
+        let rd_values = [0.5f64, 1.5, 2.5, 3.5, 0.25, 1.75, 2.75, 0.1];
+        let max_dist = 2.0f64;
+
+        // All siblings enabled
+        let mask_all = f64::simd_prune_block3(&rd_values, max_dist, 0xFF);
+        // Only even-indexed siblings enabled
+        let mask_even = f64::simd_prune_block3(&rd_values, max_dist, 0b01010101);
+        // Only odd-indexed siblings enabled
+        let mask_odd = f64::simd_prune_block3(&rd_values, max_dist, 0b10101010);
+
+        // mask_all should have bits 0,1,4,5,7 set (values <= 2.0)
+        let expected_all = 0b10110011;
+        assert_eq!(
+            mask_all, expected_all,
+            "Unfiltered mask mismatch: got {:08b}, expected {:08b}",
+            mask_all, expected_all
+        );
+
+        // mask_even should have only bits 0,4 set (even indices & values <= 2.0)
+        let expected_even = 0b00010001;
+        assert_eq!(
+            mask_even, expected_even,
+            "Even-filtered mask mismatch: got {:08b}, expected {:08b}",
+            mask_even, expected_even
+        );
+
+        // mask_odd should have only bits 1,5,7 set (odd indices & values <= 2.0)
+        let expected_odd = 0b10100010;
+        assert_eq!(
+            mask_odd, expected_odd,
+            "Odd-filtered mask mismatch: got {:08b}, expected {:08b}",
+            mask_odd, expected_odd
         );
     }
 }
