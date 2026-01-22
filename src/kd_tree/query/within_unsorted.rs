@@ -22,6 +22,7 @@ where
     ) -> Vec<NearestNeighbour<D::Output, T>>
     where
         D: DistanceMetricUnified<A, K>,
+        D::Output: crate::stem_strategies::SimdPrune,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
         self.nearest_n_within::<D>(query, max_dist, NonZeroUsize::MAX, false)

@@ -1,4 +1,7 @@
 //! Definitions and implementations for some traits that are common between the [`float`](crate::mutable::float), [`immutable`](crate::immutable) and [`fixed`](crate::mutable::fixed)  modules
+// use std::num::NonZero;
+use crate::kd_tree::query_stack::StackTrait;
+use crate::traits_unified_2::AxisUnified;
 // use crate::{BestNeighbour, NearestNeighbour, WithinUnsortedIter};
 use aligned_vec::AVec;
 use az::Cast;
@@ -9,9 +12,6 @@ use num_traits::float::FloatCore;
 use num_traits::{PrimInt, Unsigned, Zero};
 use std::fmt::Debug;
 use std::iter::Sum;
-// use std::num::NonZero;
-use crate::kd_tree::query_stack::StackTrait;
-use crate::traits_unified_2::AxisUnified;
 use std::ptr::NonNull;
 
 /// Axis trait represents the traits that must be implemented
@@ -452,7 +452,7 @@ pub trait StemStrategy: Clone + Sync + Send {
         Self: Sized,
         A: crate::traits_unified_2::AxisUnified<Coord = A>,
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
-        O: crate::traits_unified_2::AxisUnified<Coord = O>,
+        O: crate::traits_unified_2::AxisUnified<Coord = O> + crate::stem_strategies::SimdPrune,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
         LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
@@ -523,7 +523,6 @@ pub trait NNMutable<A: Axis, T, const K: usize> {}*/
 
 #[cfg(test)]
 mod tests {
-
     use crate::traits::Index;
 
     #[test]

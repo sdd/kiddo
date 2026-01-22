@@ -17,6 +17,7 @@ where
     pub fn nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         D: DistanceMetricUnified<A, K>,
+        D::Output: crate::stem_strategies::SimdPrune,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
         let mut req_ctx = NearestOneReqCtx {

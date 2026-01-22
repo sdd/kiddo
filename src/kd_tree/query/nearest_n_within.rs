@@ -30,6 +30,7 @@ where
     ) -> Vec<NearestNeighbour<D::Output, T>>
     where
         D: DistanceMetricUnified<A, K>,
+        D::Output: crate::stem_strategies::SimdPrune,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
         let max_qty: usize = max_qty.get();
@@ -60,6 +61,7 @@ where
     ) -> Vec<NearestNeighbour<D::Output, T>>
     where
         D: DistanceMetricUnified<A, K>,
+        D::Output: crate::stem_strategies::SimdPrune,
         R: ResultCollection<D::Output, T>,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
