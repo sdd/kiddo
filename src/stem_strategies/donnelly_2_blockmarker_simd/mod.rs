@@ -22,6 +22,10 @@ mod autovec;
 mod prune_traits;
 pub use prune_traits::SimdPrune;
 
+// Comparison traits for type-specific dispatch
+mod compare_traits;
+pub use compare_traits::{CompareBlock3, CompareBlock4};
+
 /// Block3 interval lower bounds encoded as u64 literal.
 /// Each 8-bit segment contains the lower bound pivot offset for a child (255 = -∞).
 /// Lower bounds: [255, 3, 1, 4, 0, 5, 2, 6] for children 0-7
@@ -101,105 +105,10 @@ pub struct DonnellyMarkerSimd<BS: BlockSizeMarker, const CL: u32, const VB: u32,
 #[inline(always)]
 pub(crate) fn compare_block3<A>(stems: &[A], query_val: A, block_base_idx: usize) -> u8
 where
-    A: AxisUnified + CompareBlock3,
+    A: CompareBlock3,
 {
     let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
-
-    // Type-based dispatch via trait specialization pattern
-    CompareBlock3::compare_block3_impl(stems_ptr, query_val, block_base_idx)
-}
-
-/// Trait for SIMD block comparison support.
-///
-/// This trait is automatically implemented for all `AxisUnified` types.
-/// Specialized SIMD implementations exist for:
-/// - `f32` - uses AVX2 or AVX-512 (x86_64) / NEON (aarch64)
-/// - `f64` - uses AVX2 or AVX-512 (x86_64) / NEON (aarch64)
-///
-/// Users should not implement this trait directly. If you try to use `DonnellyMarkerSimd`
-/// with an unsupported type, you'll get a runtime panic.
-pub trait CompareBlock3: AxisUnified {
-    #[doc(hidden)]
-    fn compare_block3_impl(stems_ptr: NonNull<u8>, query_val: Self, block_base_idx: usize) -> u8;
-}
-
-// Blanket implementation that dispatches based on type and architecture
-impl<T: AxisUnified> CompareBlock3 for T {
-    #[inline(always)]
-    fn compare_block3_impl(stems_ptr: NonNull<u8>, query_val: Self, block_base_idx: usize) -> u8 {
-        // Type-based dispatch using size_of and transmute
-        // This is monomorphized away at compile time
-        if std::mem::size_of::<Self>() == 8 {
-            // f64 path
-            let query_f64: f64 = unsafe { std::mem::transmute_copy(&query_val) };
-
-            #[cfg(all(feature = "simd", target_arch = "x86_64"))]
-            {
-                #[cfg(target_feature = "avx512f")]
-                {
-                    unsafe {
-                        x86_64::compare_block3_f64_avx512(stems_ptr, block_base_idx, query_f64)
-                    }
-                }
-
-                #[cfg(not(target_feature = "avx512f"))]
-                {
-                    unsafe { x86_64::compare_block3_f64_avx2(stems_ptr, block_base_idx, query_f64) }
-                }
-            }
-
-            #[cfg(all(feature = "simd", target_arch = "aarch64"))]
-            {
-                unsafe { aarch64::compare_block3_f64_neon(stems_ptr, block_base_idx, query_f64) }
-            }
-
-            #[cfg(not(any(
-                all(feature = "simd", target_arch = "x86_64"),
-                all(feature = "simd", target_arch = "aarch64")
-            )))]
-            {
-                unsafe { autovec::compare_block3_f64_autovec(stems_ptr, block_base_idx, query_f64) }
-            }
-        } else if std::mem::size_of::<Self>() == 4 {
-            // f32 path
-            let query_f32: f32 = unsafe { std::mem::transmute_copy(&query_val) };
-
-            #[cfg(all(feature = "simd", target_arch = "x86_64"))]
-            {
-                #[cfg(target_feature = "avx512f")]
-                {
-                    unsafe {
-                        x86_64::compare_block3_f32_avx512(stems_ptr, block_base_idx, query_f32)
-                    }
-                }
-
-                #[cfg(not(target_feature = "avx512f"))]
-                {
-                    unsafe { x86_64::compare_block3_f32_avx2(stems_ptr, block_base_idx, query_f32) }
-                }
-            }
-
-            #[cfg(all(feature = "simd", target_arch = "aarch64"))]
-            {
-                unsafe { aarch64::compare_block3_f32_neon(stems_ptr, block_base_idx, query_f32) }
-            }
-
-            #[cfg(not(any(
-                all(feature = "simd", target_arch = "x86_64"),
-                all(feature = "simd", target_arch = "aarch64")
-            )))]
-            {
-                unsafe { autovec::compare_block3_f32_autovec(stems_ptr, block_base_idx, query_f32) }
-            }
-        } else {
-            panic!(
-                "DonnellyMarkerSimd only supports f32 (4 bytes) and f64 (8 bytes) axis types. \
-                    Type {} with size {} is not supported.",
-                std::any::type_name::<Self>(),
-                std::mem::size_of::<Self>()
-            )
-        }
-    }
+    A::compare_block3_impl(stems_ptr, query_val, block_base_idx)
 }
 
 /// Perform all comparisons in a 4-level block, dispatching to the appropriate SIMD implementation
@@ -207,74 +116,10 @@ impl<T: AxisUnified> CompareBlock3 for T {
 #[inline(always)]
 pub(crate) fn compare_block4<A>(stems: &[A], query_val: A, block_base_idx: usize) -> u8
 where
-    A: AxisUnified + CompareBlock4,
+    A: CompareBlock4,
 {
     let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
-
-    // Type-based dispatch via trait specialization pattern
-    CompareBlock4::compare_block4_impl(stems_ptr, query_val, block_base_idx)
-}
-
-/// Trait for SIMD 4-level block comparison support.
-///
-/// This trait is automatically implemented for all `AxisUnified` types.
-/// Specialized SIMD implementations exist for:
-/// - `f32` - uses AVX2 or AVX-512 (x86_64) / NEON (aarch64)
-/// - `f64` - uses AVX2 or AVX-512 (x86_64) / NEON (aarch64)
-///
-/// Users should not implement this trait directly. If you try to use `DonnellyMarkerSimd`
-/// with an unsupported type, you'll get a runtime panic.
-pub trait CompareBlock4: AxisUnified {
-    #[doc(hidden)]
-    fn compare_block4_impl(stems_ptr: NonNull<u8>, query_val: Self, block_base_idx: usize) -> u8;
-}
-
-// Blanket implementation that dispatches based on type and architecture
-impl<T: AxisUnified> CompareBlock4 for T {
-    #[inline(always)]
-    fn compare_block4_impl(stems_ptr: NonNull<u8>, query_val: Self, block_base_idx: usize) -> u8 {
-        // Type-based dispatch using size_of and transmute
-        // This is monomorphized away at compile time
-        if std::mem::size_of::<Self>() == 4 {
-            // f32 path
-            let query_f32: f32 = unsafe { std::mem::transmute_copy(&query_val) };
-
-            #[cfg(all(feature = "simd", target_arch = "x86_64"))]
-            {
-                #[cfg(target_feature = "avx512f")]
-                {
-                    unsafe {
-                        x86_64::compare_block4_f32_avx512(stems_ptr, block_base_idx, query_f32)
-                    }
-                }
-
-                #[cfg(not(target_feature = "avx512f"))]
-                {
-                    unsafe { x86_64::compare_block4_f32_avx2(stems_ptr, block_base_idx, query_f32) }
-                }
-            }
-
-            #[cfg(all(feature = "simd", target_arch = "aarch64"))]
-            {
-                unsafe { aarch64::compare_block4_f32_neon(stems_ptr, block_base_idx, query_f32) }
-            }
-
-            #[cfg(not(any(
-                all(feature = "simd", target_arch = "x86_64"),
-                all(feature = "simd", target_arch = "aarch64")
-            )))]
-            {
-                unsafe { autovec::compare_block4_f32_autovec(stems_ptr, block_base_idx, query_f32) }
-            }
-        } else {
-            panic!(
-                "DonnellyMarkerSimd only supports f32 (4 bytes) axis types for Block4. \
-                    Type {} with size {} is not supported.",
-                std::any::type_name::<Self>(),
-                std::mem::size_of::<Self>()
-            )
-        }
-    }
+    A::compare_block4_impl(stems_ptr, query_val, block_base_idx)
 }
 
 // ====================================================================================
@@ -383,7 +228,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
     ) -> bool
     where
         Self: Sized,
-        A: AxisUnified<Coord = A> + CompareBlock3,
+        A: AxisUnified<Coord = A>,
         O: AxisUnified<Coord = O>,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
     {
@@ -402,8 +247,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
         let block_base_idx = self.stem_idx();
 
         // SIMD comparison to get child index
-        let stems_ptr = std::ptr::NonNull::new(stems.as_ptr() as *mut u8).unwrap();
-        let child_idx = CompareBlock3::compare_block3_impl(stems_ptr, query_val, block_base_idx);
+        let child_idx = compare_block3(stems, query_val, block_base_idx);
         tracing::trace!("child_idx = {}", child_idx);
 
         let child_idx_mask = 1 << child_idx;
@@ -703,7 +547,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
         process_leaf: impl FnMut(&crate::kd_tree::leaf_view::LeafView<A, T, K2, B>, &mut QC),
     ) where
         Self: Sized,
-        A: crate::traits_unified_2::AxisUnified<Coord = A> + CompareBlock3,
+        A: crate::traits_unified_2::AxisUnified<Coord = A>,
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
         O: crate::traits_unified_2::AxisUnified<Coord = O> + crate::stem_strategies::SimdPrune,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
@@ -816,7 +660,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
     ) -> bool
     where
         Self: Sized,
-        A: AxisUnified<Coord = A> + CompareBlock4,
+        A: AxisUnified<Coord = A>,
         O: AxisUnified<Coord = O>,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
     {
@@ -830,8 +674,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
         let old_off_val = unsafe { *off.get_unchecked(dim_val) };
         let block_base_idx = self.stem_idx();
 
-        let stems_ptr = std::ptr::NonNull::new(stems.as_ptr() as *mut u8).unwrap();
-        let child_idx = CompareBlock4::compare_block4_impl(stems_ptr, query_val, block_base_idx);
+        let child_idx = compare_block4(stems, query_val, block_base_idx);
 
         let child_idx_mask = 1u16 << child_idx;
 
@@ -1057,7 +900,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
         process_leaf: impl FnMut(&crate::kd_tree::leaf_view::LeafView<A, T, K2, B>, &mut QC),
     ) where
         Self: Sized,
-        A: crate::traits_unified_2::AxisUnified<Coord = A> + CompareBlock4,
+        A: crate::traits_unified_2::AxisUnified<Coord = A>,
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
         O: crate::traits_unified_2::AxisUnified<Coord = O> + crate::stem_strategies::SimdPrune,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,

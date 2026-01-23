@@ -359,3 +359,6 @@ required-features = ["csv", "rkyv_08"]
 name = "serde"
 path = "examples/serde.rs"
 required-features = ["csv", "serde"]
+
+[build-dependencies]
+yep-cache-line-size = "0.9"
