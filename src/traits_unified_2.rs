@@ -222,6 +222,9 @@ pub trait AxisUnified:
 
     /// Saturating addition of two coordinate values.
     fn saturating_add(a: Self::Coord, b: Self::Coord) -> Self::Coord;
+
+    /// Returns the maximum of two coordinate values.
+    fn max(a: Self::Coord, b: Self::Coord) -> Self::Coord;
 }
 
 /// Strategy for how leaf storage is laid out and constructed.
@@ -656,6 +659,11 @@ macro_rules! impl_axis_float {
             fn saturating_add(a: Self::Coord, b: Self::Coord) -> Self::Coord {
                 a + b
             }
+
+            #[inline(always)]
+            fn max(a: Self::Coord, b: Self::Coord) -> Self::Coord {
+                a.max(b)
+            }
         }
     };
 }
@@ -714,6 +722,11 @@ macro_rules! impl_axis_fixed {
             #[inline(always)]
             fn saturating_add(a: Self::Coord, b: Self::Coord) -> Self::Coord {
                 a.saturating_add(b)
+            }
+
+            #[inline(always)]
+            fn max(a: Self::Coord, b: Self::Coord) -> Self::Coord {
+                a.max(b)
             }
         }
     };
