@@ -36,6 +36,16 @@ const CHILD_LOWER_BOUNDS_BLOCK3: u64 = 0x06_02_05_00_04_01_03_FF;
 /// Upper bounds: [3, 1, 4, 0, 5, 2, 6, 255] for children 0-7
 const CHILD_UPPER_BOUNDS_BLOCK3: u64 = 0xFF_06_02_05_00_04_01_03;
 
+/// Block4 interval lower bounds encoded as u128 literal (16 children).
+/// Each 8-bit segment contains the lower bound pivot offset for a child (255 = -∞).
+/// Lower bounds: [255, 7, 3, 8, 1, 9, 4, 10, 0, 11, 5, 12, 2, 13, 6, 14] for children 0-15
+const CHILD_LOWER_BOUNDS_BLOCK4: u128 = 0x0E_06_0D_02_0C_05_0B_00_0A_04_09_01_08_03_07_FF;
+
+/// Block4 interval upper bounds encoded as u128 literal (16 children).
+/// Each 8-bit segment contains the upper bound pivot offset for a child (255 = +∞).
+/// Upper bounds: [7, 3, 8, 1, 9, 4, 10, 0, 11, 5, 12, 2, 13, 6, 14, 255] for children 0-15
+const CHILD_UPPER_BOUNDS_BLOCK4: u128 = 0xFF_0E_06_0D_02_0C_05_0B_00_0A_04_09_01_08_03_07;
+
 /// Returns the interval bounds [lower, upper) for a Block3 child in a given dimension.
 ///
 /// Block3 has 8 children arranged in a triangular layout, where all levels in the block
@@ -62,6 +72,36 @@ const CHILD_UPPER_BOUNDS_BLOCK3: u64 = 0xFF_06_02_05_00_04_01_03;
 pub(crate) const fn child_interval_bounds_block3(child_idx: usize) -> (u8, u8) {
     let lower = ((CHILD_LOWER_BOUNDS_BLOCK3 >> (child_idx * 8)) & 0xFF) as u8;
     let upper = ((CHILD_UPPER_BOUNDS_BLOCK3 >> (child_idx * 8)) & 0xFF) as u8;
+    (lower, upper)
+}
+
+/// Returns the interval bounds [lower, upper) for a Block4 child in a given dimension.
+///
+/// Block4 has 16 children arranged in a triangular layout, where all levels in the block
+/// split on the same dimension. Each child occupies an interval [lower, upper) in that dimension.
+///
+/// Returns (lower_pivot_offset, upper_pivot_offset) where:
+/// - Offset refers to the pivot within the block (0-14 are actual pivots, 15 is padding)
+/// - 255 represents ±∞ (child 0 extends to -∞, child 15 extends to +∞)
+///
+/// # Example
+/// ```text
+/// Block structure:
+///            pivot[0]
+///       pivot[1]    pivot[2]
+///    p[3] p[4]   p[5] p[6]
+/// p[7]p[8]p[9]p[10]p[11]p[12]p[13]p[14]
+/// c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15
+///
+/// Child 0: [-∞, pivot[7]) → (255, 7)
+/// Child 1: [pivot[7], pivot[3]) → (7, 3)
+/// Child 2: [pivot[3], pivot[8]) → (3, 8)
+/// ...etc
+/// ```
+#[inline(always)]
+pub(crate) const fn child_interval_bounds_block4(child_idx: usize) -> (u8, u8) {
+    let lower = ((CHILD_LOWER_BOUNDS_BLOCK4 >> (child_idx * 8)) & 0xFF) as u8;
+    let upper = ((CHILD_UPPER_BOUNDS_BLOCK4 >> (child_idx * 8)) & 0xFF) as u8;
     (lower, upper)
 }
 
@@ -670,7 +710,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 
         let dim_val = *dim;
         let query_val = unsafe { *query.get_unchecked(dim_val) };
-        let query_wide_val = unsafe { *query_wide.get_unchecked(dim_val) };
+        let _query_wide_val = unsafe { *query_wide.get_unchecked(dim_val) };
         let old_off_val = unsafe { *off.get_unchecked(dim_val) };
         let block_base_idx = self.stem_idx();
 
@@ -761,12 +801,32 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
                     .core
                     .traverse_block(sibling_idx as u8, Self::BLOCK_SIZE as u32);
 
-                let pivot_idx = block_base_idx + sibling_idx;
-                let pivot = unsafe { *stems.get_unchecked(pivot_idx) };
-                let pivot_wide = D::widen_coord(pivot);
-                let new_off = O::saturating_dist(query_wide_val, pivot_wide);
+                let (lower_offset, upper_offset) = child_interval_bounds_block4(sibling_idx);
+
+                let lower = if lower_offset == 255 {
+                    A::min_value()
+                } else {
+                    unsafe { *stems.get_unchecked(block_base_idx + lower_offset as usize) }
+                };
+
+                let upper = if upper_offset == 255 {
+                    A::max_value()
+                } else {
+                    unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
+                };
+
+                // TODO: this only works for f64! need a refactor to work for any AxisUnified
+                let query_wide_f64: f64 =
+                    unsafe { std::mem::transmute_copy(&D::widen_coord(query_val)) };
+                let lower_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(lower)) };
+                let upper_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(upper)) };
+                let interval_dist = interval_distance_1d(query_wide_f64, lower_f64, upper_f64);
+                let new_off: O = unsafe { std::mem::transmute_copy(&interval_dist) };
+
                 new_off_values[sibling_idx] = new_off;
-                let rd_far = O::saturating_add(rd, D::dist1(new_off, old_off_val));
+
+                let delta = D::dist1(new_off, old_off_val);
+                let rd_far = O::saturating_add(rd, delta);
                 rd_values[sibling_idx] = rd_far;
 
                 if rd_far <= best_dist {
@@ -791,12 +851,33 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
                     .core
                     .traverse_block(sibling_idx as u8, Self::BLOCK_SIZE as u32);
 
-                let pivot_idx = block_base_idx + sibling_idx;
-                let pivot = unsafe { *stems.get_unchecked(pivot_idx) };
-                let pivot_wide = D::widen_coord(pivot);
-                let new_off = O::saturating_dist(query_wide_val, pivot_wide);
+                let (lower_offset, upper_offset) = child_interval_bounds_block4(sibling_idx);
+
+                let lower = if lower_offset == 255 {
+                    A::min_value()
+                } else {
+                    unsafe { *stems.get_unchecked(block_base_idx + lower_offset as usize) }
+                };
+
+                let upper = if upper_offset == 255 {
+                    A::max_value()
+                } else {
+                    unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
+                };
+
+                // TODO: this only works for f64! need a refactor to work for any AxisUnified
+                let query_wide_f64: f64 =
+                    unsafe { std::mem::transmute_copy(&D::widen_coord(query_val)) };
+                let lower_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(lower)) };
+                let upper_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(upper)) };
+                let interval_dist = interval_distance_1d(query_wide_f64, lower_f64, upper_f64);
+                let new_off: O = unsafe { std::mem::transmute_copy(&interval_dist) };
+
                 new_off_values[sibling_idx] = new_off;
-                rd_values[sibling_idx] = O::saturating_add(rd, D::dist1(new_off, old_off_val));
+
+                let delta = D::dist1(new_off, old_off_val);
+                let rd_far = O::saturating_add(rd, delta);
+                rd_values[sibling_idx] = rd_far;
             }
 
             let high_mask = (backtrack_mask >> 8) as u8;
@@ -881,10 +962,27 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
             }
         }
 
-        let pivot_idx = block_base_idx + child_idx as usize;
-        let pivot = unsafe { *stems.get_unchecked(pivot_idx) };
-        let pivot_wide = D::widen_coord(pivot);
-        let new_off = O::saturating_dist(query_wide_val, pivot_wide);
+        let (lower_offset, upper_offset) = child_interval_bounds_block4(child_idx as usize);
+
+        let lower = if lower_offset == 255 {
+            A::min_value()
+        } else {
+            unsafe { *stems.get_unchecked(block_base_idx + lower_offset as usize) }
+        };
+
+        let upper = if upper_offset == 255 {
+            A::max_value()
+        } else {
+            unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
+        };
+
+        let query_val = unsafe { *query.get_unchecked(dim_val) };
+        let query_wide_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(query_val)) };
+        let lower_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(lower)) };
+        let upper_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(upper)) };
+
+        let interval_dist = interval_distance_1d(query_wide_f64, lower_f64, upper_f64);
+        let new_off: O = unsafe { std::mem::transmute_copy(&interval_dist) };
         unsafe { *off.get_unchecked_mut(dim_val) = new_off };
 
         self.core.traverse_block(child_idx, Self::BLOCK_SIZE as u32);
@@ -1031,6 +1129,112 @@ mod tests {
         assert_eq!(child_interval_bounds_block3(5), (5, 2)); // [pivot[5], pivot[2])
         assert_eq!(child_interval_bounds_block3(6), (2, 6)); // [pivot[2], pivot[6])
         assert_eq!(child_interval_bounds_block3(7), (6, 255)); // [pivot[6], +∞)
+    }
+
+    #[test]
+    fn test_child_interval_bounds_block4() {
+        // Verify all 16 children have correct interval bounds
+        // Expected bounds based on triangular structure:
+        //            pivot[0]
+        //       pivot[1]    pivot[2]
+        //    p[3] p[4]   p[5] p[6]
+        // p[7]p[8]p[9]p[10]p[11]p[12]p[13]p[14]
+        // c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15
+
+        assert_eq!(child_interval_bounds_block4(0), (255, 7)); // [-∞, pivot[7])
+        assert_eq!(child_interval_bounds_block4(1), (7, 3)); // [pivot[7], pivot[3])
+        assert_eq!(child_interval_bounds_block4(2), (3, 8)); // [pivot[3], pivot[8])
+        assert_eq!(child_interval_bounds_block4(3), (8, 1)); // [pivot[8], pivot[1])
+        assert_eq!(child_interval_bounds_block4(4), (1, 9)); // [pivot[1], pivot[9])
+        assert_eq!(child_interval_bounds_block4(5), (9, 4)); // [pivot[9], pivot[4])
+        assert_eq!(child_interval_bounds_block4(6), (4, 10)); // [pivot[4], pivot[10])
+        assert_eq!(child_interval_bounds_block4(7), (10, 0)); // [pivot[10], pivot[0])
+        assert_eq!(child_interval_bounds_block4(8), (0, 11)); // [pivot[0], pivot[11])
+        assert_eq!(child_interval_bounds_block4(9), (11, 5)); // [pivot[11], pivot[5])
+        assert_eq!(child_interval_bounds_block4(10), (5, 12)); // [pivot[5], pivot[12])
+        assert_eq!(child_interval_bounds_block4(11), (12, 2)); // [pivot[12], pivot[2])
+        assert_eq!(child_interval_bounds_block4(12), (2, 13)); // [pivot[2], pivot[13])
+        assert_eq!(child_interval_bounds_block4(13), (13, 6)); // [pivot[13], pivot[6])
+        assert_eq!(child_interval_bounds_block4(14), (6, 14)); // [pivot[6], pivot[14])
+        assert_eq!(child_interval_bounds_block4(15), (14, 255)); // [pivot[14], +∞)
+    }
+
+    #[test]
+    fn test_block4_interval_coverage() {
+        // Verify Block4 intervals have no gaps and full coverage
+        // Child i's upper bound should equal child i+1's lower bound
+        for child_idx in 0..15 {
+            let (_, upper) = child_interval_bounds_block4(child_idx);
+            let (lower_next, _) = child_interval_bounds_block4(child_idx + 1);
+            assert_eq!(
+                upper,
+                lower_next,
+                "Gap detected: child {} upper bound ({}) != child {} lower bound ({})",
+                child_idx,
+                upper,
+                child_idx + 1,
+                lower_next
+            );
+        }
+
+        // First child should start at -∞ (255)
+        let (lower_first, _) = child_interval_bounds_block4(0);
+        assert_eq!(lower_first, 255, "First child should start at -∞ (255)");
+
+        // Last child should end at +∞ (255)
+        let (_, upper_last) = child_interval_bounds_block4(15);
+        assert_eq!(upper_last, 255, "Last child should end at +∞ (255)");
+    }
+
+    #[test]
+    fn test_block4_interval_monotonicity() {
+        // Create test pivots arranged in BST order for a complete Block4 tree
+        // In-order traversal gives: p7, p3, p8, p1, p9, p4, p10, p0, p11, p5, p12, p2, p13, p6, p14
+        // So we need: p0=0.7, p1=0.3, p2=0.11, p3=0.1, p4=0.5, p5=0.9, p6=0.13
+        //             p7=0.0, p8=0.2, p9=0.4, p10=0.6, p11=0.8, p12=1.0, p13=1.2, p14=1.4
+        let mut pivots = [0.0; 16]; // 16 slots (0-14 are pivots, 15 is padding)
+        pivots[0] = 0.7; // p0 - middle of tree
+        pivots[1] = 0.3; // p1 - middle of left subtree
+        pivots[2] = 1.1; // p2 - middle of right subtree
+        pivots[3] = 0.1; // p3
+        pivots[4] = 0.5; // p4
+        pivots[5] = 0.9; // p5
+        pivots[6] = 1.3; // p6
+        pivots[7] = 0.0; // p7 - leftmost (smallest)
+        pivots[8] = 0.2; // p8
+        pivots[9] = 0.4; // p9
+        pivots[10] = 0.6; // p10
+        pivots[11] = 0.8; // p11
+        pivots[12] = 1.0; // p12
+        pivots[13] = 1.2; // p13
+        pivots[14] = 1.4; // p14 - rightmost (largest)
+
+        // Verify that intervals are monotonic (lower < upper for each child)
+        for child_idx in 0..16 {
+            let (lower_offset, upper_offset) = child_interval_bounds_block4(child_idx);
+
+            let lower_val = if lower_offset == 255 {
+                f64::NEG_INFINITY
+            } else {
+                pivots[lower_offset as usize]
+            };
+
+            let upper_val = if upper_offset == 255 {
+                f64::INFINITY
+            } else {
+                pivots[upper_offset as usize]
+            };
+
+            assert!(
+                lower_val < upper_val,
+                "Child {} interval [{}, {}) is not monotonic (offsets: {}, {})",
+                child_idx,
+                lower_val,
+                upper_val,
+                lower_offset,
+                upper_offset
+            );
+        }
     }
 
     #[test]
