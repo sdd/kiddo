@@ -107,20 +107,20 @@ pub(crate) const fn child_interval_bounds_block4(child_idx: usize) -> (u8, u8) {
 
 /// Computes absolute distance from a query point to an interval [lower, upper).
 ///
-/// Branchless implementation for performance.
-///
-/// TODO: This is hardcoded for SquaredEuclidean metric. Generalize to Manhattan and other
-///       metrics once we confirm this interval-based approach works correctly.
+/// This is a metric-agnostic geometric distance - the metric's `dist1` is applied separately.
 ///
 /// Returns:
 /// - If query < lower: lower - query
 /// - If query >= upper: query - upper
 /// - If lower <= query < upper: 0 (query is inside the interval)
 #[inline(always)]
-pub(crate) fn interval_distance_1d(query: f64, lower: f64, upper: f64) -> f64 {
-    let below_dist = (lower - query).max(0.0);
-    let above_dist = (query - upper).max(0.0);
-    below_dist + above_dist
+pub(crate) fn interval_distance_1d<O>(query: O, lower: O, upper: O) -> O
+where
+    O: AxisUnified<Coord = O>,
+{
+    let below = O::max(O::zero(), lower - query);
+    let above = O::max(O::zero(), query - upper);
+    O::saturating_add(below, above)
 }
 
 /// Donnelly SIMD Strategy
@@ -391,14 +391,10 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
                 };
 
                 let query_val = unsafe { *query.get_unchecked(*dim) };
-
-                // TODO: this only works for f64! need a refactor to work for any AxisUnified
-                let query_wide_f64: f64 =
-                    unsafe { std::mem::transmute_copy(&D::widen_coord(query_val)) };
-                let lower_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(lower)) };
-                let upper_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(upper)) };
-                let interval_dist = interval_distance_1d(query_wide_f64, lower_f64, upper_f64);
-                let new_off: O = unsafe { std::mem::transmute_copy(&interval_dist) };
+                let query_wide = D::widen_coord(query_val);
+                let lower_wide = D::widen_coord(lower);
+                let upper_wide = D::widen_coord(upper);
+                let new_off = interval_distance_1d(query_wide, lower_wide, upper_wide);
 
                 new_off_values[sibling_idx] = new_off;
 
@@ -419,10 +415,9 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
                     upper_offset,
                     ?lower,
                     ?upper,
-                    lower_f64,
-                    upper_f64,
-                    query_val_f64 = query_wide_f64,
-                    interval_dist,
+                    ?lower_wide,
+                    ?upper_wide,
+                    ?query_wide,
                     ?new_off,
                     ?old_off_val,
                     ?rd,
@@ -488,14 +483,10 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
                 };
 
                 let query_val = unsafe { *query.get_unchecked(*dim) };
-
-                // TODO: this only works for f64! need a refactor to work for any AxisUnified
-                let query_wide_f64: f64 =
-                    unsafe { std::mem::transmute_copy(&D::widen_coord(query_val)) };
-                let lower_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(lower)) };
-                let upper_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(upper)) };
-                let interval_dist = interval_distance_1d(query_wide_f64, lower_f64, upper_f64);
-                let new_off: O = unsafe { std::mem::transmute_copy(&interval_dist) };
+                let query_wide = D::widen_coord(query_val);
+                let lower_wide = D::widen_coord(lower);
+                let upper_wide = D::widen_coord(upper);
+                let new_off = interval_distance_1d(query_wide, lower_wide, upper_wide);
 
                 new_off_values[sibling_idx] = new_off;
 
@@ -511,10 +502,9 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
                     upper_offset,
                     ?lower,
                     ?upper,
-                    lower_f64,
-                    upper_f64,
-                    query_val_f64 = query_wide_f64,
-                    interval_dist,
+                    ?lower_wide,
+                    ?upper_wide,
+                    ?query_wide,
                     ?new_off,
                     ?old_off_val,
                     ?rd,
@@ -566,12 +556,11 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
         };
 
         let query_val = unsafe { *query.get_unchecked(dim_val) };
-        let query_wide_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(query_val)) };
-        let lower_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(lower)) };
-        let upper_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(upper)) };
+        let query_wide = D::widen_coord(query_val);
+        let lower_wide = D::widen_coord(lower);
+        let upper_wide = D::widen_coord(upper);
 
-        let interval_dist = interval_distance_1d(query_wide_f64, lower_f64, upper_f64);
-        let new_off: O = unsafe { std::mem::transmute_copy(&interval_dist) };
+        let new_off = interval_distance_1d(query_wide, lower_wide, upper_wide);
         unsafe { *off.get_unchecked_mut(dim_val) = new_off };
 
         self.core.traverse_block(child_idx, Self::BLOCK_SIZE as u32);
@@ -815,13 +804,10 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
                     unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
                 };
 
-                // TODO: this only works for f64! need a refactor to work for any AxisUnified
-                let query_wide_f64: f64 =
-                    unsafe { std::mem::transmute_copy(&D::widen_coord(query_val)) };
-                let lower_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(lower)) };
-                let upper_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(upper)) };
-                let interval_dist = interval_distance_1d(query_wide_f64, lower_f64, upper_f64);
-                let new_off: O = unsafe { std::mem::transmute_copy(&interval_dist) };
+                let query_wide = D::widen_coord(query_val);
+                let lower_wide = D::widen_coord(lower);
+                let upper_wide = D::widen_coord(upper);
+                let new_off = interval_distance_1d(query_wide, lower_wide, upper_wide);
 
                 new_off_values[sibling_idx] = new_off;
 
@@ -865,13 +851,10 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
                     unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
                 };
 
-                // TODO: this only works for f64! need a refactor to work for any AxisUnified
-                let query_wide_f64: f64 =
-                    unsafe { std::mem::transmute_copy(&D::widen_coord(query_val)) };
-                let lower_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(lower)) };
-                let upper_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(upper)) };
-                let interval_dist = interval_distance_1d(query_wide_f64, lower_f64, upper_f64);
-                let new_off: O = unsafe { std::mem::transmute_copy(&interval_dist) };
+                let query_wide = D::widen_coord(query_val);
+                let lower_wide = D::widen_coord(lower);
+                let upper_wide = D::widen_coord(upper);
+                let new_off = interval_distance_1d(query_wide, lower_wide, upper_wide);
 
                 new_off_values[sibling_idx] = new_off;
 
@@ -977,12 +960,11 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
         };
 
         let query_val = unsafe { *query.get_unchecked(dim_val) };
-        let query_wide_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(query_val)) };
-        let lower_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(lower)) };
-        let upper_f64: f64 = unsafe { std::mem::transmute_copy(&D::widen_coord(upper)) };
+        let query_wide = D::widen_coord(query_val);
+        let lower_wide = D::widen_coord(lower);
+        let upper_wide = D::widen_coord(upper);
 
-        let interval_dist = interval_distance_1d(query_wide_f64, lower_f64, upper_f64);
-        let new_off: O = unsafe { std::mem::transmute_copy(&interval_dist) };
+        let new_off = interval_distance_1d(query_wide, lower_wide, upper_wide);
         unsafe { *off.get_unchecked_mut(dim_val) = new_off };
 
         self.core.traverse_block(child_idx, Self::BLOCK_SIZE as u32);
