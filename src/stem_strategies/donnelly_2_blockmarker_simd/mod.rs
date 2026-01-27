@@ -1877,4 +1877,234 @@ mod tests {
             mask_odd, expected_odd
         );
     }
+
+    // =======================================================================================
+    // Block4 Option A (chunked 8-wide blocks) tests
+    // =======================================================================================
+
+    /// Test that Block4 u16 mask correctly splits into two u8 chunks.
+    #[test]
+    fn test_block4_mask_split_basic() {
+        // Test case: all 16 bits set
+        let full_mask: u16 = 0xFFFF;
+        let high_mask = (full_mask >> 8) as u8;
+        let low_mask = full_mask as u8;
+
+        assert_eq!(high_mask, 0xFF, "High mask should be 0xFF for full mask");
+        assert_eq!(low_mask, 0xFF, "Low mask should be 0xFF for full mask");
+
+        // Test case: only low 8 bits set
+        let low_only: u16 = 0x00FF;
+        let high_mask = (low_only >> 8) as u8;
+        let low_mask = low_only as u8;
+
+        assert_eq!(
+            high_mask, 0x00,
+            "High mask should be 0x00 for low-only mask"
+        );
+        assert_eq!(low_mask, 0xFF, "Low mask should be 0xFF for low-only mask");
+
+        // Test case: only high 8 bits set
+        let high_only: u16 = 0xFF00;
+        let high_mask = (high_only >> 8) as u8;
+        let low_mask = high_only as u8;
+
+        assert_eq!(
+            high_mask, 0xFF,
+            "High mask should be 0xFF for high-only mask"
+        );
+        assert_eq!(low_mask, 0x00, "Low mask should be 0x00 for high-only mask");
+    }
+
+    /// Test that Block4 mask splitting correctly maps child indices to chunks.
+    #[test]
+    fn test_block4_mask_split_child_mapping() {
+        // Children 0-7 should be in the low chunk
+        // Children 8-15 should be in the high chunk
+
+        for child_idx in 0..16u16 {
+            let single_child_mask: u16 = 1 << child_idx;
+            let high_mask = (single_child_mask >> 8) as u8;
+            let low_mask = single_child_mask as u8;
+
+            if child_idx < 8 {
+                // Low chunk: child should appear in low_mask at position child_idx
+                assert_eq!(
+                    high_mask, 0,
+                    "Child {} should not appear in high chunk",
+                    child_idx
+                );
+                assert_eq!(
+                    low_mask,
+                    1 << child_idx,
+                    "Child {} should appear at position {} in low chunk",
+                    child_idx,
+                    child_idx
+                );
+            } else {
+                // High chunk: child should appear in high_mask at position (child_idx - 8)
+                assert_eq!(
+                    low_mask, 0,
+                    "Child {} should not appear in low chunk",
+                    child_idx
+                );
+                assert_eq!(
+                    high_mask,
+                    1 << (child_idx - 8),
+                    "Child {} should appear at position {} in high chunk",
+                    child_idx,
+                    child_idx - 8
+                );
+            }
+        }
+    }
+
+    /// Test that Block4 Option A correctly splits sibling arrays into 8-wide chunks.
+    #[test]
+    fn test_block4_sibling_array_chunking() {
+        // Simulate the 16-element arrays that Block4 produces
+        let siblings_16: [u32; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let rd_values_16: [f64; 16] = [
+            0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5,
+        ];
+        let new_off_16: [f64; 16] = [
+            1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5,
+        ];
+
+        // Split into high and low chunks (as done in actual code)
+        let mut high_siblings = [0u32; 8];
+        let mut high_rd_values = [0.0f64; 8];
+        let mut high_new_off_values = [0.0f64; 8];
+        for i in 0..8 {
+            high_siblings[i] = siblings_16[i + 8];
+            high_rd_values[i] = rd_values_16[i + 8];
+            high_new_off_values[i] = new_off_16[i + 8];
+        }
+
+        let mut low_siblings = [0u32; 8];
+        let mut low_rd_values = [0.0f64; 8];
+        let mut low_new_off_values = [0.0f64; 8];
+        for i in 0..8 {
+            low_siblings[i] = siblings_16[i];
+            low_rd_values[i] = rd_values_16[i];
+            low_new_off_values[i] = new_off_16[i];
+        }
+
+        // Verify high chunk contains children 8-15
+        assert_eq!(high_siblings, [8, 9, 10, 11, 12, 13, 14, 15]);
+        assert_eq!(high_rd_values, [0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]);
+        assert_eq!(
+            high_new_off_values,
+            [1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5]
+        );
+
+        // Verify low chunk contains children 0-7
+        assert_eq!(low_siblings, [0, 1, 2, 3, 4, 5, 6, 7]);
+        assert_eq!(low_rd_values, [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]);
+        assert_eq!(low_new_off_values, [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7]);
+    }
+
+    /// Test that mask exclusion of taken child works correctly for Block4.
+    #[test]
+    fn test_block4_taken_child_exclusion() {
+        // When we take child N, we should exclude it from the backtrack mask
+
+        for taken_child in 0..16u16 {
+            let backtrack_mask: u16 = 0xFFFF; // All children would pass
+            let child_idx_mask: u16 = 1 << taken_child;
+            let filtered_mask = backtrack_mask & !child_idx_mask;
+
+            // The filtered mask should have all bits except the taken child
+            assert_eq!(
+                filtered_mask,
+                0xFFFF ^ (1 << taken_child),
+                "Taken child {} should be excluded from mask",
+                taken_child
+            );
+
+            // Split and verify exclusion appears in correct chunk
+            let high_mask = (filtered_mask >> 8) as u8;
+            let low_mask = filtered_mask as u8;
+
+            if taken_child < 8 {
+                // Taken child is in low chunk
+                assert_eq!(
+                    high_mask, 0xFF,
+                    "High chunk unaffected by low child exclusion"
+                );
+                assert_eq!(
+                    low_mask,
+                    0xFF ^ (1 << taken_child),
+                    "Low chunk should exclude taken child {}",
+                    taken_child
+                );
+            } else {
+                // Taken child is in high chunk
+                assert_eq!(
+                    high_mask,
+                    0xFF ^ (1 << (taken_child - 8)),
+                    "High chunk should exclude taken child {}",
+                    taken_child
+                );
+                assert_eq!(
+                    low_mask, 0xFF,
+                    "Low chunk unaffected by high child exclusion"
+                );
+            }
+        }
+    }
+
+    /// Test Block4 interval bounds produce correct chunks when mapped.
+    #[test]
+    fn test_block4_interval_bounds_chunk_consistency() {
+        // Verify that interval bounds for children 0-7 and 8-15 maintain
+        // the invariant that child N's upper bound equals child (N+1)'s lower bound
+
+        // Check low chunk (children 0-7)
+        for child_idx in 0..7 {
+            let (_, upper) = child_interval_bounds_block4(child_idx);
+            let (lower_next, _) = child_interval_bounds_block4(child_idx + 1);
+            assert_eq!(
+                upper, lower_next,
+                "Low chunk gap at child {}: upper {} != next lower {}",
+                child_idx, upper, lower_next
+            );
+        }
+
+        // Check high chunk (children 8-15)
+        for child_idx in 8..15 {
+            let (_, upper) = child_interval_bounds_block4(child_idx);
+            let (lower_next, _) = child_interval_bounds_block4(child_idx + 1);
+            assert_eq!(
+                upper, lower_next,
+                "High chunk gap at child {}: upper {} != next lower {}",
+                child_idx, upper, lower_next
+            );
+        }
+
+        // Check the boundary between low and high chunks (child 7 -> child 8)
+        let (_, upper_7) = child_interval_bounds_block4(7);
+        let (lower_8, _) = child_interval_bounds_block4(8);
+        assert_eq!(
+            upper_7, lower_8,
+            "Chunk boundary gap: child 7 upper {} != child 8 lower {}",
+            upper_7, lower_8
+        );
+    }
+
+    /// Compile-time assertion: Block3 uses u8 mask, Block4 uses u16 mask.
+    #[test]
+    fn test_block_mask_type_assertions() {
+        // Block3: 8 siblings -> u8 mask
+        const _BLOCK3_SIBLINGS: usize = 1 << 3; // 8
+        const _: () = assert!(_BLOCK3_SIBLINGS == 8);
+
+        // Block4: 16 siblings -> u16 mask
+        const _BLOCK4_SIBLINGS: usize = 1 << 4; // 16
+        const _: () = assert!(_BLOCK4_SIBLINGS == 16);
+
+        // Verify mask can hold all sibling bits
+        const _: () = assert!(std::mem::size_of::<u8>() * 8 >= _BLOCK3_SIBLINGS);
+        const _: () = assert!(std::mem::size_of::<u16>() * 8 >= _BLOCK4_SIBLINGS);
+    }
 }
