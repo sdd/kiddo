@@ -130,13 +130,13 @@ impl CompareBlock3 for f64 {
 
         #[cfg(all(feature = "simd", target_arch = "aarch64"))]
         {
-            return unsafe {
+            unsafe {
                 crate::stem_strategies::donnelly_2_blockmarker_simd::aarch64::compare_block3_f64_neon(
                     stems_ptr,
                     block_base_idx,
                     query_val,
                 )
-            };
+            }
         }
 
         #[cfg(not(any(
@@ -203,13 +203,13 @@ impl CompareBlock3 for f32 {
 
         #[cfg(all(feature = "simd", target_arch = "aarch64"))]
         {
-            return unsafe {
+            unsafe {
                 crate::stem_strategies::donnelly_2_blockmarker_simd::aarch64::compare_block3_f32_neon(
                     stems_ptr,
                     block_base_idx,
                     query_val,
                 )
-            };
+            }
         }
 
         #[cfg(not(any(
@@ -258,13 +258,13 @@ impl CompareBlock4 for f32 {
 
         #[cfg(all(feature = "simd", target_arch = "aarch64"))]
         {
-            return unsafe {
+            unsafe {
                 crate::stem_strategies::donnelly_2_blockmarker_simd::aarch64::compare_block4_f32_neon(
                     stems_ptr,
                     block_base_idx,
                     query_val,
                 )
-            };
+            }
         }
 
         #[cfg(not(any(
