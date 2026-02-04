@@ -26,6 +26,10 @@ pub use prune_traits::SimdPrune;
 mod compare_traits;
 pub use compare_traits::{CompareBlock3, CompareBlock4};
 
+// Backtrack mask generation traits for type-specific dispatch
+pub mod backtrack_traits;
+pub use backtrack_traits::{BacktrackBlock3, BacktrackBlock4};
+
 /// Block3 interval lower bounds encoded as u64 literal.
 /// Each 8-bit segment contains the lower bound pivot offset for a child (255 = -∞).
 /// Lower bounds: [255, 3, 1, 4, 0, 5, 2, 6] for children 0-7
@@ -269,7 +273,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
     where
         Self: Sized,
         A: AxisUnified<Coord = A>,
-        O: AxisUnified<Coord = O>,
+        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
     {
         if self.level() > max_stem_level {
@@ -292,79 +296,21 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 
         let child_idx_mask = 1 << child_idx;
 
-        // SIMD distance check to get backtrack mask (x86_64 intrinsics) or autovec fallback.
-        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
-        let backtrack_mask = {
-            if std::mem::size_of::<A>() == 8 {
-                // f64 path
-                let query_wide_f64: f64 = unsafe { std::mem::transmute_copy(&query_wide_val) };
-                let old_off_f64: f64 = unsafe { std::mem::transmute_copy(&old_off_val) };
-                let rd_f64: f64 = unsafe { std::mem::transmute_copy(&rd) };
-                let best_dist_f64: f64 = unsafe { std::mem::transmute_copy(&best_dist) };
+        // SIMD distance check to get backtrack mask (trait-based dispatch).
+        #[cfg(feature = "simd")]
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
 
-                #[cfg(target_feature = "avx512f")]
-                {
-                    D::simd_backtrack_check_block3_f64_avx512(
-                        unsafe { std::mem::transmute_copy(&query_wide_f64) },
-                        stems_ptr.as_ptr(),
-                        block_base_idx,
-                        unsafe { std::mem::transmute_copy(&old_off_f64) },
-                        unsafe { std::mem::transmute_copy(&rd_f64) },
-                        unsafe { std::mem::transmute_copy(&best_dist_f64) },
-                    )
-                }
-                #[cfg(not(target_feature = "avx512f"))]
-                {
-                    unsafe {
-                        D::simd_backtrack_check_block3_interval_f64_avx2(
-                            std::mem::transmute_copy(&query_wide_f64),
-                            stems_ptr.as_ptr(),
-                            block_base_idx,
-                            std::mem::transmute_copy(&old_off_f64),
-                            std::mem::transmute_copy(&rd_f64),
-                            std::mem::transmute_copy(&best_dist_f64),
-                        )
-                    }
-                }
-            } else if std::mem::size_of::<A>() == 4 {
-                // f32 path
-                let query_wide_f32: f32 = unsafe { std::mem::transmute_copy(&query_wide_val) };
-                let old_off_f32: f32 = unsafe { std::mem::transmute_copy(&old_off_val) };
-                let rd_f32: f32 = unsafe { std::mem::transmute_copy(&rd) };
-                let best_dist_f32: f32 = unsafe { std::mem::transmute_copy(&best_dist) };
+        #[cfg(feature = "simd")]
+        let backtrack_mask = O::backtrack_block3::<A, D, K2>(
+            query_wide_val,
+            stems_ptr,
+            block_base_idx,
+            old_off_val,
+            rd,
+            best_dist,
+        ) & !child_idx_mask;
 
-                #[cfg(target_feature = "avx512f")]
-                {
-                    unsafe {
-                        D::simd_backtrack_check_block3_f32_avx512(
-                            std::mem::transmute_copy(&query_wide_f32),
-                            stems_ptr.as_ptr(),
-                            block_base_idx,
-                            std::mem::transmute_copy(&old_off_f32),
-                            std::mem::transmute_copy(&rd_f32),
-                            std::mem::transmute_copy(&best_dist_f32),
-                        )
-                    }
-                }
-                #[cfg(not(target_feature = "avx512f"))]
-                {
-                    unsafe {
-                        D::simd_backtrack_check_block3_f32_avx2(
-                            std::mem::transmute_copy(&query_wide_f32),
-                            stems_ptr.as_ptr(),
-                            block_base_idx,
-                            std::mem::transmute_copy(&old_off_f32),
-                            std::mem::transmute_copy(&rd_f32),
-                            std::mem::transmute_copy(&best_dist_f32),
-                        )
-                    }
-                }
-            } else {
-                panic!("Unsupported axis type size");
-            }
-        } & !child_idx_mask;
-
-        #[cfg(not(all(feature = "simd", target_arch = "x86_64")))]
+        #[cfg(not(feature = "simd"))]
         let (backtrack_mask, siblings, rd_values, new_off_values) = {
             let mut siblings = [*self; 8];
             let mut rd_values = [O::zero(); 8];
@@ -449,7 +395,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
             "Block3: backtrack mask"
         );
 
-        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+        #[cfg(feature = "simd")]
         if backtrack_mask != 0 {
             use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
 
@@ -459,7 +405,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
             //   * In cases where D == O, widen is a no-op. In this case we can use SIMD ops to calc new_off
             //     and rd_values in parallel for all siblings.
 
-            let mut siblings = [self.clone(); 8];
+            let mut siblings = [*self; 8];
             let mut rd_values = [O::zero(); 8];
             let mut new_off_values = [O::zero(); 8];
 
@@ -527,7 +473,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
             });
         }
 
-        #[cfg(not(all(feature = "simd", target_arch = "x86_64")))]
+        #[cfg(not(feature = "simd"))]
         if backtrack_mask != 0 {
             use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
 
@@ -578,7 +524,10 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
         Self: Sized,
         A: crate::traits_unified_2::AxisUnified<Coord = A>,
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
-        O: crate::traits_unified_2::AxisUnified<Coord = O> + crate::stem_strategies::SimdPrune,
+        O: crate::traits_unified_2::AxisUnified<Coord = O>
+            + crate::stem_strategies::SimdPrune
+            + BacktrackBlock3
+            + BacktrackBlock4,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
         LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
@@ -690,7 +639,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
     where
         Self: Sized,
         A: AxisUnified<Coord = A>,
-        O: AxisUnified<Coord = O>,
+        O: AxisUnified<Coord = O> + BacktrackBlock4,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
     {
         if self.level() > max_stem_level {
@@ -699,7 +648,9 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 
         let dim_val = *dim;
         let query_val = unsafe { *query.get_unchecked(dim_val) };
-        let _query_wide_val = unsafe { *query_wide.get_unchecked(dim_val) };
+        #[allow(unused)]
+        // used by simd code below, but is also the only code that uses query_wide arg
+        let query_wide_val = unsafe { *query_wide.get_unchecked(dim_val) };
         let old_off_val = unsafe { *off.get_unchecked(dim_val) };
         let block_base_idx = self.stem_idx();
 
@@ -707,78 +658,20 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 
         let child_idx_mask = 1u16 << child_idx;
 
-        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
-        let backtrack_mask = {
-            if std::mem::size_of::<A>() == 8 {
-                let query_wide_f64: f64 = unsafe { std::mem::transmute_copy(&query_wide_val) };
-                let old_off_f64: f64 = unsafe { std::mem::transmute_copy(&old_off_val) };
-                let rd_f64: f64 = unsafe { std::mem::transmute_copy(&rd) };
-                let best_dist_f64: f64 = unsafe { std::mem::transmute_copy(&best_dist) };
+        #[cfg(feature = "simd")]
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
 
-                #[cfg(target_feature = "avx512f")]
-                {
-                    unsafe {
-                        D::simd_backtrack_check_block4_f64_avx512(
-                            std::mem::transmute_copy(&query_wide_f64),
-                            stems_ptr.as_ptr(),
-                            block_base_idx,
-                            std::mem::transmute_copy(&old_off_f64),
-                            std::mem::transmute_copy(&rd_f64),
-                            std::mem::transmute_copy(&best_dist_f64),
-                        )
-                    }
-                }
-                #[cfg(not(target_feature = "avx512f"))]
-                {
-                    unsafe {
-                        D::simd_backtrack_check_block4_f64_avx2(
-                            std::mem::transmute_copy(&query_wide_f64),
-                            stems_ptr.as_ptr(),
-                            block_base_idx,
-                            std::mem::transmute_copy(&old_off_f64),
-                            std::mem::transmute_copy(&rd_f64),
-                            std::mem::transmute_copy(&best_dist_f64),
-                        )
-                    }
-                }
-            } else if std::mem::size_of::<A>() == 4 {
-                let query_wide_f32: f32 = unsafe { std::mem::transmute_copy(&query_wide_val) };
-                let old_off_f32: f32 = unsafe { std::mem::transmute_copy(&old_off_val) };
-                let rd_f32: f32 = unsafe { std::mem::transmute_copy(&rd) };
-                let best_dist_f32: f32 = unsafe { std::mem::transmute_copy(&best_dist) };
+        #[cfg(feature = "simd")]
+        let backtrack_mask = O::backtrack_block4::<A, D, K2>(
+            query_wide_val,
+            stems_ptr,
+            block_base_idx,
+            old_off_val,
+            rd,
+            best_dist,
+        ) & !child_idx_mask;
 
-                #[cfg(target_feature = "avx512f")]
-                {
-                    unsafe {
-                        D::simd_backtrack_check_block4_f32_avx512(
-                            std::mem::transmute_copy(&query_wide_f32),
-                            stems_ptr.as_ptr(),
-                            block_base_idx,
-                            std::mem::transmute_copy(&old_off_f32),
-                            std::mem::transmute_copy(&rd_f32),
-                            std::mem::transmute_copy(&best_dist_f32),
-                        )
-                    }
-                }
-                #[cfg(not(target_feature = "avx512f"))]
-                {
-                    unsafe {
-                        D::simd_backtrack_check_block4_f32_avx2(
-                            std::mem::transmute_copy(&query_wide_f32),
-                            stems_ptr.as_ptr(),
-                            block_base_idx,
-                            std::mem::transmute_copy(&old_off_f32),
-                            std::mem::transmute_copy(&rd_f32),
-                            std::mem::transmute_copy(&best_dist_f32),
-                        )
-                    }
-                }
-            } else {
-                panic!("Unsupported axis type size");
-            }
-        } & !child_idx_mask;
-
-        #[cfg(not(all(feature = "simd", target_arch = "x86_64")))]
+        #[cfg(not(feature = "simd"))]
         let (backtrack_mask, siblings, rd_values, new_off_values) = {
             let mut siblings = [*self; 16];
             let mut rd_values = [O::zero(); 16];
@@ -824,11 +717,11 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
             (mask, siblings, rd_values, new_off_values)
         };
 
-        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+        #[cfg(feature = "simd")]
         if backtrack_mask != 0 {
             use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
 
-            let mut siblings = [self.clone(); 16];
+            let mut siblings = [*self; 16];
             let mut rd_values = [O::zero(); 16];
             let mut new_off_values = [O::zero(); 16];
 
@@ -865,14 +758,12 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 
             let high_mask = (backtrack_mask >> 8) as u8;
             if high_mask != 0 {
-                let mut high_siblings = [self.clone(); 8];
+                let mut high_siblings = [*self; 8];
                 let mut high_rd_values = [O::zero(); 8];
                 let mut high_new_off_values = [O::zero(); 8];
-                for i in 0..8 {
-                    high_siblings[i] = siblings[i + 8].clone();
-                    high_rd_values[i] = rd_values[i + 8];
-                    high_new_off_values[i] = new_off_values[i + 8];
-                }
+                high_siblings.copy_from_slice(&siblings[8..16]);
+                high_rd_values.copy_from_slice(&rd_values[8..16]);
+                high_new_off_values.copy_from_slice(&new_off_values[8..16]);
                 stack.push(SimdQueryStackContext::Block {
                     siblings: high_siblings,
                     rd_values: high_rd_values,
@@ -885,14 +776,12 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 
             let low_mask = backtrack_mask as u8;
             if low_mask != 0 {
-                let mut low_siblings = [self.clone(); 8];
+                let mut low_siblings = [*self; 8];
                 let mut low_rd_values = [O::zero(); 8];
                 let mut low_new_off_values = [O::zero(); 8];
-                for i in 0..8 {
-                    low_siblings[i] = siblings[i].clone();
-                    low_rd_values[i] = rd_values[i];
-                    low_new_off_values[i] = new_off_values[i];
-                }
+                low_siblings.copy_from_slice(&siblings[..8]);
+                low_rd_values.copy_from_slice(&rd_values[..8]);
+                low_new_off_values.copy_from_slice(&new_off_values[..8]);
                 stack.push(SimdQueryStackContext::Block {
                     siblings: low_siblings,
                     rd_values: low_rd_values,
@@ -904,7 +793,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
             }
         }
 
-        #[cfg(not(all(feature = "simd", target_arch = "x86_64")))]
+        #[cfg(not(feature = "simd"))]
         if backtrack_mask != 0 {
             use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
 
@@ -982,7 +871,10 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
         Self: Sized,
         A: crate::traits_unified_2::AxisUnified<Coord = A>,
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
-        O: crate::traits_unified_2::AxisUnified<Coord = O> + crate::stem_strategies::SimdPrune,
+        O: crate::traits_unified_2::AxisUnified<Coord = O>
+            + crate::stem_strategies::SimdPrune
+            + BacktrackBlock3
+            + BacktrackBlock4,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
         LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
@@ -1278,7 +1170,6 @@ mod tests {
     #[test]
     #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
     fn test_simd_backtrack_vs_scalar() {
-        use crate::traits_unified_2::DistanceMetricUnified;
         use crate::traits_unified_2::SquaredEuclidean;
 
         // Create test pivots: [pivot0, pivot1, ..., pivot6, +∞]
@@ -1314,14 +1205,12 @@ mod tests {
             scalar_results[child_idx] = rd_far <= best_dist;
         }
 
-        // Compute SIMD version
-        let pivots_ptr = pivots.as_ptr() as *const u8;
-        // Replace the test with a simpler version
-        let simd_mask = unsafe {
-            <SquaredEuclidean<f64> as DistanceMetricUnified<f64, 3>>::simd_backtrack_check_block3_interval_f64_avx2(
-                query, pivots_ptr, 0, old_off, rd, best_dist
-            )
-        };
+        // Compute SIMD version via backtrack trait
+        let pivots_ptr = pivots.as_ptr() as *mut u8;
+        let stems_ptr = NonNull::new(pivots_ptr).unwrap();
+        let simd_mask = f64::backtrack_block3::<f64, SquaredEuclidean<f64>, 3>(
+            query, stems_ptr, 0, old_off, rd, best_dist,
+        );
 
         // Compare
         for child_idx in 0..8 {
@@ -1542,15 +1431,10 @@ mod tests {
             // Test SIMD implementation if available
             #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
             {
-                use crate::traits_unified_2::DistanceMetricUnified;
-                use crate::traits_unified_2::SquaredEuclidean;
-
-                let pivots_ptr = pivots.as_ptr() as *const u8;
-                let simd_mask = unsafe {
-                    <SquaredEuclidean<f64> as DistanceMetricUnified<f64, 3>>::simd_backtrack_check_block3_interval_f64_avx2(
-                        query, pivots_ptr, 0, old_off, rd, best_dist
-                    )
-                };
+                let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
+                let simd_mask = f64::backtrack_block3::<f64, SquaredEuclidean<f64>, 3>(
+                    query, stems_ptr, 0, old_off, rd, best_dist,
+                );
 
                 assert_eq!(
                     scalar_mask, simd_mask,
@@ -1584,15 +1468,10 @@ mod tests {
 
             #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
             {
-                use crate::traits_unified_2::DistanceMetricUnified;
-                use crate::traits_unified_2::SquaredEuclidean;
-
-                let pivots_ptr = pivots.as_ptr() as *const u8;
-                let simd_mask = unsafe {
-                    <SquaredEuclidean<f32> as DistanceMetricUnified<f32, 3>>::simd_backtrack_check_block3_f32_avx2(
-                        query, pivots_ptr, 0, old_off, rd, best_dist
-                    )
-                };
+                let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
+                let simd_mask = f32::backtrack_block3::<f32, SquaredEuclidean<f32>, 3>(
+                    query, stems_ptr, 0, old_off, rd, best_dist,
+                );
 
                 assert_eq!(
                     scalar_mask, simd_mask,
@@ -1975,20 +1854,16 @@ mod tests {
         let mut high_siblings = [0u32; 8];
         let mut high_rd_values = [0.0f64; 8];
         let mut high_new_off_values = [0.0f64; 8];
-        for i in 0..8 {
-            high_siblings[i] = siblings_16[i + 8];
-            high_rd_values[i] = rd_values_16[i + 8];
-            high_new_off_values[i] = new_off_16[i + 8];
-        }
+        high_siblings.copy_from_slice(&siblings_16[8..16]);
+        high_rd_values.copy_from_slice(&rd_values_16[8..16]);
+        high_new_off_values.copy_from_slice(&new_off_16[8..16]);
 
         let mut low_siblings = [0u32; 8];
         let mut low_rd_values = [0.0f64; 8];
         let mut low_new_off_values = [0.0f64; 8];
-        for i in 0..8 {
-            low_siblings[i] = siblings_16[i];
-            low_rd_values[i] = rd_values_16[i];
-            low_new_off_values[i] = new_off_16[i];
-        }
+        low_siblings.copy_from_slice(&siblings_16[..8]);
+        low_rd_values.copy_from_slice(&rd_values_16[..8]);
+        low_new_off_values.copy_from_slice(&new_off_16[..8]);
 
         // Verify high chunk contains children 8-15
         assert_eq!(high_siblings, [8, 9, 10, 11, 12, 13, 14, 15]);

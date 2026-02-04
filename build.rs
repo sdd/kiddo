@@ -7,6 +7,10 @@ fn main() {
     // Register the custom cfg to avoid warnings
     println!("cargo::rustc-check-cfg=cfg(cache_line_128)");
 
+    let emit_warnings = std::env::var("KIDDO_CACHELINE_WARN")
+        .map(|val| val == "1")
+        .unwrap_or(false);
+
     let target = std::env::var("TARGET").unwrap();
     let host = std::env::var("HOST").unwrap();
 
@@ -18,28 +22,39 @@ fn main() {
             yep_cache_line_size::CacheType::Data,
         ) {
             Ok(cache_line_size) => {
-                println!(
-                    "cargo:warning=Detected L1 data cache line size: {} bytes",
-                    cache_line_size
-                );
+                if emit_warnings {
+                    println!(
+                        "cargo:warning=Detected L1 data cache line size: {} bytes",
+                        cache_line_size
+                    );
+                }
 
                 if cache_line_size >= 128 {
                     println!("cargo:rustc-cfg=cache_line_128");
-                    println!(
-                        "cargo:warning=Enabling f64 Block4 support (128-byte cache lines detected)"
-                    );
+                    if emit_warnings {
+                        println!(
+                            "cargo:warning=Enabling f64 Block4 support (128-byte cache lines detected)"
+                        );
+                    }
                 }
             }
             Err(e) => {
-                println!("cargo:warning=Failed to detect cache line size: {}. Assuming 64-byte cache lines.", e);
+                if emit_warnings {
+                    println!(
+                        "cargo:warning=Failed to detect cache line size: {}. Assuming 64-byte cache lines.",
+                        e
+                    );
+                }
             }
         }
     } else {
-        println!(
-            "cargo:warning=Cross-compiling (host: {}, target: {}). \
-             Assuming 64-byte cache lines. Override with RUSTFLAGS='--cfg cache_line_128' if needed.",
-            host, target
-        );
+        if emit_warnings {
+            println!(
+                "cargo:warning=Cross-compiling (host: {}, target: {}). \
+                 Assuming 64-byte cache lines. Override with RUSTFLAGS='--cfg cache_line_128' if needed.",
+                host, target
+            );
+        }
     }
 
     println!("cargo:rerun-if-changed=build.rs");

@@ -39,6 +39,7 @@ pub trait SimdPrune: AxisUnified<Coord = Self> + sealed::Sealed {
 /// - `$rd_values`: Array of distance values
 /// - `$max_dist`: Maximum distance threshold
 /// - `$sibling_mask`: Pre-computed mask of valid siblings
+#[allow(unused_macros)]
 macro_rules! autovec_fallback {
     ($width:expr, $mask_ty:ty, $rd_values:expr, $max_dist:expr, $sibling_mask:expr) => {{
         let mut mask: $mask_ty = 0;
