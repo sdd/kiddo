@@ -18,7 +18,7 @@ mod donnelly_2_pf_blockmarker;
 pub mod donnelly_core;
 mod prefetch;
 
-mod donnelly_2_blockmarker_simd;
+pub mod donnelly_2_blockmarker_simd;
 
 pub use donnelly_2_blockmarker_simd::{
     CompareBlock3, CompareBlock4, DonnellyMarkerSimd, SimdPrune,

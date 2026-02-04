@@ -4,6 +4,7 @@
 ///
 /// Compares 8 rd_values against max_dist in parallel and returns a bitmask.
 #[inline(always)]
+#[allow(dead_code)]
 pub(crate) fn simd_prune_block_f64(rd_values: &[f64; 8], max_dist: f64, sibling_mask: u8) -> u8 {
     unsafe {
         use core::arch::aarch64::*;
@@ -39,6 +40,7 @@ pub(crate) fn simd_prune_block_f64(rd_values: &[f64; 8], max_dist: f64, sibling_
 ///
 /// Compares 8 rd_values against max_dist in parallel and returns a bitmask.
 #[inline(always)]
+#[allow(dead_code)]
 pub(crate) fn simd_prune_block_f32(rd_values: &[f32; 8], max_dist: f32, sibling_mask: u8) -> u8 {
     unsafe {
         use core::arch::aarch64::*;

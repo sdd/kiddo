@@ -278,7 +278,7 @@ required-features = ["test_utils", "rkyv_08"]
 [[example]]
 name = "immutable-large-donnelly-simulate-traverse-f32-unrolled"
 path = "examples/immutable-large-donnelly-simulate-traverse-f32-unrolled.rs"
-required-features = ["test_utils", "simulator"]
+required-features = ["test_utils", "simulator", "rkyv_08"]
 
 [[example]]
 name = "immutable-large-donnelly-deserialize-and-traverse-f32-rolled"
@@ -303,7 +303,7 @@ required-features = ["test_utils", "rkyv_08"]
 [[example]]
 name = "immutable-large-eytz-simulate-traverse-f32"
 path = "examples/immutable-large-eytz-simulate-traverse-f32.rs"
-required-features = ["test_utils", "simulator"]
+required-features = ["test_utils", "simulator", "rkyv_08"]
 
 [[example]]
 name = "immutable-large-eytz-deserialize-and-traverse-f32"

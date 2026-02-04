@@ -2,6 +2,7 @@ use crate::kd_tree::leaf_view::LeafView;
 use crate::kd_tree::query_stack::{QueryStack, QueryStackContext, StackTrait};
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
+use crate::stem_strategies::donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4};
 use crate::traits_unified_2::{
     AxisUnified, Basics, DistanceMetricUnified, LeafStrategy, Mutability,
 };
@@ -97,7 +98,10 @@ where
         process_leaf: impl FnMut(&LeafView<A, T, K, B>, &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
-        O: AxisUnified<Coord = O> + crate::stem_strategies::SimdPrune,
+        O: AxisUnified<Coord = O>
+            + crate::stem_strategies::SimdPrune
+            + BacktrackBlock3
+            + BacktrackBlock4,
         D: DistanceMetricUnified<A, K, Output = O>,
         SS::Stack<O>: StackTrait<O, SS>,
     {
@@ -114,7 +118,10 @@ where
         process_leaf: impl FnMut(&LeafView<A, T, K, B>, &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
-        O: AxisUnified<Coord = O> + crate::stem_strategies::SimdPrune,
+        O: AxisUnified<Coord = O>
+            + crate::stem_strategies::SimdPrune
+            + BacktrackBlock3
+            + BacktrackBlock4,
         D: DistanceMetricUnified<A, K, Output = O>,
         SS::Stack<O>: StackTrait<O, SS>,
     {
@@ -137,7 +144,7 @@ where
         mut process_leaf: impl FnMut(&LeafView<A, T, K, B>, &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
-        O: AxisUnified<Coord = O>,
+        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
         D: DistanceMetricUnified<A, K, Output = O>,
     {
         let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
@@ -199,7 +206,7 @@ where
         stack: &mut QueryStack<O, SS>,
     ) -> usize
     where
-        O: AxisUnified<Coord = O>,
+        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
         D: DistanceMetricUnified<A, K, Output = O>,
     {
         loop {
@@ -246,7 +253,10 @@ where
         mut process_leaf: impl FnMut(&LeafView<A, T, K, B>, &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
-        O: AxisUnified<Coord = O> + crate::stem_strategies::SimdPrune,
+        O: AxisUnified<Coord = O>
+            + crate::stem_strategies::SimdPrune
+            + BacktrackBlock3
+            + BacktrackBlock4,
         D: DistanceMetricUnified<A, K, Output = O>,
     {
         use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
@@ -387,7 +397,7 @@ where
         stack: &mut crate::kd_tree::query_stack_simd::SimdQueryStack<O, SS>,
     ) -> usize
     where
-        O: AxisUnified<Coord = O>,
+        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
         D: DistanceMetricUnified<A, K, Output = O>,
     {
         loop {

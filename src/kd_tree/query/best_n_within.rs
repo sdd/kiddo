@@ -1,6 +1,7 @@
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
+use crate::stem_strategies::donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4};
 use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, LeafStrategy};
 use crate::{BestNeighbour, StemStrategy};
 use std::collections::BinaryHeap;
@@ -25,7 +26,7 @@ where
     ) -> BinaryHeap<BestNeighbour<<D as DistanceMetricUnified<A, K>>::Output, T>>
     where
         D: DistanceMetricUnified<A, K>,
-        D::Output: crate::stem_strategies::SimdPrune,
+        D::Output: crate::stem_strategies::SimdPrune + BacktrackBlock3 + BacktrackBlock4,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
         let max_qty = max_qty.into();

@@ -5,6 +5,12 @@ use std::ptr::NonNull;
 /// Compare query value against 7 pivots in a Block3 (f64, NEON)
 ///
 /// Returns the child index (0-7) based on how many pivots the query exceeds.
+///
+/// # Safety
+/// - `stems_ptr` must point to at least 8 contiguous f64 values starting at
+///   `cache_line_base * 8`.
+/// - The caller must ensure the pointer is valid for reads and properly aligned
+///   for `f64` loads on the target.
 #[inline(always)]
 pub unsafe fn compare_block3_f64_neon(
     stems_ptr: NonNull<u8>,
@@ -42,6 +48,12 @@ pub unsafe fn compare_block3_f64_neon(
 /// Compare query value against 7 pivots in a Block3 (f32, NEON)
 ///
 /// Returns the child index (0-7) based on how many pivots the query exceeds.
+///
+/// # Safety
+/// - `stems_ptr` must point to at least 8 contiguous f32 values starting at
+///   `cache_line_base * 4`.
+/// - The caller must ensure the pointer is valid for reads and properly aligned
+///   for `f32` loads on the target.
 #[inline(always)]
 pub unsafe fn compare_block3_f32_neon(
     stems_ptr: NonNull<u8>,
@@ -71,6 +83,12 @@ pub unsafe fn compare_block3_f32_neon(
 /// Compare query value against 15 pivots in a Block4 (f32, NEON)
 ///
 /// Returns the child index (0-15) based on how many pivots the query exceeds.
+///
+/// # Safety
+/// - `stems_ptr` must point to at least 16 contiguous f32 values starting at
+///   `cache_line_base * 4`.
+/// - The caller must ensure the pointer is valid for reads and properly aligned
+///   for `f32` loads on the target.
 #[inline(always)]
 pub unsafe fn compare_block4_f32_neon(
     stems_ptr: NonNull<u8>,

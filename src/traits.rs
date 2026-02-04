@@ -1,6 +1,9 @@
 //! Definitions and implementations for some traits that are common between the [`float`](crate::mutable::float), [`immutable`](crate::immutable) and [`fixed`](crate::mutable::fixed)  modules
 // use std::num::NonZero;
 use crate::kd_tree::query_stack::StackTrait;
+use crate::stem_strategies::donnelly_2_blockmarker_simd::backtrack_traits::{
+    BacktrackBlock3, BacktrackBlock4,
+};
 use crate::traits_unified_2::AxisUnified;
 // use crate::{BestNeighbour, NearestNeighbour, WithinUnsortedIter};
 use aligned_vec::AVec;
@@ -371,7 +374,7 @@ pub trait StemStrategy: Clone + Sync + Send {
     where
         Self: Sized,
         A: AxisUnified<Coord = A>,
-        O: AxisUnified<Coord = O>,
+        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K, Output = O>,
         Self::Stack<O>: StackTrait<O, Self>,
     {
@@ -452,7 +455,10 @@ pub trait StemStrategy: Clone + Sync + Send {
         Self: Sized,
         A: crate::traits_unified_2::AxisUnified<Coord = A>,
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
-        O: crate::traits_unified_2::AxisUnified<Coord = O> + crate::stem_strategies::SimdPrune,
+        O: crate::traits_unified_2::AxisUnified<Coord = O>
+            + crate::stem_strategies::SimdPrune
+            + BacktrackBlock3
+            + BacktrackBlock4,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
         LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
