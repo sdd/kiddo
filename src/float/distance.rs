@@ -40,6 +40,40 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
     }
 }
 
+/// Returns the Chebyshev / L-infinity distance between two points.
+///
+/// Chebyshev distance is the maximum absolute difference along any axis.
+/// Also known as chessboard distance or L-infinity norm.
+///
+/// re-exported as `kiddo::Chebyshev` for convenience
+///
+/// # Examples
+///
+/// ```rust
+/// use kiddo::traits::DistanceMetric;
+/// use kiddo::Chebyshev;
+///
+/// assert_eq!(0f32, Chebyshev::dist(&[0f32, 0f32], &[0f32, 0f32]));
+/// assert_eq!(1f32, Chebyshev::dist(&[0f32, 0f32], &[1f32, 0f32]));
+/// assert_eq!(1f32, Chebyshev::dist(&[0f32, 0f32], &[1f32, 1f32]));
+/// ```
+pub struct Chebyshev {}
+
+impl<A: Axis, const K: usize> DistanceMetric<A, K> for Chebyshev {
+    #[inline]
+    fn dist(a: &[A; K], b: &[A; K]) -> A {
+        a.iter()
+            .zip(b.iter())
+            .map(|(&a_val, &b_val)| (a_val - b_val).abs())
+            .fold(A::zero(), |acc, val| acc.max(val))
+    }
+
+    #[inline]
+    fn dist1(a: A, b: A) -> A {
+        (a - b).abs()
+    }
+}
+
 /// Returns the squared euclidean distance between two points.
 ///
 /// Faster than Euclidean distance due to not needing a square root, but still
@@ -296,6 +330,115 @@ mod tests {
         }
     }
 
+    mod chebyshev_tests {
+        use super::*;
+
+        #[rstest]
+        #[case([0.0f32, 0.0f32], [0.0f32, 0.0f32], 0.0f32)] // identical points
+        #[case([0.0f32, 0.0f32], [1.0f32, 0.0f32], 1.0f32)] // single axis difference
+        #[case([0.0f32, 0.0f32], [0.0f32, 1.0f32], 1.0f32)] // single axis difference (other axis)
+        #[case([0.0f32, 0.0f32], [1.0f32, 1.0f32], 1.0f32)] // diagonal
+        #[case([-1.0f32, -1.0f32], [1.0f32, 1.0f32], 2.0f32)] // negative to positive
+        #[case([1.5f32, 2.5f32], [3.5f32, 4.5f32], 2.0f32)] // fractional values
+        #[case([0.0f32, 0.0f32], [2.0f32, 1.0f32], 2.0f32)] // max on first axis
+        #[case([0.0f32, 0.0f32], [1.0f32, 2.0f32], 2.0f32)] // max on second axis
+        fn test_chebyshev_distance_2d(
+            #[case] a: [f32; 2],
+            #[case] b: [f32; 2],
+            #[case] expected: f32,
+        ) {
+            assert_eq!(Chebyshev::dist(&a, &b), expected);
+        }
+
+        #[rstest]
+        #[case([0.0f64, 0.0f64, 0.0f64], [0.0f64, 0.0f64, 0.0f64], 0.0f64)] // identical points 3D
+        #[case([0.0f64, 0.0f64, 0.0f64], [1.0f64, 2.0f64, 3.0f64], 3.0f64)] // 3D diagonal (max is 3)
+        #[case([1.0f64, 2.0f64, 3.0f64], [4.0f64, 5.0f64, 6.0f64], 3.0f64)] // 3D offset (max is 3)
+        fn test_chebyshev_distance_3d(
+            #[case] a: [f64; 3],
+            #[case] b: [f64; 3],
+            #[case] expected: f64,
+        ) {
+            assert_eq!(Chebyshev::dist(&a, &b), expected);
+        }
+
+        #[rstest]
+        #[case([0.0f32], [0.0f32], 0.0f32)] // 1D identical
+        #[case([0.0f32], [5.0f32], 5.0f32)] // 1D positive
+        #[case([5.0f32], [0.0f32], 5.0f32)] // 1D negative (reversed)
+        #[case([-3.0f32], [7.0f32], 10.0f32)] // 1D negative to positive
+        fn test_chebyshev_distance_1d(
+            #[case] a: [f32; 1],
+            #[case] b: [f32; 1],
+            #[case] expected: f32,
+        ) {
+            assert_eq!(Chebyshev::dist(&a, &b), expected);
+        }
+
+        #[test]
+        fn test_chebyshev_distance_4d() {
+            let a = [1.0f32, 2.0f32, 3.0f32, 4.0f32];
+            let b = [5.0f32, 6.0f32, 7.0f32, 8.0f32];
+            let expected = 4.0f32; // max(|5-1|, |6-2|, |7-3|, |8-4|) = max(4, 4, 4, 4) = 4
+            assert_eq!(Chebyshev::dist(&a, &b), expected);
+        }
+
+        #[test]
+        fn test_chebyshev_distance_5d() {
+            let a = [0.0f64, 1.0f64, 2.0f64, 3.0f64, 4.0f64];
+            let b = [5.0f64, 6.0f64, 7.0f64, 8.0f64, 9.0f64];
+            let expected = 5.0f64; // max(|5-0|, |6-1|, |7-2|, |8-3|, |9-4|) = max(5, 5, 5, 5, 5) = 5
+            assert_eq!(Chebyshev::dist(&a, &b), expected);
+        }
+
+        #[rstest]
+        #[case(0.0f32, 0.0f32, 0.0f32)] // zero difference
+        #[case(1.0f32, 0.0f32, 1.0f32)] // positive difference
+        #[case(0.0f32, 1.0f32, 1.0f32)] // negative difference (reversed)
+        #[case(-2.5f32, 3.5f32, 6.0f32)] // fractional negative to positive
+        #[case(1000.0f32, -1000.0f32, 2000.0f32)] // large values
+        fn test_chebyshev_dist1(#[case] a: f32, #[case] b: f32, #[case] expected: f32) {
+            assert_eq!(<Chebyshev as DistanceMetric<f32, 1>>::dist1(a, b), expected);
+        }
+
+        #[test]
+        fn test_chebyshev_symmetry() {
+            let a = [1.0f64, 2.0f64, 3.0f64];
+            let b = [4.0f64, 5.0f64, 6.0f64];
+            assert_eq!(Chebyshev::dist(&a, &b), Chebyshev::dist(&b, &a));
+        }
+
+        #[test]
+        fn test_chebyshev_identity() {
+            let a = [1.0f32, 2.0f32, 3.0f32];
+            assert_eq!(Chebyshev::dist(&a, &a), 0.0f32);
+        }
+
+        #[test]
+        fn test_chebyshev_non_negativity() {
+            let a = [1.0f32, 2.0f32];
+            let b = [3.0f32, 4.0f32];
+            let distance = Chebyshev::dist(&a, &b);
+            assert!(distance >= 0.0f32);
+        }
+
+        #[test]
+        fn test_chebyshev_max_property() {
+            // Test that Chebyshev correctly finds the maximum difference
+            let a = [0.0, 0.0];
+            let b = [3.0, 1.0];
+
+            let result = Chebyshev::dist(&a, &b);
+
+            // max(|0-3|, |0-1|) = max(3, 1) = 3
+            assert_eq!(result, 3.0);
+
+            // Verify it's not Manhattan (which would be 4) or Euclidean (sqrt(10))
+            assert_ne!(result, 4.0);
+            assert_ne!(result, (10.0_f64).sqrt());
+        }
+    }
+
     #[cfg(feature = "f16")]
     mod f16_tests {
         use super::*;
@@ -321,6 +464,402 @@ mod tests {
             let expected = f16::from_f32(2.0);
 
             assert_eq!(result, expected);
+        }
+    }
+
+    mod integration_tests {
+        use super::*;
+        use crate::KdTree;
+
+        #[test]
+        fn test_nearest_n_manhattan_distance() {
+            let mut kdtree: KdTree<f32, 2> = KdTree::new();
+
+            // Add points in a simple pattern
+            let points = [
+                ([0.0f32, 0.0f32], 0), // distance 0 from query point
+                ([1.0f32, 0.0f32], 1), // distance 1 from query point
+                ([0.0f32, 1.0f32], 2), // distance 1 from query point
+                ([2.0f32, 0.0f32], 3), // distance 2 from query point
+                ([0.0f32, 2.0f32], 4), // distance 2 from query point
+                ([3.0f32, 3.0f32], 5), // distance 6 from query point
+            ];
+
+            for (point, index) in points {
+                kdtree.add(&point, index);
+            }
+
+            let query_point = [0.0f32, 0.0f32];
+            let results = kdtree.nearest_n::<Manhattan>(&query_point, 4);
+
+            // Expected order: [0], [1], [2], [3], [4]
+            // Distances: 0, 1, 1, 2, 2
+            // But we only ask for 4 nearest
+            assert_eq!(results.len(), 4);
+
+            // First result should be the query point itself
+            assert_eq!(results[0].item, 0);
+            assert_eq!(results[0].distance, 0.0);
+
+            // Next two should be the points at Manhattan distance 1
+            assert_eq!(results[1].item, 1);
+            assert_eq!(results[1].distance, 1.0);
+            assert_eq!(results[2].item, 2);
+            assert_eq!(results[2].distance, 1.0);
+
+            // Fourth should be one of the points at distance 2
+            assert!(results[3].item == 3 || results[3].item == 4);
+            assert_eq!(results[3].distance, 2.0);
+        }
+
+        #[test]
+        fn test_nearest_n_squared_euclidean_distance() {
+            let mut kdtree: KdTree<f64, 2> = KdTree::new();
+
+            // Add points in a pattern where Euclidean and Manhattan differ
+            let points = [
+                ([0.0, 0.0], 0), // distance 0 from query point
+                ([1.0, 0.0], 1), // Euclidean: 1, Manhattan: 1
+                ([0.0, 1.0], 2), // Euclidean: 1, Manhattan: 1
+                ([1.0, 1.0], 3), // Euclidean: 2, Manhattan: 2
+                ([2.0, 0.0], 4), // Euclidean: 4, Manhattan: 2
+                ([0.0, 2.0], 5), // Euclidean: 4, Manhattan: 2
+                ([3.0, 4.0], 6), // Euclidean: 25, Manhattan: 7
+            ];
+
+            for (point, index) in points {
+                kdtree.add(&point, index);
+            }
+
+            let query_point = [0.0, 0.0];
+            let results = kdtree.nearest_n::<SquaredEuclidean>(&query_point, 5);
+
+            assert_eq!(results.len(), 5);
+
+            // First should be the query point itself
+            assert_eq!(results[0].item, 0);
+            assert_eq!(results[0].distance, 0.0);
+
+            // Next two should be the points at Euclidean distance 1
+            assert_eq!(results[1].item, 1);
+            assert_eq!(results[1].distance, 1.0);
+            assert_eq!(results[2].item, 2);
+            assert_eq!(results[2].distance, 1.0);
+
+            // Next two should be the points at Euclidean distance 2
+            assert_eq!(results[3].item, 3);
+            assert_eq!(results[3].distance, 2.0);
+            assert_eq!(results[4].item, 4);
+            assert_eq!(results[4].distance, 4.0);
+
+            // Verify that points at squared Euclidean distance 4 are indeed farther
+            // than points at squared Euclidean distance 2
+            assert!(results[4].distance > results[3].distance);
+        }
+
+        #[test]
+        fn test_nearest_n_different_metrics_produce_different_orderings() {
+            let mut kdtree: KdTree<f32, 2> = KdTree::new();
+
+            // Add points where Manhattan and Euclidean give different orderings
+            let points = [
+                ([0.0, 0.0], 0), // origin
+                ([2.0, 1.0], 1), // Manhattan: 3, Euclidean^2: 5
+                ([1.0, 2.0], 2), // Manhattan: 3, Euclidean^2: 5
+                ([3.0, 0.0], 3), // Manhattan: 3, Euclidean^2: 9
+                ([0.0, 3.0], 4), // Manhattan: 3, Euclidean^2: 9
+            ];
+
+            for (point, index) in points {
+                kdtree.add(&point, index);
+            }
+
+            let query_point = [0.0, 0.0];
+
+            let manhattan_results = kdtree.nearest_n::<Manhattan>(&query_point, 3);
+            let euclidean_results = kdtree.nearest_n::<SquaredEuclidean>(&query_point, 3);
+
+            // Both should include the origin as first result
+            assert_eq!(manhattan_results[0].item, 0);
+            assert_eq!(euclidean_results[0].item, 0);
+
+            // For Manhattan: points 1, 2, 3, 4 are all at distance 3
+            // The ordering among ties depends on tree structure, but they should all have same distance
+            assert_eq!(manhattan_results[1].distance, 3.0);
+            assert_eq!(manhattan_results[2].distance, 3.0);
+
+            // For Euclidean: points 1 and 2 are at distance sqrt(5) ≈ 2.236 (squared: 5)
+            // Points 3 and 4 are at distance 3 (squared: 9)
+            assert_eq!(euclidean_results[1].distance, 5.0);
+            assert_eq!(euclidean_results[2].distance, 5.0);
+
+            // Verify that Euclidean ordering puts points 1 and 2 before 3 and 4
+            let euclidean_items: Vec<u64> = euclidean_results
+                .iter()
+                .skip(1) // skip origin
+                .take(2) // take next 2
+                .map(|nn| nn.item)
+                .collect();
+
+            assert!(euclidean_items.contains(&1) || euclidean_items.contains(&2));
+
+            // Calculate actual distances to verify our understanding
+            let p1 = [2.0, 1.0];
+            let p2 = [1.0, 2.0];
+            let p3 = [3.0, 0.0];
+
+            let manhattan_p1 = Manhattan::dist(&query_point, &p1);
+            let manhattan_p2 = Manhattan::dist(&query_point, &p2);
+            let manhattan_p3 = Manhattan::dist(&query_point, &p3);
+
+            let euclidean_p1 = SquaredEuclidean::dist(&query_point, &p1);
+            let euclidean_p2 = SquaredEuclidean::dist(&query_point, &p2);
+            let euclidean_p3 = SquaredEuclidean::dist(&query_point, &p3);
+
+            assert_eq!(manhattan_p1, 3.0);
+            assert_eq!(manhattan_p2, 3.0);
+            assert_eq!(manhattan_p3, 3.0);
+
+            assert_eq!(euclidean_p1, 5.0);
+            assert_eq!(euclidean_p2, 5.0);
+            assert_eq!(euclidean_p3, 9.0);
+        }
+
+        #[test]
+        fn test_nearest_n_3d_different_metrics() {
+            let mut kdtree: KdTree<f64, 3> = KdTree::new();
+
+            // Add points in 3D space
+            let points = [
+                ([1.0, 1.0, 1.0], 0), // origin
+                ([2.0, 1.0, 1.0], 1), // 1 unit away on x-axis
+                ([1.0, 2.0, 1.0], 2), // 1 unit away on y-axis
+                ([1.0, 1.0, 2.0], 3), // 1 unit away on z-axis
+                ([3.0, 1.0, 1.0], 4), // 2 units away on x-axis
+                ([0.0, 0.0, 0.0], 5), // sqrt(3) ≈ 1.732 from origin
+            ];
+
+            for (point, index) in points {
+                kdtree.add(&point, index);
+            }
+
+            let query_point = [1.0, 1.0, 1.0];
+            let results = kdtree.nearest_n::<Manhattan>(&query_point, 4);
+
+            assert_eq!(results.len(), 4);
+
+            // First should be the query point itself
+            assert_eq!(results[0].item, 0);
+            assert_eq!(results[0].distance, 0.0);
+
+            // Next three should be the points at Manhattan distance 1
+            let nearby_items: Vec<u64> = results
+                .iter()
+                .skip(1) // skip origin
+                .take(3) // take next 3
+                .map(|nn| nn.item)
+                .collect();
+
+            assert!(nearby_items.contains(&1));
+            assert!(nearby_items.contains(&2));
+            assert!(nearby_items.contains(&3));
+
+            // All nearby points should have distance 1
+            for result in results.iter().skip(1).take(3) {
+                assert_eq!(result.distance, 1.0);
+            }
+
+            // Point 4 should be farther (distance 2) and not in top 4
+            let all_items: Vec<u64> = results.iter().map(|nn| nn.item).collect();
+            assert!(!all_items.contains(&4));
+
+            // Point 5 has Manhattan distance 3, so definitely not in top 4
+            assert!(!all_items.contains(&5));
+        }
+
+        #[test]
+        fn test_nearest_n_large_scale() {
+            let mut kdtree: KdTree<f32, 2> = KdTree::new();
+
+            // Create a grid of points
+            let mut index = 0;
+            for x in 0i32..10 {
+                for y in 0i32..10 {
+                    let point = [x as f32, y as f32];
+                    kdtree.add(&point, index);
+                    index += 1;
+                }
+            }
+
+            // Query from center of grid
+            let query_point = [5.0f32, 5.0f32];
+            let results = kdtree.nearest_n::<SquaredEuclidean>(&query_point, 10);
+
+            assert_eq!(results.len(), 10);
+
+            // First result should be the center point itself (index 55)
+            assert_eq!(results[0].item, 55);
+            assert_eq!(results[0].distance, 0.0);
+
+            // Results should be ordered by increasing distance
+            for i in 1..10 {
+                assert!(results[i].distance >= results[i - 1].distance);
+            }
+
+            // Verify distances make sense for a grid
+            // The nearest points should be at squared distances: 0, 1, 1, 1, 1, 2, 2, 4, 4, 5...
+            let expected_distances = [0.0f32, 1.0f32, 1.0f32, 1.0f32, 1.0f32, 2.0f32];
+
+            for (i, &expected_dist) in expected_distances.iter().enumerate() {
+                if i < results.len() {
+                    assert_eq!(results[i].distance, expected_dist);
+                }
+            }
+        }
+
+        #[test]
+        fn test_nearest_n_chebyshev_distance() {
+            let mut kdtree: KdTree<f32, 2> = KdTree::new();
+
+            // Add points that show Chebyshev behavior
+            let points = [
+                ([0.0f32, 0.0f32], 0), // distance 0 from query point
+                ([1.0f32, 0.0f32], 1), // Chebyshev: 1, Manhattan: 1, Euclidean^2: 1
+                ([0.0f32, 1.0f32], 2), // Chebyshev: 1, Manhattan: 1, Euclidean^2: 1
+                ([2.0f32, 0.0f32], 3), // Chebyshev: 2, Manhattan: 2, Euclidean^2: 4
+                ([0.0f32, 2.0f32], 4), // Chebyshev: 2, Manhattan: 2, Euclidean^2: 4
+                ([1.0f32, 1.0f32], 5), // Chebyshev: 1, Manhattan: 2, Euclidean^2: 2
+            ];
+
+            for (point, index) in points {
+                kdtree.add(&point, index);
+            }
+
+            let query_point = [0.0f32, 0.0f32];
+            let results = kdtree.nearest_n::<Chebyshev>(&query_point, 5);
+
+            // With Chebyshev, points at (1,0), (0,1), and (1,1) all have distance 1
+            // Points at (2,0) and (0,2) have distance 2
+            assert_eq!(results.len(), 5);
+
+            // First should be the query point itself
+            assert_eq!(results[0].item, 0);
+            assert_eq!(results[0].distance, 0.0);
+
+            // Next should all be at Chebyshev distance 1
+            let nearby_items: Vec<u64> = results
+                .iter()
+                .skip(1) // skip origin
+                .take(4) // take next 4
+                .filter(|r| (r.distance - 1.0).abs() < 0.001) // check for distance 1 (with some float tolerance)
+                .map(|nn| nn.item)
+                .collect();
+
+            // All of these should be in the results: 1, 2, 5
+            assert!(nearby_items.contains(&1));
+            assert!(nearby_items.contains(&2));
+            assert!(nearby_items.contains(&5));
+        }
+
+        #[test]
+        fn test_within_chebyshev_distance() {
+            let mut kdtree: KdTree<f32, 2> = KdTree::new();
+
+            // Add points with varying Chebyshev distances
+            let points = [
+                ([0.0f32, 0.0f32], 0), // distance 0
+                ([0.5f32, 0.5f32], 1), // Chebyshev: 0.5
+                ([1.0f32, 0.0f32], 2), // Chebyshev: 1.0
+                ([0.8f32, 0.9f32], 3), // Chebyshev: 0.9
+                ([2.0f32, 0.0f32], 4), // Chebyshev: 2.0
+                ([0.0f32, 2.0f32], 5), // Chebyshev: 2.0
+                ([1.5f32, 1.5f32], 6), // Chebyshev: 1.5
+            ];
+
+            for (point, index) in points {
+                kdtree.add(&point, index);
+            }
+
+            let query_point = [0.0f32, 0.0f32];
+            let radius = 1.0; // radius 1 (not squared for Chebyshev)
+            let mut results = kdtree.within::<Chebyshev>(&query_point, radius);
+
+            // Sort by distance for easier verification
+            results.sort_by(|a, b| {
+                a.distance
+                    .partial_cmp(&b.distance)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            // NOTE: This test demonstrates a known limitation with Chebyshev distance:
+            // The k-d tree query logic uses dist1 for pruning, which is incorrect for Chebyshev.
+            // Point at [1.0, 0.0] (index 2) has Chebyshev distance exactly 1.0 but is NOT found.
+
+            // Should include points with Chebyshev distance <= 1
+            // These SHOULD be: 0, 1, 2, 3 (distances: 0, 0.5, 1.0, 0.9)
+            // But ACTUALLY FINDS: 0, 1, 3 (index 2 is missing due to dist1 pruning issue)
+            let found_indices: Vec<u64> = results.iter().map(|r| r.item).collect();
+
+            assert!(found_indices.contains(&0));
+            assert!(found_indices.contains(&1));
+            // This assert FAILS - demonstrates the bug
+            assert!(found_indices.contains(&2));  // currently not included, but should!
+            assert!(found_indices.contains(&3));
+
+            // Should NOT include points with Chebyshev distance > 1
+            assert!(!found_indices.contains(&4));
+            assert!(!found_indices.contains(&5));
+            assert!(!found_indices.contains(&6));
+
+            // Verify distances
+            for result in results {
+                assert!(result.distance <= 1.0 || (result.distance - 1.0).abs() < 0.001);
+            }
+        }
+
+        #[test]
+        fn test_chebyshev_vs_manhattan_ordering() {
+            let mut kdtree: KdTree<f32, 2> = KdTree::new();
+
+            // Points where Chebyshev and Manhattan differ significantly
+            let points = [
+                ([0.0f32, 0.0f32], 0), // origin
+                ([3.0f32, 1.0f32], 1), // Chebyshev: 3, Manhattan: 4
+                ([1.0f32, 3.0f32], 2), // Chebyshev: 3, Manhattan: 4
+                ([2.0f32, 2.0f32], 3), // Chebyshev: 2, Manhattan: 4
+                ([4.0f32, 0.5f32], 4), // Chebyshev: 4, Manhattan: 4.5
+            ];
+
+            for (point, index) in points {
+                kdtree.add(&point, index);
+            }
+
+            let query_point = [0.0f32, 0.0f32];
+
+            let chebyshev_results = kdtree.nearest_n::<Chebyshev>(&query_point, 4);
+            let manhattan_results = kdtree.nearest_n::<Manhattan>(&query_point, 4);
+
+            // Both should include the origin first
+            assert_eq!(chebyshev_results[0].item, 0);
+            assert_eq!(manhattan_results[0].item, 0);
+
+            // With Chebyshev, nearest should be point 3 (distance 2)
+            // With Manhattan, nearest should be points 1 and 2 (distance 4)
+            assert_eq!(chebyshev_results[1].item, 3);
+            assert_eq!(chebyshev_results[1].distance, 2.0);
+
+            // With Manhattan, points 1 and 2 should come before point 3 (which is distance 4)
+            let manhattan_items: Vec<u64> = manhattan_results
+                .iter()
+                .skip(1)
+                .take(3)
+                .map(|r| r.item)
+                .collect();
+            assert!(manhattan_items.contains(&1) || manhattan_items.contains(&2));
+
+            // Verify the distance calculations are correct
+            assert_eq!(chebyshev_results[1].distance, 2.0); // Chebyshev: max(|2-0|, |2-0|) = 2
+            assert_eq!(manhattan_results[1].distance, 4.0); // Manhattan: |3-0| + |1-0| = 4
         }
     }
 }

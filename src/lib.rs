@@ -135,6 +135,7 @@ pub type ImmutableKdTree<A, const K: usize> =
     immutable::float::kdtree::ImmutableKdTree<A, u64, K, 32>;
 
 pub use best_neighbour::BestNeighbour;
+pub use float::distance::Chebyshev;
 pub use float::distance::Manhattan;
 pub use float::distance::SquaredEuclidean;
 pub use nearest_neighbour::NearestNeighbour;
