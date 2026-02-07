@@ -163,7 +163,7 @@ mod tests {
 
         for &(p, item) in content {
             let dist = Manhattan::dist(query_point, &p);
-            if dist < radius {
+            if dist <= radius {
                 matching_items.push((dist, item));
             }
         }

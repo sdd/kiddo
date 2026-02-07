@@ -235,10 +235,14 @@ where
 
         #[allow(clippy::needless_range_loop)]
         for idx in 0..remainder_items.len() {
-            let mut distance = A::zero();
-            (0..K).step_by(1).for_each(|dim| {
-                distance += D::dist1(remainder_points[dim][idx], query[dim]);
-            });
+            let distance = D::dist(
+                &(0..K)
+                    .map(|dim| remainder_points[dim][idx])
+                    .collect::<Vec<_>>()
+                    .try_into()
+                    .unwrap(),
+                query,
+            );
 
             if distance < radius {
                 results.add(NearestNeighbour {
@@ -269,10 +273,14 @@ where
 
         #[allow(clippy::needless_range_loop)]
         for idx in 0..remainder_items.len() {
-            let mut distance = A::zero();
-            (0..K).step_by(1).for_each(|dim| {
-                distance += D::dist1(remainder_points[dim][idx], query[dim]);
-            });
+            let distance = D::dist(
+                &(0..K)
+                    .map(|dim| remainder_points[dim][idx])
+                    .collect::<Vec<_>>()
+                    .try_into()
+                    .unwrap(),
+                query,
+            );
 
             if distance < radius {
                 let item = remainder_items[idx];
@@ -365,16 +373,20 @@ where
         Self: Sized,
     {
         // AVX512: 4 loops of 32 iterations, each 4x unrolled, 5 instructions per pre-unrolled iteration
-        let mut acc = [0f64; C];
-        (0..K).step_by(1).for_each(|dim| {
-            let qd = [query[dim]; C];
-
-            (0..C).step_by(1).for_each(|idx| {
-                acc[idx] += D::dist1(chunk[dim][idx], qd[idx]);
-            });
-        });
-
-        acc
+        // TODO: For each point in chunk, compute full distance using D::dist
+        //       This is prob slower than SIMD, but works for all metrics
+        (0..C)
+            .map(|idx| {
+                let point: [Self; K] = (0..K)
+                    .map(|dim| chunk[dim][idx])
+                    .collect::<Vec<_>>()
+                    .try_into()
+                    .unwrap();
+                D::dist(&point, query)
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap()
     }
 }
 
@@ -451,16 +463,20 @@ where
         Self: Sized,
     {
         // AVX512: 4 loops of 32 iterations, each 4x unrolled, 5 instructions per pre-unrolled iteration
-        let mut acc = [0f32; C];
-        (0..K).step_by(1).for_each(|dim| {
-            let qd = [query[dim]; C];
-
-            (0..C).step_by(1).for_each(|idx| {
-                acc[idx] += D::dist1(chunk[dim][idx], qd[idx]);
-            });
-        });
-
-        acc
+        // TODO: For each point in chunk, compute full distance using D::dist
+        //       Same as above, optimisation to be recovered again
+        (0..C)
+            .map(|idx| {
+                let point: [Self; K] = (0..K)
+                    .map(|dim| chunk[dim][idx])
+                    .collect::<Vec<_>>()
+                    .try_into()
+                    .unwrap();
+                D::dist(&point, query)
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap()
     }
 }
 
