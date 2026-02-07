@@ -485,9 +485,9 @@ mod tests {
     mod integration_tests {
         use super::*;
         use crate::KdTree;
-        use rstest::rstest;
         use rand::prelude::*;
         use rand_distr::Normal;
+        use rstest::rstest;
 
         #[derive(Debug, Clone, Copy)]
         enum DataScenario {
@@ -663,7 +663,8 @@ mod tests {
             // Query based on tree type
             let results = match tree_type {
                 TreeType::Mutable => {
-                    let mut tree: crate::float::kdtree::KdTree<f64, u64, 6, 128, u32> = crate::float::kdtree::KdTree::new();
+                    let mut tree: crate::float::kdtree::KdTree<f64, u64, 6, 128, u32> =
+                        crate::float::kdtree::KdTree::new();
                     for (i, point) in points.iter().enumerate() {
                         tree.add(point, i as u64);
                     }
@@ -721,7 +722,8 @@ mod tests {
         #[rstest]
         fn test_nearest_n_chebyshev(
             #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
-            #[values(DataScenario::NoTies, DataScenario::Ties, DataScenario::Gaussian)] scenario: DataScenario,
+            #[values(DataScenario::NoTies, DataScenario::Ties, DataScenario::Gaussian)]
+            scenario: DataScenario,
             #[values(1, 2, 3, 4, 5, 6)] n: usize,
             #[values(1, 2, 3, 4)] dim: usize,
         ) {
@@ -731,7 +733,8 @@ mod tests {
         #[rstest]
         fn test_nearest_n_squared_euclidean(
             #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
-            #[values(DataScenario::NoTies, DataScenario::Ties, DataScenario::Gaussian)] scenario: DataScenario,
+            #[values(DataScenario::NoTies, DataScenario::Ties, DataScenario::Gaussian)]
+            scenario: DataScenario,
             #[values(1, 2, 3, 4, 5, 6)] n: usize,
             #[values(1, 2, 3, 4)] dim: usize,
         ) {
@@ -741,7 +744,8 @@ mod tests {
         #[rstest]
         fn test_nearest_n_manhattan(
             #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
-            #[values(DataScenario::NoTies, DataScenario::Ties, DataScenario::Gaussian)] scenario: DataScenario,
+            #[values(DataScenario::NoTies, DataScenario::Ties, DataScenario::Gaussian)]
+            scenario: DataScenario,
             #[values(1, 2, 3, 4, 5, 6)] n: usize,
             #[values(1, 2, 3, 4)] dim: usize,
         ) {
@@ -1068,13 +1072,8 @@ mod tests {
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
 
-            // NOTE: This test demonstrates a known limitation with Chebyshev distance:
-            // The k-d tree query logic uses dist1 for pruning, which is incorrect for Chebyshev.
-            // Point at [1.0, 0.0] (index 2) has Chebyshev distance exactly 1.0 but is NOT found.
-
-            // Should include points with Chebyshev distance <= 1
             // These SHOULD be: 0, 1, 2, 3 (distances: 0, 0.5, 1.0, 0.9)
-            // But ACTUALLY FINDS: 0, 1, 3 (index 2 is missing due to dist1 pruning issue)
+            // For `<=5.2.4` found: 0, 1, 3 (index 2 is missing due to dist1 pruning issue)
             let found_indices: Vec<u64> = results.iter().map(|r| r.item).collect();
 
             assert!(found_indices.contains(&0));
