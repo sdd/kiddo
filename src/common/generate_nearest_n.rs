@@ -67,7 +67,7 @@ macro_rules! generate_nearest_n {
 
             rd = D::accumulate(rd, D::dist1(new_off, old_off));
 
-            if Self::dist_belongs_in_heap(rd, results) {
+            if Self::dist_belongs_in_heap(rd, results, D::IS_MAX_BASED) {
                 off[split_dim] = new_off;
                 self.nearest_n_recurse::<D>(
                     query,
@@ -94,7 +94,7 @@ macro_rules! generate_nearest_n {
                 .for_each(|(idx, entry)| {
                     let distance: A = D::dist(query, transform(entry));
 
-                    if Self::dist_belongs_in_heap(distance, results) {
+                    if Self::dist_belongs_in_heap(distance, results, D::IS_MAX_BASED) {
                         let item = unsafe { leaf_node.content_items.get_unchecked(idx) };
                         let item = *transform(item);
 
@@ -112,9 +112,15 @@ macro_rules! generate_nearest_n {
         }
     }
 
-    #[inline]
-    fn dist_belongs_in_heap(dist: A, heap: &BinaryHeap<NearestNeighbour<A, T>>) -> bool {
-        heap.is_empty() || dist < heap.peek().unwrap().distance || heap.len() < heap.capacity()
+    #[inline(always)]
+    fn dist_belongs_in_heap(dist: A, heap: &BinaryHeap<NearestNeighbour<A, T>>, is_max_based: bool) -> bool {
+        heap.is_empty() || (
+            if is_max_based {
+                dist <= heap.peek().unwrap().distance
+            } else {
+                dist < heap.peek().unwrap().distance
+            }
+        ) || heap.len() < heap.capacity()
     }
     };
 }
