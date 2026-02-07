@@ -365,6 +365,7 @@ where
         D: DistanceMetric<Self, K>,
         Self: Sized,
     {
+        // AVX512: 4 loops of 32 iterations, each 4x unrolled, 5 instructions per pre-unrolled iteration
         let mut acc = [0f64; C];
         (0..K).step_by(1).for_each(|dim| {
             let qd = [query[dim]; C];
@@ -448,6 +449,7 @@ where
         D: DistanceMetric<Self, K>,
         Self: Sized,
     {
+        // AVX512: 4 loops of 32 iterations, each 4x unrolled, 5 instructions per pre-unrolled iteration
         let mut acc = [0f32; C];
         (0..K).step_by(1).for_each(|dim| {
             let qd = [query[dim]; C];
