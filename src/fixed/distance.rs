@@ -55,6 +55,13 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
             b - a
         }
     }
+
+    #[inline]
+    fn accumulate(rd: A, delta: A) -> A {
+        rd.saturating_add(delta)
+    }
+
+    const IS_MAX_BASED: bool = false;
 }
 
 /// Returns the squared euclidean distance between two points.
@@ -99,4 +106,11 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for SquaredEuclidean {
         let diff: A = a.dist(b);
         diff * diff
     }
+
+    #[inline]
+    fn accumulate(rd: A, delta: A) -> A {
+        rd.saturating_add(delta)
+    }
+
+    const IS_MAX_BASED: bool = false;
 }
