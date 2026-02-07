@@ -128,6 +128,63 @@ mod tests {
     use super::*;
     use rstest::rstest;
 
+    mod common_metric_tests {
+        use super::*;
+
+        #[rstest]
+        #[case::zeros_1d([0.0f32], [0.0f32])]
+        #[case::normal_1d([1.0f32], [2.0f32])]
+        #[case::neg_1d([-1.0f32], [1.0f32])]
+        #[case::zeros_2d([0.0f32, 0.0f32], [0.0f32, 0.0f32])]
+        #[case::normal_2d([1.0f32, 2.0f32], [3.0f32, 4.0f32])]
+        #[case::large_2d([1e30f32, 1e30f32], [-1e30f32, -1e30f32])]
+        #[case::zeros_3d([0.0f32, 0.0f32, 0.0f32], [0.0f32, 0.0f32, 0.0f32])]
+        #[case::normal_3d([1.0f32, 2.0f32, 3.0f32], [4.0f32, 5.0f32, 6.0f32])]
+        #[case::zeros_4d([0.0f32; 4], [0.0f32; 4])]
+        #[case::normal_4d([1.0f32; 4], [2.0f32; 4])]
+        #[case::zeros_5d([0.0f32; 5], [0.0f32; 5])]
+        #[case::normal_5d([1.0f32; 5], [2.0f32; 5])]
+        fn test_metric_non_negativity<A: Axis, const K: usize, D: DistanceMetric<A, K>>(
+            #[values(Manhattan {}, SquaredEuclidean {}, Chebyshev {})] _metric: D,
+            #[case] a: [A; K],
+            #[case] b: [A; K],
+        ) {
+            let distance = D::dist(&a, &b);
+            assert!(distance >= A::zero());
+        }
+
+        #[rstest]
+        #[case::zeros_1d([0.0f32])]
+        #[case::normal_1d([1.0f32])]
+        #[case::zeros_2d([0.0f32, 0.0f32])]
+        #[case::normal_2d([1.0f32, 2.0f32])]
+        #[case::zeros_3d([0.0f32, 0.0f32, 0.0f32])]
+        #[case::normal_3d([1.0f32, 2.0f32, 3.0f32])]
+        #[case::zeros_4d([0.0f32; 4])]
+        #[case::zeros_5d([0.0f32; 5])]
+        fn test_metric_identity<A: Axis, const K: usize, D: DistanceMetric<A, K>>(
+            #[values(Manhattan {}, SquaredEuclidean {}, Chebyshev {})] _metric: D,
+            #[case] a: [A; K],
+        ) {
+            assert_eq!(D::dist(&a, &a), A::zero());
+        }
+
+        #[rstest]
+        #[case::normal_1d([1.0f64], [2.0f64])]
+        #[case::neg_1d([-1.0f64], [1.0f64])]
+        #[case::normal_2d([1.0f64, 2.0f64], [3.0f64, 4.0f64])]
+        #[case::normal_3d([1.0f64, 2.0f64, 3.0f64], [4.0f64, 5.0f64, 6.0f64])]
+        #[case::normal_4d([1.0f64; 4], [2.0f64; 4])]
+        #[case::normal_5d([1.0f64; 5], [2.0f64; 5])]
+        fn test_metric_symmetry<A: Axis, const K: usize, D: DistanceMetric<A, K>>(
+            #[values(Manhattan {}, SquaredEuclidean {}, Chebyshev {})] _metric: D,
+            #[case] a: [A; K],
+            #[case] b: [A; K],
+        ) {
+            assert_eq!(D::dist(&a, &b), D::dist(&b, &a));
+        }
+    }
+
     mod manhattan_tests {
         use super::*;
 
@@ -210,28 +267,6 @@ mod tests {
                 2000.0f32
             ); // large values
         }
-
-        #[test]
-        fn test_manhattan_symmetry() {
-            let a = [1.0f64, 2.0f64, 3.0f64];
-            let b = [4.0f64, 5.0f64, 6.0f64];
-
-            assert_eq!(Manhattan::dist(&a, &b), Manhattan::dist(&b, &a));
-        }
-
-        #[test]
-        fn test_manhattan_identity() {
-            let a = [1.0f32, 2.0f32, 3.0f32];
-            assert_eq!(Manhattan::dist(&a, &a), 0.0f32);
-        }
-
-        #[test]
-        fn test_manhattan_non_negativity() {
-            let a = [1.0f32, 2.0f32];
-            let b = [3.0f32, 4.0f32];
-            let distance = Manhattan::dist(&a, &b);
-            assert!(distance >= 0.0f32);
-        }
     }
 
     mod squared_euclidean_tests {
@@ -300,31 +335,6 @@ mod tests {
                 <SquaredEuclidean as DistanceMetric<f32, 1>>::dist1(10.0f32, -10.0f32),
                 400.0f32
             ); // large values (20^2)
-        }
-
-        #[test]
-        fn test_squared_euclidean_symmetry() {
-            let a = [1.0f64, 2.0f64, 3.0f64];
-            let b = [4.0f64, 5.0f64, 6.0f64];
-
-            assert_eq!(
-                SquaredEuclidean::dist(&a, &b),
-                SquaredEuclidean::dist(&b, &a)
-            );
-        }
-
-        #[test]
-        fn test_squared_euclidean_identity() {
-            let a = [1.0f32, 2.0f32, 3.0f32];
-            assert_eq!(SquaredEuclidean::dist(&a, &a), 0.0f32);
-        }
-
-        #[test]
-        fn test_squared_euclidean_non_negativity() {
-            let a = [1.0f32, 2.0f32];
-            let b = [3.0f32, 4.0f32];
-            let distance = SquaredEuclidean::dist(&a, &b);
-            assert!(distance >= 0.0f32);
         }
 
         #[test]
@@ -414,27 +424,6 @@ mod tests {
         #[case(1000.0f32, -1000.0f32, 2000.0f32)] // large values
         fn test_chebyshev_dist1(#[case] a: f32, #[case] b: f32, #[case] expected: f32) {
             assert_eq!(<Chebyshev as DistanceMetric<f32, 1>>::dist1(a, b), expected);
-        }
-
-        #[test]
-        fn test_chebyshev_symmetry() {
-            let a = [1.0f64, 2.0f64, 3.0f64];
-            let b = [4.0f64, 5.0f64, 6.0f64];
-            assert_eq!(Chebyshev::dist(&a, &b), Chebyshev::dist(&b, &a));
-        }
-
-        #[test]
-        fn test_chebyshev_identity() {
-            let a = [1.0f32, 2.0f32, 3.0f32];
-            assert_eq!(Chebyshev::dist(&a, &a), 0.0f32);
-        }
-
-        #[test]
-        fn test_chebyshev_non_negativity() {
-            let a = [1.0f32, 2.0f32];
-            let b = [3.0f32, 4.0f32];
-            let distance = Chebyshev::dist(&a, &b);
-            assert!(distance >= 0.0f32);
         }
 
         #[test]
