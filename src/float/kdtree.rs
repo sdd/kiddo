@@ -73,7 +73,7 @@ impl<T: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign> 
 
     #[inline]
     fn rd_update(rd: Self, delta: Self) -> Self {
-        rd + delta
+        rd.max(delta)
     }
 }
 
