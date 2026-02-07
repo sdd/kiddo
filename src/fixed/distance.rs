@@ -99,6 +99,13 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Chebyshev {
             delta
         }
     }
+
+    #[inline]
+    fn accumulate(rd: A, delta: A) -> A {
+        rd.saturating_add(delta)
+    }
+
+    const IS_MAX_BASED: bool = false;
 }
 
 /// Returns the squared euclidean distance between two points.
@@ -457,4 +464,11 @@ mod integration_tests {
     ) {
         run_test_helper::<Manhattan>(dim, scenario, n);
     }
+
+    #[inline]
+    fn accumulate(rd: A, delta: A) -> A {
+        rd.saturating_add(delta)
+    }
+
+    const IS_MAX_BASED: bool = false;
 }
