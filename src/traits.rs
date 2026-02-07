@@ -107,43 +107,59 @@ pub(crate) fn is_stem_index<IDX: Index<T = IDX>>(x: IDX) -> bool {
     x < <IDX as Index>::leaf_offset()
 }
 
-/// Trait that needs to be implemented by any potential distance
-/// metric to be used within queries
+/// Defines how distances are measured and compared for k-d tree queries.
+///
+/// Implement this trait to use custom distance metrics with [`kiddo:KdTree`](crate::KdTree).
+///
+/// # Distance Metrics in k-d Trees
+///
+/// **Distance aggregation**: How to combine per-dimension distances into a total distance
+///  - Sum-based: `dist(p,q) = Σ |p[i] - q[i]|` (Manhattan, SquaredEuclidean)
+///  - Max-based: `dist(p,q) = max_i |p[i] - q[i]|` (Chebyshev/L∞)
+///
+/// # Required Methods
+///
+/// - [`dist()`]: Compute total distance between two points
+/// - [`dist1()`]: Compute per-dimension distance component
+/// - [`accumulate()`]: Aggregate distance components (add or max)
+///
+/// # Migration from pre-v5.3.0 Code // TODO: update version number for breaking change
+///
+/// For custom distance metrics that worked before v5.3.0:
+/// - Implement `accumulate()` as `rd + delta` (or `rd.saturating_add(delta)` for fixed-point)
+///
 pub trait DistanceMetric<A, const K: usize> {
-    /// returns the distance between two K-d points, as measured
-    /// by a particular distance metric
+    /// Returns the distance between two K-d points, as measured by this metric.
     fn dist(a: &[A; K], b: &[A; K]) -> A;
 
-    /// returns the distance between two points along a single axis,
-    /// as measured by a particular distance metric.
+    /// Returns the distance between two points along a single dimension.
     ///
-    /// (needs to be implemented as it is used by the NN query implementations
-    /// to extend the minimum acceptable distance for a node when recursing
-    /// back up the tree)
+    /// Used internally by NN query implementations to extend the minimum
+    /// acceptable distance for a node when recursing back up the tree.
     fn dist1(a: A, b: A) -> A;
 
-    /// Accumulates a distance contribution for this metric.
+    /// Aggregates a distance contribution into a running total.
     ///
-    /// For sum-based metrics (Manhattan, SquaredEuclidean), this adds the contribution.
-    /// For max-based metrics (Chebyshev), this uses max aggregation.
+    /// This defines how per-dimension distances combine into a total distance.
+    /// Choose based on your distance metric:
     ///
-    /// This is used in pruning logic to estimate lower bounds on distance to subtrees.
+    /// - **Sum-based (L1, L2)**: Use `rd + delta` or `rd.saturating_add(delta)` for fixed-point types
+    /// - **Max-based (L∞/Chebyshev)**: Use `rd.max(delta)`
     ///
-    /// # Migration from pre-v5.3.0 code  // TODO: Update version number
+    /// The implementation should match the mathematical definition of your metric:
+    /// - Manhattan: `dist(p,q) = Σ |p[i] - q[i]|` -> accumulate by adding
+    /// - SquaredEuclidean: `dist(p,q) = Σ (p[i] - q[i])²` -> accumulate by adding
+    /// - Chebyshev: `dist(p,q) = max_i |p[i] - q[i]|` -> accumulate by taking max
+    /// - Generalised Minkowski (L_p): `dist(p,q) = (Σ |p[i] - q[i]|^p)^(1/p)`.
+    ///   For k-d tree pruning, use the sum of powers: accumulate by adding.
+    ///   Only the limit p → ∞ (Chebyshev) uses `max`.
     ///
-    /// If you have custom distance metrics that worked before v5.3.0, implement this
+    /// # Migration from pre-v5.3.0 Code // TODO: update version number for breaking change
+    ///
+    /// If you have custom distance metrics that worked before v5.3.0, implement this // TODO: update version number for breaking change
     /// method as `rd + delta` (or `rd.saturating_add(delta)` for fixed-point types)
     /// to maintain backward compatible behaviour.
-    ///
-    /// Choose based on your distance metric:
-    /// - **Sum-based (L1, L2)**: Use `rd + delta` or `rd.saturating_add(delta)`
-    /// - **Max-based (L∞/Chebyshev)**: Use `rd.max(delta)`
     fn accumulate(rd: A, delta: A) -> A;
-
-    /// Whether this metric uses max-based aggregation (Chebyshev) instead of sum-based.
-    ///
-    /// Max-based metrics (L∞) do not use SIMD-optimised sum accumulation.
-    const IS_MAX_BASED: bool = false;
 }
 
 #[cfg(test)]

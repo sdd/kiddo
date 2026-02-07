@@ -43,8 +43,6 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
     fn accumulate(rd: A, delta: A) -> A {
         rd + delta
     }
-
-    const IS_MAX_BASED: bool = false;
 }
 
 /// Returns the Chebyshev / L-infinity distance between two points.
@@ -84,8 +82,6 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Chebyshev {
     fn accumulate(rd: A, delta: A) -> A {
         rd.max(delta)
     }
-
-    const IS_MAX_BASED: bool = true;
 }
 
 /// Returns the squared euclidean distance between two points.
@@ -125,8 +121,6 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for SquaredEuclidean {
     fn accumulate(rd: A, delta: A) -> A {
         rd + delta
     }
-
-    const IS_MAX_BASED: bool = false;
 }
 
 #[cfg(test)]
@@ -490,13 +484,16 @@ mod tests {
 
     mod integration_tests {
         use super::*;
-        use crate::{ImmutableKdTree, KdTree};
+        use crate::KdTree;
         use rstest::rstest;
+        use rand::prelude::*;
+        use rand_distr::Normal;
 
         #[derive(Debug, Clone, Copy)]
         enum DataScenario {
             NoTies,
             Ties,
+            Gaussian,
         }
 
         #[derive(Debug, Clone, Copy)]
@@ -508,7 +505,6 @@ mod tests {
         impl DataScenario {
             /// Get data scenario
             ///
-            /// Data is ordered to appear in increasing distance to the 0-th point.
             /// Predefined data has input dimension (`dim`) and either
             /// with `DataScenario::NoTies` or `DataScenario::Ties`.
             ///
@@ -584,6 +580,18 @@ mod tests {
                         vec![0.0, 0.0, 0.0, 1.0],
                         vec![-1.0, 0.0, 0.0, 0.0],
                     ],
+                    (DataScenario::Gaussian, d) => {
+                        let mut rng = StdRng::seed_from_u64(8757);
+                        let normal = Normal::new(1.0, 10.0).unwrap();
+                        let n_samples = 200;
+                        let mut data = vec![vec![0.0; d]; n_samples];
+                        for i in 0..n_samples {
+                            for j in 0..d {
+                                data[i][j] = normal.sample(&mut rng);
+                            }
+                        }
+                        data
+                    }
                     _ => panic!("Unsupported dimension {} for scenario {:?}", dim, self),
                 }
             }
@@ -634,7 +642,7 @@ mod tests {
             }
 
             // Calculate ground truth with brute-force approach
-            let expected: Vec<(usize, f64)> = points
+            let mut expected: Vec<(usize, f64)> = points
                 .iter()
                 .enumerate()
                 .map(|(i, &point)| {
@@ -642,6 +650,8 @@ mod tests {
                     (i, dist)
                 })
                 .collect();
+
+            expected.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
 
             let expected_distances: Vec<f64> = expected.iter().map(|(_, d)| *d).collect();
 
@@ -653,14 +663,15 @@ mod tests {
             // Query based on tree type
             let results = match tree_type {
                 TreeType::Mutable => {
-                    let mut tree: KdTree<f64, 6> = KdTree::new();
+                    let mut tree: crate::float::kdtree::KdTree<f64, u64, 6, 128, u32> = crate::float::kdtree::KdTree::new();
                     for (i, point) in points.iter().enumerate() {
                         tree.add(point, i as u64);
                     }
                     tree.nearest_n::<D>(&query_arr, n)
                 }
                 TreeType::Immutable => {
-                    let tree: ImmutableKdTree<f64, 6> = ImmutableKdTree::new_from_slice(&points);
+                    let tree: crate::immutable::float::kdtree::ImmutableKdTree<f64, u64, 6, 128> =
+                        crate::immutable::float::kdtree::ImmutableKdTree::new_from_slice(&points);
                     tree.nearest_n::<D>(&query_arr, std::num::NonZero::new(n).unwrap())
                 }
             };
@@ -710,7 +721,7 @@ mod tests {
         #[rstest]
         fn test_nearest_n_chebyshev(
             #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
-            #[values(DataScenario::NoTies, DataScenario::Ties)] scenario: DataScenario,
+            #[values(DataScenario::NoTies, DataScenario::Ties, DataScenario::Gaussian)] scenario: DataScenario,
             #[values(1, 2, 3, 4, 5, 6)] n: usize,
             #[values(1, 2, 3, 4)] dim: usize,
         ) {
@@ -720,7 +731,7 @@ mod tests {
         #[rstest]
         fn test_nearest_n_squared_euclidean(
             #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
-            #[values(DataScenario::NoTies, DataScenario::Ties)] scenario: DataScenario,
+            #[values(DataScenario::NoTies, DataScenario::Ties, DataScenario::Gaussian)] scenario: DataScenario,
             #[values(1, 2, 3, 4, 5, 6)] n: usize,
             #[values(1, 2, 3, 4)] dim: usize,
         ) {
@@ -730,7 +741,7 @@ mod tests {
         #[rstest]
         fn test_nearest_n_manhattan(
             #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
-            #[values(DataScenario::NoTies, DataScenario::Ties)] scenario: DataScenario,
+            #[values(DataScenario::NoTies, DataScenario::Ties, DataScenario::Gaussian)] scenario: DataScenario,
             #[values(1, 2, 3, 4, 5, 6)] n: usize,
             #[values(1, 2, 3, 4)] dim: usize,
         ) {
@@ -1068,10 +1079,8 @@ mod tests {
 
             assert!(found_indices.contains(&0));
             assert!(found_indices.contains(&1));
-            // This assert FAILS - demonstrates the bug
-            assert!(found_indices.contains(&2)); // currently not included, but should!
+            assert!(found_indices.contains(&2));
             assert!(found_indices.contains(&3));
-
             // Should NOT include points with Chebyshev distance > 1
             assert!(!found_indices.contains(&4));
             assert!(!found_indices.contains(&5));

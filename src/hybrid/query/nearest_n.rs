@@ -93,7 +93,7 @@ where
             // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
             //       so that updating rd is not hardcoded to sq euclidean
             rd = rd + new_off * new_off - old_off * old_off;
-            if Self::dist_belongs_in_heap(rd, results, D::IS_MAX_BASED) {
+            if Self::dist_belongs_in_heap(rd, results) {
                 off[split_dim] = new_off;
                 self.nearest_n_recurse(
                     query,
@@ -118,7 +118,7 @@ where
                 .enumerate()
                 .for_each(|(idx, entry)| {
                     let distance: A = distance_fn(query, entry);
-                    if Self::dist_belongs_in_heap(distance, results, D::IS_MAX_BASED) {
+                    if Self::dist_belongs_in_heap(distance, results) {
                         let item = unsafe { *leaf_node.content_items.get_unchecked(idx) };
                         let element = Neighbour { distance, item };
                         if results.len() < results.capacity() {
@@ -135,14 +135,8 @@ where
     }
 
     #[inline(always)]
-    fn dist_belongs_in_heap(dist: A, heap: &BinaryHeap<Neighbour<A, T>>, is_max_based: bool) -> bool {
-        heap.is_empty() || (
-            if is_max_based {
-                dist <= heap.peek().unwrap().distance
-            } else {
-                dist < heap.peek().unwrap().distance
-            }
-        ) || heap.len() < heap.capacity()
+    fn dist_belongs_in_heap(dist: A, heap: &BinaryHeap<Neighbour<A, T>>) -> bool {
+        heap.is_empty() || dist < heap.peek().unwrap().distance || heap.len() < heap.capacity()
     }
 }
 
