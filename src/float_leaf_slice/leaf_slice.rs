@@ -235,20 +235,11 @@ where
 
         #[allow(clippy::needless_range_loop)]
         for idx in 0..remainder_items.len() {
-            let distance = if D::IS_MAX_BASED {
-                let mut dist = A::zero();
-                (0..K).step_by(1).for_each(|dim| {
-                    dist = dist.max(D::dist1(remainder_points[dim][idx], query[dim]));
-                });
-                dist
-            } else {
-                let mut dist = A::zero();
-                (0..K).step_by(1).for_each(|dim| {
-                    dist += D::dist1(remainder_points[dim][idx], query[dim]);
-                });
-                dist
-            };
-
+            let mut distance = A::zero();
+            (0..K).step_by(1).for_each(|dim| {
+                distance =
+                    D::accumulate(distance, D::dist1(remainder_points[dim][idx], query[dim]));
+            });
             if distance <= radius {
                 results.add(NearestNeighbour {
                     distance,
@@ -278,19 +269,11 @@ where
 
         #[allow(clippy::needless_range_loop)]
         for idx in 0..remainder_items.len() {
-            let distance = if D::IS_MAX_BASED {
-                let mut dist = A::zero();
-                (0..K).step_by(1).for_each(|dim| {
-                    dist = dist.max(D::dist1(remainder_points[dim][idx], query[dim]));
-                });
-                dist
-            } else {
-                let mut dist = A::zero();
-                (0..K).step_by(1).for_each(|dim| {
-                    dist += D::dist1(remainder_points[dim][idx], query[dim]);
-                });
-                dist
-            };
+            let mut distance = A::zero();
+            (0..K).step_by(1).for_each(|dim| {
+                distance =
+                    D::accumulate(distance, D::dist1(remainder_points[dim][idx], query[dim]));
+            });
 
             if distance <= radius {
                 let item = remainder_items[idx];
@@ -382,27 +365,14 @@ where
         D: DistanceMetric<Self, K>,
         Self: Sized,
     {
-        if D::IS_MAX_BASED {
-            let mut acc = [0f64; C];
-            (0..K).step_by(1).for_each(|dim| {
-                let qd = [query[dim]; C];
-                (0..C).step_by(1).for_each(|idx| {
-                    acc[idx] = acc[idx].max(D::dist1(chunk[dim][idx], qd[idx]));
-                });
+        let mut acc = [0f64; C];
+        (0..K).step_by(1).for_each(|dim| {
+            let qd = [query[dim]; C];
+            (0..C).step_by(1).for_each(|idx| {
+                acc[idx] = D::accumulate(acc[idx], D::dist1(chunk[dim][idx], qd[idx]));
             });
-            acc
-        } else {
-            // AVX512: 4 loops of 32 iterations, each 4x unrolled, 5 instructions per pre-unrolled iteration
-            let mut acc = [0f64; C];
-            (0..K).step_by(1).for_each(|dim| {
-                let qd = [query[dim]; C];
-
-                (0..C).step_by(1).for_each(|idx| {
-                    acc[idx] += D::dist1(chunk[dim][idx], qd[idx]);
-                });
-            });
-            acc
-        }
+        });
+        acc
     }
 }
 
@@ -478,27 +448,14 @@ where
         D: DistanceMetric<Self, K>,
         Self: Sized,
     {
-        if D::IS_MAX_BASED {
-            let mut acc = [0f32; C];
-            (0..K).step_by(1).for_each(|dim| {
-                let qd = [query[dim]; C];
-                (0..C).step_by(1).for_each(|idx| {
-                    acc[idx] = acc[idx].max(D::dist1(chunk[dim][idx], qd[idx]));
-                });
+        let mut acc = [0f32; C];
+        (0..K).step_by(1).for_each(|dim| {
+            let qd = [query[dim]; C];
+            (0..C).step_by(1).for_each(|idx| {
+                acc[idx] = D::accumulate(acc[idx], D::dist1(chunk[dim][idx], qd[idx]));
             });
-            acc
-        } else {
-            // AVX512: 4 loops of 32 iterations, each 4x unrolled, 5 instructions per pre-unrolled iteration
-            let mut acc = [0f32; C];
-            (0..K).step_by(1).for_each(|dim| {
-                let qd = [query[dim]; C];
-
-                (0..C).step_by(1).for_each(|idx| {
-                    acc[idx] += D::dist1(chunk[dim][idx], qd[idx]);
-                });
-            });
-            acc
-        }
+        });
+        acc
     }
 }
 
