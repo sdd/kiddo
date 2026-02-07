@@ -469,7 +469,256 @@ mod tests {
 
     mod integration_tests {
         use super::*;
-        use crate::KdTree;
+        use crate::{ImmutableKdTree, KdTree};
+        use rstest::rstest;
+
+        #[derive(Debug, Clone, Copy)]
+        enum DataScenario {
+            NoTies,
+            Ties,
+        }
+
+        #[derive(Debug, Clone, Copy)]
+        enum TreeType {
+            Mutable,
+            Immutable,
+        }
+
+        impl DataScenario {
+            /// Get data scenario
+            ///
+            /// Data is ordered to appear in increasing distance to the 0-th point.
+            /// Predefined data has input dimension (`dim`) and either
+            /// with `DataScenario::NoTies` or `DataScenario::Ties`.
+            ///
+            /// # Parameters
+            /// - `dim`: The dimensionality of the data to retrieve.
+            ///   Must be a value between 1 and 4 (inclusive).
+            ///
+            /// # Returns
+            /// - `Vec<Vec<f64>>`: A 2D vector where each inner vector represents a data point.
+            fn get(&self, dim: usize) -> Vec<Vec<f64>> {
+                match (self, dim) {
+                    (DataScenario::NoTies, 1) => vec![
+                        vec![1.0],
+                        vec![2.0],
+                        vec![4.0],
+                        vec![7.0],
+                        vec![-9.0],
+                        vec![16.0],
+                    ],
+                    (DataScenario::NoTies, 2) => vec![
+                        vec![0.0, 0.0],
+                        vec![1.1, 0.1],
+                        vec![2.3, 0.4],
+                        vec![3.6, 0.9],
+                        vec![5.0, 1.6],
+                        vec![6.5, 2.5],
+                    ],
+                    (DataScenario::NoTies, 3) => vec![
+                        vec![0.0, 0.0, 0.0],
+                        vec![1.1, 0.1, 0.01],
+                        vec![2.3, 0.4, 0.08],
+                        vec![-3.6, -0.9, -0.27],
+                        vec![5.0, 1.6, 0.64],
+                        vec![6.5, 2.5, 1.25],
+                    ],
+                    (DataScenario::NoTies, 4) => vec![
+                        vec![0.0, 0.0, 0.0, 1000.0],
+                        vec![1.1, 0.1, 0.01, 1000.001],
+                        vec![2.3, 0.4, 0.08, 1000.008],
+                        vec![3.6, 0.9, 0.27, 1000.027],
+                        vec![5.0, 1.6, 0.64, 1000.256],
+                        vec![6.5, 2.5, 1.25, 1000.625],
+                    ],
+                    (DataScenario::Ties, 1) => vec![
+                        vec![0.0],
+                        vec![1.0],
+                        vec![1.0],
+                        vec![2.0],
+                        vec![2.0],
+                        vec![3.0],
+                    ],
+                    (DataScenario::Ties, 2) => vec![
+                        vec![0.0, 0.0],
+                        vec![1.0, 0.0],
+                        vec![0.0, 1.0],
+                        vec![-1.0, 0.0],
+                        vec![0.0, -1.0],
+                        vec![1.0, 1.0],
+                    ],
+                    (DataScenario::Ties, 3) => vec![
+                        vec![0.0, 0.0, 0.0],
+                        vec![1.0, 0.0, 0.0],
+                        vec![0.0, 1.0, 0.0],
+                        vec![0.0, 0.0, 1.0],
+                        vec![-1.0, 0.0, 0.0],
+                        vec![0.0, -1.0, 0.0],
+                    ],
+                    (DataScenario::Ties, 4) => vec![
+                        vec![0.0, 0.0, 0.0, 0.0],
+                        vec![1.0, 0.0, 0.0, 0.0],
+                        vec![0.0, 1.0, 0.0, 0.0],
+                        vec![0.0, 0.0, 1.0, 0.0],
+                        vec![0.0, 0.0, 0.0, 1.0],
+                        vec![-1.0, 0.0, 0.0, 0.0],
+                    ],
+                    _ => panic!("Unsupported dimension {} for scenario {:?}", dim, self),
+                }
+            }
+        }
+
+        /// Helper function to test nearest_n queries for `D: DistanceMetric`
+        ///
+        /// Tests KD-tree Chebyshev distance queries across different tree types and
+        /// data scenarios. This simplifies testing across different combinations.
+        ///
+        /// # What this function does
+        /// 1. Get test data points based on a scenario (NoTies/Ties) and dimensionality
+        /// 2. Builds either MutableKdTree (incremental) or ImmutableKdTree (bulk construction)
+        /// 3. Performs nearest_n query with Chebyshev distance from point 0
+        /// 4. Compares results against Brute-force distances,
+        ///    calculated from `<D: DistanceMetric<f64, 6>>::dist`.
+        ///
+        /// # Choices
+        /// - Fixed-size array `[f64; 6]`. For `dim<6` a subspace/padding is used for practicality
+        ///
+        /// # Assertions
+        /// - Point 0 is always the query point (distance 0, index 0 expected first result)
+        /// - NoTies scenario: checks distances and item IDs for points with unique distances
+        /// - Ties scenario: checks distances (order among ties is non-deterministic)
+        fn run_test_helper<D: DistanceMetric<f64, 6>>(
+            dim: usize,
+            tree_type: TreeType,
+            scenario: DataScenario,
+            n: usize,
+        ) {
+            let data = scenario.get(dim);
+            let query_point = &data[0];
+
+            let mut points: Vec<[f64; 6]> = Vec::with_capacity(data.len());
+            for row in &data {
+                let mut p = [0.0; 6];
+                for (i, &val) in row.iter().enumerate() {
+                    p[i] = val;
+                }
+                points.push(p);
+            }
+
+            let mut query_arr = [0.0; 6];
+            for (i, &val) in query_point.iter().enumerate() {
+                if i < 6 {
+                    query_arr[i] = val;
+                }
+            }
+
+            // Calculate ground truth with brute-force approach
+            let expected: Vec<(usize, f64)> = points
+                .iter()
+                .enumerate()
+                .map(|(i, &point)| {
+                    let dist = D::dist(&query_arr, &point);
+                    (i, dist)
+                })
+                .collect();
+
+            let expected_distances: Vec<f64> = expected.iter().map(|(_, d)| *d).collect();
+
+            println!(
+                "Query: {:?}, TreeType: {:?}, Scenario: {:?}, dim={}, n={}",
+                query_point, tree_type, scenario, dim, n
+            );
+
+            // Query based on tree type
+            let results = match tree_type {
+                TreeType::Mutable => {
+                    let mut tree: KdTree<f64, 6> = KdTree::new();
+                    for (i, point) in points.iter().enumerate() {
+                        tree.add(point, i as u64);
+                    }
+                    tree.nearest_n::<D>(&query_arr, n)
+                }
+                TreeType::Immutable => {
+                    let tree: ImmutableKdTree<f64, 6> = ImmutableKdTree::new_from_slice(&points);
+                    tree.nearest_n::<D>(&query_arr, std::num::NonZero::new(n).unwrap())
+                }
+            };
+
+            println!("Results (len: {}):", results.len());
+
+            assert_eq!(results[0].item, 0, "First result should be the query point");
+            assert_eq!(
+                results[0].distance, 0.0,
+                "First result distance should be 0.0"
+            );
+
+            for (i, result) in results.iter().enumerate() {
+                assert_eq!(
+                    result.distance, expected_distances[i],
+                    "Distance at index {} should be {}, but was {}",
+                    i, expected_distances[i], result.distance
+                );
+            }
+
+            if matches!(scenario, DataScenario::NoTies) {
+                for (i, result) in results.iter().enumerate() {
+                    let expected_id = expected[i].0;
+                    assert_eq!(
+                        result.item, expected_id as u64,
+                        "Result {}: item ID mismatch. Expected {}, got {}",
+                        i, expected_id, result.item
+                    );
+                }
+            }
+        }
+
+        /// Chebyshev distance nearest-neighbor query tests.
+        ///
+        /// Test matrix covering all combinations of mutable/immutable trees,
+        /// data scenarios (with/out ties), dimensions, and neighbor query counts.
+        ///
+        /// Currently passing tests:
+        /// - All MutableKdTree tests pass
+        /// - ImmutableKdTree with NoTies:
+        ///   - Pass for when just querying the root n=1 or dim=1
+        /// - ImmutableKdTree with Ties: Several pass (one edge case failure for n=6, dim=2)
+        ///
+        /// Currently failing tests (16 of 96):
+        /// - ImmutableKdTree + NoTies: fails for dim>=2 AND n>=2 (15 failures)
+        /// - ImmutableKdTree + Ties: 1 failure (n=6, dim=2)
+        ///
+        /// TODO: Hypothesis: Problem might be `rd_update` in `src/float/kdtree.rs`
+        ///       using `+` aggregation (sensible for sum-based metrics like L1/L2).
+        ///       L_inf would need `max` aggregation.
+        #[rstest]
+        fn test_nearest_n_chebyshev(
+            #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
+            #[values(DataScenario::NoTies, DataScenario::Ties)] scenario: DataScenario,
+            #[values(1, 2, 3, 4, 5, 6)] n: usize,
+            #[values(1, 2, 3, 4)] dim: usize,
+        ) {
+            run_test_helper::<Chebyshev>(dim, tree_type, scenario, n);
+        }
+
+        #[rstest]
+        fn test_nearest_n_squared_euclidean(
+            #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
+            #[values(DataScenario::NoTies, DataScenario::Ties)] scenario: DataScenario,
+            #[values(1, 2, 3, 4, 5, 6)] n: usize,
+            #[values(1, 2, 3, 4)] dim: usize,
+        ) {
+            run_test_helper::<SquaredEuclidean>(dim, tree_type, scenario, n);
+        }
+
+        #[rstest]
+        fn test_nearest_n_manhattan(
+            #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
+            #[values(DataScenario::NoTies, DataScenario::Ties)] scenario: DataScenario,
+            #[values(1, 2, 3, 4, 5, 6)] n: usize,
+            #[values(1, 2, 3, 4)] dim: usize,
+        ) {
+            run_test_helper::<Manhattan>(dim, tree_type, scenario, n);
+        }
 
         #[test]
         fn test_nearest_n_manhattan_distance() {
@@ -803,7 +1052,7 @@ mod tests {
             assert!(found_indices.contains(&0));
             assert!(found_indices.contains(&1));
             // This assert FAILS - demonstrates the bug
-            assert!(found_indices.contains(&2));  // currently not included, but should!
+            assert!(found_indices.contains(&2)); // currently not included, but should!
             assert!(found_indices.contains(&3));
 
             // Should NOT include points with Chebyshev distance > 1
