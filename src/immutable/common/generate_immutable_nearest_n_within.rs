@@ -112,7 +112,7 @@ macro_rules! generate_immutable_nearest_n_within {
                     closer_leaf_idx,
                 );
 
-                rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
+                rd = D::accumulate(rd, D::dist1(new_off, old_off));
 
                 if rd <= radius && rd < matching_items.max_dist() {
                     off[split_dim] = new_off;
@@ -189,7 +189,7 @@ macro_rules! generate_immutable_nearest_n_within {
                     closer_leaf_idx,
                 );
 
-                rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
+                rd = D::accumulate(rd, D::dist1(new_off, old_off));
 
                 if rd <= radius && rd < matching_items.max_dist() {
                     off[split_dim] = new_off;

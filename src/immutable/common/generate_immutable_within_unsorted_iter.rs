@@ -83,7 +83,7 @@ macro_rules! generate_immutable_within_unsorted_iter {
                         closer_leaf_idx,
                     );
 
-                    rd = Axis::rd_update(rd, D::dist1(new_off, old_off));
+                    rd = D::accumulate(rd, D::dist1(new_off, old_off));
 
                     if rd <= radius {
                         off[split_dim] = new_off;
