@@ -121,6 +121,29 @@ pub trait DistanceMetric<A, const K: usize> {
     /// to extend the minimum acceptable distance for a node when recursing
     /// back up the tree)
     fn dist1(a: A, b: A) -> A;
+
+    /// Accumulates a distance contribution for this metric.
+    ///
+    /// For sum-based metrics (Manhattan, SquaredEuclidean), this adds the contribution.
+    /// For max-based metrics (Chebyshev), this uses max aggregation.
+    ///
+    /// This is used in pruning logic to estimate lower bounds on distance to subtrees.
+    ///
+    /// # Migration from pre-v5.3.0 code  // TODO: Update version number
+    ///
+    /// If you have custom distance metrics that worked before v5.3.0, implement this
+    /// method as `rd + delta` (or `rd.saturating_add(delta)` for fixed-point types)
+    /// to maintain backward compatible behaviour.
+    ///
+    /// Choose based on your distance metric:
+    /// - **Sum-based (L1, L2)**: Use `rd + delta` or `rd.saturating_add(delta)`
+    /// - **Max-based (L∞/Chebyshev)**: Use `rd.max(delta)`
+    fn accumulate(rd: A, delta: A) -> A;
+
+    /// Whether this metric uses max-based aggregation (Chebyshev) instead of sum-based.
+    ///
+    /// Max-based metrics (L∞) do not use SIMD-optimised sum accumulation.
+    const IS_MAX_BASED: bool = false;
 }
 
 #[cfg(test)]

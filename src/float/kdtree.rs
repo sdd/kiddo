@@ -63,6 +63,7 @@ pub trait Axis: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::Add
     fn saturating_dist(self, other: Self) -> Self;
 
     /// Used in query methods to update the rd value. A saturating add for Fixed and an add for Float
+    #[deprecated(since = "5.3.0", note = "Use D::accumulate instead")] // TODO: change version number if adding this change - or better so: fully get rid off rd_update
     fn rd_update(rd: Self, delta: Self) -> Self;
 }
 
@@ -73,7 +74,8 @@ impl<T: FloatCore + Default + Debug + Copy + Sync + Send + std::ops::AddAssign> 
 
     #[inline]
     fn rd_update(rd: Self, delta: Self) -> Self {
-        rd.max(delta)
+        // DEPRECATED: Use D::accumulate instead
+        rd + delta
     }
 }
 
