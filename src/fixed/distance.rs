@@ -104,8 +104,6 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Chebyshev {
     fn accumulate(rd: A, delta: A) -> A {
         rd.saturating_add(delta)
     }
-
-    const IS_MAX_BASED: bool = false;
 }
 
 /// Returns the Chebyshev distance (L-infinity norm) between two points.
@@ -165,8 +163,6 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Chebyshev {
             delta
         }
     }
-
-    const IS_MAX_BASED: bool = true;
 }
 
 /// Returns the squared euclidean distance between two points.
@@ -530,8 +526,6 @@ mod integration_tests {
     fn accumulate(rd: A, delta: A) -> A {
         rd.saturating_add(delta)
     }
-
-    const IS_MAX_BASED: bool = false;
 }
 
 #[cfg(test)]
