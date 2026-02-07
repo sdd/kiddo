@@ -686,10 +686,6 @@ mod tests {
         /// Currently failing tests (16 of 96):
         /// - ImmutableKdTree + NoTies: fails for dim>=2 AND n>=2 (15 failures)
         /// - ImmutableKdTree + Ties: 1 failure (n=6, dim=2)
-        ///
-        /// TODO: Hypothesis: Problem might be `rd_update` in `src/float/kdtree.rs`
-        ///       using `+` aggregation (sensible for sum-based metrics like L1/L2).
-        ///       L_inf would need `max` aggregation.
         #[rstest]
         fn test_nearest_n_chebyshev(
             #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
