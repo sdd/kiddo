@@ -1108,6 +1108,40 @@ mod tests {
             run_test_helper::<Manhattan>(dim, tree_type, scenario, n);
         }
 
+        #[rstest]
+        fn test_nearest_n_minkowski(
+            #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
+            #[values(DataScenario::NoTies, DataScenario::Ties, DataScenario::Gaussian)]
+            scenario: DataScenario,
+            #[values(1, 2, 3, 4, 5, 6)] n: usize,
+            #[values(1, 2, 3, 4)] dim: usize,
+            #[values(3, 4)] p: u32,
+        ) {
+            match p {
+                3 => run_test_helper::<Minkowski<3>>(dim, tree_type, scenario, n),
+                4 => run_test_helper::<Minkowski<4>>(dim, tree_type, scenario, n),
+                _ => unreachable!(),
+            }
+        }
+
+        #[rstest]
+        fn test_nearest_n_minkowski_f64(
+            #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
+            #[values(DataScenario::NoTies, DataScenario::Ties, DataScenario::Gaussian)]
+            scenario: DataScenario,
+            #[values(1, 2, 3, 4, 5, 6)] n: usize,
+            #[values(1, 2, 3, 4)] dim: usize,
+            #[values(0.5, 1.5)] p: f64,
+        ) {
+            if (p - 0.5).abs() < f64::EPSILON {
+                run_test_helper::<MinkowskiF64<{ 0.5f64.to_bits() }>>(dim, tree_type, scenario, n);
+            } else if (p - 1.5).abs() < f64::EPSILON {
+                run_test_helper::<MinkowskiF64<{ 1.5f64.to_bits() }>>(dim, tree_type, scenario, n);
+            } else {
+                unreachable!()
+            }
+        }
+
         #[test]
         fn test_nearest_n_manhattan_distance() {
             let mut kdtree: KdTree<f32, 2> = KdTree::new();
