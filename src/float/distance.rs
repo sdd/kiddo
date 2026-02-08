@@ -113,6 +113,93 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for SquaredEuclidean {
     }
 }
 
+/// Returns the Minkowski distance (power distance) between two points.
+///
+/// This implementation returns the sum of the powers of the absolute differences:
+/// `dist(p,q) = Σ |p[i] - q[i]|^P`.
+/// To get the actual Minkowski distance (L_P norm), you must take the 1/P root
+/// of the result.
+///
+/// # Performance
+/// Using `u32` for `P` is significantly faster than using a floating-point `P`,
+/// as it uses `powi` instead of `powf`.
+///
+/// # Overflow
+/// High values of `P` can easily result in overflows, especially with large
+/// coordinate differences.
+///
+/// re-exported as `kiddo::Minkowski` for convenience
+pub struct Minkowski<const P: u32> {}
+
+impl<A: Axis, const K: usize, const P: u32> DistanceMetric<A, K> for Minkowski<P> {
+    #[inline]
+    fn dist(a: &[A; K], b: &[A; K]) -> A {
+        a.iter()
+            .zip(b.iter())
+            .map(|(&av, &bv)| (av - bv).abs().powi(P as i32))
+            .fold(A::zero(), std::ops::Add::add)
+    }
+
+    #[inline]
+    fn dist1(a: A, b: A) -> A {
+        (a - b).abs().powi(P as i32)
+    }
+
+    #[inline]
+    fn accumulate(rd: A, delta: A) -> A {
+        rd + delta
+    }
+}
+
+/// Returns the Minkowski distance (power distance) between two points with a floating-point power `P`.
+///
+/// This implementation returns the sum of the powers of the absolute differences:
+/// `dist(p,q) = Σ |p[i] - q[i]|^P`.
+/// To get the actual Minkowski distance (L_P norm), you must take the 1/P root
+/// of the result.
+///
+/// # Performance
+/// This version uses a floating-point power and is significantly slower than
+/// `Minkowski<P>` which uses an integer power.
+///
+/// # Overflow
+/// High values of `P` can easily result in overflows, especially with large
+/// coordinate differences.
+///
+/// # Const Generics Hack
+/// Since Rust does not yet support `f64` in const generics, the power `P` is
+/// passed as its `u64` bit representation via `P_BITS`. Use `f64::to_bits()`
+/// to provide this value.
+///
+/// re-exported as `kiddo::MinkowskiF64` for convenience
+pub struct MinkowskiF64<const P_BITS: u64> {}
+
+impl<A: Axis, const K: usize, const P_BITS: u64> DistanceMetric<A, K> for MinkowskiF64<P_BITS> {
+    #[inline]
+    fn dist(a: &[A; K], b: &[A; K]) -> A {
+        let p = f64::from_bits(P_BITS);
+        a.iter()
+            .zip(b.iter())
+            .map(|(&av, &bv)| {
+                let diff = (av - bv).abs().to_f64().unwrap();
+                A::from(diff.powf(p)).unwrap()
+            })
+            .fold(A::zero(), std::ops::Add::add)
+    }
+
+    #[inline]
+    fn dist1(a: A, b: A) -> A {
+        let p = f64::from_bits(P_BITS);
+        let diff = (a - b).abs().to_f64().unwrap();
+        A::from(diff.powf(p)).unwrap()
+    }
+
+    #[inline]
+    fn accumulate(rd: A, delta: A) -> A {
+        rd + delta
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,7 +222,14 @@ mod tests {
         #[case::zeros_5d([0.0f32; 5], [0.0f32; 5])]
         #[case::normal_5d([1.0f32; 5], [2.0f32; 5])]
         fn test_metric_non_negativity<A: Axis, const K: usize, D: DistanceMetric<A, K>>(
-            #[values(Manhattan {}, SquaredEuclidean {}, Chebyshev {})] _metric: D,
+            #[values(
+                Manhattan {},
+                SquaredEuclidean {},
+                Chebyshev {},
+                Minkowski::<3> {},
+                MinkowskiF64::<{ 0.5f64.to_bits() }> {}
+            )]
+            _metric: D,
             #[case] a: [A; K],
             #[case] b: [A; K],
         ) {
@@ -153,7 +247,14 @@ mod tests {
         #[case::zeros_4d([0.0f32; 4])]
         #[case::zeros_5d([0.0f32; 5])]
         fn test_metric_identity<A: Axis, const K: usize, D: DistanceMetric<A, K>>(
-            #[values(Manhattan {}, SquaredEuclidean {}, Chebyshev {})] _metric: D,
+            #[values(
+                Manhattan {},
+                SquaredEuclidean {},
+                Chebyshev {},
+                Minkowski::<3> {},
+                MinkowskiF64::<{ 0.5f64.to_bits() }> {}
+            )]
+            _metric: D,
             #[case] a: [A; K],
         ) {
             assert_eq!(D::dist(&a, &a), A::zero());
@@ -167,7 +268,14 @@ mod tests {
         #[case::normal_4d([1.0f64; 4], [2.0f64; 4])]
         #[case::normal_5d([1.0f64; 5], [2.0f64; 5])]
         fn test_metric_symmetry<A: Axis, const K: usize, D: DistanceMetric<A, K>>(
-            #[values(Manhattan {}, SquaredEuclidean {}, Chebyshev {})] _metric: D,
+            #[values(
+                Manhattan {},
+                SquaredEuclidean {},
+                Chebyshev {},
+                Minkowski::<3> {},
+                MinkowskiF64::<{ 0.5f64.to_bits() }> {}
+            )]
+            _metric: D,
             #[case] a: [A; K],
             #[case] b: [A; K],
         ) {
@@ -539,6 +647,79 @@ mod tests {
             // Verify it's not Manhattan (which would be 4) or Euclidean (sqrt(10))
             assert_ne!(result, 4.0);
             assert_ne!(result, (10.0_f64).sqrt());
+        }
+    }
+
+    mod minkowski_tests {
+        use super::*;
+
+        #[rstest]
+        #[case([0.0f32, 0.0f32], [0.0f32, 0.0f32], 0.0f32)] // identical
+        #[case([0.0f32, 0.0f32], [1.0f32, 1.0f32], 2.0f32)] // |0-1|^3 + |0-1|^3 = 1+1=2
+        #[case([0.0f32, 0.0f32], [2.0f32, 0.0f32], 8.0f32)] // |0-2|^3 = 8
+        #[case([-1.0f32, -1.0f32], [1.0f32, 1.0f32], 16.0f32)] // | -1 - 1|^3 + |-1 - 1|^3 = 8 + 8 = 16
+        fn test_minkowski_3_distance_2d(
+            #[case] a: [f32; 2],
+            #[case] b: [f32; 2],
+            #[case] expected: f32,
+        ) {
+            assert_eq!(Minkowski::<3>::dist(&a, &b), expected);
+        }
+
+        #[rstest]
+        #[case([0.0f64, 0.0f64, 0.0f64], [1.0f64, 1.0f64, 1.0f64], 3.0f64)]
+        #[case([1.0f64, 2.0f64, 3.0f64], [4.0f64, 5.0f64, 6.0f64], 81.0f64)] // 3^3 + 3^3 + 3^3 = 27*3 = 81
+        fn test_minkowski_3_distance_3d(
+            #[case] a: [f64; 3],
+            #[case] b: [f64; 3],
+            #[case] expected: f64,
+        ) {
+            assert_eq!(Minkowski::<3>::dist(&a, &b), expected);
+        }
+
+        #[rstest]
+        #[case([0.0f32, 0.0f32], [1.0f32, 1.0f32], 2.0f32)] // |0-1|^0.5 + |0-1|^0.5 = 1+1=2
+        #[case([0.0f32, 0.0f32], [4.0f32, 9.0f32], 5.0f32)] // |0-4|^0.5 + |0-9|^0.5 = 2+3=5
+        #[case([1.0f32, 1.0f32], [5.0f32, 10.0f32], 5.0f32)] // |1-5|^0.5 + |1-10|^0.5 = 2+3=5
+        fn test_minkowski_05_distance_2d(
+            #[case] a: [f32; 2],
+            #[case] b: [f32; 2],
+            #[case] expected: f32,
+        ) {
+            assert_eq!(MinkowskiF64::<{ 0.5f64.to_bits() }>::dist(&a, &b), expected);
+        }
+
+        #[rstest]
+        #[case([0.0f32], [0.0f32], 0.0f32)]
+        #[case([0.0f32], [2.0f32], 8.0f32)]
+        #[case([-2.0f32], [2.0f32], 64.0f32)] // | -2 - 2|^3 = 4^3 = 64
+        fn test_minkowski_3_distance_1d(
+            #[case] a: [f32; 1],
+            #[case] b: [f32; 1],
+            #[case] expected: f32,
+        ) {
+            assert_eq!(Minkowski::<3>::dist(&a, &b), expected);
+        }
+
+        #[rstest]
+        #[case(0.0f32, 0.0f32, 0.0f32)]
+        #[case(1.0f32, 0.0f32, 1.0f32)]
+        #[case(0.0f32, 2.0f32, 8.0f32)]
+        #[case(-2.5f32, 3.5f32, 216.0f32)] // | -2.5 - 3.5|^3 = 6^3 = 216
+        fn test_minkowski_3_dist1(#[case] a: f32, #[case] b: f32, #[case] expected: f32) {
+            assert_eq!(<Minkowski<3> as DistanceMetric<f32, 1>>::dist1(a, b), expected);
+        }
+
+        #[rstest]
+        #[case(0.0f32, 0.0f32, 0.0f32)]
+        #[case(1.0f32, 0.0f32, 1.0f32)]
+        #[case(0.0f32, 4.0f32, 2.0f32)]
+        #[case(10.0f32, 35.0f32, 5.0f32)] // | 10 - 35|^0.5 = 25^0.5 = 5
+        fn test_minkowski_05_dist1(#[case] a: f32, #[case] b: f32, #[case] expected: f32) {
+            assert_eq!(
+                <MinkowskiF64<{ 0.5f64.to_bits() }> as DistanceMetric<f32, 1>>::dist1(a, b),
+                expected
+            );
         }
     }
 
