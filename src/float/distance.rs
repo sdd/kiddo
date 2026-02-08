@@ -12,6 +12,8 @@ use crate::traits::DistanceMetric;
 /// Faster than squared Euclidean, and just as effective if not more so in higher-dimensional spaces
 ///
 /// re-exported as `kiddo::Manhattan` for convenience
+#[doc(alias = "minkowski")]
+#[doc(alias = "l1")]
 ///
 /// # Examples
 ///
@@ -85,6 +87,8 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Chebyshev {
 /// preserves the same distance ordering as with Euclidean distance.
 ///
 /// re-exported as `kiddo::SquaredEuclidean` for convenience
+#[doc(alias = "minkowski")]
+#[doc(alias = "l2")]
 ///
 /// # Examples
 ///
@@ -120,6 +124,22 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for SquaredEuclidean {
 /// To get the actual Minkowski distance (L_P norm), you must take the 1/P root
 /// of the result.
 ///
+/// This struct provides the generalised functionality for:
+/// - P < 1: Fractional distance metrics
+/// - P ∈ (1, 2): Interpolation between Manhattan and Euclidean
+/// - P > 2: Distances emphasizing larger differences (can lead to overflow)
+///
+/// # Compile-time Warnings for Special Cases
+///
+/// Using `P=1` or `P=2` will result in a compile-time error:
+///
+/// - For `P=1`: Use [`Manhattan`] instead - it's faster and avoids the overhead
+///   of `powi(1)`.
+/// - For `P=2`: Use [`SquaredEuclidean`] instead.
+///
+/// This is enforced at compile time because these specific values have
+/// specialised.
+///
 /// # Performance
 /// Using `u32` for `P` is significantly faster than using a floating-point `P`,
 /// as it uses `powi` instead of `powf`.
@@ -129,11 +149,33 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for SquaredEuclidean {
 /// coordinate differences.
 ///
 /// re-exported as `kiddo::Minkowski` for convenience
+#[doc(alias = "taxicab")]
+#[doc(alias = "l1")]
+#[doc(alias = "l2")]
+#[doc(alias = "euclidean")]
 pub struct Minkowski<const P: u32> {}
+
+impl<const P: u32> Minkowski<P> {
+    const CHECK_P: () = {
+        if P == 1 {
+            panic!(
+                "Minkowski<1> is not recommended. Use `kiddo::Manhattan` metric instead."
+            );
+        }
+        if P == 2 {
+            panic!(
+                "Minkowski<2> is not recommended. Use `kiddo::SquaredEuclidean` metric instead."
+            );
+        }
+    };
+}
 
 impl<A: Axis, const K: usize, const P: u32> DistanceMetric<A, K> for Minkowski<P> {
     #[inline]
+    #[allow(clippy::let_unit_value)]
     fn dist(a: &[A; K], b: &[A; K]) -> A {
+        let _ = Self::CHECK_P;
+
         a.iter()
             .zip(b.iter())
             .map(|(&av, &bv)| (av - bv).abs().powi(P as i32))
@@ -141,7 +183,10 @@ impl<A: Axis, const K: usize, const P: u32> DistanceMetric<A, K> for Minkowski<P
     }
 
     #[inline]
+    #[allow(clippy::let_unit_value)]
     fn dist1(a: A, b: A) -> A {
+        let _ = Self::CHECK_P;
+
         (a - b).abs().powi(P as i32)
     }
 
@@ -158,25 +203,71 @@ impl<A: Axis, const K: usize, const P: u32> DistanceMetric<A, K> for Minkowski<P
 /// To get the actual Minkowski distance (L_P norm), you must take the 1/P root
 /// of the result.
 ///
-/// # Performance
-/// This version uses a floating-point power and is significantly slower than
-/// `Minkowski<P>` which uses an integer power.
-///
-/// # Overflow
-/// High values of `P` can easily result in overflows, especially with large
-/// coordinate differences.
+/// This struct provides the generalised functionality for:
+/// - P < 1: Fractional distance metrics
+/// - P ∈ (1, 2): Interpolation between Manhattan and Euclidean
+/// - P > 2: Distances emphasizing larger differences (can lead to overflow)
 ///
 /// # Const Generics Hack
 /// Since Rust does not yet support `f64` in const generics, the power `P` is
 /// passed as its `u64` bit representation via `P_BITS`. Use `f64::to_bits()`
 /// to provide this value.
 ///
+/// # Compile-time Warnings for Special Cases
+///
+/// Using `P=1` or `P=2` will result in a compile-time error:
+///
+/// - For `P=1`: Use [`Manhattan`] instead - it's faster and avoids the overhead
+///   of `powi(1)`.
+/// - For `P=2`: Use [`SquaredEuclidean`] instead.
+/// - If `P` is an integer, consider using [`Minkowski<P>`] instead.
+///
+/// This is enforced at compile time because these specific values have
+/// specialised.
+///
+/// # Performance
+/// This version uses a floating-point power and is significantly slower than
+/// `Minkowski<P>` which uses an integer power. Please use the latter if possible.
+///
+/// # Overflow
+/// High values of `P` can easily result in overflows, especially with large
+/// coordinate differences.
+///
 /// re-exported as `kiddo::MinkowskiF64` for convenience
+#[doc(alias = "taxicab")]
+#[doc(alias = "l1")]
+#[doc(alias = "l2")]
+#[doc(alias = "euclidean")]
 pub struct MinkowskiF64<const P_BITS: u64> {}
+
+impl<const P_BITS: u64> MinkowskiF64<P_BITS> {
+    const CHECK_P: () = {
+        let p = f64::from_bits(P_BITS);
+        if (p - 1.0).abs() < f64::EPSILON {
+            panic!(
+                "MinkowskiF64<P=1.0> is not recommended. Use `kiddo::Manhattan` metric instead."
+            );
+        }
+        if (p - 2.0).abs() < f64::EPSILON {
+            panic!(
+                "MinkowskiF64<P=2.0> is not recommended. Use `kiddo::SquaredEuclidean` metric instead."
+            );
+        }
+        // Check if P is an integer. Then suggest to use Minkowski<P> instead.
+        if p.fract() < f64::EPSILON {
+            panic!(
+                "MinkowskiF64<P as F64> with power that is basically integer. Consider using Minkowski<P as u32> instead.",
+            );
+        }
+    };
+}
 
 impl<A: Axis, const K: usize, const P_BITS: u64> DistanceMetric<A, K> for MinkowskiF64<P_BITS> {
     #[inline]
+    #[allow(clippy::let_unit_value)]
     fn dist(a: &[A; K], b: &[A; K]) -> A {
+        let _ = Self::CHECK_P;
+
         let p = f64::from_bits(P_BITS);
         a.iter()
             .zip(b.iter())
@@ -188,7 +279,10 @@ impl<A: Axis, const K: usize, const P_BITS: u64> DistanceMetric<A, K> for Minkow
     }
 
     #[inline]
+    #[allow(clippy::let_unit_value)]
     fn dist1(a: A, b: A) -> A {
+        let _ = Self::CHECK_P;
+
         let p = f64::from_bits(P_BITS);
         let diff = (a - b).abs().to_f64().unwrap();
         A::from(diff.powf(p)).unwrap()
@@ -707,7 +801,10 @@ mod tests {
         #[case(0.0f32, 2.0f32, 8.0f32)]
         #[case(-2.5f32, 3.5f32, 216.0f32)] // | -2.5 - 3.5|^3 = 6^3 = 216
         fn test_minkowski_3_dist1(#[case] a: f32, #[case] b: f32, #[case] expected: f32) {
-            assert_eq!(<Minkowski<3> as DistanceMetric<f32, 1>>::dist1(a, b), expected);
+            assert_eq!(
+                <Minkowski<3> as DistanceMetric<f32, 1>>::dist1(a, b),
+                expected
+            );
         }
 
         #[rstest]
