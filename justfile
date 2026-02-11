@@ -6,6 +6,12 @@ default:
 test-donnelly:
     cargo test donnelly
 
+fuzz-kd-tree:
+    RUST_TEST_THREADS=1 cargo test --release --test kd_tree_fuzz -- --ignored --nocapture
+
+fuzz-kd-tree-v6:
+    RUST_TEST_THREADS=1 cargo test --release --test kd_tree_fuzz_v6 -- --ignored --nocapture
+
 bench-d-v2:
     cargo bench --bench donnelly_v2
 

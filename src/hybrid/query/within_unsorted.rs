@@ -130,7 +130,7 @@ where
                 .for_each(|(idx, entry)| {
                     let distance = distance_fn(query, entry);
 
-                    if distance < radius {
+                    if distance <= radius {
                         matching_items.push(Neighbour {
                             distance,
                             item: *leaf_node.content_items.get_unchecked(idx.az::<usize>()),
@@ -257,7 +257,7 @@ use crate::traits::Axis;
 
         for &(p, item) in content {
             let dist = squared_euclidean(query_point, &p);
-            if dist < radius {
+            if dist <= radius {
                 matching_items.push((dist, item));
             }
         }

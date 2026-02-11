@@ -212,7 +212,7 @@ mod tests {
 
         for &(p, item) in content {
             let distance = Manhattan::dist(query_point, &p);
-            if distance < radius {
+            if distance <= radius {
                 matching_items.push(NearestNeighbour { distance, item });
             }
         }

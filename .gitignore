@@ -15,3 +15,5 @@ examples/*.rkyv
 examples/*.bincode.gz
 .DS_Store
 .vscode
+kd_tree_fuzz_report.txt
+kd_tree_fuzz_v6_report.txt

@@ -210,11 +210,13 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use kiddo::kdtree::KdTree;
+    /// use kiddo::kd_tree::KdTree;
+    /// use kiddo::kd_tree::leaf_strategies::FlatVec;
     /// use kiddo::Eytzinger;
     ///
     /// let points: Vec<[f64; 3]> = vec!([1.0f64, 2.0f64, 3.0f64]);
-    /// let tree: KdTree<f64, u32, Eytzinger<3>, 3, 32> = KdTree::new_from_slice(&points);
+    /// let tree: KdTree<f64, u32, Eytzinger<3>, FlatVec<f64, u32, 3, 32>, 3, 32> =
+    ///     KdTree::new_from_slice(&points);
     ///
     /// assert_eq!(tree.size(), 1);
     /// ```
