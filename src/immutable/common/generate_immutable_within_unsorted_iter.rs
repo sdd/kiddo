@@ -96,7 +96,7 @@ macro_rules! generate_immutable_within_unsorted_iter {
                             );
                             let distance = D::dist(query, &point);
 
-                            if distance < radius {
+                            if distance <= radius {
                                 gen_scope.yield_(NearestNeighbour {
                                     distance,
                                     item,

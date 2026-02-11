@@ -102,7 +102,7 @@ macro_rules! generate_fixed_within_unsorted {
                         .for_each(|(idx, entry)| {
                             let distance = D::dist(query, transform(entry));
 
-                            if distance < radius {
+                            if distance <= radius {
                                 let item = unsafe { leaf_node.content_items.get_unchecked(idx) };
                                 let item = *transform(item);
 

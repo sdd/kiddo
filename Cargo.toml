@@ -123,6 +123,7 @@ rstest = "0.25"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 ubyte = "0.10"
+zzz = "0.3.2"
 
 [profile.release]
 debug = true
@@ -359,6 +360,11 @@ required-features = ["csv", "rkyv_08"]
 name = "serde"
 path = "examples/serde.rs"
 required-features = ["csv", "serde"]
+
+[[bin]]
+name = "fuzz-case-repro"
+path = "src/bin/fuzz-case-repro.rs"
+required-features = ["test_utils"]
 
 [build-dependencies]
 yep-cache-line-size = "0.9"

@@ -240,7 +240,7 @@ where
                 distance += D::dist1(remainder_points[dim][idx], query[dim]);
             });
 
-            if distance < radius {
+            if distance <= radius {
                 results.add(NearestNeighbour {
                     distance,
                     item: *unsafe { self.content_items.get_unchecked(idx) },
@@ -274,7 +274,7 @@ where
                 distance += D::dist1(remainder_points[dim][idx], query[dim]);
             });
 
-            if distance < radius {
+            if distance <= radius {
                 let item = *unsafe { remainder_items.get_unchecked(idx) };
                 if results.len() < max_qty {
                     results.push(BestNeighbour { distance, item });
