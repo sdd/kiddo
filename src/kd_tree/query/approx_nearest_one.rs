@@ -468,6 +468,7 @@ mod tests {
     #[cfg(target_arch = "x86_64")]
     fn v6_approx_nearest_one_donnelly_marker_simd_f64() {
         use crate::stem_strategies::Block3;
+        use crate::stem_strategies::{DonnellyMarkerSimd};
 
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
@@ -529,6 +530,7 @@ mod tests {
     #[cfg(target_arch = "x86_64")]
     fn v6_approx_nearest_one_donnelly_marker_simd_f32() {
         use crate::stem_strategies::Block4;
+        use crate::stem_strategies::{DonnellyMarkerSimd};
 
         // Test DonnellyMarkerSimd with f32 data
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
