@@ -696,7 +696,7 @@ unsafe fn simd_backtrack_block4_f32_avx2<
 }
 
 // ====================================================================================
-// x86_64 AVX-512 implementations (stubs)
+// x86_64 AVX-512 implementations
 // ====================================================================================
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
@@ -713,16 +713,53 @@ unsafe fn simd_backtrack_block3_f64_avx512<
     rd: f64,
     best_dist: f64,
 ) -> u8 {
-    // TODO: Implement AVX-512 version
-    // For now, fall back to autovec
-    autovec_backtrack_block3::<f64, A, D, K>(
-        query_wide,
-        stems_ptr,
-        block_base_idx,
-        old_off,
-        rd,
-        best_dist,
-    )
+    use std::arch::x86_64::*;
+
+    // Load 8 pivots into a scalar array
+    let ptr = stems_ptr.as_ptr().add(block_base_idx * 8) as *const f64;
+    let mut pivots = [0.0f64; 8];
+    std::ptr::copy_nonoverlapping(ptr, pivots.as_mut_ptr(), 8);
+
+    // Precompute child-indexed lower/upper bounds
+    let mut lower_vals = [0.0f64; 8];
+    let mut upper_vals = [0.0f64; 8];
+    for i in 0..8 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block3(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f64::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f64::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    // All 8 children fit in a single __m512d
+    let lower = _mm512_loadu_pd(lower_vals.as_ptr());
+    let upper = _mm512_loadu_pd(upper_vals.as_ptr());
+
+    let query_vec = _mm512_set1_pd(query_wide);
+    let old_off_sq_vec = _mm512_set1_pd(old_off * old_off);
+    let rd_vec = _mm512_set1_pd(rd);
+    let best_dist_vec = _mm512_set1_pd(best_dist);
+    let zero_vec = _mm512_setzero_pd();
+
+    // Interval distance: max(0, lower - query) + max(0, query - upper)
+    let below = _mm512_max_pd(_mm512_sub_pd(lower, query_vec), zero_vec);
+    let above = _mm512_max_pd(_mm512_sub_pd(query_vec, upper), zero_vec);
+    let interval = _mm512_add_pd(below, above);
+
+    // new_sq = interval² (SquaredEuclidean)
+    let new_sq = _mm512_mul_pd(interval, interval);
+
+    // rd_far = rd - old_off² + new_off²
+    let rd_far = _mm512_add_pd(rd_vec, _mm512_sub_pd(new_sq, old_off_sq_vec));
+
+    // Compare rd_far <= best_dist → __mmask8 directly
+    _mm512_cmp_pd_mask(rd_far, best_dist_vec, _CMP_LE_OQ)
 }
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
@@ -739,15 +776,54 @@ unsafe fn simd_backtrack_block3_f32_avx512<
     rd: f32,
     best_dist: f32,
 ) -> u8 {
-    // TODO: Implement AVX-512 version
-    autovec_backtrack_block3::<f32, A, D, K>(
-        query_wide,
-        stems_ptr,
-        block_base_idx,
-        old_off,
-        rd,
-        best_dist,
-    )
+    use std::arch::x86_64::*;
+
+    // Load 8 pivots into a scalar array
+    let ptr = stems_ptr.as_ptr().add(block_base_idx * 4) as *const f32;
+    let mut pivots = [0.0f32; 8];
+    std::ptr::copy_nonoverlapping(ptr, pivots.as_mut_ptr(), 8);
+
+    // Precompute child-indexed lower/upper bounds
+    let mut lower_vals = [0.0f32; 8];
+    let mut upper_vals = [0.0f32; 8];
+    for i in 0..8 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block3(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f32::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f32::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    // 8 children fit in __m256 (AVX-512 implies AVX2 availability)
+    let lower = _mm256_loadu_ps(lower_vals.as_ptr());
+    let upper = _mm256_loadu_ps(upper_vals.as_ptr());
+
+    let query_vec = _mm256_set1_ps(query_wide);
+    let old_off_sq_vec = _mm256_set1_ps(old_off * old_off);
+    let rd_vec = _mm256_set1_ps(rd);
+    let best_dist_vec = _mm256_set1_ps(best_dist);
+    let zero_vec = _mm256_setzero_ps();
+
+    // Interval distance: max(0, lower - query) + max(0, query - upper)
+    let below = _mm256_max_ps(_mm256_sub_ps(lower, query_vec), zero_vec);
+    let above = _mm256_max_ps(_mm256_sub_ps(query_vec, upper), zero_vec);
+    let interval = _mm256_add_ps(below, above);
+
+    // new_sq = interval² (SquaredEuclidean)
+    let new_sq = _mm256_mul_ps(interval, interval);
+
+    // rd_far = rd - old_off² + new_off²
+    let rd_far = _mm256_add_ps(rd_vec, _mm256_sub_ps(new_sq, old_off_sq_vec));
+
+    // Compare rd_far <= best_dist
+    let cmp = _mm256_cmp_ps(rd_far, best_dist_vec, _CMP_LE_OQ);
+    _mm256_movemask_ps(cmp) as u8
 }
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
@@ -764,15 +840,60 @@ unsafe fn simd_backtrack_block4_f64_avx512<
     rd: f64,
     best_dist: f64,
 ) -> u16 {
-    // TODO: Implement AVX-512 version
-    autovec_backtrack_block4::<f64, A, D, K>(
-        query_wide,
-        stems_ptr,
-        block_base_idx,
-        old_off,
-        rd,
-        best_dist,
-    )
+    use std::arch::x86_64::*;
+
+    // Load 16 pivots into a scalar array
+    let ptr = stems_ptr.as_ptr().add(block_base_idx * 8) as *const f64;
+    let mut pivots = [0.0f64; 16];
+    std::ptr::copy_nonoverlapping(ptr, pivots.as_mut_ptr(), 16);
+
+    // Precompute child-indexed lower/upper bounds
+    let mut lower_vals = [0.0f64; 16];
+    let mut upper_vals = [0.0f64; 16];
+    for i in 0..16 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block4(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f64::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f64::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let query_vec = _mm512_set1_pd(query_wide);
+    let old_off_sq_vec = _mm512_set1_pd(old_off * old_off);
+    let rd_vec = _mm512_set1_pd(rd);
+    let best_dist_vec = _mm512_set1_pd(best_dist);
+    let zero_vec = _mm512_setzero_pd();
+
+    // Children 0-7
+    let lower_lo = _mm512_loadu_pd(lower_vals.as_ptr());
+    let upper_lo = _mm512_loadu_pd(upper_vals.as_ptr());
+
+    let below_lo = _mm512_max_pd(_mm512_sub_pd(lower_lo, query_vec), zero_vec);
+    let above_lo = _mm512_max_pd(_mm512_sub_pd(query_vec, upper_lo), zero_vec);
+    let interval_lo = _mm512_add_pd(below_lo, above_lo);
+    let new_sq_lo = _mm512_mul_pd(interval_lo, interval_lo);
+    let rd_far_lo = _mm512_add_pd(rd_vec, _mm512_sub_pd(new_sq_lo, old_off_sq_vec));
+    let mask_lo = _mm512_cmp_pd_mask(rd_far_lo, best_dist_vec, _CMP_LE_OQ);
+
+    // Children 8-15
+    let lower_hi = _mm512_loadu_pd(lower_vals.as_ptr().add(8));
+    let upper_hi = _mm512_loadu_pd(upper_vals.as_ptr().add(8));
+
+    let below_hi = _mm512_max_pd(_mm512_sub_pd(lower_hi, query_vec), zero_vec);
+    let above_hi = _mm512_max_pd(_mm512_sub_pd(query_vec, upper_hi), zero_vec);
+    let interval_hi = _mm512_add_pd(below_hi, above_hi);
+    let new_sq_hi = _mm512_mul_pd(interval_hi, interval_hi);
+    let rd_far_hi = _mm512_add_pd(rd_vec, _mm512_sub_pd(new_sq_hi, old_off_sq_vec));
+    let mask_hi = _mm512_cmp_pd_mask(rd_far_hi, best_dist_vec, _CMP_LE_OQ);
+
+    // Combine: low 8 bits | high 8 bits
+    (mask_lo as u16) | ((mask_hi as u16) << 8)
 }
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
@@ -789,15 +910,53 @@ unsafe fn simd_backtrack_block4_f32_avx512<
     rd: f32,
     best_dist: f32,
 ) -> u16 {
-    // TODO: Implement AVX-512 version
-    autovec_backtrack_block4::<f32, A, D, K>(
-        query_wide,
-        stems_ptr,
-        block_base_idx,
-        old_off,
-        rd,
-        best_dist,
-    )
+    use std::arch::x86_64::*;
+
+    // Load 16 pivots into a scalar array
+    let ptr = stems_ptr.as_ptr().add(block_base_idx * 4) as *const f32;
+    let mut pivots = [0.0f32; 16];
+    std::ptr::copy_nonoverlapping(ptr, pivots.as_mut_ptr(), 16);
+
+    // Precompute child-indexed lower/upper bounds
+    let mut lower_vals = [0.0f32; 16];
+    let mut upper_vals = [0.0f32; 16];
+    for i in 0..16 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block4(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f32::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f32::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    // All 16 children fit in a single __m512
+    let lower = _mm512_loadu_ps(lower_vals.as_ptr());
+    let upper = _mm512_loadu_ps(upper_vals.as_ptr());
+
+    let query_vec = _mm512_set1_ps(query_wide);
+    let old_off_sq_vec = _mm512_set1_ps(old_off * old_off);
+    let rd_vec = _mm512_set1_ps(rd);
+    let best_dist_vec = _mm512_set1_ps(best_dist);
+    let zero_vec = _mm512_setzero_ps();
+
+    // Interval distance: max(0, lower - query) + max(0, query - upper)
+    let below = _mm512_max_ps(_mm512_sub_ps(lower, query_vec), zero_vec);
+    let above = _mm512_max_ps(_mm512_sub_ps(query_vec, upper), zero_vec);
+    let interval = _mm512_add_ps(below, above);
+
+    // new_sq = interval² (SquaredEuclidean)
+    let new_sq = _mm512_mul_ps(interval, interval);
+
+    // rd_far = rd - old_off² + new_off²
+    let rd_far = _mm512_add_ps(rd_vec, _mm512_sub_ps(new_sq, old_off_sq_vec));
+
+    // Compare rd_far <= best_dist → __mmask16 directly
+    _mm512_cmp_ps_mask(rd_far, best_dist_vec, _CMP_LE_OQ)
 }
 
 // ====================================================================================
