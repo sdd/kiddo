@@ -1756,7 +1756,7 @@ mod tests {
         }
     }
 
-    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+    #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
     #[test]
     fn test_block3_f64_simd_vs_autovec() {
         let mut pivots = build_block3_pivots_f64();
@@ -1782,7 +1782,7 @@ mod tests {
         }
     }
 
-    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+    #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
     #[test]
     fn test_block3_f32_simd_vs_autovec() {
         let mut pivots = build_block3_pivots_f32();

@@ -886,6 +886,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::traits_unified_2::SquaredEuclidean;
 
     fn build_test_block3_pivots_f64() -> [f64; 8] {
         [0.2, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f64::INFINITY]
@@ -1419,7 +1420,7 @@ mod tests {
         let test_cases = [
             (0.25, 0.0, 0.0, f64::INFINITY),
             (0.5, 0.0, 0.0, 0.1),
-            (0.5, 0.01, 0.05, 0.2),
+            (0.5, 0.01, 0.05, 0.21),
             (-0.5, 0.0, 0.0, f64::INFINITY),
             (1.5, 0.0, 0.0, f64::INFINITY),
         ];

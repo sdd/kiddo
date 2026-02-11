@@ -406,11 +406,9 @@ mod tests {
     fn v6_query_nearest_one_donnelly_marker_simd_block3_f32() {
         use crate::stem_strategies::{Block3, DonnellyMarkerSimd};
 
-        // Test DonnellyMarkerSimd with f32 data using exact nearest_one query
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
 
         // Use smaller dataset for faster test (16384 points = 512 leaves = 2^9, depth = 9)
-        // Block4 doesn't divide evenly into 9, will be padded to 12
         let points: Vec<[f32; 4]> = (0..16_384)
             .map(|_| {
                 [
@@ -438,7 +436,6 @@ mod tests {
         // Verify max_stem_level is padded to multiple of block size (3)
         assert_eq!((tree.max_stem_level() + 1) % 3, 0);
 
-        // Test multiple query points to ensure backtracking queries work correctly
         let query_points: Vec<[f32; 4]> = (0..50)
             .map(|_| {
                 [
@@ -450,21 +447,24 @@ mod tests {
             })
             .collect();
 
-        for query_point in query_points.iter() {
+        let mut pass_count = 0;
+        let mut fail_count = 0;
+        for (i, query_point) in query_points.iter().enumerate() {
             let expected = linear_search(&points, query_point);
             let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
 
-            assert_eq!(
-                result.0, expected.distance,
-                "Distance mismatch for query {:?}",
-                query_point
-            );
-            assert_eq!(
-                result.1 as usize, expected.item,
-                "Item mismatch for query {:?}",
-                query_point
-            );
+            if result.0 != expected.distance || result.1 as usize != expected.item {
+                eprintln!(
+                    "FAIL query #{i}: {:?} → got dist={}, item={}, expected dist={}, item={}",
+                    query_point, result.0, result.1, expected.distance, expected.item
+                );
+                fail_count += 1;
+            } else {
+                pass_count += 1;
+            }
         }
+        eprintln!("Block3 f32: {pass_count} passed, {fail_count} failed out of {}", query_points.len());
+        assert_eq!(fail_count, 0, "{fail_count} queries returned wrong results");
     }
 
     #[test]
