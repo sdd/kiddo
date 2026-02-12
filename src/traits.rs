@@ -123,11 +123,6 @@ pub(crate) fn is_stem_index<IDX: Index<T = IDX>>(x: IDX) -> bool {
 /// - [`dist1()`]: Compute per-dimension distance component
 /// - [`accumulate()`]: Aggregate distance components (add or max)
 ///
-/// # Migration from pre-v5.3.0 Code // TODO: update version number for breaking change
-///
-/// For custom distance metrics that worked before v5.3.0:
-/// - Implement `accumulate()` as `rd + delta` (or `rd.saturating_add(delta)` for fixed-point)
-///
 pub trait DistanceMetric<A, const K: usize> {
     /// Returns the distance between two K-d points, as measured by this metric.
     fn dist(a: &[A; K], b: &[A; K]) -> A;
@@ -154,18 +149,23 @@ pub trait DistanceMetric<A, const K: usize> {
     ///   For k-d tree pruning, use the sum of powers: accumulate by adding.
     ///   Only the limit p → ∞ (Chebyshev) uses `max`.
     ///
-    /// # Migration from pre-v5.3.0 Code // TODO: update version number for breaking change
-    ///
-    /// If you have custom distance metrics that worked before v5.3.0, implement this // TODO: update version number for breaking change
-    /// method as `rd + delta` (or `rd.saturating_add(delta)` for fixed-point types)
-    /// to maintain backward compatible behaviour.
-    fn accumulate(rd: A, delta: A) -> A;
+    /// The default implementation uses regular addition (`rd + delta`), which works for
+    /// both integer and floating-point types. For fixed-point types where overflow is a
+    /// concern, override this with `rd.saturating_add(delta)`.
+    fn accumulate(rd: A, delta: A) -> A
+    where
+        A: std::ops::Add<Output = A>,
+    {
+        rd + delta
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
+    use super::DistanceMetric;
     use crate::traits::Index;
+    use rstest::rstest;
 
     #[test]
     fn test_u16() {
@@ -196,5 +196,46 @@ mod tests {
         let capacity_with_bucket_size =
             (u32::MAX - u32::MAX.overflowing_shr(1).0).saturating_mul(bucket_size);
         assert_eq!(capacity_with_bucket_size, u32::MAX);
+    }
+
+    struct TestMetricU32;
+    struct TestMetricI64;
+
+    impl<const K: usize> DistanceMetric<u32, K> for TestMetricU32 {
+        fn dist(_a: &[u32; K], _b: &[u32; K]) -> u32 {
+            0
+        }
+        fn dist1(a: u32, _b: u32) -> u32 {
+            a
+        }
+    }
+
+    impl<const K: usize> DistanceMetric<i64, K> for TestMetricI64 {
+        fn dist(_a: &[i64; K], _b: &[i64; K]) -> i64 {
+            0
+        }
+        fn dist1(a: i64, _b: i64) -> i64 {
+            a
+        }
+    }
+
+    #[rstest]
+    #[case(5u32, 3u32, 8u32)]
+    #[case(10u32, 20u32, 30u32)]
+    fn test_default_accumulate_u32(#[case] rd: u32, #[case] delta: u32, #[case] expected: u32) {
+        assert_eq!(
+            <TestMetricU32 as DistanceMetric<u32, 1>>::accumulate(rd, delta),
+            expected
+        );
+    }
+
+    #[rstest]
+    #[case(10i64, 20i64, 30i64)]
+    #[case(100i64, 200i64, 300i64)]
+    fn test_default_accumulate_i64(#[case] rd: i64, #[case] delta: i64, #[case] expected: i64) {
+        assert_eq!(
+            <TestMetricI64 as DistanceMetric<i64, 1>>::accumulate(rd, delta),
+            expected
+        );
     }
 }
