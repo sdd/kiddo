@@ -99,11 +99,6 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Chebyshev {
             delta
         }
     }
-
-    #[inline]
-    fn accumulate(rd: A, delta: A) -> A {
-        rd.saturating_add(delta)
-    }
 }
 
 /// Returns the Chebyshev distance (L-infinity norm) between two points.
@@ -521,11 +516,6 @@ mod integration_tests {
     ) {
         run_test_helper::<Manhattan>(dim, scenario, n);
     }
-
-    #[inline]
-    fn accumulate(rd: A, delta: A) -> A {
-        rd.saturating_add(delta)
-    }
 }
 
 #[cfg(test)]
@@ -582,6 +572,91 @@ mod tests {
         #[case] expected: FxdU16,
     ) {
         assert_eq!(Manhattan::dist(&a, &b), expected);
+    }
+
+    #[rstest]
+    #[case([ZERO, ZERO], [ZERO, ZERO], ZERO)]
+    #[case([ZERO, ZERO], [ONE, ZERO], ONE)]
+    #[case([ZERO, ZERO], [ZERO, ONE], ONE)]
+    #[case([ZERO, ZERO], [ONE, ONE], FxdU16::lit("2"))]
+    #[case([TWO, TWO], [ZERO, ZERO], FxdU16::lit("8"))]
+    #[case([ONE, TWO], [TWO, ONE], FxdU16::lit("2"))]
+    fn test_squared_euclidean_distance_2d(
+        #[case] a: [FxdU16; 2],
+        #[case] b: [FxdU16; 2],
+        #[case] expected: FxdU16,
+    ) {
+        assert_eq!(SquaredEuclidean::dist(&a, &b), expected);
+    }
+
+    #[rstest]
+    #[case([ZERO, ZERO, ZERO], [ZERO, ZERO, ZERO], ZERO)]
+    #[case([ZERO, ZERO, ZERO], [ONE, ZERO, ZERO], ONE)]
+    #[case([ONE, ONE, ONE], [TWO, TWO, TWO], THREE)]
+    fn test_squared_euclidean_distance_3d(
+        #[case] a: [FxdU16; 3],
+        #[case] b: [FxdU16; 3],
+        #[case] expected: FxdU16,
+    ) {
+        assert_eq!(SquaredEuclidean::dist(&a, &b), expected);
+    }
+
+    #[rstest]
+    #[case::zero(ZERO, ZERO, ZERO)]
+    #[case::pos(ONE, ZERO, ONE)]
+    #[case::neg(ZERO, ONE, ONE)]
+    #[case::diff(THREE, ONE, TWO)]
+    fn test_manhattan_dist1(#[case] a: FxdU16, #[case] b: FxdU16, #[case] expected: FxdU16) {
+        assert_eq!(
+            <Manhattan as DistanceMetric<FxdU16, 1>>::dist1(a, b),
+            expected
+        );
+    }
+
+    #[rstest]
+    #[case::zero(ZERO, ZERO, ZERO)]
+    #[case::pos(ONE, ZERO, ONE)]
+    #[case::neg(ZERO, ONE, ONE)]
+    #[case::a_larger(TWO, ONE, ONE)]
+    #[case::b_larger(ONE, TWO, ONE)]
+    fn test_chebyshev_dist1(#[case] a: FxdU16, #[case] b: FxdU16, #[case] expected: FxdU16) {
+        assert_eq!(
+            <Chebyshev as DistanceMetric<FxdU16, 1>>::dist1(a, b),
+            expected
+        );
+    }
+
+    #[rstest]
+    #[case::zero(ZERO, ZERO, ZERO)]
+    #[case::pos(ONE, ZERO, ONE)]
+    #[case::neg(ZERO, ONE, ONE)]
+    #[case::a_larger(TWO, ONE, ONE)]
+    #[case::b_larger(ONE, TWO, ONE)]
+    fn test_squared_euclidean_dist1(
+        #[case] a: FxdU16,
+        #[case] b: FxdU16,
+        #[case] expected: FxdU16,
+    ) {
+        assert_eq!(
+            <SquaredEuclidean as DistanceMetric<FxdU16, 1>>::dist1(a, b),
+            expected
+        );
+    }
+
+    #[rstest]
+    #[case::zero_one(ZERO, ONE, ONE)]
+    #[case::one_zero(ONE, ZERO, ONE)]
+    #[case::first_larger(ONE, TWO, TWO)]
+    #[case::second_larger(TWO, ONE, TWO)]
+    fn test_chebyshev_accumulate(
+        #[case] rd: FxdU16,
+        #[case] delta: FxdU16,
+        #[case] expected: FxdU16,
+    ) {
+        assert_eq!(
+            <Chebyshev as DistanceMetric<FxdU16, 1>>::accumulate(rd, delta),
+            expected
+        );
     }
 }
 
