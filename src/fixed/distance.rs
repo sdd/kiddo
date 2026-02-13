@@ -99,6 +99,11 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Chebyshev {
             delta
         }
     }
+
+    #[inline]
+    fn accumulate(rd: A, delta: A) -> A {
+        rd.saturating_add(delta)
+    }
 }
 
 /// Returns the Chebyshev distance (L-infinity norm) between two points.
@@ -515,6 +520,11 @@ mod integration_tests {
         #[values(1, 2, 3)] dim: usize,
     ) {
         run_test_helper::<Manhattan>(dim, scenario, n);
+    }
+
+    #[inline]
+    fn accumulate(rd: A, delta: A) -> A {
+        rd.saturating_add(delta)
     }
 }
 
