@@ -55,6 +55,11 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
             b - a
         }
     }
+
+    #[inline]
+    fn accumulate(rd: A, delta: A) -> A {
+        rd.saturating_add(delta)
+    }
 }
 
 /// Returns the Chebyshev distance (L-infinity norm) between two points.
@@ -157,6 +162,11 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for SquaredEuclidean {
     fn dist1(a: A, b: A) -> A {
         let diff: A = a.dist(b);
         diff * diff
+    }
+
+    #[inline]
+    fn accumulate(rd: A, delta: A) -> A {
+        rd.saturating_add(delta)
     }
 }
 
