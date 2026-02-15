@@ -68,10 +68,6 @@ where
     }
     fn max_dist(&self) -> O {
         self.max_dist
-        // self.results
-        //     .peek()
-        //     .map(|n| n.distance)
-        //     .unwrap_or(self.max_dist)
     }
 }
 

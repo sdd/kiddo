@@ -409,11 +409,10 @@ pub trait StemStrategy: Clone + Sync + Send {
 
             let new_off = O::saturating_dist(query_elem_wide, pivot_wide);
             let old_off = *unsafe { off.get_unchecked(*dim) };
-            // Correct formula: rd_new = rd - old_off² + new_off²
-            // NOT: rd + (new_off - old_off)²
-            let new_sq = D::dist1(new_off, O::zero());
-            let old_sq = D::dist1(old_off, O::zero());
-            let rd_far = O::saturating_add(rd - old_sq, new_sq);
+
+            let new_dist1 = D::dist1(new_off, O::zero());
+            let old_dist1 = D::dist1(old_off, O::zero());
+            let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
 
             // Only push if the sibling is worth exploring
             if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
@@ -475,57 +474,6 @@ pub trait StemStrategy: Clone + Sync + Send {
         tree.backtracking_query_with_stack_impl::<QC, O, D>(query_ctx, stack_ref, process_leaf);
     }
 }
-
-/*/// Structs defining this trait can perform nearest neighbour queries
-pub trait NNQueryable<A: Axis, T, const K: usize> {
-    fn get_bucket_idx(&self, query: &[A; K]) -> usize;
-
-    fn approx_nearest_one(&self, query: &[A; K]) -> NearestNeighbour<A, T>;
-    fn nearest_one(&self, query: &[A; K]) -> NearestNeighbour<A, T>;
-
-    fn best_n_within(
-        &self,
-        query: &[A; K],
-        dist: A,
-        max_qty: NonZero<usize>,
-    ) -> impl Iterator<Item = BestNeighbour<A, T>>;
-    fn nearest_n_within(
-        &self,
-        query: &[A; K],
-        dist: A,
-        max_qty: NonZero<usize>,
-        sorted: bool,
-    ) -> Vec<NearestNeighbour<A, T>>;
-
-    fn nearest_n(
-        &self,
-        query: &[A; K],
-        max_qty: NonZero<usize>,
-        sorted: bool,
-    ) -> Vec<NearestNeighbour<A, T>> {
-        self.nearest_n_within(query, A::infinity(), max_qty, sorted)
-    }
-
-    fn within(&self, query: &[A; K], dist: A) -> Vec<NearestNeighbour<A, T>> {
-        self.nearest_n_within(query, dist, NonZero::new(usize::MAX).unwrap(), true)
-    }
-
-    fn within_unsorted(&self, query: &[A; K], dist: A) -> Vec<NearestNeighbour<A, T>> {
-        self.nearest_n_within(query, dist, NonZero::new(usize::MAX).unwrap(), false)
-    }
-}
-
-/// Structs defining this trait can perform nearest neighbour queries that return an iterator
-pub trait NNIterQueryable<A, T, const K: usize> {
-    fn within_unsorted_iter<'a>(
-        &'a self,
-        query: &'a [A; K],
-        dist: A,
-    ) -> WithinUnsortedIter<'a, A, T>;
-}
-
-/// Structs defining this trait can have their contents modified after construction
-pub trait NNMutable<A: Axis, T, const K: usize> {}*/
 
 #[cfg(test)]
 mod tests {

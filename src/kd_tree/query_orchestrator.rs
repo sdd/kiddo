@@ -61,32 +61,21 @@ where
             stem_strat.traverse(is_right_child);
         }
 
-        match &self.stem_leaf_resolution {
-            crate::kd_tree::StemLeafResolution::Mapped { leaf_idx_map, .. } => {
-                leaf_idx_map[stem_strat.stem_idx()].unwrap().get()
-            }
-            _ => unreachable!(),
-        }
+        self.stem_leaf_resolution
+            .resolve_terminal_stem_idx(stem_strat.stem_idx(), stem_strat.leaf_idx())
     }
 
+    // TODO: don't like this structure
     /// Check if a stem points directly to a leaf
     #[inline(always)]
     pub(crate) fn resolve_terminal_stem(&self, stem_idx: usize) -> Option<usize> {
-        match &self.stem_leaf_resolution {
-            crate::kd_tree::StemLeafResolution::Mapped {
-                min_stem_leaf_idx,
-                leaf_idx_map,
-            } => {
-                if stem_idx >= *min_stem_leaf_idx {
-                    let map_idx = stem_idx - *min_stem_leaf_idx;
-                    leaf_idx_map
-                        .get(map_idx)
-                        .and_then(|opt| opt.map(|n| n.get()))
-                } else {
-                    None
-                }
-            }
-            _ => None,
+        if self.stem_leaf_resolution.is_terminal_stem_idx(stem_idx) {
+            Some(
+                self.stem_leaf_resolution
+                    .resolve_terminal_stem_idx(stem_idx, 0),
+            )
+        } else {
+            None
         }
     }
 
@@ -240,7 +229,8 @@ where
             }
         }
 
-        stem_strat.leaf_idx()
+        self.stem_leaf_resolution
+            .resolve_terminal_stem_idx(stem_strat.stem_idx(), stem_strat.leaf_idx())
     }
 
     /// Implementation of backtracking query with SIMD stack.
@@ -438,6 +428,7 @@ where
             }
         }
 
-        stem_strat.leaf_idx()
+        self.stem_leaf_resolution
+            .resolve_terminal_stem_idx(stem_strat.stem_idx(), stem_strat.leaf_idx())
     }
 }

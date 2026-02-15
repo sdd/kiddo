@@ -54,6 +54,53 @@ pub(crate) trait Mutability: sealed::Sealed + 'static {
         LS: LeafStrategy<A, T, SS, K, B>;
 }
 
+fn build_mapped_stem_leaf_resolution<SS: StemStrategy>(
+    stems_depth: usize,
+    leaf_count: usize,
+) -> crate::kd_tree::StemLeafResolution {
+    if leaf_count == 0 {
+        return crate::kd_tree::StemLeafResolution::Mapped {
+            min_stem_leaf_idx: 0,
+            leaf_idx_map: Vec::new(),
+        };
+    }
+
+    let min_stem_leaf_idx = 0;
+
+    // Determine highest stem index that can resolve to a leaf at this depth.
+    let mut stem_strategy = SS::new_no_ptr();
+    for bit_idx in (0..stems_depth).rev() {
+        let is_right = (leaf_count - 1) & (1 << bit_idx) != 0;
+        stem_strategy.traverse(is_right);
+    }
+
+    let mut leaf_idx_map: Vec<Option<NonMaxUsize>> = vec![None; stem_strategy.stem_idx() + 1];
+
+    // Map each leaf index to the traversal endpoint that would resolve it.
+    for leaf_idx in 0..leaf_count {
+        let mut stem_strategy = SS::new_no_ptr();
+        for bit_idx in (0..stems_depth).rev() {
+            let is_right = leaf_idx & (1 << bit_idx) != 0;
+            stem_strategy.traverse(is_right);
+        }
+        if let Some(existing_leaf_idx) = leaf_idx_map[stem_strategy.stem_idx()] {
+            panic!(
+                "Duplicate terminal stem index in initial mapped leaf_idx_map construction: stem_idx={} existing_leaf_idx={} new_leaf_idx={}",
+                stem_strategy.stem_idx(),
+                existing_leaf_idx.get(),
+                leaf_idx
+            );
+        }
+        leaf_idx_map[stem_strategy.stem_idx()] =
+            Some(NonMaxUsize::new(leaf_idx).expect("leaf_idx overflow"));
+    }
+
+    crate::kd_tree::StemLeafResolution::Mapped {
+        min_stem_leaf_idx,
+        leaf_idx_map,
+    }
+}
+
 /// Marker type for immutable leaf strategies.
 ///
 /// Immutable strategies never mutate the tree structure after construction,
@@ -121,32 +168,7 @@ impl Mutability for Mutable {
     ) -> crate::kd_tree::StemLeafResolution {
         // Start in Mapped state with min_stem_leaf_idx = 0 for simplicity.
         // TODO: Optimize later with Pristine state and dynamic min_stem_leaf_idx
-
-        let min_stem_leaf_idx = 0;
-
-        // determine idx for highest numbered leaf so we can size the leaf_idx_map array
-        let mut stem_strategy = SS::new_no_ptr();
-        for bit_idx in (0..stems_depth).rev() {
-            let is_right = (leaf_count - 1) & (1 << bit_idx) != 0;
-            stem_strategy.traverse(is_right);
-        }
-
-        let mut leaf_idx_map: Vec<Option<NonMaxUsize>> = vec![None; stem_strategy.stem_idx() + 1];
-
-        for leaf_idx in 0..leaf_count {
-            let mut stem_strategy = SS::new_no_ptr();
-            for bit_idx in (0..stems_depth).rev() {
-                let is_right = leaf_idx & (1 << bit_idx) != 0;
-                stem_strategy.traverse(is_right);
-            }
-            leaf_idx_map[stem_strategy.stem_idx()] =
-                Some(NonMaxUsize::new(leaf_idx).expect("stem_idx overflow"));
-        }
-
-        crate::kd_tree::StemLeafResolution::Mapped {
-            min_stem_leaf_idx,
-            leaf_idx_map,
-        }
+        build_mapped_stem_leaf_resolution::<SS>(stems_depth, leaf_count)
     }
 
     fn get_leaf_idx<A, T, SS, LS, const K: usize, const B: usize>(
@@ -227,6 +249,16 @@ pub trait AxisUnified:
     fn max(a: Self::Coord, b: Self::Coord) -> Self::Coord;
 }
 
+/// Specifies whether a LeafStrategy's bucket size is a hard or soft limit
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BucketLimitType {
+    /// Bucket size is completely fixed
+    Hard,
+
+    /// Bucket size is a target and can be larger than specified size if reqs
+    Soft,
+}
+
 /// Strategy for how leaf storage is laid out and constructed.
 /// - AX: Axis marker implementing AxisUnified (selects float or fixed semantics).
 /// - T: item/content type stored alongside points.
@@ -245,6 +277,9 @@ where
     /// Marker type indicating whether this strategy supports mutation.
     #[allow(private_bounds)]
     type Mutability: Mutability;
+
+    /// Whether bucket size is a hard or soft limit
+    const BUCKET_LIMIT_TYPE: BucketLimitType;
 
     // ---- Construction ----
 
