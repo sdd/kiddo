@@ -5,9 +5,9 @@ use std::env;
 use std::num::NonZeroUsize;
 
 use kiddo::distance::float::{Manhattan, SquaredEuclidean};
+use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
 use kiddo::kd_tree::KdTree as V6KdTree;
-use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::mutable::float::kdtree::KdTree;
 use kiddo::nearest_neighbour::NearestNeighbour;
 use kiddo::stem_strategies::{Donnelly, Eytzinger};
@@ -106,8 +106,8 @@ fn parse_repro_id(input: &str) -> Result<ReproParams, String> {
             }
         }
 
-        let (key, value) = matched
-            .ok_or_else(|| format!("missing key/value in segment '{part}'"))?;
+        let (key, value) =
+            matched.ok_or_else(|| format!("missing key/value in segment '{part}'"))?;
         fields.insert(key, value);
     }
 
@@ -228,7 +228,10 @@ fn run_immutable_f32(params: &ReproParams) -> Result<(), String> {
         "eytzinger" => run_immutable_strategy_f32::<EytzingerStrategyF32>(params),
         "donnelly" => run_immutable_strategy_f32::<DonnellyStrategyF32>(params),
         "donnelly_simd" => run_immutable_strategy_f32::<DonnellySimdStrategyF32>(params),
-        _ => Err(format!("unsupported immutable strategy '{}'", params.strategy)),
+        _ => Err(format!(
+            "unsupported immutable strategy '{}'",
+            params.strategy
+        )),
     }
 }
 
@@ -237,7 +240,10 @@ fn run_immutable_f64(params: &ReproParams) -> Result<(), String> {
         "eytzinger" => run_immutable_strategy_f64::<EytzingerStrategyF64>(params),
         "donnelly" => run_immutable_strategy_f64::<DonnellyStrategyF64>(params),
         "donnelly_simd" => run_immutable_strategy_f64::<DonnellySimdStrategyF64>(params),
-        _ => Err(format!("unsupported immutable strategy '{}'", params.strategy)),
+        _ => Err(format!(
+            "unsupported immutable strategy '{}'",
+            params.strategy
+        )),
     }
 }
 
@@ -990,8 +996,7 @@ where
     F2: Fn(Metric, usize) -> Result<Vec<NearestNeighbour<A, usize>>, String>,
     F3: Fn(Metric, A) -> Vec<NearestNeighbour<A, usize>>,
 {
-    let (mut sq_state, mut man_state) =
-        brute_states(points, query, max_qty, radius_sq, radius_man);
+    let (mut sq_state, mut man_state) = brute_states(points, query, max_qty, radius_sq, radius_man);
 
     let result_sq = nearest_one(Metric::SquaredEuclidean);
     check_nearest_one("SquaredEuclidean", result_sq, &sq_state)?;

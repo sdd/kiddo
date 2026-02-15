@@ -1,5 +1,5 @@
 use crate::kd_tree::leaf_view::LeafView;
-use crate::traits_unified_2::{AxisUnified, Basics, Immutable, LeafStrategy};
+use crate::traits_unified_2::{AxisUnified, Basics, BucketLimitType, Immutable, LeafStrategy};
 use crate::StemStrategy;
 
 /// A leaf storage strategy using flat vectors for coordinates.
@@ -21,6 +21,8 @@ where
 {
     type Num = AX;
     type Mutability = Immutable;
+
+    const BUCKET_LIMIT_TYPE: BucketLimitType = BucketLimitType::Soft;
 
     fn new_with_capacity(capacity: usize) -> Self {
         Self {

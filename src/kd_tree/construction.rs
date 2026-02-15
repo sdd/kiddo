@@ -1,5 +1,7 @@
 use crate::kd_tree::{KdTree, StemLeafResolution};
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy, Mutability, MutableLeafStrategy};
+use crate::traits_unified_2::{
+    AxisUnified, Basics, BucketLimitType, LeafStrategy, Mutability, MutableLeafStrategy,
+};
 use crate::StemStrategy;
 use aligned_vec::{avec, AVec, ConstAlign, CACHELINE_ALIGN};
 use az::{Az, Cast};
@@ -278,6 +280,8 @@ where
         let mut stems = avec![A::max_value(); stem_node_count_padded];
 
         let mut leaves = LS::new_with_capacity(item_count);
+        let mut terminal_stem_indices = Vec::with_capacity(leaf_node_count);
+        let mut actual_max_stem_level: i32 = -1;
         let mut sort_index = Vec::from_iter(0..item_count);
 
         Self::populate_recursive_with(
@@ -288,11 +292,18 @@ where
             stems_depth as i32 - 1,
             leaf_node_count * B,
             &mut leaves,
+            &mut terminal_stem_indices,
+            &mut actual_max_stem_level,
             &mut push_item,
         );
 
+        let initial_max_stem_level = stems_depth as i32 - 1;
         let stem_leaf_resolution =
-            LS::Mutability::initial_stem_leaf_resolution::<SS>(stems_depth, leaf_node_count);
+            if LS::Mutability::is_mutable() || actual_max_stem_level > initial_max_stem_level {
+                Self::mapped_stem_leaf_resolution_from_terminals(&terminal_stem_indices)
+            } else {
+                LS::Mutability::initial_stem_leaf_resolution::<SS>(stems_depth, leaf_node_count)
+            };
 
         // println!("Stems: {:?}", &stems);
         Self {
@@ -300,7 +311,7 @@ where
             leaves,
             stem_leaf_resolution,
             size: item_count,
-            max_stem_level: stems_depth as i32 - 1,
+            max_stem_level: actual_max_stem_level,
             _phantom: Default::default(),
         }
     }
@@ -371,6 +382,20 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
 {
+    fn at_leaf_level(
+        current_stem_level: i32,
+        max_stem_level: i32,
+        bucket_limit_type: BucketLimitType,
+        chunk_length: usize,
+        capacity: usize,
+    ) -> bool {
+        match bucket_limit_type {
+            // TODO: check that this is the behaviour that we want
+            BucketLimitType::Soft => current_stem_level > max_stem_level || capacity <= B,
+            BucketLimitType::Hard => chunk_length <= B,
+        }
+    }
+
     /// Shared recursive tree construction helper
     #[allow(clippy::too_many_arguments)]
     fn populate_recursive_with<F>(
@@ -381,6 +406,8 @@ where
         max_stem_level: i32,
         capacity: usize,
         leaves: &mut LS,
+        terminal_stem_indices: &mut Vec<usize>,
+        actual_max_stem_level: &mut i32,
         push_item: &mut F,
     ) where
         F: FnMut(&mut Vec<T>, usize),
@@ -388,20 +415,40 @@ where
         let chunk_length = sort_index.len();
         let dim = stem_ordering.construction_dim();
 
-        if stem_ordering.level() > max_stem_level {
+        debug_assert!(
+            chunk_length > 0,
+            "recursed an empty chunk (stem_idx={}, level={}, chunk_length={}, capacity={})",
+            stem_ordering.stem_idx(),
+            stem_ordering.level(),
+            chunk_length,
+            capacity,
+        );
+
+        if Self::at_leaf_level(
+            stem_ordering.level(),
+            max_stem_level,
+            LS::BUCKET_LIMIT_TYPE,
+            chunk_length,
+            capacity,
+        ) {
             // Write leaf and terminate recursion
             let leaf_len = sort_index.len();
+
+            debug_assert!(
+                leaf_len > 0,
+                "attempted to construct an empty leaf (stem_idx={}, level={}, capacity={})",
+                stem_ordering.stem_idx(),
+                stem_ordering.level(),
+                capacity
+            );
             let mut leaf_points: [Vec<A>; K] =
                 array_init::array_init(|_| Vec::with_capacity(leaf_len));
             let mut leaf_items: Vec<T> = Vec::with_capacity(leaf_len);
 
-            // Gather from `source` via `sort_index`
             for &src_idx in sort_index.iter() {
-                // points
                 for d in 0..K {
                     leaf_points[d].push(source[src_idx][d]);
                 }
-                // delegate item handling
                 push_item(&mut leaf_items, src_idx);
             }
 
@@ -409,53 +456,101 @@ where
             let leaf_points_refs: [&[A]; K] = array_init::array_init(|d| leaf_points[d].as_slice());
 
             leaves.append_leaf(&leaf_points_refs, leaf_items.as_slice());
+            terminal_stem_indices.push(stem_ordering.stem_idx());
             return;
         }
 
         let levels_below = max_stem_level - stem_ordering.level();
-        let left_capacity = (2usize.pow(levels_below as u32) * B).min(capacity);
+        let clamped_levels_below = levels_below.max(0) as u32;
+        let left_capacity = (2usize.pow(clamped_levels_below) * B).min(capacity);
         let right_capacity = capacity.saturating_sub(left_capacity);
 
-        let stem_index = stem_ordering.stem_idx();
-        let mut pivot = Self::calc_pivot(chunk_length, stem_index, right_capacity);
+        debug_assert!(
+            left_capacity > 0,
+            "left_capacity is zero - should never happen (stem_idx={}, level={}, chunk_length={}, capacity={}, right_capacity={})",
+            stem_ordering.stem_idx(),
+            stem_ordering.level(),
+            chunk_length,
+            capacity,
+            right_capacity
+        );
 
-        // only bother with this if we are putting at least one item in the right hand child
+        let stem_index = stem_ordering.stem_idx();
+        *actual_max_stem_level = (*actual_max_stem_level).max(stem_ordering.level());
+
+        if stem_index >= stems.len() {
+            tracing::warn!(
+                %stem_index,
+                existing_stem_vec_len = %stems.len(),
+                "encountered a stem index beyond the end of the stem vec. Growing the vec to fit"
+            );
+
+            stems.resize(stem_index + 1, A::max_value());
+        }
+
+        let mut pivot = Self::calc_pivot(
+            chunk_length,
+            stem_index,
+            right_capacity,
+            LS::BUCKET_LIMIT_TYPE,
+        );
+
+        debug_assert!(
+            pivot > 0,
+            "construction produced initial pivot=0 (empty-left split candidate): \
+            stem_index = {}, level={}, chunk_length = {}, capacity = {}, \
+            left_capacity = {}, right_capacity = {}, dim = {}",
+            stem_index,
+            stem_ordering.level(),
+            chunk_length,
+            capacity,
+            left_capacity,
+            right_capacity,
+            dim,
+        );
+
+        // only bother with this logic if we are putting at least one item in the right-hand child
         if pivot < chunk_length {
             pivot = Self::update_pivot(source, sort_index, dim, pivot);
 
-            // if we end up with a pivot of 0, something has gone wrong,
-            // unless we only had a slice of len 1 anyway
-            debug_assert!(pivot > 0 || chunk_length == 1);
             debug_assert!(
-                A::Coord::is_max_value(stems[stem_index]),
-                "Wrote to stem #{stem_index:?} for a second time",
+                pivot > 0,
+                "construction produced updated pivot=0 (empty-left split candidate): \
+                stem_index = {}, level={}, chunk_length = {}, capacity = {}, \
+                left_capacity = {}, right_capacity = {}, dim = {}",
+                stem_index,
+                stem_ordering.level(),
+                chunk_length,
+                capacity,
+                left_capacity,
+                right_capacity,
+                dim,
             );
 
-            // TODO: we want this here for Leaf Strategies whose bucket size is a hard limit.
-            // That's not the case for flat_vec but it is for vec_of_arrays
+            // if we end up with a pivot of 0, something has gone wrong,
+            // unless we only had a slice of len 1 anyway
             // debug_assert!(
-            //     right_capacity >= chunk_length.saturating_sub(pivot),
-            //     "right_capacity ({right_capacity}) should be greater than chunk_length - pivot ({chunk_length} - {pivot})"
+            //     pivot > 0 || chunk_length == 1,
             // );
 
-            stems[stem_index] = source[sort_index[pivot]][dim];
+            // if LS::BUCKET_LIMIT_TYPE == BucketLimitType::Hard {
+            //     debug_assert!(
+            //         right_capacity >= chunk_length.saturating_sub(pivot),
+            //         "right_capacity ({right_capacity}) should be greater than chunk_length - pivot ({chunk_length} - {pivot})"
+            //     );
+            // }
+
+            if pivot < chunk_length {
+                debug_assert!(
+                    A::Coord::is_max_value(stems[stem_index]),
+                    "Wrote to stem #{stem_index:?} for a second time",
+                );
+
+                stems[stem_index] = source[sort_index[pivot]][dim];
+            }
         }
 
         let right_stem_ordering = stem_ordering.branch();
-
-        if pivot == chunk_length {
-            return Self::populate_recursive_with(
-                stems,
-                source,
-                sort_index,
-                stem_ordering,
-                max_stem_level,
-                left_capacity,
-                leaves,
-                push_item,
-            );
-        }
-
         let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
 
         Self::populate_recursive_with(
@@ -466,10 +561,12 @@ where
             max_stem_level,
             left_capacity,
             leaves,
+            terminal_stem_indices,
+            actual_max_stem_level,
             push_item,
         );
 
-        if right_capacity > 0 {
+        if !upper_sort_index.is_empty() {
             Self::populate_recursive_with(
                 stems,
                 source,
@@ -478,9 +575,107 @@ where
                 max_stem_level,
                 right_capacity,
                 leaves,
+                terminal_stem_indices,
+                actual_max_stem_level,
                 push_item,
             );
         }
+    }
+
+    // TODO: remove this entirely in favor of just taking ownership of terminal_stem_indices
+    //       once confident that the debug_asserts never fire
+    fn mapped_stem_leaf_resolution_from_terminals(
+        terminal_stem_indices: &[usize],
+    ) -> StemLeafResolution {
+        if terminal_stem_indices.is_empty() {
+            return StemLeafResolution::Mapped {
+                min_stem_leaf_idx: 0,
+                leaf_idx_map: Vec::new(),
+            };
+        }
+
+        // TODO: this should not be needed. Just use terminal_stem_indices.len()
+        let max_terminal_stem_idx = terminal_stem_indices.iter().copied().max().unwrap_or(0);
+        // debug_assert!(
+        //     max_terminal_stem_idx == terminal_stem_indices.len() - 1,
+        //     "Leaf array should be contiguous. Construction invariant failed"
+        // );
+        if max_terminal_stem_idx > terminal_stem_indices.len() - 1 {
+            tracing::warn!("Leaf array should be contiguous. Construction invariant failed");
+        };
+        let mut leaf_idx_map: Vec<Option<NonMaxUsize>> = vec![None; max_terminal_stem_idx + 1];
+
+        for (leaf_idx, &terminal_stem_idx) in terminal_stem_indices.iter().enumerate() {
+            debug_assert!(
+                leaf_idx_map[terminal_stem_idx].is_none(),
+                "Duplicate terminal stem index in mapped leaf_idx_map construction: stem_idx={} existing_leaf_idx={} new_leaf_idx={}",
+                terminal_stem_idx,
+                leaf_idx_map[terminal_stem_idx].unwrap(),
+                leaf_idx
+            );
+
+            leaf_idx_map[terminal_stem_idx] = NonMaxUsize::new(leaf_idx);
+        }
+
+        StemLeafResolution::Mapped {
+            min_stem_leaf_idx: 0,
+            leaf_idx_map,
+        }
+    }
+
+    fn calc_pivot(
+        chunk_length: usize,
+        _stem_index: usize,
+        right_capacity: usize,
+        bucket_limit_type: BucketLimitType,
+    ) -> usize {
+        let mut result = chunk_length
+            .saturating_sub(right_capacity)
+            .next_multiple_of(B)
+            .min(chunk_length);
+
+        // Treat this as the ideal split target: put at least B items on the left
+        // whenever the chunk can support it.
+        if chunk_length > 0 {
+            let min_ideal_left = B.min(chunk_length);
+            if result < min_ideal_left {
+                result = min_ideal_left;
+            }
+        }
+
+        // debug_assert!(
+        //     result > 0 || chunk_length >= right_capacity,
+        //     "Unexpectedly generated an initial pivot to split a slice at position 0 during construction (chunk length: {chunk_length}, right_capacity: {right_capacity})"
+        // );
+
+        let result = if bucket_limit_type == BucketLimitType::Hard
+            && result >= chunk_length
+            && result > B
+        {
+            let adjusted_result = chunk_length
+                .saturating_sub(right_capacity.max(B))
+                .next_multiple_of(B)
+                .min(chunk_length);
+
+            tracing::debug!(
+                orig_pivot = %result,
+                adjusted_pivot = %adjusted_result,
+                %chunk_length,
+                %right_capacity,
+                "initial pivot calc would result in infinite recursion due to everything going in left but left being > B. Splitting finer"
+            );
+
+            adjusted_result
+        } else {
+            result
+        };
+
+        debug_assert!(
+            result < chunk_length + 1,
+            "Unexpectedly generated an initial pivot to split a slice at or beyond its end during construction (chunk length: {chunk_length}, right_capacity: {right_capacity})"
+        );
+
+        result
     }
 
     // #[cfg(not(feature = "unreliable_select_nth_unstable"))]
@@ -489,11 +684,13 @@ where
         source: &[[A; K]],
         sort_index: &mut [usize],
         dim: usize,
-        mut pivot: usize,
+        init_pivot: usize,
     ) -> usize {
         // TODO: this block might be faster by using a quickselect with a fat partition?
         //       we could then run that quickselect and subtract (fat partition length - 1)
         //       from the pivot, avoiding the need for the while loop.
+
+        let mut pivot = init_pivot;
 
         // ensure the item whose index = pivot is in its correctly sorted position, and any
         // items that are equal to it are adjacent, according to our assumptions about the
@@ -501,22 +698,63 @@ where
         sort_index
             .select_nth_unstable_by(pivot, |&ia, &ib| A::cmp(source[ia][dim], source[ib][dim]));
 
-        if pivot == 0 {
-            return pivot;
-        }
-
         // if the pivot straddles two values that are equal, keep nudging it left until they aren't
-        while source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim] && pivot > 1 {
+        while pivot > 0 && source[sort_index[pivot]][dim] == source[sort_index[pivot - 1]][dim] {
             pivot -= 1;
         }
 
-        pivot
-    }
+        // if we nudged it all the way to the left, reset and try nudging it rightwards from the
+        // initial pivot point instead. This requires that the entire slice is sorted, rather than
+        // just the left-hand side
+        if pivot == 0 {
+            pivot = init_pivot;
 
-    fn calc_pivot(chunk_length: usize, _stem_index: usize, right_capacity: usize) -> usize {
-        chunk_length
-            .saturating_sub(right_capacity)
-            .next_multiple_of(B)
-            .min(chunk_length)
+            sort_index.sort_unstable_by(|&ia, &ib| A::cmp(source[ia][dim], source[ib][dim]));
+
+            while pivot < sort_index.len()
+                && source[sort_index[pivot]][dim] == source[sort_index[pivot + 1]][dim]
+            {
+                pivot += 1;
+            }
+
+            if pivot == sort_index.len() {
+                // if we end up here with pivot == sort_index.len(), then the source slice is unsplittable
+                // in this dimension due to all entries having the same value on the given dimension
+                tracing::debug!(
+                    slice_len = %sort_index.len(),
+                    %dim,
+                    "Slice unsplittable along dimension"
+                );
+
+                if LS::BUCKET_LIMIT_TYPE == BucketLimitType::Hard {
+                    panic!(
+                        "Slice unsplittable along dimension. More points with the same value along \
+                        splitting dimension than will fit in a bucket"
+                    );
+                }
+            } else {
+                // Avoid empty-left splits: place the boundary after the run.
+                pivot += 1;
+                tracing::trace!(
+                    slice_len = %sort_index.len(),
+                    %dim,
+                    %init_pivot,
+                    shift = %(pivot - init_pivot),
+                    %pivot,
+                    "pivot shifted right"
+                );
+            }
+        } else if pivot != init_pivot {
+            tracing::trace!(
+                slice_len = %sort_index.len(),
+                %dim,
+                %init_pivot,
+                shift = %(init_pivot - pivot),
+                %pivot,
+                "pivot shifted left"
+            );
+        }
+
+        pivot
     }
 }

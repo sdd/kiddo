@@ -1,5 +1,5 @@
 use crate::kd_tree::leaf_view::LeafView;
-use crate::traits_unified_2::{AxisUnified, Basics, Immutable, LeafStrategy};
+use crate::traits_unified_2::{AxisUnified, Basics, BucketLimitType, Immutable, LeafStrategy};
 use crate::StemStrategy;
 
 /// A dummy leaf strategy used for testing.
@@ -17,6 +17,8 @@ where
 {
     type Num = ();
     type Mutability = Immutable;
+
+    const BUCKET_LIMIT_TYPE: BucketLimitType = BucketLimitType::Hard;
 
     fn new_with_capacity(_capacity: usize) -> Self {
         Self::default()

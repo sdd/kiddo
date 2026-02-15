@@ -83,8 +83,6 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
         //       `acc` and `coord_wide` can also be reused across leaf visits but thread-local
         //       is probably the most efficient approach.
 
-        // TODO:
-
         // accumulator of widened distance type
         let mut acc: Vec<D::Output> = vec![D::Output::zero(); n];
 
@@ -155,7 +153,7 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
         R: ResultCollection<O, T>,
     {
         dists.iter().zip(items).for_each(|(&d, &i)| {
-            if d < dist {
+            if d <= dist {
                 results.add(NearestNeighbour {
                     distance: d,
                     item: i,

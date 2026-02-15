@@ -1,6 +1,8 @@
 use crate::kd_tree::leaf_view::LeafView;
 use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy, Mutable, MutableLeafStrategy};
+use crate::traits_unified_2::{
+    AxisUnified, Basics, BucketLimitType, LeafStrategy, Mutable, MutableLeafStrategy,
+};
 use crate::StemStrategy;
 
 /// A leaf storage strategy using vectors of fixed-size arrays.
@@ -31,6 +33,8 @@ where
 {
     type Num = AX;
     type Mutability = Mutable;
+
+    const BUCKET_LIMIT_TYPE: BucketLimitType = BucketLimitType::Hard;
 
     fn new_with_capacity(capacity: usize) -> Self {
         Self {
@@ -506,8 +510,10 @@ mod test {
 
         assert!(!tree.is_empty());
         assert_eq!(tree.size(), 65_536);
-        assert_eq!(tree.leaf_count(), 2048);
-        assert_eq!(tree.max_stem_level(), 10);
+        // Hard-bucket construction may need deeper splits to keep all leaves <= B.
+        // That can increase leaf count above the nominal ceil(size / B) value.
+        assert!(tree.leaf_count() >= 2048);
+        assert!(tree.max_stem_level() >= 10);
 
         // perform a nearest_one query
         let query_point = [0.5, 0.5, 0.5];

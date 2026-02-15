@@ -64,6 +64,60 @@ impl StemLeafResolution {
     pub fn uses_arithmetic(&self) -> bool {
         matches!(self, Self::Arithmetic { .. } | Self::Pristine { .. })
     }
+
+    /// Resolves a terminal stem index to a leaf index.
+    ///
+    /// In mapped mode, this requires an explicit terminal map entry and panics on misses.
+    /// In arithmetic/pristine mode, `arithmetic_leaf_idx` is returned.
+    #[inline(always)]
+    pub fn resolve_terminal_stem_idx(&self, stem_idx: usize, arithmetic_leaf_idx: usize) -> usize {
+        match self {
+            Self::Mapped {
+                min_stem_leaf_idx,
+                leaf_idx_map,
+            } => {
+                if stem_idx >= *min_stem_leaf_idx {
+                    let map_idx = stem_idx - *min_stem_leaf_idx;
+                    leaf_idx_map
+                        .get(map_idx)
+                        .and_then(|opt| opt.map(|n| n.get()))
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "mapped leaf resolution miss: stem_idx={} map_idx={} leaf_idx_map_len={}",
+                                stem_idx,
+                                map_idx,
+                                leaf_idx_map.len()
+                            )
+                        })
+                } else {
+                    panic!(
+                        "mapped leaf resolution miss: stem_idx={} below min_stem_leaf_idx={}",
+                        stem_idx, min_stem_leaf_idx
+                    )
+                }
+            }
+            _ => arithmetic_leaf_idx,
+        }
+    }
+
+    /// Returns true if `stem_idx` has an explicit terminal mapping in mapped mode.
+    #[inline(always)]
+    pub fn is_terminal_stem_idx(&self, stem_idx: usize) -> bool {
+        match self {
+            Self::Mapped {
+                min_stem_leaf_idx,
+                leaf_idx_map,
+            } => {
+                if stem_idx >= *min_stem_leaf_idx {
+                    let map_idx = stem_idx - *min_stem_leaf_idx;
+                    leaf_idx_map.get(map_idx).is_some_and(Option::is_some)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
 }
 
 /// A k-d tree for efficient spatial queries.
