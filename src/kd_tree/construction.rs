@@ -122,8 +122,9 @@ where
             leaf_idx_map[right_child_idx] = NonMaxUsize::new(new_leaf_idx);
         }
 
-        // Increment max_stem_level since we now have children
-        self.max_stem_level += 1;
+        // Track actual deepest interior stem level reached by splits.
+        // Splitting a leaf at level L converts that terminal stem into an interior pivot.
+        self.max_stem_level = self.max_stem_level.max(stem_strategy.level());
 
         (pivot_val, split_dim, new_leaf_idx)
     }

@@ -96,7 +96,22 @@ impl StemLeafResolution {
                     )
                 }
             }
-            _ => arithmetic_leaf_idx,
+            Self::Arithmetic {
+                stems_depth,
+                leaf_count,
+            }
+            | Self::Pristine {
+                stems_depth,
+                leaf_count,
+            } => {
+                if arithmetic_leaf_idx >= *leaf_count {
+                    panic!(
+                        "arithmetic leaf resolution out of bounds: stem_idx={} arithmetic_leaf_idx={} leaf_count={} stems_depth={}",
+                        stem_idx, arithmetic_leaf_idx, leaf_count, stems_depth
+                    );
+                }
+                arithmetic_leaf_idx
+            }
         }
     }
 

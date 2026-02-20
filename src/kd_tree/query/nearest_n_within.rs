@@ -30,7 +30,9 @@ where
         sorted: bool,
     ) -> Vec<NearestNeighbour<D::Output, T>>
     where
-        D: DistanceMetricUnified<A, K>,
+        D: DistanceMetricUnified<A, K>
+            + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, D::Output>
+            + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, D::Output>,
         D::Output: crate::stem_strategies::SimdPrune + BacktrackBlock3 + BacktrackBlock4,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
@@ -61,7 +63,9 @@ where
         sorted: bool,
     ) -> Vec<NearestNeighbour<D::Output, T>>
     where
-        D: DistanceMetricUnified<A, K>,
+        D: DistanceMetricUnified<A, K>
+            + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, D::Output>
+            + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, D::Output>,
         D::Output: crate::stem_strategies::SimdPrune + BacktrackBlock3 + BacktrackBlock4,
         R: ResultCollection<D::Output, T>,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
@@ -110,7 +114,12 @@ where
     }
 
     fn max_dist(&self) -> O {
-        self.results.max_dist()
+        let results_cap = self.results.max_dist();
+        if results_cap < self.max_dist {
+            results_cap
+        } else {
+            self.max_dist
+        }
     }
 }
 

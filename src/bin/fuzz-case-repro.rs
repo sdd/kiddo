@@ -147,6 +147,12 @@ fn normalize_strategy(value: &str) -> String {
     let lower = value.to_ascii_lowercase();
     match lower.as_str() {
         "donnellysimd" | "donnelly_simd" | "donnelly-simd" => "donnelly_simd".to_string(),
+        "donnellysimdblock3" | "donnelly_simd_block3" | "donnelly-simd-block3" => {
+            "donnelly_simd_block3".to_string()
+        }
+        "donnellysimdblock4" | "donnelly_simd_block4" | "donnelly-simd-block4" => {
+            "donnelly_simd_block4".to_string()
+        }
         other => other.to_string(),
     }
 }
@@ -253,6 +259,13 @@ fn run_v6_mutable_f32(params: &ReproParams) -> Result<(), String> {
         "eytzinger" => run_v6_mutable_strategy_f32::<V6EytzingerStrategyF32>(params),
         "donnelly" => run_v6_mutable_strategy_f32::<V6DonnellyStrategyF32>(params),
         "donnelly_simd" => run_v6_mutable_strategy_f32::<V6DonnellySimdStrategyF32>(params),
+        "donnelly_simd_block3" => Err(
+            "donnelly_simd_block3 is not supported for f32 on 64-byte-line targets; use donnelly_simd_block4"
+                .to_string(),
+        ),
+        "donnelly_simd_block4" => {
+            run_v6_mutable_strategy_f32::<V6DonnellySimdBlock4StrategyF32>(params)
+        }
         _ => Err(format!(
             "unsupported v6 mutable strategy '{}'",
             params.strategy
@@ -266,6 +279,13 @@ fn run_v6_mutable_f64(params: &ReproParams) -> Result<(), String> {
         "eytzinger" => run_v6_mutable_strategy_f64::<V6EytzingerStrategyF64>(params),
         "donnelly" => run_v6_mutable_strategy_f64::<V6DonnellyStrategyF64>(params),
         "donnelly_simd" => run_v6_mutable_strategy_f64::<V6DonnellySimdStrategyF64>(params),
+        "donnelly_simd_block3" => {
+            run_v6_mutable_strategy_f64::<V6DonnellySimdBlock3StrategyF64>(params)
+        }
+        "donnelly_simd_block4" => Err(
+            "donnelly_simd_block4 is not supported for f64 on 64-byte-line targets; use donnelly_simd_block3"
+                .to_string(),
+        ),
         _ => Err(format!(
             "unsupported v6 mutable strategy '{}'",
             params.strategy
@@ -279,6 +299,13 @@ fn run_v6_immutable_f32(params: &ReproParams) -> Result<(), String> {
         "eytzinger" => run_v6_immutable_strategy_f32::<V6EytzingerStrategyF32>(params),
         "donnelly" => run_v6_immutable_strategy_f32::<V6DonnellyStrategyF32>(params),
         "donnelly_simd" => run_v6_immutable_strategy_f32::<V6DonnellySimdStrategyF32>(params),
+        "donnelly_simd_block3" => Err(
+            "donnelly_simd_block3 is not supported for f32 on 64-byte-line targets; use donnelly_simd_block4"
+                .to_string(),
+        ),
+        "donnelly_simd_block4" => {
+            run_v6_immutable_strategy_f32::<V6DonnellySimdBlock4StrategyF32>(params)
+        }
         _ => Err(format!(
             "unsupported v6 immutable strategy '{}'",
             params.strategy
@@ -292,6 +319,13 @@ fn run_v6_immutable_f64(params: &ReproParams) -> Result<(), String> {
         "eytzinger" => run_v6_immutable_strategy_f64::<V6EytzingerStrategyF64>(params),
         "donnelly" => run_v6_immutable_strategy_f64::<V6DonnellyStrategyF64>(params),
         "donnelly_simd" => run_v6_immutable_strategy_f64::<V6DonnellySimdStrategyF64>(params),
+        "donnelly_simd_block3" => {
+            run_v6_immutable_strategy_f64::<V6DonnellySimdBlock3StrategyF64>(params)
+        }
+        "donnelly_simd_block4" => Err(
+            "donnelly_simd_block4 is not supported for f64 on 64-byte-line targets; use donnelly_simd_block3"
+                .to_string(),
+        ),
         _ => Err(format!(
             "unsupported v6 immutable strategy '{}'",
             params.strategy
@@ -393,9 +427,11 @@ trait V6StrategySelectorF64 {
 struct V6EytzingerStrategyF32;
 struct V6DonnellyStrategyF32;
 struct V6DonnellySimdStrategyF32;
+struct V6DonnellySimdBlock4StrategyF32;
 struct V6EytzingerStrategyF64;
 struct V6DonnellyStrategyF64;
 struct V6DonnellySimdStrategyF64;
+struct V6DonnellySimdBlock3StrategyF64;
 
 impl V6StrategySelectorF32 for V6EytzingerStrategyF32 {
     fn run_mutable<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
@@ -441,6 +477,32 @@ impl V6StrategySelectorF32 for V6DonnellySimdStrategyF32 {
     }
 }
 
+impl V6StrategySelectorF32 for V6DonnellySimdBlock4StrategyF32 {
+    fn run_mutable<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
+        let _ = params;
+        #[cfg(feature = "simd")]
+        {
+            run_v6_mutable_case_f32::<K, B, DonnellyMarkerSimd<Block4, 64, 4, K>>(params)
+        }
+        #[cfg(not(feature = "simd"))]
+        {
+            Err("donnelly_simd_block4 requires --features simd".to_string())
+        }
+    }
+
+    fn run_immutable<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
+        let _ = params;
+        #[cfg(feature = "simd")]
+        {
+            run_v6_immutable_case_f32::<K, B, DonnellyMarkerSimd<Block4, 64, 4, K>>(params)
+        }
+        #[cfg(not(feature = "simd"))]
+        {
+            Err("donnelly_simd_block4 requires --features simd".to_string())
+        }
+    }
+}
+
 impl V6StrategySelectorF64 for V6EytzingerStrategyF64 {
     fn run_mutable<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
         run_v6_mutable_case_f64::<K, B, Eytzinger<K>>(params)
@@ -481,6 +543,32 @@ impl V6StrategySelectorF64 for V6DonnellySimdStrategyF64 {
         #[cfg(not(feature = "simd"))]
         {
             Err("donnelly_simd requires --features simd".to_string())
+        }
+    }
+}
+
+impl V6StrategySelectorF64 for V6DonnellySimdBlock3StrategyF64 {
+    fn run_mutable<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
+        let _ = params;
+        #[cfg(feature = "simd")]
+        {
+            run_v6_mutable_case_f64::<K, B, DonnellyMarkerSimd<Block3, 64, 8, K>>(params)
+        }
+        #[cfg(not(feature = "simd"))]
+        {
+            Err("donnelly_simd_block3 requires --features simd".to_string())
+        }
+    }
+
+    fn run_immutable<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
+        let _ = params;
+        #[cfg(feature = "simd")]
+        {
+            run_v6_immutable_case_f64::<K, B, DonnellyMarkerSimd<Block3, 64, 8, K>>(params)
+        }
+        #[cfg(not(feature = "simd"))]
+        {
+            Err("donnelly_simd_block3 requires --features simd".to_string())
         }
     }
 }

@@ -127,6 +127,11 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellyCore
 }
 
 impl<const CL: u32, const VB: u32, const K: usize> DonnellyCore<CL, VB, K> {
+    #[inline(always)]
+    pub(crate) fn minor_level(&self) -> u32 {
+        self.minor_level
+    }
+
     /// Traverse an entire block at once
     ///
     /// - `child_idx`: index of the child block to traverse to the root of
@@ -140,11 +145,26 @@ impl<const CL: u32, const VB: u32, const K: usize> DonnellyCore<CL, VB, K> {
     #[allow(unused)] // used when simd feature is on
     #[inline(always)]
     pub(crate) fn traverse_block(&mut self, child_idx: u8, block_size: u32) {
-        // sanity check to help enforce preconditions
-        debug_assert!(self.minor_level == 0);
+        debug_assert_eq!(block_size, Self::BLOCK_SIZE as u32, "Block size ({block_size}) must match BLOCK_SIZE constant ({})", Self::BLOCK_SIZE);
+        debug_assert!(child_idx < (1u8 << block_size));
+        debug_assert_eq!(self.minor_level, 0);
+        debug_assert_eq!(self.stem_idx & Self::line_mask(), 0);
 
-        self.stem_idx = Self::step_pure_block(self.stem_idx, child_idx);
+        // TODO: this used to call step_pure_block. Either remove step_pure_block or factor
+        //       this code back into it
+        let minor_tri_height = Self::log2_items_per_line();
+        let major_base = self.stem_idx & Self::line_mask_inv();
 
+        let major_offset = Self::items_per_line()
+            .wrapping_sub(block_size.wrapping_shl(1))
+            .wrapping_sub(1);
+
+        self.stem_idx = major_base
+            .wrapping_add(major_offset)
+            .wrapping_add(child_idx as u32)
+            .wrapping_shl(minor_tri_height);
+
+        self.minor_level = 0;
         self.level = self.level.wrapping_add(block_size as i32);
 
         let wrap_dim_mask = 0usize.wrapping_sub((self.dim == (K - 1)) as usize);
@@ -636,5 +656,140 @@ mod tests {
         });
 
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn regression_block4_traverse_block_matches_repeated_traverse_f32() {
+        let stems = avec![f32::INFINITY; 2_048];
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+
+        let start_paths: [&[bool]; 4] = [
+            &[],
+            &[false, false, false, false],
+            &[false, false, false, true],
+            &[true, true, true, true],
+        ];
+
+        for start_path in start_paths {
+            let mut base = DonnellyCore::<64, 4, 2>::new(stems_ptr);
+            for &is_right in start_path {
+                base.traverse(is_right);
+            }
+            assert_eq!(base.level() % 4, 0, "base must be at block boundary");
+
+            for child_idx in 0u8..16 {
+                let mut block = base;
+                block.traverse_block(child_idx, 4);
+
+                let mut repeated = base;
+                for shift in (0..4).rev() {
+                    repeated.traverse(((child_idx >> shift) & 1) != 0);
+                }
+
+                assert_eq!(
+                    block.stem_idx(),
+                    repeated.stem_idx(),
+                    "stem_idx mismatch for start_path={:?}, child_idx={}",
+                    start_path,
+                    child_idx
+                );
+                assert_eq!(
+                    block.leaf_idx(),
+                    repeated.leaf_idx(),
+                    "leaf_idx mismatch for start_path={:?}, child_idx={}",
+                    start_path,
+                    child_idx
+                );
+                assert_eq!(
+                    block.level(),
+                    repeated.level(),
+                    "level mismatch for start_path={:?}, child_idx={}",
+                    start_path,
+                    child_idx
+                );
+            }
+        }
+
+        // Also verify deeper block boundaries (level 8) reached via two full block traversals.
+        for block_a in 0u8..16 {
+            for block_b in 0u8..16 {
+                let mut base = DonnellyCore::<64, 4, 2>::new(stems_ptr);
+                base.traverse_block(block_a, 4);
+                base.traverse_block(block_b, 4);
+                assert_eq!(base.level() % 4, 0, "base must be at block boundary");
+
+                for child_idx in 0u8..16 {
+                    let mut block = base;
+                    block.traverse_block(child_idx, 4);
+
+                    let mut repeated = base;
+                    for shift in (0..4).rev() {
+                        repeated.traverse(((child_idx >> shift) & 1) != 0);
+                    }
+
+                    assert_eq!(
+                        block.stem_idx(),
+                        repeated.stem_idx(),
+                        "deep stem_idx mismatch for block_a={}, block_b={}, child_idx={}",
+                        block_a,
+                        block_b,
+                        child_idx
+                    );
+                    assert_eq!(
+                        block.leaf_idx(),
+                        repeated.leaf_idx(),
+                        "deep leaf_idx mismatch for block_a={}, block_b={}, child_idx={}",
+                        block_a,
+                        block_b,
+                        child_idx
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn regression_branch_relative_matches_traverse_children_block4_f32() {
+        use crate::StemStrategy;
+
+        let stems = avec![f32::INFINITY; 4_096];
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+
+        // Exercise a broad set of states including block boundaries and tails.
+        for path_len in 0..=12 {
+            let combinations = 1usize << path_len.min(10);
+            for bits in 0..combinations {
+                let mut base = DonnellyCore::<64, 4, 2>::new(stems_ptr);
+                for step in 0..path_len {
+                    let is_right = if step < 10 {
+                        (bits >> step) & 1 == 1
+                    } else {
+                        // Deterministic extension once the bit-combination cap is reached.
+                        step % 2 == 1
+                    };
+                    base.traverse(is_right);
+                }
+
+                for &is_right in &[false, true] {
+                    let mut branched = base;
+                    let far = branched.branch_relative(is_right);
+                    let near = branched;
+
+                    let mut near_ref = base;
+                    near_ref.traverse(is_right);
+
+                    let mut far_ref = base;
+                    far_ref.traverse(!is_right);
+
+                    assert_eq!(near.stem_idx(), near_ref.stem_idx());
+                    assert_eq!(near.level(), near_ref.level());
+                    assert_eq!(near.leaf_idx(), near_ref.leaf_idx());
+
+                    assert_eq!(far.stem_idx(), far_ref.stem_idx());
+                    assert_eq!(far.level(), far_ref.level());
+                    assert_eq!(far.leaf_idx(), far_ref.leaf_idx());
+                }
+            }
+        }
     }
 }
