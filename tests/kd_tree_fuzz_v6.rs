@@ -27,7 +27,9 @@ const DEFAULT_PERTURB_MIN: i32 = -5;
 const DEFAULT_PERTURB_MAX: i32 = 5;
 const DEFAULT_MAX_NEAREST_N: usize = 32;
 const DEFAULT_SEED: u64 = 0x4b1d_f00d;
-const QUERY_COUNT: usize = 100;
+const DEFAULT_QUERY_COUNT: usize = 100;
+const SIMD_FAST_CASES: usize = 1;
+const SIMD_FAST_QUERY_COUNT: usize = 10;
 const PROGRESS_EVERY: usize = 100;
 const PREVIEW_LEN: usize = 8;
 const REPORT_PATH: &str = "kd_tree_fuzz_v6_report.txt";
@@ -40,6 +42,7 @@ static REPORT_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 struct FuzzConfig {
     seed: u64,
     cases: usize,
+    query_count: usize,
     min_pow: u32,
     max_pow: u32,
     perturb_min: i32,
@@ -62,6 +65,7 @@ impl FuzzConfig {
         Self {
             seed: read_env_u64("KIDDO_FUZZ_SEED", DEFAULT_SEED),
             cases: read_env_usize("KIDDO_FUZZ_CASES", DEFAULT_CASES),
+            query_count: read_env_usize("KIDDO_FUZZ_QUERY_COUNT", DEFAULT_QUERY_COUNT).max(1),
             min_pow: read_env_u32("KIDDO_FUZZ_MIN_POW", DEFAULT_MIN_POW),
             max_pow: read_env_u32("KIDDO_FUZZ_MAX_POW", DEFAULT_MAX_POW),
             perturb_min: read_env_i32("KIDDO_FUZZ_PERTURB_MIN", DEFAULT_PERTURB_MIN),
@@ -72,6 +76,19 @@ impl FuzzConfig {
 
     fn case_seed(self, case_idx: usize) -> u64 {
         self.seed ^ (case_idx as u64).wrapping_mul(SEED_MIX_CASE)
+    }
+
+    #[cfg(feature = "simd")]
+    fn for_simd(self) -> Self {
+        if read_env_bool("KIDDO_FUZZ_V6_SIMD_FAST", false) {
+            Self {
+                cases: self.cases.min(SIMD_FAST_CASES).max(1),
+                query_count: self.query_count.min(SIMD_FAST_QUERY_COUNT).max(1),
+                ..self
+            }
+        } else {
+            self
+        }
     }
 }
 
@@ -101,6 +118,26 @@ fn read_env_u64(key: &str, default: u64) -> u64 {
         .ok()
         .and_then(|value| value.parse::<u64>().ok())
         .unwrap_or(default)
+}
+
+fn read_env_bool(key: &str, default: bool) -> bool {
+    env::var(key)
+        .ok()
+        .map(|value| match value.to_ascii_lowercase().as_str() {
+            "1" | "true" | "yes" | "on" => true,
+            "0" | "false" | "no" | "off" => false,
+            _ => default,
+        })
+        .unwrap_or(default)
+}
+
+fn should_run_non_simd_paths() -> bool {
+    read_env_bool("KIDDO_FUZZ_V6_RUN_NON_SIMD", true)
+}
+
+#[cfg(feature = "simd")]
+fn should_run_simd_paths() -> bool {
+    read_env_bool("KIDDO_FUZZ_V6_RUN_SIMD", true)
 }
 
 fn log_failure(message: &str) {
@@ -486,13 +523,19 @@ fn print_case_start(label: &str, case_idx: usize, cases: usize, point_count: usi
     );
 }
 
-fn print_query_progress(label: &str, case_idx: usize, query_idx: usize, seed: u64) {
+fn print_query_progress(
+    label: &str,
+    case_idx: usize,
+    query_idx: usize,
+    query_count: usize,
+    seed: u64,
+) {
     if query_idx.is_multiple_of(PROGRESS_EVERY) {
         println!(
             "{label}: case {} query {}/{} (query_seed={seed})",
             case_idx + 1,
             query_idx + 1,
-            QUERY_COUNT
+            query_count
         );
     }
 }
@@ -501,12 +544,13 @@ struct ProgressReporter {
     bar: Option<ProgressBar>,
     label: String,
     cases: usize,
+    query_count: usize,
 }
 
 impl ProgressReporter {
-    fn new(label: &str, cases: usize) -> Self {
+    fn new(label: &str, cases: usize, query_count: usize) -> Self {
         let bar = if std::io::stderr().is_terminal() {
-            let total = cases.saturating_mul(QUERY_COUNT);
+            let total = cases.saturating_mul(query_count);
             Some(ProgressBar::with_target(total))
         } else {
             None
@@ -516,6 +560,7 @@ impl ProgressReporter {
             bar,
             label: label.to_string(),
             cases,
+            query_count,
         }
     }
 
@@ -527,19 +572,25 @@ impl ProgressReporter {
 
     fn advance(&mut self, case_idx: usize, query_idx: usize, _content_seed: u64, query_seed: u64) {
         if let Some(bar) = self.bar.as_mut() {
-            if query_idx.is_multiple_of(PROGRESS_EVERY) || query_idx + 1 == QUERY_COUNT {
+            if query_idx.is_multiple_of(PROGRESS_EVERY) || query_idx + 1 == self.query_count {
                 bar.set_message(Some(format!(
                     "{} case {}/{} query {}/{} ",
                     self.label,
                     case_idx + 1,
                     self.cases,
                     query_idx + 1,
-                    QUERY_COUNT,
+                    self.query_count,
                 )));
             }
             bar.add(1);
         } else {
-            print_query_progress(&self.label, case_idx, query_idx, query_seed);
+            print_query_progress(
+                &self.label,
+                case_idx,
+                query_idx,
+                self.query_count,
+                query_seed,
+            );
         }
     }
 }
@@ -551,7 +602,7 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
 ) where
     SO: StemStrategy,
 {
-    let mut progress = ProgressReporter::new(label, cfg.cases);
+    let mut progress = ProgressReporter::new(label, cfg.cases, cfg.query_count);
     for case_idx in 0..cfg.cases {
         let content_seed = cfg.case_seed(case_idx);
         let mut rng_content = StdRng::seed_from_u64(content_seed);
@@ -571,7 +622,7 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
 
         let max_nearest_n = cfg.max_nearest_n.max(1).min(point_count);
 
-        for query_idx in 0..QUERY_COUNT {
+        for query_idx in 0..cfg.query_count {
             let query_seed = query_seed(content_seed, query_idx);
             let mut rng_query = StdRng::seed_from_u64(query_seed);
             let query = random_point_f32::<K>(&mut rng_query);
@@ -740,7 +791,7 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
 ) where
     SO: StemStrategy,
 {
-    let mut progress = ProgressReporter::new(label, cfg.cases);
+    let mut progress = ProgressReporter::new(label, cfg.cases, cfg.query_count);
     for case_idx in 0..cfg.cases {
         let content_seed = cfg.case_seed(case_idx);
         let mut rng_content = StdRng::seed_from_u64(content_seed);
@@ -760,7 +811,7 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
 
         let max_nearest_n = cfg.max_nearest_n.max(1).min(point_count);
 
-        for query_idx in 0..QUERY_COUNT {
+        for query_idx in 0..cfg.query_count {
             let query_seed = query_seed(content_seed, query_idx);
             let mut rng_query = StdRng::seed_from_u64(query_seed);
             let query = random_point_f64::<K>(&mut rng_query);
@@ -929,7 +980,7 @@ fn run_immutable_case_f32<const K: usize, const B: usize, SO>(
 ) where
     SO: StemStrategy,
 {
-    let mut progress = ProgressReporter::new(label, cfg.cases);
+    let mut progress = ProgressReporter::new(label, cfg.cases, cfg.query_count);
     for case_idx in 0..cfg.cases {
         let content_seed = cfg.case_seed(case_idx);
         let mut rng_content = StdRng::seed_from_u64(content_seed);
@@ -945,7 +996,7 @@ fn run_immutable_case_f32<const K: usize, const B: usize, SO>(
 
         let max_nearest_n = cfg.max_nearest_n.max(1).min(point_count);
 
-        for query_idx in 0..QUERY_COUNT {
+        for query_idx in 0..cfg.query_count {
             let query_seed = query_seed(content_seed, query_idx);
             let mut rng_query = StdRng::seed_from_u64(query_seed);
             let query = random_point_f32::<K>(&mut rng_query);
@@ -1114,7 +1165,7 @@ fn run_immutable_case_f64<const K: usize, const B: usize, SO>(
 ) where
     SO: StemStrategy,
 {
-    let mut progress = ProgressReporter::new(label, cfg.cases);
+    let mut progress = ProgressReporter::new(label, cfg.cases, cfg.query_count);
     for case_idx in 0..cfg.cases {
         let content_seed = cfg.case_seed(case_idx);
         let mut rng_content = StdRng::seed_from_u64(content_seed);
@@ -1130,7 +1181,7 @@ fn run_immutable_case_f64<const K: usize, const B: usize, SO>(
 
         let max_nearest_n = cfg.max_nearest_n.max(1).min(point_count);
 
-        for query_idx in 0..QUERY_COUNT {
+        for query_idx in 0..cfg.query_count {
             let query_seed = query_seed(content_seed, query_idx);
             let mut rng_query = StdRng::seed_from_u64(query_seed);
             let query = random_point_f64::<K>(&mut rng_query);
@@ -1299,15 +1350,50 @@ type DonnellyF64<const K: usize> = Donnelly<3, 64, 8, K>;
 
 #[cfg(feature = "simd")]
 #[allow(type_alias_bounds)]
-type DonnellySimdF32<const K: usize> = DonnellyMarkerSimd<Block4, 64, 4, K>;
+type DonnellySimdBlock4F32<const K: usize> = DonnellyMarkerSimd<Block4, 64, 4, K>;
 #[cfg(feature = "simd")]
 #[allow(type_alias_bounds)]
-type DonnellySimdF64<const K: usize> = DonnellyMarkerSimd<Block3, 64, 8, K>;
+type DonnellySimdBlock3F64<const K: usize> = DonnellyMarkerSimd<Block3, 64, 8, K>;
+
+#[cfg(feature = "simd")]
+macro_rules! run_simd_matrix_f32 {
+    ($runner:ident, $cfg:expr, $meta:expr, $prefix:literal, $strategy:ident, $block:literal) => {
+        $runner::<2, 32, $strategy<2>>($cfg, concat!($prefix, " ", $block, " K=2 B=32"), $meta);
+        $runner::<2, 64, $strategy<2>>($cfg, concat!($prefix, " ", $block, " K=2 B=64"), $meta);
+        $runner::<2, 128, $strategy<2>>($cfg, concat!($prefix, " ", $block, " K=2 B=128"), $meta);
+        $runner::<3, 32, $strategy<3>>($cfg, concat!($prefix, " ", $block, " K=3 B=32"), $meta);
+        $runner::<3, 64, $strategy<3>>($cfg, concat!($prefix, " ", $block, " K=3 B=64"), $meta);
+        $runner::<3, 128, $strategy<3>>($cfg, concat!($prefix, " ", $block, " K=3 B=128"), $meta);
+        $runner::<4, 32, $strategy<4>>($cfg, concat!($prefix, " ", $block, " K=4 B=32"), $meta);
+        $runner::<4, 64, $strategy<4>>($cfg, concat!($prefix, " ", $block, " K=4 B=64"), $meta);
+        $runner::<4, 128, $strategy<4>>($cfg, concat!($prefix, " ", $block, " K=4 B=128"), $meta);
+    };
+}
+
+#[cfg(feature = "simd")]
+macro_rules! run_simd_matrix_f64 {
+    ($runner:ident, $cfg:expr, $meta:expr, $prefix:literal, $strategy:ident, $block:literal) => {
+        $runner::<2, 32, $strategy<2>>($cfg, concat!($prefix, " ", $block, " K=2 B=32"), $meta);
+        $runner::<2, 64, $strategy<2>>($cfg, concat!($prefix, " ", $block, " K=2 B=64"), $meta);
+        $runner::<2, 128, $strategy<2>>($cfg, concat!($prefix, " ", $block, " K=2 B=128"), $meta);
+        $runner::<3, 32, $strategy<3>>($cfg, concat!($prefix, " ", $block, " K=3 B=32"), $meta);
+        $runner::<3, 64, $strategy<3>>($cfg, concat!($prefix, " ", $block, " K=3 B=64"), $meta);
+        $runner::<3, 128, $strategy<3>>($cfg, concat!($prefix, " ", $block, " K=3 B=128"), $meta);
+        $runner::<4, 32, $strategy<4>>($cfg, concat!($prefix, " ", $block, " K=4 B=32"), $meta);
+        $runner::<4, 64, $strategy<4>>($cfg, concat!($prefix, " ", $block, " K=4 B=64"), $meta);
+        $runner::<4, 128, $strategy<4>>($cfg, concat!($prefix, " ", $block, " K=4 B=128"), $meta);
+    };
+}
 
 #[test]
 #[ignore = "long-running fuzz-style correctness checks"]
 fn fuzz_v6_mutable_f32() {
     let cfg = FuzzConfig::from_env();
+    let run_non_simd_paths = should_run_non_simd_paths();
+    #[cfg(feature = "simd")]
+    let run_simd_paths = should_run_simd_paths();
+    #[cfg(feature = "simd")]
+    let simd_cfg = cfg.for_simd();
     let meta = ReproMeta {
         kind: "v6_mutable",
         leaf: "vec_of_arrays",
@@ -1317,83 +1403,97 @@ fn fuzz_v6_mutable_f32() {
         k: 2,
     };
 
-    run_mutable_case_f32::<2, 16, Eytzinger<2>>(cfg, "v6 mutable f32 Eytzinger K=2 B=16", meta);
-    run_mutable_case_f32::<2, 32, Eytzinger<2>>(cfg, "v6 mutable f32 Eytzinger K=2 B=32", meta);
-    run_mutable_case_f32::<2, 64, Eytzinger<2>>(cfg, "v6 mutable f32 Eytzinger K=2 B=64", meta);
-    run_mutable_case_f32::<3, 16, Eytzinger<3>>(cfg, "v6 mutable f32 Eytzinger K=3 B=16", meta);
-    run_mutable_case_f32::<3, 32, Eytzinger<3>>(cfg, "v6 mutable f32 Eytzinger K=3 B=32", meta);
-    run_mutable_case_f32::<3, 64, Eytzinger<3>>(cfg, "v6 mutable f32 Eytzinger K=3 B=64", meta);
-    run_mutable_case_f32::<4, 16, Eytzinger<4>>(cfg, "v6 mutable f32 Eytzinger K=4 B=16", meta);
-    run_mutable_case_f32::<4, 32, Eytzinger<4>>(cfg, "v6 mutable f32 Eytzinger K=4 B=32", meta);
-    run_mutable_case_f32::<4, 64, Eytzinger<4>>(cfg, "v6 mutable f32 Eytzinger K=4 B=64", meta);
+    if run_non_simd_paths {
+        run_mutable_case_f32::<2, 32, Eytzinger<2>>(cfg, "v6 mutable f32 Eytzinger K=2 B=32", meta);
+        run_mutable_case_f32::<2, 64, Eytzinger<2>>(cfg, "v6 mutable f32 Eytzinger K=2 B=64", meta);
+        run_mutable_case_f32::<2, 128, Eytzinger<2>>(
+            cfg,
+            "v6 mutable f32 Eytzinger K=2 B=128",
+            meta,
+        );
+        run_mutable_case_f32::<3, 32, Eytzinger<3>>(cfg, "v6 mutable f32 Eytzinger K=3 B=32", meta);
+        run_mutable_case_f32::<3, 64, Eytzinger<3>>(cfg, "v6 mutable f32 Eytzinger K=3 B=64", meta);
+        run_mutable_case_f32::<3, 128, Eytzinger<3>>(
+            cfg,
+            "v6 mutable f32 Eytzinger K=3 B=128",
+            meta,
+        );
+        run_mutable_case_f32::<4, 32, Eytzinger<4>>(cfg, "v6 mutable f32 Eytzinger K=4 B=32", meta);
+        run_mutable_case_f32::<4, 64, Eytzinger<4>>(cfg, "v6 mutable f32 Eytzinger K=4 B=64", meta);
+        run_mutable_case_f32::<4, 128, Eytzinger<4>>(
+            cfg,
+            "v6 mutable f32 Eytzinger K=4 B=128",
+            meta,
+        );
 
-    let meta = ReproMeta {
-        strategy: "donnelly",
-        ..meta
-    };
-
-    run_mutable_case_f32::<2, 16, DonnellyF32<2>>(cfg, "v6 mutable f32 Donnelly K=2 B=16", meta);
-    run_mutable_case_f32::<2, 32, DonnellyF32<2>>(cfg, "v6 mutable f32 Donnelly K=2 B=32", meta);
-    run_mutable_case_f32::<2, 64, DonnellyF32<2>>(cfg, "v6 mutable f32 Donnelly K=2 B=64", meta);
-    run_mutable_case_f32::<3, 16, DonnellyF32<3>>(cfg, "v6 mutable f32 Donnelly K=3 B=16", meta);
-    run_mutable_case_f32::<3, 32, DonnellyF32<3>>(cfg, "v6 mutable f32 Donnelly K=3 B=32", meta);
-    run_mutable_case_f32::<3, 64, DonnellyF32<3>>(cfg, "v6 mutable f32 Donnelly K=3 B=64", meta);
-    run_mutable_case_f32::<4, 16, DonnellyF32<4>>(cfg, "v6 mutable f32 Donnelly K=4 B=16", meta);
-    run_mutable_case_f32::<4, 32, DonnellyF32<4>>(cfg, "v6 mutable f32 Donnelly K=4 B=32", meta);
-    run_mutable_case_f32::<4, 64, DonnellyF32<4>>(cfg, "v6 mutable f32 Donnelly K=4 B=64", meta);
-
-    #[cfg(feature = "simd")]
-    {
         let meta = ReproMeta {
-            strategy: "donnelly_simd",
+            strategy: "donnelly",
             ..meta
         };
 
-        run_mutable_case_f32::<2, 16, DonnellySimdF32<2>>(
+        run_mutable_case_f32::<2, 16, DonnellyF32<2>>(
             cfg,
-            "v6 mutable f32 DonnellySimd K=2 B=16",
+            "v6 mutable f32 Donnelly K=2 B=16",
             meta,
         );
-        run_mutable_case_f32::<2, 32, DonnellySimdF32<2>>(
+        run_mutable_case_f32::<2, 32, DonnellyF32<2>>(
             cfg,
-            "v6 mutable f32 DonnellySimd K=2 B=32",
+            "v6 mutable f32 Donnelly K=2 B=32",
             meta,
         );
-        run_mutable_case_f32::<2, 64, DonnellySimdF32<2>>(
+        run_mutable_case_f32::<2, 64, DonnellyF32<2>>(
             cfg,
-            "v6 mutable f32 DonnellySimd K=2 B=64",
+            "v6 mutable f32 Donnelly K=2 B=64",
             meta,
         );
-        run_mutable_case_f32::<3, 16, DonnellySimdF32<3>>(
+        run_mutable_case_f32::<3, 16, DonnellyF32<3>>(
             cfg,
-            "v6 mutable f32 DonnellySimd K=3 B=16",
+            "v6 mutable f32 Donnelly K=3 B=16",
             meta,
         );
-        run_mutable_case_f32::<3, 32, DonnellySimdF32<3>>(
+        run_mutable_case_f32::<3, 32, DonnellyF32<3>>(
             cfg,
-            "v6 mutable f32 DonnellySimd K=3 B=32",
+            "v6 mutable f32 Donnelly K=3 B=32",
             meta,
         );
-        run_mutable_case_f32::<3, 64, DonnellySimdF32<3>>(
+        run_mutable_case_f32::<3, 64, DonnellyF32<3>>(
             cfg,
-            "v6 mutable f32 DonnellySimd K=3 B=64",
+            "v6 mutable f32 Donnelly K=3 B=64",
             meta,
         );
-        run_mutable_case_f32::<4, 16, DonnellySimdF32<4>>(
+        run_mutable_case_f32::<4, 16, DonnellyF32<4>>(
             cfg,
-            "v6 mutable f32 DonnellySimd K=4 B=16",
+            "v6 mutable f32 Donnelly K=4 B=16",
             meta,
         );
-        run_mutable_case_f32::<4, 32, DonnellySimdF32<4>>(
+        run_mutable_case_f32::<4, 32, DonnellyF32<4>>(
             cfg,
-            "v6 mutable f32 DonnellySimd K=4 B=32",
+            "v6 mutable f32 Donnelly K=4 B=32",
             meta,
         );
-        run_mutable_case_f32::<4, 64, DonnellySimdF32<4>>(
+        run_mutable_case_f32::<4, 64, DonnellyF32<4>>(
             cfg,
-            "v6 mutable f32 DonnellySimd K=4 B=64",
+            "v6 mutable f32 Donnelly K=4 B=64",
             meta,
         );
+    }
+
+    #[cfg(feature = "simd")]
+    {
+        if run_simd_paths {
+            let block4_meta = ReproMeta {
+                strategy: "donnelly_simd_block4",
+                ..meta
+            };
+            run_simd_matrix_f32!(
+                run_mutable_case_f32,
+                simd_cfg,
+                block4_meta,
+                "v6 mutable f32 DonnellySimd",
+                DonnellySimdBlock4F32,
+                "Block4"
+            );
+        }
     }
 }
 
@@ -1401,6 +1501,11 @@ fn fuzz_v6_mutable_f32() {
 #[ignore = "long-running fuzz-style correctness checks"]
 fn fuzz_v6_mutable_f64() {
     let cfg = FuzzConfig::from_env();
+    let run_non_simd_paths = should_run_non_simd_paths();
+    #[cfg(feature = "simd")]
+    let run_simd_paths = should_run_simd_paths();
+    #[cfg(feature = "simd")]
+    let simd_cfg = cfg.for_simd();
     let meta = ReproMeta {
         kind: "v6_mutable",
         leaf: "vec_of_arrays",
@@ -1410,83 +1515,97 @@ fn fuzz_v6_mutable_f64() {
         k: 2,
     };
 
-    run_mutable_case_f64::<2, 16, Eytzinger<2>>(cfg, "v6 mutable f64 Eytzinger K=2 B=16", meta);
-    run_mutable_case_f64::<2, 32, Eytzinger<2>>(cfg, "v6 mutable f64 Eytzinger K=2 B=32", meta);
-    run_mutable_case_f64::<2, 64, Eytzinger<2>>(cfg, "v6 mutable f64 Eytzinger K=2 B=64", meta);
-    run_mutable_case_f64::<3, 16, Eytzinger<3>>(cfg, "v6 mutable f64 Eytzinger K=3 B=16", meta);
-    run_mutable_case_f64::<3, 32, Eytzinger<3>>(cfg, "v6 mutable f64 Eytzinger K=3 B=32", meta);
-    run_mutable_case_f64::<3, 64, Eytzinger<3>>(cfg, "v6 mutable f64 Eytzinger K=3 B=64", meta);
-    run_mutable_case_f64::<4, 16, Eytzinger<4>>(cfg, "v6 mutable f64 Eytzinger K=4 B=16", meta);
-    run_mutable_case_f64::<4, 32, Eytzinger<4>>(cfg, "v6 mutable f64 Eytzinger K=4 B=32", meta);
-    run_mutable_case_f64::<4, 64, Eytzinger<4>>(cfg, "v6 mutable f64 Eytzinger K=4 B=64", meta);
+    if run_non_simd_paths {
+        run_mutable_case_f64::<2, 32, Eytzinger<2>>(cfg, "v6 mutable f64 Eytzinger K=2 B=32", meta);
+        run_mutable_case_f64::<2, 64, Eytzinger<2>>(cfg, "v6 mutable f64 Eytzinger K=2 B=64", meta);
+        run_mutable_case_f64::<2, 128, Eytzinger<2>>(
+            cfg,
+            "v6 mutable f64 Eytzinger K=2 B=128",
+            meta,
+        );
+        run_mutable_case_f64::<3, 32, Eytzinger<3>>(cfg, "v6 mutable f64 Eytzinger K=3 B=32", meta);
+        run_mutable_case_f64::<3, 64, Eytzinger<3>>(cfg, "v6 mutable f64 Eytzinger K=3 B=64", meta);
+        run_mutable_case_f64::<3, 128, Eytzinger<3>>(
+            cfg,
+            "v6 mutable f64 Eytzinger K=3 B=128",
+            meta,
+        );
+        run_mutable_case_f64::<4, 32, Eytzinger<4>>(cfg, "v6 mutable f64 Eytzinger K=4 B=32", meta);
+        run_mutable_case_f64::<4, 64, Eytzinger<4>>(cfg, "v6 mutable f64 Eytzinger K=4 B=64", meta);
+        run_mutable_case_f64::<4, 128, Eytzinger<4>>(
+            cfg,
+            "v6 mutable f64 Eytzinger K=4 B=128",
+            meta,
+        );
 
-    let meta = ReproMeta {
-        strategy: "donnelly",
-        ..meta
-    };
-
-    run_mutable_case_f64::<2, 16, DonnellyF64<2>>(cfg, "v6 mutable f64 Donnelly K=2 B=16", meta);
-    run_mutable_case_f64::<2, 32, DonnellyF64<2>>(cfg, "v6 mutable f64 Donnelly K=2 B=32", meta);
-    run_mutable_case_f64::<2, 64, DonnellyF64<2>>(cfg, "v6 mutable f64 Donnelly K=2 B=64", meta);
-    run_mutable_case_f64::<3, 16, DonnellyF64<3>>(cfg, "v6 mutable f64 Donnelly K=3 B=16", meta);
-    run_mutable_case_f64::<3, 32, DonnellyF64<3>>(cfg, "v6 mutable f64 Donnelly K=3 B=32", meta);
-    run_mutable_case_f64::<3, 64, DonnellyF64<3>>(cfg, "v6 mutable f64 Donnelly K=3 B=64", meta);
-    run_mutable_case_f64::<4, 16, DonnellyF64<4>>(cfg, "v6 mutable f64 Donnelly K=4 B=16", meta);
-    run_mutable_case_f64::<4, 32, DonnellyF64<4>>(cfg, "v6 mutable f64 Donnelly K=4 B=32", meta);
-    run_mutable_case_f64::<4, 64, DonnellyF64<4>>(cfg, "v6 mutable f64 Donnelly K=4 B=64", meta);
-
-    #[cfg(feature = "simd")]
-    {
         let meta = ReproMeta {
-            strategy: "donnelly_simd",
+            strategy: "donnelly",
             ..meta
         };
 
-        run_mutable_case_f64::<2, 16, DonnellySimdF64<2>>(
+        run_mutable_case_f64::<2, 16, DonnellyF64<2>>(
             cfg,
-            "v6 mutable f64 DonnellySimd K=2 B=16",
+            "v6 mutable f64 Donnelly K=2 B=16",
             meta,
         );
-        run_mutable_case_f64::<2, 32, DonnellySimdF64<2>>(
+        run_mutable_case_f64::<2, 32, DonnellyF64<2>>(
             cfg,
-            "v6 mutable f64 DonnellySimd K=2 B=32",
+            "v6 mutable f64 Donnelly K=2 B=32",
             meta,
         );
-        run_mutable_case_f64::<2, 64, DonnellySimdF64<2>>(
+        run_mutable_case_f64::<2, 64, DonnellyF64<2>>(
             cfg,
-            "v6 mutable f64 DonnellySimd K=2 B=64",
+            "v6 mutable f64 Donnelly K=2 B=64",
             meta,
         );
-        run_mutable_case_f64::<3, 16, DonnellySimdF64<3>>(
+        run_mutable_case_f64::<3, 16, DonnellyF64<3>>(
             cfg,
-            "v6 mutable f64 DonnellySimd K=3 B=16",
+            "v6 mutable f64 Donnelly K=3 B=16",
             meta,
         );
-        run_mutable_case_f64::<3, 32, DonnellySimdF64<3>>(
+        run_mutable_case_f64::<3, 32, DonnellyF64<3>>(
             cfg,
-            "v6 mutable f64 DonnellySimd K=3 B=32",
+            "v6 mutable f64 Donnelly K=3 B=32",
             meta,
         );
-        run_mutable_case_f64::<3, 64, DonnellySimdF64<3>>(
+        run_mutable_case_f64::<3, 64, DonnellyF64<3>>(
             cfg,
-            "v6 mutable f64 DonnellySimd K=3 B=64",
+            "v6 mutable f64 Donnelly K=3 B=64",
             meta,
         );
-        run_mutable_case_f64::<4, 16, DonnellySimdF64<4>>(
+        run_mutable_case_f64::<4, 16, DonnellyF64<4>>(
             cfg,
-            "v6 mutable f64 DonnellySimd K=4 B=16",
+            "v6 mutable f64 Donnelly K=4 B=16",
             meta,
         );
-        run_mutable_case_f64::<4, 32, DonnellySimdF64<4>>(
+        run_mutable_case_f64::<4, 32, DonnellyF64<4>>(
             cfg,
-            "v6 mutable f64 DonnellySimd K=4 B=32",
+            "v6 mutable f64 Donnelly K=4 B=32",
             meta,
         );
-        run_mutable_case_f64::<4, 64, DonnellySimdF64<4>>(
+        run_mutable_case_f64::<4, 64, DonnellyF64<4>>(
             cfg,
-            "v6 mutable f64 DonnellySimd K=4 B=64",
+            "v6 mutable f64 Donnelly K=4 B=64",
             meta,
         );
+    }
+
+    #[cfg(feature = "simd")]
+    {
+        if run_simd_paths {
+            let block3_meta = ReproMeta {
+                strategy: "donnelly_simd_block3",
+                ..meta
+            };
+            run_simd_matrix_f64!(
+                run_mutable_case_f64,
+                simd_cfg,
+                block3_meta,
+                "v6 mutable f64 DonnellySimd",
+                DonnellySimdBlock3F64,
+                "Block3"
+            );
+        }
     }
 }
 
@@ -1494,6 +1613,11 @@ fn fuzz_v6_mutable_f64() {
 #[ignore = "long-running fuzz-style correctness checks"]
 fn fuzz_v6_immutable_f32() {
     let cfg = FuzzConfig::from_env();
+    let run_non_simd_paths = should_run_non_simd_paths();
+    #[cfg(feature = "simd")]
+    let run_simd_paths = should_run_simd_paths();
+    #[cfg(feature = "simd")]
+    let simd_cfg = cfg.for_simd();
     let meta = ReproMeta {
         kind: "v6_immutable",
         leaf: "flat_vec",
@@ -1503,119 +1627,121 @@ fn fuzz_v6_immutable_f32() {
         k: 2,
     };
 
-    run_immutable_case_f32::<2, 16, Eytzinger<2>>(cfg, "v6 immutable f32 Eytzinger K=2 B=16", meta);
-    run_immutable_case_f32::<2, 32, Eytzinger<2>>(cfg, "v6 immutable f32 Eytzinger K=2 B=32", meta);
-    run_immutable_case_f32::<2, 64, Eytzinger<2>>(cfg, "v6 immutable f32 Eytzinger K=2 B=64", meta);
-    run_immutable_case_f32::<3, 16, Eytzinger<3>>(cfg, "v6 immutable f32 Eytzinger K=3 B=16", meta);
-    run_immutable_case_f32::<3, 32, Eytzinger<3>>(cfg, "v6 immutable f32 Eytzinger K=3 B=32", meta);
-    run_immutable_case_f32::<3, 64, Eytzinger<3>>(cfg, "v6 immutable f32 Eytzinger K=3 B=64", meta);
-    run_immutable_case_f32::<4, 16, Eytzinger<4>>(cfg, "v6 immutable f32 Eytzinger K=4 B=16", meta);
-    run_immutable_case_f32::<4, 32, Eytzinger<4>>(cfg, "v6 immutable f32 Eytzinger K=4 B=32", meta);
-    run_immutable_case_f32::<4, 64, Eytzinger<4>>(cfg, "v6 immutable f32 Eytzinger K=4 B=64", meta);
+    if run_non_simd_paths {
+        run_immutable_case_f32::<2, 16, Eytzinger<2>>(
+            cfg,
+            "v6 immutable f32 Eytzinger K=2 B=16",
+            meta,
+        );
+        run_immutable_case_f32::<2, 32, Eytzinger<2>>(
+            cfg,
+            "v6 immutable f32 Eytzinger K=2 B=32",
+            meta,
+        );
+        run_immutable_case_f32::<2, 64, Eytzinger<2>>(
+            cfg,
+            "v6 immutable f32 Eytzinger K=2 B=64",
+            meta,
+        );
+        run_immutable_case_f32::<3, 16, Eytzinger<3>>(
+            cfg,
+            "v6 immutable f32 Eytzinger K=3 B=16",
+            meta,
+        );
+        run_immutable_case_f32::<3, 32, Eytzinger<3>>(
+            cfg,
+            "v6 immutable f32 Eytzinger K=3 B=32",
+            meta,
+        );
+        run_immutable_case_f32::<3, 64, Eytzinger<3>>(
+            cfg,
+            "v6 immutable f32 Eytzinger K=3 B=64",
+            meta,
+        );
+        run_immutable_case_f32::<4, 16, Eytzinger<4>>(
+            cfg,
+            "v6 immutable f32 Eytzinger K=4 B=16",
+            meta,
+        );
+        run_immutable_case_f32::<4, 32, Eytzinger<4>>(
+            cfg,
+            "v6 immutable f32 Eytzinger K=4 B=32",
+            meta,
+        );
+        run_immutable_case_f32::<4, 64, Eytzinger<4>>(
+            cfg,
+            "v6 immutable f32 Eytzinger K=4 B=64",
+            meta,
+        );
 
-    let meta = ReproMeta {
-        strategy: "donnelly",
-        ..meta
-    };
-
-    run_immutable_case_f32::<2, 16, DonnellyF32<2>>(
-        cfg,
-        "v6 immutable f32 Donnelly K=2 B=16",
-        meta,
-    );
-    run_immutable_case_f32::<2, 32, DonnellyF32<2>>(
-        cfg,
-        "v6 immutable f32 Donnelly K=2 B=32",
-        meta,
-    );
-    run_immutable_case_f32::<2, 64, DonnellyF32<2>>(
-        cfg,
-        "v6 immutable f32 Donnelly K=2 B=64",
-        meta,
-    );
-    run_immutable_case_f32::<3, 16, DonnellyF32<3>>(
-        cfg,
-        "v6 immutable f32 Donnelly K=3 B=16",
-        meta,
-    );
-    run_immutable_case_f32::<3, 32, DonnellyF32<3>>(
-        cfg,
-        "v6 immutable f32 Donnelly K=3 B=32",
-        meta,
-    );
-    run_immutable_case_f32::<3, 64, DonnellyF32<3>>(
-        cfg,
-        "v6 immutable f32 Donnelly K=3 B=64",
-        meta,
-    );
-    run_immutable_case_f32::<4, 16, DonnellyF32<4>>(
-        cfg,
-        "v6 immutable f32 Donnelly K=4 B=16",
-        meta,
-    );
-    run_immutable_case_f32::<4, 32, DonnellyF32<4>>(
-        cfg,
-        "v6 immutable f32 Donnelly K=4 B=32",
-        meta,
-    );
-    run_immutable_case_f32::<4, 64, DonnellyF32<4>>(
-        cfg,
-        "v6 immutable f32 Donnelly K=4 B=64",
-        meta,
-    );
-
-    #[cfg(feature = "simd")]
-    {
         let meta = ReproMeta {
-            strategy: "donnelly_simd",
+            strategy: "donnelly",
             ..meta
         };
 
-        run_immutable_case_f32::<2, 16, DonnellySimdF32<2>>(
+        run_immutable_case_f32::<2, 16, DonnellyF32<2>>(
             cfg,
-            "v6 immutable f32 DonnellySimd K=2 B=16",
+            "v6 immutable f32 Donnelly K=2 B=16",
             meta,
         );
-        run_immutable_case_f32::<2, 32, DonnellySimdF32<2>>(
+        run_immutable_case_f32::<2, 32, DonnellyF32<2>>(
             cfg,
-            "v6 immutable f32 DonnellySimd K=2 B=32",
+            "v6 immutable f32 Donnelly K=2 B=32",
             meta,
         );
-        run_immutable_case_f32::<2, 64, DonnellySimdF32<2>>(
+        run_immutable_case_f32::<2, 64, DonnellyF32<2>>(
             cfg,
-            "v6 immutable f32 DonnellySimd K=2 B=64",
+            "v6 immutable f32 Donnelly K=2 B=64",
             meta,
         );
-        run_immutable_case_f32::<3, 16, DonnellySimdF32<3>>(
+        run_immutable_case_f32::<3, 16, DonnellyF32<3>>(
             cfg,
-            "v6 immutable f32 DonnellySimd K=3 B=16",
+            "v6 immutable f32 Donnelly K=3 B=16",
             meta,
         );
-        run_immutable_case_f32::<3, 32, DonnellySimdF32<3>>(
+        run_immutable_case_f32::<3, 32, DonnellyF32<3>>(
             cfg,
-            "v6 immutable f32 DonnellySimd K=3 B=32",
+            "v6 immutable f32 Donnelly K=3 B=32",
             meta,
         );
-        run_immutable_case_f32::<3, 64, DonnellySimdF32<3>>(
+        run_immutable_case_f32::<3, 64, DonnellyF32<3>>(
             cfg,
-            "v6 immutable f32 DonnellySimd K=3 B=64",
+            "v6 immutable f32 Donnelly K=3 B=64",
             meta,
         );
-        run_immutable_case_f32::<4, 16, DonnellySimdF32<4>>(
+        run_immutable_case_f32::<4, 16, DonnellyF32<4>>(
             cfg,
-            "v6 immutable f32 DonnellySimd K=4 B=16",
+            "v6 immutable f32 Donnelly K=4 B=16",
             meta,
         );
-        run_immutable_case_f32::<4, 32, DonnellySimdF32<4>>(
+        run_immutable_case_f32::<4, 32, DonnellyF32<4>>(
             cfg,
-            "v6 immutable f32 DonnellySimd K=4 B=32",
+            "v6 immutable f32 Donnelly K=4 B=32",
             meta,
         );
-        run_immutable_case_f32::<4, 64, DonnellySimdF32<4>>(
+        run_immutable_case_f32::<4, 64, DonnellyF32<4>>(
             cfg,
-            "v6 immutable f32 DonnellySimd K=4 B=64",
+            "v6 immutable f32 Donnelly K=4 B=64",
             meta,
         );
+    }
+
+    #[cfg(feature = "simd")]
+    {
+        if run_simd_paths {
+            let block4_meta = ReproMeta {
+                strategy: "donnelly_simd_block4",
+                ..meta
+            };
+            run_simd_matrix_f32!(
+                run_immutable_case_f32,
+                simd_cfg,
+                block4_meta,
+                "v6 immutable f32 DonnellySimd",
+                DonnellySimdBlock4F32,
+                "Block4"
+            );
+        }
     }
 }
 
@@ -1623,6 +1749,11 @@ fn fuzz_v6_immutable_f32() {
 #[ignore = "long-running fuzz-style correctness checks"]
 fn fuzz_v6_immutable_f64() {
     let cfg = FuzzConfig::from_env();
+    let run_non_simd_paths = should_run_non_simd_paths();
+    #[cfg(feature = "simd")]
+    let run_simd_paths = should_run_simd_paths();
+    #[cfg(feature = "simd")]
+    let simd_cfg = cfg.for_simd();
     let meta = ReproMeta {
         kind: "v6_immutable",
         leaf: "flat_vec",
@@ -1632,118 +1763,120 @@ fn fuzz_v6_immutable_f64() {
         k: 2,
     };
 
-    run_immutable_case_f64::<2, 16, Eytzinger<2>>(cfg, "v6 immutable f64 Eytzinger K=2 B=16", meta);
-    run_immutable_case_f64::<2, 32, Eytzinger<2>>(cfg, "v6 immutable f64 Eytzinger K=2 B=32", meta);
-    run_immutable_case_f64::<2, 64, Eytzinger<2>>(cfg, "v6 immutable f64 Eytzinger K=2 B=64", meta);
-    run_immutable_case_f64::<3, 16, Eytzinger<3>>(cfg, "v6 immutable f64 Eytzinger K=3 B=16", meta);
-    run_immutable_case_f64::<3, 32, Eytzinger<3>>(cfg, "v6 immutable f64 Eytzinger K=3 B=32", meta);
-    run_immutable_case_f64::<3, 64, Eytzinger<3>>(cfg, "v6 immutable f64 Eytzinger K=3 B=64", meta);
-    run_immutable_case_f64::<4, 16, Eytzinger<4>>(cfg, "v6 immutable f64 Eytzinger K=4 B=16", meta);
-    run_immutable_case_f64::<4, 32, Eytzinger<4>>(cfg, "v6 immutable f64 Eytzinger K=4 B=32", meta);
-    run_immutable_case_f64::<4, 64, Eytzinger<4>>(cfg, "v6 immutable f64 Eytzinger K=4 B=64", meta);
+    if run_non_simd_paths {
+        run_immutable_case_f64::<2, 16, Eytzinger<2>>(
+            cfg,
+            "v6 immutable f64 Eytzinger K=2 B=16",
+            meta,
+        );
+        run_immutable_case_f64::<2, 32, Eytzinger<2>>(
+            cfg,
+            "v6 immutable f64 Eytzinger K=2 B=32",
+            meta,
+        );
+        run_immutable_case_f64::<2, 64, Eytzinger<2>>(
+            cfg,
+            "v6 immutable f64 Eytzinger K=2 B=64",
+            meta,
+        );
+        run_immutable_case_f64::<3, 16, Eytzinger<3>>(
+            cfg,
+            "v6 immutable f64 Eytzinger K=3 B=16",
+            meta,
+        );
+        run_immutable_case_f64::<3, 32, Eytzinger<3>>(
+            cfg,
+            "v6 immutable f64 Eytzinger K=3 B=32",
+            meta,
+        );
+        run_immutable_case_f64::<3, 64, Eytzinger<3>>(
+            cfg,
+            "v6 immutable f64 Eytzinger K=3 B=64",
+            meta,
+        );
+        run_immutable_case_f64::<4, 16, Eytzinger<4>>(
+            cfg,
+            "v6 immutable f64 Eytzinger K=4 B=16",
+            meta,
+        );
+        run_immutable_case_f64::<4, 32, Eytzinger<4>>(
+            cfg,
+            "v6 immutable f64 Eytzinger K=4 B=32",
+            meta,
+        );
+        run_immutable_case_f64::<4, 64, Eytzinger<4>>(
+            cfg,
+            "v6 immutable f64 Eytzinger K=4 B=64",
+            meta,
+        );
 
-    let meta = ReproMeta {
-        strategy: "donnelly",
-        ..meta
-    };
-
-    run_immutable_case_f64::<2, 16, DonnellyF64<2>>(
-        cfg,
-        "v6 immutable f64 Donnelly K=2 B=16",
-        meta,
-    );
-    run_immutable_case_f64::<2, 32, DonnellyF64<2>>(
-        cfg,
-        "v6 immutable f64 Donnelly K=2 B=32",
-        meta,
-    );
-    run_immutable_case_f64::<2, 64, DonnellyF64<2>>(
-        cfg,
-        "v6 immutable f64 Donnelly K=2 B=64",
-        meta,
-    );
-    run_immutable_case_f64::<3, 16, DonnellyF64<3>>(
-        cfg,
-        "v6 immutable f64 Donnelly K=3 B=16",
-        meta,
-    );
-    run_immutable_case_f64::<3, 32, DonnellyF64<3>>(
-        cfg,
-        "v6 immutable f64 Donnelly K=3 B=32",
-        meta,
-    );
-    run_immutable_case_f64::<3, 64, DonnellyF64<3>>(
-        cfg,
-        "v6 immutable f64 Donnelly K=3 B=64",
-        meta,
-    );
-    run_immutable_case_f64::<4, 16, DonnellyF64<4>>(
-        cfg,
-        "v6 immutable f64 Donnelly K=4 B=16",
-        meta,
-    );
-    run_immutable_case_f64::<4, 32, DonnellyF64<4>>(
-        cfg,
-        "v6 immutable f64 Donnelly K=4 B=32",
-        meta,
-    );
-    run_immutable_case_f64::<4, 64, DonnellyF64<4>>(
-        cfg,
-        "v6 immutable f64 Donnelly K=4 B=64",
-        meta,
-    );
-
-    #[cfg(feature = "simd")]
-    {
         let meta = ReproMeta {
-            strategy: "donnelly_simd",
+            strategy: "donnelly",
             ..meta
         };
 
-        run_immutable_case_f64::<2, 16, DonnellySimdF64<2>>(
+        run_immutable_case_f64::<2, 16, DonnellyF64<2>>(
             cfg,
-            "v6 immutable f64 DonnellySimd K=2 B=16",
+            "v6 immutable f64 Donnelly K=2 B=16",
             meta,
         );
-        run_immutable_case_f64::<2, 32, DonnellySimdF64<2>>(
+        run_immutable_case_f64::<2, 32, DonnellyF64<2>>(
             cfg,
-            "v6 immutable f64 DonnellySimd K=2 B=32",
+            "v6 immutable f64 Donnelly K=2 B=32",
             meta,
         );
-        run_immutable_case_f64::<2, 64, DonnellySimdF64<2>>(
+        run_immutable_case_f64::<2, 64, DonnellyF64<2>>(
             cfg,
-            "v6 immutable f64 DonnellySimd K=2 B=64",
+            "v6 immutable f64 Donnelly K=2 B=64",
             meta,
         );
-        run_immutable_case_f64::<3, 16, DonnellySimdF64<3>>(
+        run_immutable_case_f64::<3, 16, DonnellyF64<3>>(
             cfg,
-            "v6 immutable f64 DonnellySimd K=3 B=16",
+            "v6 immutable f64 Donnelly K=3 B=16",
             meta,
         );
-        run_immutable_case_f64::<3, 32, DonnellySimdF64<3>>(
+        run_immutable_case_f64::<3, 32, DonnellyF64<3>>(
             cfg,
-            "v6 immutable f64 DonnellySimd K=3 B=32",
+            "v6 immutable f64 Donnelly K=3 B=32",
             meta,
         );
-        run_immutable_case_f64::<3, 64, DonnellySimdF64<3>>(
+        run_immutable_case_f64::<3, 64, DonnellyF64<3>>(
             cfg,
-            "v6 immutable f64 DonnellySimd K=3 B=64",
+            "v6 immutable f64 Donnelly K=3 B=64",
             meta,
         );
-        run_immutable_case_f64::<4, 16, DonnellySimdF64<4>>(
+        run_immutable_case_f64::<4, 16, DonnellyF64<4>>(
             cfg,
-            "v6 immutable f64 DonnellySimd K=4 B=16",
+            "v6 immutable f64 Donnelly K=4 B=16",
             meta,
         );
-        run_immutable_case_f64::<4, 32, DonnellySimdF64<4>>(
+        run_immutable_case_f64::<4, 32, DonnellyF64<4>>(
             cfg,
-            "v6 immutable f64 DonnellySimd K=4 B=32",
+            "v6 immutable f64 Donnelly K=4 B=32",
             meta,
         );
-        run_immutable_case_f64::<4, 64, DonnellySimdF64<4>>(
+        run_immutable_case_f64::<4, 64, DonnellyF64<4>>(
             cfg,
-            "v6 immutable f64 DonnellySimd K=4 B=64",
+            "v6 immutable f64 Donnelly K=4 B=64",
             meta,
         );
+    }
+
+    #[cfg(feature = "simd")]
+    {
+        if run_simd_paths {
+            let block3_meta = ReproMeta {
+                strategy: "donnelly_simd_block3",
+                ..meta
+            };
+            run_simd_matrix_f64!(
+                run_immutable_case_f64,
+                simd_cfg,
+                block3_meta,
+                "v6 immutable f64 DonnellySimd",
+                DonnellySimdBlock3F64,
+                "Block3"
+            );
+        }
     }
 }

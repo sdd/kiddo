@@ -9,6 +9,12 @@ use crate::traits_unified_2::AxisUnified;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
+// Compile-time gate for valid 64-byte-line Donnelly SIMD block/VB pairings.
+trait ValidBlock3Config64 {}
+impl<const K: usize> ValidBlock3Config64 for DonnellyMarkerSimd<Block3, 64, 8, K> {}
+trait ValidBlock4Config64 {}
+impl<const K: usize> ValidBlock4Config64 for DonnellyMarkerSimd<Block4, 64, 4, K> {}
+
 // Architecture-specific modules
 #[cfg(all(feature = "simd", target_arch = "x86_64"))]
 pub mod x86_64;
@@ -28,7 +34,9 @@ pub use compare_traits::{CompareBlock3, CompareBlock4};
 
 // Backtrack mask generation traits for type-specific dispatch
 pub mod backtrack_traits;
-pub use backtrack_traits::{BacktrackBlock3, BacktrackBlock4};
+pub use backtrack_traits::{
+    BacktrackBlock3, BacktrackBlock4, DistanceMetricSimdBlock3, DistanceMetricSimdBlock4,
+};
 
 /// Block3 interval lower bounds encoded as u64 literal.
 /// Each 8-bit segment contains the lower bound pivot offset for a child (255 = -∞).
@@ -171,7 +179,10 @@ where
 // ====================================================================================
 
 // Block3 implementation (3-level blocks, 64-byte cache lines)
-impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<Block3, 64, VB, K> {
+impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<Block3, 64, VB, K>
+where
+    Self: ValidBlock3Config64,
+{
     const ROOT_IDX: usize = 0;
     const BLOCK_SIZE: usize = 3;
 
@@ -200,7 +211,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 
     #[inline(always)]
     fn dim(&self) -> usize {
-        self.core.dim()
+        self.core.level() as usize / Self::BLOCK_SIZE % K
     }
 
     #[inline(always)]
@@ -246,12 +257,27 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
             let dim = strat.dim();
             let query_val = unsafe { *query.get_unchecked(dim) };
             let block_base_idx = strat.stem_idx();
+            let block_width = 1usize << Self::BLOCK_SIZE;
+            let minor_tri_height = (64 / VB).ilog2();
+            let can_take_full_block = strat.level() + Self::BLOCK_SIZE as i32 - 1 <= max_stem_level
+                && block_base_idx + block_width <= stems.len()
+                && Self::BLOCK_SIZE as u32 == minor_tri_height
+                && strat.core.minor_level() == 0;
 
-            let child_idx = compare_block3(stems, query_val, block_base_idx);
-
-            strat
-                .core
-                .traverse_block(child_idx, Self::BLOCK_SIZE as u32);
+            if can_take_full_block {
+                let child_idx = compare_block3(stems, query_val, block_base_idx);
+                strat
+                    .core
+                    .traverse_block(child_idx, Self::BLOCK_SIZE as u32);
+            } else {
+                let stem_idx = strat.stem_idx();
+                let is_right = if stem_idx < stems.len() {
+                    query_val >= unsafe { *stems.get_unchecked(stem_idx) }
+                } else {
+                    false
+                };
+                strat.traverse(is_right);
+            }
         }
 
         strat.leaf_idx()
@@ -274,12 +300,16 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
         Self: Sized,
         A: AxisUnified<Coord = A>,
         O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
+        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
+            + crate::stem_strategies::donnelly_2_blockmarker_simd::backtrack_traits::DistanceMetricSimdBlock3<
+                A,
+                K2,
+                O,
+            >,
     {
         if self.level() > max_stem_level {
             return false;
         }
-
         let dim_val = *dim;
         let query_val = unsafe { *query.get_unchecked(dim_val) };
 
@@ -289,6 +319,68 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 
         let old_off_val = unsafe { *off.get_unchecked(dim_val) };
         let block_base_idx = self.stem_idx();
+        let block_width = 1usize << Self::BLOCK_SIZE;
+        let minor_tri_height = (64 / VB).ilog2();
+        let can_take_full_block = self.level() + Self::BLOCK_SIZE as i32 - 1 <= max_stem_level
+            && block_base_idx + block_width <= stems.len()
+            && Self::BLOCK_SIZE as u32 == minor_tri_height
+            && self.core.minor_level() == 0
+            && old_off_val == O::zero();
+
+        // TODO: this fallback should not be required. Refactor to avoid the need for it
+        if !can_take_full_block {
+            use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
+
+            tracing::warn!(
+                level = %self.level(),
+                %block_base_idx,
+                %block_width,
+                stes_len = %stems.len(),
+                %minor_tri_height,
+                minor_level = %self.core.minor_level(),
+                %old_off_val,
+                "Cannot take full block",
+            );
+
+            let stem_idx = self.stem_idx();
+            let pivot = if stem_idx < stems.len() {
+                *unsafe { stems.get_unchecked(stem_idx) }
+            } else {
+                A::max_value()
+            };
+            if pivot < A::max_value() {
+                let is_right_child = query_val >= pivot;
+                let far_ctx = self.branch_relative(is_right_child);
+
+                let pivot_wide: O = D::widen_coord(pivot);
+                let new_off = O::saturating_dist(query_wide_val, pivot_wide);
+                let old_dist1 = D::dist1(old_off_val, O::zero());
+                let new_dist1 = D::dist1(new_off, O::zero());
+                let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
+
+                if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
+                    stack.push(SimdQueryStackContext::Single {
+                        stem_strat: far_ctx,
+                        old_off: new_off,
+                        rd: rd_far,
+                    });
+                }
+            } else {
+                // +Inf can represent structural padding in left-aligned trees.
+                // Traversing right should not add geometric distance.
+                let far_ctx = self.branch_relative(false);
+                if O::cmp(rd, best_dist) != std::cmp::Ordering::Greater {
+                    stack.push(SimdQueryStackContext::Single {
+                        stem_strat: far_ctx,
+                        old_off: old_off_val,
+                        rd,
+                    });
+                }
+            }
+
+            *dim = self.dim();
+            return true;
+        }
 
         // SIMD comparison to get child index
         let child_idx = compare_block3(stems, query_val, block_base_idx);
@@ -344,8 +436,9 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 
                 new_off_values[sibling_idx] = new_off;
 
-                let delta = D::dist1(new_off, old_off_val);
-                let rd_far = O::saturating_add(rd, delta);
+                let old_dist1 = D::dist1(old_off_val, O::zero());
+                let new_dist1 = D::dist1(new_off, O::zero());
+                let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
                 rd_values[sibling_idx] = rd_far;
 
                 let passes_threshold = rd_far <= best_dist;
@@ -367,7 +460,6 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
                     ?new_off,
                     ?old_off_val,
                     ?rd,
-                    ?delta,
                     ?rd_far,
                     ?best_dist,
                     passes_threshold,
@@ -436,8 +528,9 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 
                 new_off_values[sibling_idx] = new_off;
 
-                let delta = D::dist1(new_off, old_off_val);
-                let rd_far = O::saturating_add(rd, delta);
+                let old_dist1 = D::dist1(old_off_val, O::zero());
+                let new_dist1 = D::dist1(new_off, O::zero());
+                let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
                 rd_values[sibling_idx] = rd_far;
 
                 tracing::debug!(
@@ -454,7 +547,6 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
                     ?new_off,
                     ?old_off_val,
                     ?rd,
-                    ?delta,
                     ?rd_far,
                     ?best_dist,
                     passes_threshold = rd_far <= best_dist,
@@ -463,14 +555,15 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
                 );
             }
 
-            stack.push(SimdQueryStackContext::Block {
-                siblings,
-                rd_values,
-                new_off_values,
-                sibling_mask: backtrack_mask,
-                dim: dim_val,
-                old_off: old_off_val,
-            });
+            for sibling_idx in 0..8 {
+                if (backtrack_mask & (1 << sibling_idx)) != 0 {
+                    stack.push(SimdQueryStackContext::Single {
+                        stem_strat: siblings[sibling_idx],
+                        old_off: new_off_values[sibling_idx],
+                        rd: rd_values[sibling_idx],
+                    });
+                }
+            }
         }
 
         #[cfg(not(feature = "simd"))]
@@ -528,7 +621,9 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
             + crate::stem_strategies::SimdPrune
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
+        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
+            + crate::stem_strategies::DistanceMetricSimdBlock3<A, K2, O>
+            + crate::stem_strategies::DistanceMetricSimdBlock4<A, K2, O>,
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
         LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
     {
@@ -537,7 +632,10 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 }
 
 // Block4 implementation (4-level blocks, 64-byte cache lines)
-impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<Block4, 64, VB, K> {
+impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<Block4, 64, VB, K>
+where
+    Self: ValidBlock4Config64,
+{
     const ROOT_IDX: usize = 0;
     const BLOCK_SIZE: usize = 4;
 
@@ -566,7 +664,7 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 
     #[inline(always)]
     fn dim(&self) -> usize {
-        self.core.dim()
+        self.core.level() as usize / Self::BLOCK_SIZE % K
     }
 
     #[inline(always)]
@@ -612,12 +710,33 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
             let dim = strat.dim();
             let query_val = unsafe { *query.get_unchecked(dim) };
             let block_base_idx = strat.stem_idx();
+            let block_width = 1usize << Self::BLOCK_SIZE;
+            let can_take_full_block = strat.level() + Self::BLOCK_SIZE as i32 - 1 <= max_stem_level
+                && block_base_idx + block_width <= stems.len();
 
-            let child_idx = compare_block4(stems, query_val, block_base_idx);
+            // TODO: this fallback should not be required. Refactor to avoid the need for it
+            if can_take_full_block {
+                let child_idx = compare_block4(stems, query_val, block_base_idx);
+                strat
+                    .core
+                    .traverse_block(child_idx, Self::BLOCK_SIZE as u32);
+            } else {
+                tracing::warn!(
+                    level = %strat.level(),
+                    block_base_idx = %block_base_idx,
+                    block_width = %block_width,
+                    stem_count = %stems.len(),
+                    "Block4 get_leaf_idx can't take full block"
+                );
 
-            strat
-                .core
-                .traverse_block(child_idx, Self::BLOCK_SIZE as u32);
+                let stem_idx = strat.stem_idx();
+                let is_right = if stem_idx < stems.len() {
+                    query_val >= unsafe { *stems.get_unchecked(stem_idx) }
+                } else {
+                    false
+                };
+                strat.traverse(is_right);
+            }
         }
 
         strat.leaf_idx()
@@ -640,12 +759,16 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
         Self: Sized,
         A: AxisUnified<Coord = A>,
         O: AxisUnified<Coord = O> + BacktrackBlock4,
-        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
+        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
+            + crate::stem_strategies::donnelly_2_blockmarker_simd::backtrack_traits::DistanceMetricSimdBlock4<
+                A,
+                K2,
+                O,
+            >,
     {
         if self.level() > max_stem_level {
             return false;
         }
-
         let dim_val = *dim;
         let query_val = unsafe { *query.get_unchecked(dim_val) };
         #[allow(unused)]
@@ -653,6 +776,63 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
         let query_wide_val = unsafe { *query_wide.get_unchecked(dim_val) };
         let old_off_val = unsafe { *off.get_unchecked(dim_val) };
         let block_base_idx = self.stem_idx();
+        let block_width = 1usize << Self::BLOCK_SIZE;
+        let can_take_full_block = self.level() + Self::BLOCK_SIZE as i32 - 1 <= max_stem_level
+            && block_base_idx + block_width <= stems.len()
+            && old_off_val == O::zero();
+
+        // TODO: this fallback should not be required. Refactor to avoid the need for it
+        if !can_take_full_block {
+            use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
+
+            tracing::warn!(
+                    level = %self.level(),
+                    block_base_idx = %block_base_idx,
+                    block_width = %block_width,
+                    %max_stem_level,
+                    %old_off_val,
+                    "Block4 backtracking_traverse_step can't take full block"
+                );
+
+            let stem_idx = self.stem_idx();
+            let pivot = if stem_idx < stems.len() {
+                *unsafe { stems.get_unchecked(stem_idx) }
+            } else {
+                A::max_value()
+            };
+            if pivot < A::max_value() {
+                let is_right_child = query_val >= pivot;
+                let far_ctx = self.branch_relative(is_right_child);
+
+                let pivot_wide: O = D::widen_coord(pivot);
+                let new_off = O::saturating_dist(query_wide_val, pivot_wide);
+                let old_dist1 = D::dist1(old_off_val, O::zero());
+                let new_dist1 = D::dist1(new_off, O::zero());
+                let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
+
+                if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
+                    stack.push(SimdQueryStackContext::Single {
+                        stem_strat: far_ctx,
+                        old_off: new_off,
+                        rd: rd_far,
+                    });
+                }
+            } else {
+                // +Inf can represent structural padding in left-aligned trees.
+                // Traversing right should not add geometric distance.
+                let far_ctx = self.branch_relative(false);
+                if O::cmp(rd, best_dist) != std::cmp::Ordering::Greater {
+                    stack.push(SimdQueryStackContext::Single {
+                        stem_strat: far_ctx,
+                        old_off: old_off_val,
+                        rd,
+                    });
+                }
+            }
+
+            *dim = self.dim();
+            return true;
+        }
 
         let child_idx = compare_block4(stems, query_val, block_base_idx);
 
@@ -704,8 +884,9 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 
                 new_off_values[sibling_idx] = new_off;
 
-                let delta = D::dist1(new_off, old_off_val);
-                let rd_far = O::saturating_add(rd, delta);
+                let old_dist1 = D::dist1(old_off_val, O::zero());
+                let new_dist1 = D::dist1(new_off, O::zero());
+                let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
                 rd_values[sibling_idx] = rd_far;
 
                 if rd_far <= best_dist {
@@ -751,45 +932,20 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 
                 new_off_values[sibling_idx] = new_off;
 
-                let delta = D::dist1(new_off, old_off_val);
-                let rd_far = O::saturating_add(rd, delta);
+                let old_dist1 = D::dist1(old_off_val, O::zero());
+                let new_dist1 = D::dist1(new_off, O::zero());
+                let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
                 rd_values[sibling_idx] = rd_far;
             }
 
-            let high_mask = (backtrack_mask >> 8) as u8;
-            if high_mask != 0 {
-                let mut high_siblings = [*self; 8];
-                let mut high_rd_values = [O::zero(); 8];
-                let mut high_new_off_values = [O::zero(); 8];
-                high_siblings.copy_from_slice(&siblings[8..16]);
-                high_rd_values.copy_from_slice(&rd_values[8..16]);
-                high_new_off_values.copy_from_slice(&new_off_values[8..16]);
-                stack.push(SimdQueryStackContext::Block {
-                    siblings: high_siblings,
-                    rd_values: high_rd_values,
-                    new_off_values: high_new_off_values,
-                    sibling_mask: high_mask,
-                    dim: dim_val,
-                    old_off: old_off_val,
-                });
-            }
-
-            let low_mask = backtrack_mask as u8;
-            if low_mask != 0 {
-                let mut low_siblings = [*self; 8];
-                let mut low_rd_values = [O::zero(); 8];
-                let mut low_new_off_values = [O::zero(); 8];
-                low_siblings.copy_from_slice(&siblings[..8]);
-                low_rd_values.copy_from_slice(&rd_values[..8]);
-                low_new_off_values.copy_from_slice(&new_off_values[..8]);
-                stack.push(SimdQueryStackContext::Block {
-                    siblings: low_siblings,
-                    rd_values: low_rd_values,
-                    new_off_values: low_new_off_values,
-                    sibling_mask: low_mask,
-                    dim: dim_val,
-                    old_off: old_off_val,
-                });
+            for sibling_idx in 0..16 {
+                if (backtrack_mask & (1u16 << sibling_idx)) != 0 {
+                    stack.push(SimdQueryStackContext::Single {
+                        stem_strat: siblings[sibling_idx],
+                        old_off: new_off_values[sibling_idx],
+                        rd: rd_values[sibling_idx],
+                    });
+                }
             }
         }
 
@@ -875,7 +1031,9 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
             + crate::stem_strategies::SimdPrune
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
+        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
+            + crate::stem_strategies::DistanceMetricSimdBlock3<A, K2, O>
+            + crate::stem_strategies::DistanceMetricSimdBlock4<A, K2, O>,
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
         LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
     {
@@ -886,7 +1044,6 @@ impl<const VB: u32, const K: usize> crate::StemStrategy for DonnellyMarkerSimd<B
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::traits_unified_2::SquaredEuclidean;
 
     fn build_test_block3_pivots_f64() -> [f64; 8] {
         [0.2, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f64::INFINITY]

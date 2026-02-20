@@ -17,7 +17,9 @@ where
     /// Returns a tuple of (distance, item) for the nearest neighbor.
     pub fn nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
-        D: DistanceMetricUnified<A, K>,
+        D: DistanceMetricUnified<A, K>
+            + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, D::Output>
+            + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, D::Output>,
         D::Output: crate::stem_strategies::SimdPrune + BacktrackBlock3 + BacktrackBlock4,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
@@ -398,73 +400,6 @@ mod tests {
                 i, query_point
             );
         }
-    }
-
-    #[test]
-    #[cfg(feature = "simd")]
-    #[cfg(target_arch = "x86_64")]
-    fn v6_query_nearest_one_donnelly_marker_simd_block3_f32() {
-        use crate::stem_strategies::{Block3, DonnellyMarkerSimd};
-
-        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
-
-        // Use smaller dataset for faster test (16384 points = 512 leaves = 2^9, depth = 9)
-        let points: Vec<[f32; 4]> = (0..16_384)
-            .map(|_| {
-                [
-                    rng.random::<f32>(),
-                    rng.random::<f32>(),
-                    rng.random::<f32>(),
-                    rng.random::<f32>(),
-                ]
-            })
-            .collect();
-
-        let tree: KdTree<
-            f32,
-            u32,
-            DonnellyMarkerSimd<Block3, 64, 4, 4>,
-            FlatVec<f32, u32, 4, 32>,
-            4,
-            32,
-        > = KdTree::new_from_slice(&points);
-
-        assert!(!tree.is_empty());
-        assert_eq!(tree.size(), 16_384);
-        assert_eq!(tree.leaf_count(), 512);
-
-        // Verify max_stem_level is padded to multiple of block size (3)
-        assert_eq!((tree.max_stem_level() + 1) % 3, 0);
-
-        let query_points: Vec<[f32; 4]> = (0..50)
-            .map(|_| {
-                [
-                    rng.random::<f32>(),
-                    rng.random::<f32>(),
-                    rng.random::<f32>(),
-                    rng.random::<f32>(),
-                ]
-            })
-            .collect();
-
-        let mut pass_count = 0;
-        let mut fail_count = 0;
-        for (i, query_point) in query_points.iter().enumerate() {
-            let expected = linear_search(&points, query_point);
-            let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
-
-            if result.0 != expected.distance || result.1 as usize != expected.item {
-                eprintln!(
-                    "FAIL query #{i}: {:?} → got dist={}, item={}, expected dist={}, item={}",
-                    query_point, result.0, result.1, expected.distance, expected.item
-                );
-                fail_count += 1;
-            } else {
-                pass_count += 1;
-            }
-        }
-        eprintln!("Block3 f32: {pass_count} passed, {fail_count} failed out of {}", query_points.len());
-        assert_eq!(fail_count, 0, "{fail_count} queries returned wrong results");
     }
 
     #[test]

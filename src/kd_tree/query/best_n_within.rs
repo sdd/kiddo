@@ -25,7 +25,9 @@ where
         max_qty: NonZero<usize>,
     ) -> BinaryHeap<BestNeighbour<<D as DistanceMetricUnified<A, K>>::Output, T>>
     where
-        D: DistanceMetricUnified<A, K>,
+        D: DistanceMetricUnified<A, K>
+            + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, D::Output>
+            + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, D::Output>,
         D::Output: crate::stem_strategies::SimdPrune + BacktrackBlock3 + BacktrackBlock4,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {

@@ -21,7 +21,8 @@ mod prefetch;
 pub mod donnelly_2_blockmarker_simd;
 
 pub use donnelly_2_blockmarker_simd::{
-    CompareBlock3, CompareBlock4, DonnellyMarkerSimd, SimdPrune,
+    CompareBlock3, CompareBlock4, DistanceMetricSimdBlock3, DistanceMetricSimdBlock4,
+    DonnellyMarkerSimd, SimdPrune,
 };
 
 pub use donnelly_2::Donnelly;

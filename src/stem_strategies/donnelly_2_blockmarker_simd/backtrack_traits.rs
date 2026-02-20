@@ -7,10 +7,333 @@
 use std::ptr::NonNull;
 
 use crate::traits_unified_2::AxisUnified;
-use crate::traits_unified_2::DistanceMetricUnified;
+use crate::traits_unified_2::{DistanceMetricUnified, DotProduct, Manhattan, SquaredEuclidean};
 
 mod sealed {
     pub trait Sealed {}
+}
+
+/// Metric-provided SIMD backtrack contract for Block3.
+///
+/// Implementors must provide an autovec/scalar baseline. Architecture-specific hooks
+/// are optional and default to the baseline.
+pub trait DistanceMetricSimdBlock3<A: Copy, const K: usize, O>
+where
+    O: AxisUnified<Coord = O>,
+{
+    /// Autovec/scalar baseline implementation for Block3 backtracking mask generation.
+    fn backtrack_block3_autovec(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+    ) -> u8;
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    /// AVX2 override for Block3. Defaults to autovec unless metric overrides it.
+    unsafe fn backtrack_block3_avx2(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+    ) -> u8 {
+        Self::backtrack_block3_autovec(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    /// AVX-512 override for Block3. Defaults to autovec unless metric overrides it.
+    unsafe fn backtrack_block3_avx512(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+    ) -> u8 {
+        Self::backtrack_block3_autovec(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+    #[inline(always)]
+    /// NEON override for Block3. Defaults to autovec unless metric overrides it.
+    unsafe fn backtrack_block3_neon(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+    ) -> u8 {
+        Self::backtrack_block3_autovec(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[inline(always)]
+    /// Compile-time dispatch to the best available Block3 implementation.
+    fn backtrack_block3(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+    ) -> u8 {
+        #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+        {
+            // SAFETY: guarded by target cfg and delegated to metric hook.
+            return unsafe {
+                Self::backtrack_block3_avx512(
+                    query_wide,
+                    stems_ptr,
+                    block_base_idx,
+                    old_off,
+                    rd,
+                    best_dist,
+                )
+            };
+        }
+
+        #[cfg(all(
+            feature = "simd",
+            target_arch = "x86_64",
+            target_feature = "avx2",
+            not(target_feature = "avx512f")
+        ))]
+        {
+            // SAFETY: guarded by target cfg and delegated to metric hook.
+            return unsafe {
+                Self::backtrack_block3_avx2(
+                    query_wide,
+                    stems_ptr,
+                    block_base_idx,
+                    old_off,
+                    rd,
+                    best_dist,
+                )
+            };
+        }
+
+        #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+        {
+            // SAFETY: guarded by target cfg and delegated to metric hook.
+            return unsafe {
+                Self::backtrack_block3_neon(
+                    query_wide,
+                    stems_ptr,
+                    block_base_idx,
+                    old_off,
+                    rd,
+                    best_dist,
+                )
+            };
+        }
+        #[cfg(not(any(
+            all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
+            all(
+                feature = "simd",
+                target_arch = "x86_64",
+                target_feature = "avx2",
+                not(target_feature = "avx512f")
+            ),
+            all(feature = "simd", target_arch = "aarch64")
+        )))]
+        {
+            Self::backtrack_block3_autovec(
+                query_wide,
+                stems_ptr,
+                block_base_idx,
+                old_off,
+                rd,
+                best_dist,
+            )
+        }
+    }
+}
+
+/// Metric-provided SIMD backtrack contract for Block4.
+pub trait DistanceMetricSimdBlock4<A: Copy, const K: usize, O>
+where
+    O: AxisUnified<Coord = O>,
+{
+    /// Autovec/scalar baseline implementation for Block4 backtracking mask generation.
+    fn backtrack_block4_autovec(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+    ) -> u16;
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    /// AVX2 override for Block4. Defaults to autovec unless metric overrides it.
+    unsafe fn backtrack_block4_avx2(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+    ) -> u16 {
+        Self::backtrack_block4_autovec(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    /// AVX-512 override for Block4. Defaults to autovec unless metric overrides it.
+    unsafe fn backtrack_block4_avx512(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+    ) -> u16 {
+        Self::backtrack_block4_autovec(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+    #[inline(always)]
+    /// NEON override for Block4. Defaults to autovec unless metric overrides it.
+    unsafe fn backtrack_block4_neon(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+    ) -> u16 {
+        Self::backtrack_block4_autovec(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[inline(always)]
+    /// Compile-time dispatch to the best available Block4 implementation.
+    fn backtrack_block4(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+    ) -> u16 {
+        #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+        {
+            // SAFETY: guarded by target cfg and delegated to metric hook.
+            return unsafe {
+                Self::backtrack_block4_avx512(
+                    query_wide,
+                    stems_ptr,
+                    block_base_idx,
+                    old_off,
+                    rd,
+                    best_dist,
+                )
+            };
+        }
+
+        #[cfg(all(
+            feature = "simd",
+            target_arch = "x86_64",
+            target_feature = "avx2",
+            not(target_feature = "avx512f")
+        ))]
+        {
+            // SAFETY: guarded by target cfg and delegated to metric hook.
+            return unsafe {
+                Self::backtrack_block4_avx2(
+                    query_wide,
+                    stems_ptr,
+                    block_base_idx,
+                    old_off,
+                    rd,
+                    best_dist,
+                )
+            };
+        }
+
+        #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+        {
+            // SAFETY: guarded by target cfg and delegated to metric hook.
+            return unsafe {
+                Self::backtrack_block4_neon(
+                    query_wide,
+                    stems_ptr,
+                    block_base_idx,
+                    old_off,
+                    rd,
+                    best_dist,
+                )
+            };
+        }
+        #[cfg(not(any(
+            all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
+            all(
+                feature = "simd",
+                target_arch = "x86_64",
+                target_feature = "avx2",
+                not(target_feature = "avx512f")
+            ),
+            all(feature = "simd", target_arch = "aarch64")
+        )))]
+        {
+            Self::backtrack_block4_autovec(
+                query_wide,
+                stems_ptr,
+                block_base_idx,
+                old_off,
+                rd,
+                best_dist,
+            )
+        }
+    }
 }
 
 /// Trait for computing SIMD backtrack masks for Block3 (8 children).
@@ -46,7 +369,7 @@ pub trait BacktrackBlock3: AxisUnified<Coord = Self> + sealed::Sealed {
     ) -> u8
     where
         A: Copy,
-        D: DistanceMetricUnified<A, K, Output = Self>;
+        D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>;
 }
 
 /// Trait for computing SIMD backtrack masks for Block4 (16 children).
@@ -74,7 +397,7 @@ pub trait BacktrackBlock4: AxisUnified<Coord = Self> + sealed::Sealed {
     ) -> u16
     where
         A: Copy,
-        D: DistanceMetricUnified<A, K, Output = Self>;
+        D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>;
 }
 
 // ====================================================================================
@@ -127,11 +450,11 @@ where
         // Compute interval distance
         let interval_dist = interval_distance_1d::<A>(query_wide, lower_val, upper_val);
 
-        // Compute new_off using metric's dist1
-        let new_off = D::dist1(interval_dist, A::zero());
-
-        // rd_far = rd - old_off + new_off
-        let rd_far = rd - old_off + new_off;
+        // Update rd via per-dimension contribution swap:
+        // rd_far = rd - dist1(old_off, 0) + dist1(new_off, 0)
+        let old_dist1 = D::dist1(old_off, A::zero());
+        let new_dist1 = D::dist1(interval_dist, A::zero());
+        let rd_far = rd - old_dist1 + new_dist1;
 
         if rd_far <= best_dist {
             mask |= 1 << sibling_idx;
@@ -185,11 +508,11 @@ where
         // Compute interval distance
         let interval_dist = interval_distance_1d::<A>(query_wide, lower_val, upper_val);
 
-        // Compute new_off using metric's dist1
-        let new_off = D::dist1(interval_dist, A::zero());
-
-        // rd_far = rd - old_off + new_off
-        let rd_far = rd - old_off + new_off;
+        // Update rd via per-dimension contribution swap:
+        // rd_far = rd - dist1(old_off, 0) + dist1(new_off, 0)
+        let old_dist1 = D::dist1(old_off, A::zero());
+        let new_dist1 = D::dist1(interval_dist, A::zero());
+        let rd_far = rd - old_dist1 + new_dist1;
 
         if rd_far <= best_dist {
             mask |= 1 << sibling_idx;
@@ -197,6 +520,523 @@ where
     }
 
     mask
+}
+
+// ====================================================================================
+// DistanceMetricSimdBlock* implementations for core float metrics
+// ====================================================================================
+
+impl<A, const K: usize> DistanceMetricSimdBlock3<A, K, f64> for SquaredEuclidean<f64>
+where
+    A: Copy,
+    SquaredEuclidean<f64>: DistanceMetricUnified<A, K, Output = f64>,
+{
+    #[inline(always)]
+    fn backtrack_block3_autovec(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u8 {
+        autovec_backtrack_block3::<f64, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    unsafe fn backtrack_block3_avx2(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u8 {
+        simd_backtrack_block3_f64_avx2::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    unsafe fn backtrack_block3_avx512(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u8 {
+        simd_backtrack_block3_f64_avx512::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+    #[inline(always)]
+    unsafe fn backtrack_block3_neon(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u8 {
+        autovec_backtrack_block3::<f64, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f64> for SquaredEuclidean<f64>
+where
+    A: Copy,
+    SquaredEuclidean<f64>: DistanceMetricUnified<A, K, Output = f64>,
+{
+    #[inline(always)]
+    fn backtrack_block4_autovec(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u16 {
+        autovec_backtrack_block4::<f64, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    unsafe fn backtrack_block4_avx2(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u16 {
+        simd_backtrack_block4_f64_avx2::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    unsafe fn backtrack_block4_avx512(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u16 {
+        simd_backtrack_block4_f64_avx512::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+    #[inline(always)]
+    unsafe fn backtrack_block4_neon(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u16 {
+        autovec_backtrack_block4::<f64, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+impl<A, const K: usize> DistanceMetricSimdBlock3<A, K, f32> for SquaredEuclidean<f32>
+where
+    A: Copy,
+    SquaredEuclidean<f32>: DistanceMetricUnified<A, K, Output = f32>,
+{
+    #[inline(always)]
+    fn backtrack_block3_autovec(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u8 {
+        autovec_backtrack_block3::<f32, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    unsafe fn backtrack_block3_avx2(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u8 {
+        simd_backtrack_block3_f32_avx2::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    unsafe fn backtrack_block3_avx512(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u8 {
+        simd_backtrack_block3_f32_avx512::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+    #[inline(always)]
+    unsafe fn backtrack_block3_neon(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u8 {
+        autovec_backtrack_block3::<f32, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f32> for SquaredEuclidean<f32>
+where
+    A: Copy,
+    SquaredEuclidean<f32>: DistanceMetricUnified<A, K, Output = f32>,
+{
+    #[inline(always)]
+    fn backtrack_block4_autovec(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u16 {
+        autovec_backtrack_block4::<f32, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    unsafe fn backtrack_block4_avx2(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u16 {
+        simd_backtrack_block4_f32_avx2::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    unsafe fn backtrack_block4_avx512(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u16 {
+        simd_backtrack_block4_f32_avx512::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+    #[inline(always)]
+    unsafe fn backtrack_block4_neon(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u16 {
+        autovec_backtrack_block4::<f32, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+impl<A, const K: usize> DistanceMetricSimdBlock3<A, K, f64> for Manhattan<f64>
+where
+    A: Copy,
+    Manhattan<f64>: DistanceMetricUnified<A, K, Output = f64>,
+{
+    #[inline(always)]
+    fn backtrack_block3_autovec(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u8 {
+        autovec_backtrack_block3::<f64, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f64> for Manhattan<f64>
+where
+    A: Copy,
+    Manhattan<f64>: DistanceMetricUnified<A, K, Output = f64>,
+{
+    #[inline(always)]
+    fn backtrack_block4_autovec(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u16 {
+        autovec_backtrack_block4::<f64, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+impl<A, const K: usize> DistanceMetricSimdBlock3<A, K, f32> for Manhattan<f32>
+where
+    A: Copy,
+    Manhattan<f32>: DistanceMetricUnified<A, K, Output = f32>,
+{
+    #[inline(always)]
+    fn backtrack_block3_autovec(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u8 {
+        autovec_backtrack_block3::<f32, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f32> for Manhattan<f32>
+where
+    A: Copy,
+    Manhattan<f32>: DistanceMetricUnified<A, K, Output = f32>,
+{
+    #[inline(always)]
+    fn backtrack_block4_autovec(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u16 {
+        autovec_backtrack_block4::<f32, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+// DotProduct support remains autovec-only for now.
+impl<A, const K: usize> DistanceMetricSimdBlock3<A, K, f64> for DotProduct<f64>
+where
+    A: Copy,
+    DotProduct<f64>: DistanceMetricUnified<A, K, Output = f64>,
+{
+    #[inline(always)]
+    fn backtrack_block3_autovec(
+        _query_wide: f64,
+        _stems_ptr: NonNull<u8>,
+        _block_base_idx: usize,
+        _old_off: f64,
+        _rd: f64,
+        _best_dist: f64,
+    ) -> u8 {
+        panic!("DotProduct is not currently supported with Donnelly SIMD backtracking");
+    }
+}
+
+impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f64> for DotProduct<f64>
+where
+    A: Copy,
+    DotProduct<f64>: DistanceMetricUnified<A, K, Output = f64>,
+{
+    #[inline(always)]
+    fn backtrack_block4_autovec(
+        _query_wide: f64,
+        _stems_ptr: NonNull<u8>,
+        _block_base_idx: usize,
+        _old_off: f64,
+        _rd: f64,
+        _best_dist: f64,
+    ) -> u16 {
+        panic!("DotProduct is not currently supported with Donnelly SIMD backtracking");
+    }
+}
+
+impl<A, const K: usize> DistanceMetricSimdBlock3<A, K, f32> for DotProduct<f32>
+where
+    A: Copy,
+    DotProduct<f32>: DistanceMetricUnified<A, K, Output = f32>,
+{
+    #[inline(always)]
+    fn backtrack_block3_autovec(
+        _query_wide: f32,
+        _stems_ptr: NonNull<u8>,
+        _block_base_idx: usize,
+        _old_off: f32,
+        _rd: f32,
+        _best_dist: f32,
+    ) -> u8 {
+        panic!("DotProduct is not currently supported with Donnelly SIMD backtracking");
+    }
+}
+
+impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f32> for DotProduct<f32>
+where
+    A: Copy,
+    DotProduct<f32>: DistanceMetricUnified<A, K, Output = f32>,
+{
+    #[inline(always)]
+    fn backtrack_block4_autovec(
+        _query_wide: f32,
+        _stems_ptr: NonNull<u8>,
+        _block_base_idx: usize,
+        _old_off: f32,
+        _rd: f32,
+        _best_dist: f32,
+    ) -> u16 {
+        panic!("DotProduct is not currently supported with Donnelly SIMD backtracking");
+    }
 }
 
 // ====================================================================================
@@ -217,67 +1057,16 @@ impl BacktrackBlock3 for f64 {
     ) -> u8
     where
         A: Copy,
-        D: DistanceMetricUnified<A, K, Output = Self>,
+        D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>,
     {
-        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
-        {
-            #[cfg(target_feature = "avx512f")]
-            {
-                return unsafe {
-                    simd_backtrack_block3_f64_avx512::<A, D, K>(
-                        query_wide,
-                        stems_ptr,
-                        block_base_idx,
-                        old_off,
-                        rd,
-                        best_dist,
-                    )
-                };
-            }
-
-            #[cfg(not(target_feature = "avx512f"))]
-            {
-                return unsafe {
-                    simd_backtrack_block3_f64_avx2::<A, D, K>(
-                        query_wide,
-                        stems_ptr,
-                        block_base_idx,
-                        old_off,
-                        rd,
-                        best_dist,
-                    )
-                };
-            }
-        }
-
-        #[cfg(all(feature = "simd", target_arch = "aarch64"))]
-        {
-            unsafe {
-                simd_backtrack_block3_f64_neon::<A, D, K>(
-                    query_wide,
-                    stems_ptr,
-                    block_base_idx,
-                    old_off,
-                    rd,
-                    best_dist,
-                )
-            }
-        }
-
-        #[cfg(not(any(
-            all(feature = "simd", target_arch = "x86_64"),
-            all(feature = "simd", target_arch = "aarch64")
-        )))]
-        {
-            autovec_backtrack_block3::<Self, A, D, K>(
-                query_wide,
-                stems_ptr,
-                block_base_idx,
-                old_off,
-                rd,
-                best_dist,
-            )
-        }
+        D::backtrack_block3(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
     }
 }
 
@@ -293,67 +1082,16 @@ impl BacktrackBlock4 for f64 {
     ) -> u16
     where
         A: Copy,
-        D: DistanceMetricUnified<A, K, Output = Self>,
+        D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>,
     {
-        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
-        {
-            #[cfg(target_feature = "avx512f")]
-            {
-                return unsafe {
-                    simd_backtrack_block4_f64_avx512::<A, D, K>(
-                        query_wide,
-                        stems_ptr,
-                        block_base_idx,
-                        old_off,
-                        rd,
-                        best_dist,
-                    )
-                };
-            }
-
-            #[cfg(not(target_feature = "avx512f"))]
-            {
-                return unsafe {
-                    simd_backtrack_block4_f64_avx2::<A, D, K>(
-                        query_wide,
-                        stems_ptr,
-                        block_base_idx,
-                        old_off,
-                        rd,
-                        best_dist,
-                    )
-                };
-            }
-        }
-
-        #[cfg(all(feature = "simd", target_arch = "aarch64"))]
-        {
-            unsafe {
-                simd_backtrack_block4_f64_neon::<A, D, K>(
-                    query_wide,
-                    stems_ptr,
-                    block_base_idx,
-                    old_off,
-                    rd,
-                    best_dist,
-                )
-            }
-        }
-
-        #[cfg(not(any(
-            all(feature = "simd", target_arch = "x86_64"),
-            all(feature = "simd", target_arch = "aarch64")
-        )))]
-        {
-            autovec_backtrack_block4::<Self, A, D, K>(
-                query_wide,
-                stems_ptr,
-                block_base_idx,
-                old_off,
-                rd,
-                best_dist,
-            )
-        }
+        D::backtrack_block4(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
     }
 }
 
@@ -375,67 +1113,16 @@ impl BacktrackBlock3 for f32 {
     ) -> u8
     where
         A: Copy,
-        D: DistanceMetricUnified<A, K, Output = Self>,
+        D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>,
     {
-        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
-        {
-            #[cfg(target_feature = "avx512f")]
-            {
-                return unsafe {
-                    simd_backtrack_block3_f32_avx512::<A, D, K>(
-                        query_wide,
-                        stems_ptr,
-                        block_base_idx,
-                        old_off,
-                        rd,
-                        best_dist,
-                    )
-                };
-            }
-
-            #[cfg(not(target_feature = "avx512f"))]
-            {
-                return unsafe {
-                    simd_backtrack_block3_f32_avx2::<A, D, K>(
-                        query_wide,
-                        stems_ptr,
-                        block_base_idx,
-                        old_off,
-                        rd,
-                        best_dist,
-                    )
-                };
-            }
-        }
-
-        #[cfg(all(feature = "simd", target_arch = "aarch64"))]
-        {
-            unsafe {
-                simd_backtrack_block3_f32_neon::<A, D, K>(
-                    query_wide,
-                    stems_ptr,
-                    block_base_idx,
-                    old_off,
-                    rd,
-                    best_dist,
-                )
-            }
-        }
-
-        #[cfg(not(any(
-            all(feature = "simd", target_arch = "x86_64"),
-            all(feature = "simd", target_arch = "aarch64")
-        )))]
-        {
-            autovec_backtrack_block3::<Self, A, D, K>(
-                query_wide,
-                stems_ptr,
-                block_base_idx,
-                old_off,
-                rd,
-                best_dist,
-            )
-        }
+        D::backtrack_block3(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
     }
 }
 
@@ -451,67 +1138,16 @@ impl BacktrackBlock4 for f32 {
     ) -> u16
     where
         A: Copy,
-        D: DistanceMetricUnified<A, K, Output = Self>,
+        D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>,
     {
-        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
-        {
-            #[cfg(target_feature = "avx512f")]
-            {
-                return unsafe {
-                    simd_backtrack_block4_f32_avx512::<A, D, K>(
-                        query_wide,
-                        stems_ptr,
-                        block_base_idx,
-                        old_off,
-                        rd,
-                        best_dist,
-                    )
-                };
-            }
-
-            #[cfg(not(target_feature = "avx512f"))]
-            {
-                return unsafe {
-                    simd_backtrack_block4_f32_avx2::<A, D, K>(
-                        query_wide,
-                        stems_ptr,
-                        block_base_idx,
-                        old_off,
-                        rd,
-                        best_dist,
-                    )
-                };
-            }
-        }
-
-        #[cfg(all(feature = "simd", target_arch = "aarch64"))]
-        {
-            unsafe {
-                simd_backtrack_block4_f32_neon::<A, D, K>(
-                    query_wide,
-                    stems_ptr,
-                    block_base_idx,
-                    old_off,
-                    rd,
-                    best_dist,
-                )
-            }
-        }
-
-        #[cfg(not(any(
-            all(feature = "simd", target_arch = "x86_64"),
-            all(feature = "simd", target_arch = "aarch64")
-        )))]
-        {
-            autovec_backtrack_block4::<Self, A, D, K>(
-                query_wide,
-                stems_ptr,
-                block_base_idx,
-                old_off,
-                rd,
-                best_dist,
-            )
-        }
+        D::backtrack_block4(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
     }
 }
 
@@ -965,6 +1601,7 @@ unsafe fn simd_backtrack_block4_f32_avx512<
 
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
 #[inline(always)]
+#[allow(dead_code)]
 unsafe fn simd_backtrack_block3_f64_neon<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f64>,
@@ -1041,6 +1678,7 @@ unsafe fn simd_backtrack_block3_f64_neon<
 
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
 #[inline(always)]
+#[allow(dead_code)]
 unsafe fn simd_backtrack_block3_f32_neon<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f32>,
@@ -1115,6 +1753,7 @@ unsafe fn simd_backtrack_block3_f32_neon<
 
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
 #[inline(always)]
+#[allow(dead_code)]
 unsafe fn simd_backtrack_block4_f64_neon<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f64>,
@@ -1195,6 +1834,7 @@ unsafe fn simd_backtrack_block4_f64_neon<
 
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
 #[inline(always)]
+#[allow(dead_code)]
 unsafe fn simd_backtrack_block4_f32_neon<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f32>,
@@ -1298,7 +1938,8 @@ mod fixed_impls {
                 ) -> u8
                 where
                     A: Copy,
-                    D: DistanceMetricUnified<A, K, Output = Self>,
+                    D: DistanceMetricUnified<A, K, Output = Self>
+                        + DistanceMetricSimdBlock3<A, K, Self>,
                 {
                     // TODO: Integer SIMD for fixed-point
                     autovec_backtrack_block3::<Self, A, D, K>(
@@ -1324,7 +1965,8 @@ mod fixed_impls {
                 ) -> u16
                 where
                     A: Copy,
-                    D: DistanceMetricUnified<A, K, Output = Self>,
+                    D: DistanceMetricUnified<A, K, Output = Self>
+                        + DistanceMetricSimdBlock4<A, K, Self>,
                 {
                     // TODO: Integer SIMD for fixed-point
                     autovec_backtrack_block4::<Self, A, D, K>(
@@ -1368,7 +2010,7 @@ mod f16_impl {
         ) -> u8
         where
             A: Copy,
-            D: DistanceMetricUnified<A, K, Output = Self>,
+            D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>,
         {
             // TODO: f16 SIMD (possibly widen to f32)
             autovec_backtrack_block3::<Self, A, D, K>(
@@ -1394,7 +2036,7 @@ mod f16_impl {
         ) -> u16
         where
             A: Copy,
-            D: DistanceMetricUnified<A, K, Output = Self>,
+            D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>,
         {
             // TODO: f16 SIMD (possibly widen to f32)
             autovec_backtrack_block4::<Self, A, D, K>(
