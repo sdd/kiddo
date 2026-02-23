@@ -145,7 +145,12 @@ impl<const CL: u32, const VB: u32, const K: usize> DonnellyCore<CL, VB, K> {
     #[allow(unused)] // used when simd feature is on
     #[inline(always)]
     pub(crate) fn traverse_block(&mut self, child_idx: u8, block_size: u32) {
-        debug_assert_eq!(block_size, Self::BLOCK_SIZE as u32, "Block size ({block_size}) must match BLOCK_SIZE constant ({})", Self::BLOCK_SIZE);
+        debug_assert_eq!(
+            block_size,
+            Self::BLOCK_SIZE as u32,
+            "Block size ({block_size}) must match BLOCK_SIZE constant ({})",
+            Self::BLOCK_SIZE
+        );
         debug_assert!(child_idx < (1u8 << block_size));
         debug_assert_eq!(self.minor_level, 0);
         debug_assert_eq!(self.stem_idx & Self::line_mask(), 0);

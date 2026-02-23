@@ -6,6 +6,18 @@ default:
 test-donnelly:
     cargo test donnelly
 
+test-fast ARGS='':
+    cargo test --profile fast-tests {{ARGS}}
+
+test-fast-simd ARGS='':
+    cargo test --profile fast-tests --features simd {{ARGS}}
+
+test-fast-lib FILTER:
+    cargo test --profile fast-tests --lib {{FILTER}}
+
+test-fast-v6-nearest-one-large-f32:
+    cargo test --profile fast-tests --lib v6_query_nearest_one_large_f32
+
 fuzz-kd-tree:
     RUST_TEST_THREADS=1 cargo test --release --test kd_tree_fuzz -- --ignored --nocapture
 

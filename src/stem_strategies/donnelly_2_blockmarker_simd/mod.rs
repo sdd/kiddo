@@ -786,13 +786,13 @@ where
             use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
 
             tracing::warn!(
-                    level = %self.level(),
-                    block_base_idx = %block_base_idx,
-                    block_width = %block_width,
-                    %max_stem_level,
-                    %old_off_val,
-                    "Block4 backtracking_traverse_step can't take full block"
-                );
+                level = %self.level(),
+                block_base_idx = %block_base_idx,
+                block_width = %block_width,
+                %max_stem_level,
+                %old_off_val,
+                "Block4 backtracking_traverse_step can't take full block"
+            );
 
             let stem_idx = self.stem_idx();
             let pivot = if stem_idx < stems.len() {

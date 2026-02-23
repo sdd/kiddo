@@ -57,6 +57,12 @@ where
     fn max_dist(&self) -> O {
         self.best_dist
     }
+
+    // TOOO: investigate into whether this can be removed
+    #[inline]
+    fn prune_on_equal_max_dist(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]

@@ -193,7 +193,12 @@ where
             tracing::trace!(%dim, %old_off, %rd, ?off, "Popped stack context");
 
             let max_dist = query_ctx.max_dist();
-            if O::cmp(rd, max_dist) == std::cmp::Ordering::Greater {
+            let rd_vs_max = O::cmp(rd, max_dist);
+
+            // TOOO: investigate into whether prune_on_equal_max_dist can be removed
+            let should_prune = rd_vs_max == std::cmp::Ordering::Greater
+                || (query_ctx.prune_on_equal_max_dist() && rd_vs_max == std::cmp::Ordering::Equal);
+            if should_prune {
                 tracing::trace!(%rd, %max_dist, "SCALAR Prune check: PRUNE");
                 continue;
             }
@@ -332,7 +337,12 @@ where
                     tracing::trace!(%dim, %old_off, %rd, ?off, "Popped single context");
 
                     let max_dist = query_ctx.max_dist();
-                    if O::cmp(rd, max_dist) == std::cmp::Ordering::Greater {
+                    let rd_vs_max = O::cmp(rd, max_dist);
+                    // TOOO: investigate into whether prune_on_equal_max_dist can be removed
+                    let should_prune = rd_vs_max == std::cmp::Ordering::Greater
+                        || (query_ctx.prune_on_equal_max_dist()
+                            && rd_vs_max == std::cmp::Ordering::Equal);
+                    if should_prune {
                         tracing::trace!(%rd, %max_dist, "Prune check: PRUNE");
                         continue;
                     }
