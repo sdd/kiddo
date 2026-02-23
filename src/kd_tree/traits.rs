@@ -13,4 +13,14 @@ pub trait QueryContext<A, O, const K: usize> {
     /// better results than already found. For nearest neighbor queries, this
     /// returns the distance to the best point found so far.
     fn max_dist(&self) -> O;
+
+    // TOOO: investigate into whether prune_on_equal_max_dist can be removed
+    /// Returns true if branches with `rd == max_dist` should be pruned.
+    ///
+    /// Nearest-one queries can safely prune equality and gain performance.
+    /// Radius-based queries generally need to keep equality (boundary points).
+    #[inline]
+    fn prune_on_equal_max_dist(&self) -> bool {
+        false
+    }
 }
