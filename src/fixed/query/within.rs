@@ -50,6 +50,7 @@ mod tests {
     use fixed::types::extra::U14;
     use fixed::FixedU16;
     use rand::Rng;
+    use rstest::rstest;
     use std::cmp::Ordering;
 
     type Fxd = FixedU16<U14>;
@@ -151,6 +152,25 @@ mod tests {
                 .map(|n| (n.distance, n.item))
                 .collect();
             assert_eq!(result, expected);
+        }
+    }
+
+    #[rstest]
+    #[case(true, 1)]
+    #[case(false, 0)]
+    fn test_within_boundary_inclusiveness(#[case] inclusive: bool, #[case] expected_len: usize) {
+        let mut kdtree: KdTree<Fxd, u32, 2, 5, u32> = KdTree::new();
+        kdtree.add(&[n(1.0), n(0.0)], 1);
+        kdtree.add(&[n(2.0), n(0.0)], 2);
+
+        let query = [n(0.0), n(0.0)];
+        let radius = n(1.0);
+
+        let results = kdtree.within_with_condition::<Manhattan>(&query, radius, inclusive);
+        assert_eq!(results.len(), expected_len);
+        if expected_len > 0 {
+            assert_eq!(results[0].item, 1);
+            assert_eq!(results[0].distance, n(1.0));
         }
     }
 

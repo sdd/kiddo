@@ -140,6 +140,7 @@ where
         items: &[T; C],
         radius: Self,
         results: &mut R,
+        inclusive: bool,
     ) where
         R: ResultCollection<Self, T>,
         usize: Cast<T>,
@@ -151,6 +152,7 @@ where
         radius: Self,
         max_qty: usize,
         results: &mut BinaryHeap<BestNeighbour<Self, T>>,
+        inclusive: bool,
     ) where
         Self: Axis + Sized;
 }
@@ -220,8 +222,13 @@ where
     }
 
     #[inline]
-    pub(crate) fn nearest_n_within<D, R>(&self, query: &[A; K], radius: A, results: &mut R)
-    where
+    pub(crate) fn nearest_n_within<D, R>(
+        &self,
+        query: &[A; K],
+        radius: A,
+        results: &mut R,
+        inclusive: bool,
+    ) where
         D: DistanceMetric<A, K>,
         R: ResultCollection<A, T>,
     {
@@ -230,7 +237,7 @@ where
         for chunk in chunk_iter {
             let dists = A::dists_for_chunk::<D, CHUNK_SIZE>(chunk.0, query);
 
-            A::update_nearest_dists_within(dists, chunk.1, radius, results);
+            A::update_nearest_dists_within(dists, chunk.1, radius, results, inclusive);
         }
 
         #[allow(clippy::needless_range_loop)]
@@ -240,7 +247,11 @@ where
                 distance =
                     D::accumulate(distance, D::dist1(remainder_points[dim][idx], query[dim]));
             });
-            if distance <= radius {
+            if if inclusive {
+                distance <= radius
+            } else {
+                distance < radius
+            } {
                 results.add(NearestNeighbour {
                     distance,
                     item: remainder_items[idx],
@@ -256,6 +267,7 @@ where
         radius: A,
         max_qty: usize,
         results: &mut BinaryHeap<BestNeighbour<A, T>>,
+        inclusive: bool,
     ) where
         D: DistanceMetric<A, K>,
     {
@@ -264,7 +276,7 @@ where
         for chunk in chunk_iter {
             let dists = A::dists_for_chunk::<D, CHUNK_SIZE>(chunk.0, query);
 
-            A::update_best_dists_within(dists, chunk.1, radius, max_qty, results);
+            A::update_best_dists_within(dists, chunk.1, radius, max_qty, results, inclusive);
         }
 
         #[allow(clippy::needless_range_loop)]
@@ -275,7 +287,11 @@ where
                     D::accumulate(distance, D::dist1(remainder_points[dim][idx], query[dim]));
             });
 
-            if distance <= radius {
+            if if inclusive {
+                distance <= radius
+            } else {
+                distance < radius
+            } {
                 let item = remainder_items[idx];
                 if results.len() < max_qty {
                     results.push(BestNeighbour { distance, item });
@@ -336,10 +352,11 @@ where
         items: &[T; C],
         radius: f64,
         results: &mut R,
+        inclusive: bool,
     ) where
         R: ResultCollection<f64, T>,
     {
-        update_nearest_dists_within_autovec(&acc, items, radius, results)
+        update_nearest_dists_within_autovec(&acc, items, radius, results, inclusive)
     }
 
     #[inline]
@@ -349,8 +366,9 @@ where
         radius: f64,
         max_qty: usize,
         results: &mut BinaryHeap<BestNeighbour<f64, T>>,
+        inclusive: bool,
     ) {
-        update_best_dists_within_autovec(&acc, items, radius, max_qty, results)
+        update_best_dists_within_autovec(&acc, items, radius, max_qty, results, inclusive)
     }
 }
 
@@ -420,10 +438,11 @@ where
         items: &[T; C],
         radius: f32,
         results: &mut R,
+        inclusive: bool,
     ) where
         R: ResultCollection<f32, T>,
     {
-        update_nearest_dists_within_autovec(&acc, items, radius, results)
+        update_nearest_dists_within_autovec(&acc, items, radius, results, inclusive)
     }
 
     #[inline]
@@ -433,8 +452,9 @@ where
         radius: f32,
         max_qty: usize,
         results: &mut BinaryHeap<BestNeighbour<f32, T>>,
+        inclusive: bool,
     ) {
-        update_best_dists_within_autovec(&acc, items, radius, max_qty, results)
+        update_best_dists_within_autovec(&acc, items, radius, max_qty, results, inclusive)
     }
 }
 
@@ -503,7 +523,7 @@ mod test {
             item: 100u32,
         });
 
-        f64::update_nearest_dists_within(dists, &items, radius, &mut results);
+        f64::update_nearest_dists_within(dists, &items, radius, &mut results, true);
 
         let results = results.into_vec();
 
@@ -537,7 +557,7 @@ mod test {
             item: 100u32,
         });
 
-        f64::update_best_dists_within(dists, &items, radius, max_qty, &mut results);
+        f64::update_best_dists_within(dists, &items, radius, max_qty, &mut results, true);
 
         let results = results.into_vec();
 
@@ -569,7 +589,7 @@ mod test {
             item: 100u32,
         });
 
-        f32::update_nearest_dists_within(dists, &items, radius, &mut results);
+        f32::update_nearest_dists_within(dists, &items, radius, &mut results, true);
 
         let results = results.into_vec();
 
@@ -603,7 +623,7 @@ mod test {
             item: 100u32,
         });
 
-        f32::update_best_dists_within(dists, &items, radius, max_qty, &mut results);
+        f32::update_best_dists_within(dists, &items, radius, max_qty, &mut results, true);
 
         let results = results.into_vec();
 
@@ -644,7 +664,12 @@ mod test {
         };
 
         let mut results: BinaryHeap<NearestNeighbour<f64, u32>> = BinaryHeap::with_capacity(10);
-        slice.nearest_n_within::<SquaredEuclidean, _>(&[32.0f64, 0.0f64], 4.0f64, &mut results);
+        slice.nearest_n_within::<SquaredEuclidean, _>(
+            &[32.0f64, 0.0f64],
+            4.0f64,
+            &mut results,
+            true,
+        );
 
         let items_found: Vec<_> = results.iter().map(|n| n.item).collect();
         assert!(

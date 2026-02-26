@@ -873,7 +873,7 @@ mod tests {
                     (DataScenario::Gaussian, d) => {
                         let mut rng = StdRng::seed_from_u64(8757);
                         let normal = Normal::new(1.0, 10.0).unwrap();
-                        let n_samples = 200;
+                        let n_samples = 2000;
                         let mut data = vec![vec![0.0; d]; n_samples];
                         for i in 0..n_samples {
                             for j in 0..d {
@@ -906,7 +906,7 @@ mod tests {
         /// - Point 0 is always the query point (distance 0, index 0 expected first result)
         /// - NoTies scenario: checks distances and item IDs for points with unique distances
         /// - Ties scenario: checks distances (order among ties is non-deterministic)
-        fn run_test_helper<D: DistanceMetric<f64, 6>>(
+        fn run_nearest_n_test_helper<D: DistanceMetric<f64, 6>>(
             dim: usize,
             tree_type: TreeType,
             scenario: DataScenario,
@@ -953,7 +953,7 @@ mod tests {
             // Query based on tree type
             let results = match tree_type {
                 TreeType::Mutable => {
-                    let mut tree: crate::float::kdtree::KdTree<f64, u64, 6, 128, u32> =
+                    let mut tree: crate::float::kdtree::KdTree<f64, u64, 6, 2048, u32> =
                         crate::float::kdtree::KdTree::new();
                     for (i, point) in points.iter().enumerate() {
                         tree.add(point, i as u64);
@@ -961,7 +961,7 @@ mod tests {
                     tree.nearest_n::<D>(&query_arr, n)
                 }
                 TreeType::Immutable => {
-                    let tree: crate::immutable::float::kdtree::ImmutableKdTree<f64, u64, 6, 128> =
+                    let tree: crate::immutable::float::kdtree::ImmutableKdTree<f64, u64, 6, 2048> =
                         crate::immutable::float::kdtree::ImmutableKdTree::new_from_slice(&points);
                     tree.nearest_n::<D>(&query_arr, std::num::NonZero::new(n).unwrap())
                 }
@@ -1007,7 +1007,7 @@ mod tests {
             #[values(1, 2, 3, 4, 5, 6)] n: usize,
             #[values(1, 2, 3, 4)] dim: usize,
         ) {
-            run_test_helper::<Chebyshev>(dim, tree_type, scenario, n);
+            run_nearest_n_test_helper::<Chebyshev>(dim, tree_type, scenario, n);
         }
 
         #[rstest]
@@ -1018,7 +1018,7 @@ mod tests {
             #[values(1, 2, 3, 4, 5, 6)] n: usize,
             #[values(1, 2, 3, 4)] dim: usize,
         ) {
-            run_test_helper::<SquaredEuclidean>(dim, tree_type, scenario, n);
+            run_nearest_n_test_helper::<SquaredEuclidean>(dim, tree_type, scenario, n);
         }
 
         #[rstest]
@@ -1029,7 +1029,7 @@ mod tests {
             #[values(1, 2, 3, 4, 5, 6)] n: usize,
             #[values(1, 2, 3, 4)] dim: usize,
         ) {
-            run_test_helper::<Manhattan>(dim, tree_type, scenario, n);
+            run_nearest_n_test_helper::<Manhattan>(dim, tree_type, scenario, n);
         }
 
         #[rstest]
@@ -1042,8 +1042,8 @@ mod tests {
             #[values(3, 4)] p: u32,
         ) {
             match p {
-                3 => run_test_helper::<Minkowski<3>>(dim, tree_type, scenario, n),
-                4 => run_test_helper::<Minkowski<4>>(dim, tree_type, scenario, n),
+                3 => run_nearest_n_test_helper::<Minkowski<3>>(dim, tree_type, scenario, n),
+                4 => run_nearest_n_test_helper::<Minkowski<4>>(dim, tree_type, scenario, n),
                 _ => unreachable!(),
             }
         }
@@ -1058,9 +1058,13 @@ mod tests {
             #[values(0.5, 1.5)] p: f64,
         ) {
             if (p - 0.5).abs() < f64::EPSILON {
-                run_test_helper::<MinkowskiF64<{ 0.5f64.to_bits() }>>(dim, tree_type, scenario, n);
+                run_nearest_n_test_helper::<MinkowskiF64<{ 0.5f64.to_bits() }>>(
+                    dim, tree_type, scenario, n,
+                );
             } else if (p - 1.5).abs() < f64::EPSILON {
-                run_test_helper::<MinkowskiF64<{ 1.5f64.to_bits() }>>(dim, tree_type, scenario, n);
+                run_nearest_n_test_helper::<MinkowskiF64<{ 1.5f64.to_bits() }>>(
+                    dim, tree_type, scenario, n,
+                );
             } else {
                 unreachable!()
             }
@@ -1356,53 +1360,177 @@ mod tests {
             assert!(nearby_items.contains(&5));
         }
 
-        #[test]
-        fn test_within_chebyshev_distance() {
-            let mut kdtree: KdTree<f32, 2> = KdTree::new();
+        /// Helper function to test within queries for `D: DistanceMetric`
+        fn run_within_test_helper<D: DistanceMetric<f64, 6>>(
+            dim: usize,
+            tree_type: TreeType,
+            scenario: DataScenario,
+            radius: f64,
+            inclusive: bool,
+        ) {
+            let data = scenario.get(dim);
+            let query_point = &data[0];
 
-            // Add points with varying Chebyshev distances
-            let points = [
-                ([0.0f32, 0.0f32], 0), // distance 0
-                ([0.5f32, 0.5f32], 1), // Chebyshev: 0.5
-                ([1.0f32, 0.0f32], 2), // Chebyshev: 1.0
-                ([0.8f32, 0.9f32], 3), // Chebyshev: 0.9
-                ([2.0f32, 0.0f32], 4), // Chebyshev: 2.0
-                ([0.0f32, 2.0f32], 5), // Chebyshev: 2.0
-                ([1.5f32, 1.5f32], 6), // Chebyshev: 1.5
-            ];
-
-            for (point, index) in points {
-                kdtree.add(&point, index);
+            let mut points: Vec<[f64; 6]> = Vec::with_capacity(data.len());
+            for row in &data {
+                let mut p = [0.0; 6];
+                for (i, &val) in row.iter().enumerate() {
+                    p[i] = val;
+                }
+                points.push(p);
             }
 
-            let query_point = [0.0f32, 0.0f32];
-            let radius = 1.0; // radius 1 (not squared for Chebyshev)
-            let mut results = kdtree.within::<Chebyshev>(&query_point, radius);
-
-            // Sort by distance for easier verification
-            results.sort_by(|a, b| {
-                a.distance
-                    .partial_cmp(&b.distance)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-
-            // These SHOULD be: 0, 1, 2, 3 (distances: 0, 0.5, 1.0, 0.9)
-            // For `<=5.2.4` found: 0, 1, 3 (index 2 is missing due to dist1 pruning issue)
-            let found_indices: Vec<u64> = results.iter().map(|r| r.item).collect();
-
-            assert!(found_indices.contains(&0));
-            assert!(found_indices.contains(&1));
-            assert!(found_indices.contains(&2));
-            assert!(found_indices.contains(&3));
-            // Should NOT include points with Chebyshev distance > 1
-            assert!(!found_indices.contains(&4));
-            assert!(!found_indices.contains(&5));
-            assert!(!found_indices.contains(&6));
-
-            // Verify distances
-            for result in results {
-                assert!(result.distance <= 1.0 || (result.distance - 1.0).abs() < 0.001);
+            let mut query_arr = [0.0; 6];
+            for (i, &val) in query_point.iter().enumerate() {
+                if i < 6 {
+                    query_arr[i] = val;
+                }
             }
+
+            // Ground truth with brute-force
+            let mut expected: Vec<(usize, f64)> = points
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &point)| {
+                    let dist = D::dist(&query_arr, &point);
+                    if if inclusive {
+                        dist <= radius
+                    } else {
+                        dist < radius
+                    } {
+                        Some((i, dist))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            expected.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+
+            println!(
+                "Within Query: TreeType: {:?}, Scenario: {:?}, dim={}, radius={}, inclusive={}",
+                tree_type, scenario, dim, radius, inclusive
+            );
+
+            // Query based on tree type
+            let mut results = match tree_type {
+                TreeType::Mutable => {
+                    let mut tree: crate::float::kdtree::KdTree<f64, u64, 6, 2048, u32> =
+                        crate::float::kdtree::KdTree::new();
+                    for (i, point) in points.iter().enumerate() {
+                        tree.add(point, i as u64);
+                    }
+                    tree.within_with_condition::<D>(&query_arr, radius, inclusive)
+                }
+                TreeType::Immutable => {
+                    let tree: crate::immutable::float::kdtree::ImmutableKdTree<f64, u64, 6, 2048> =
+                        crate::immutable::float::kdtree::ImmutableKdTree::new_from_slice(&points);
+                    tree.within_with_condition::<D>(&query_arr, radius, inclusive)
+                }
+            };
+
+            results.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
+
+            println!(
+                "Results (len: {}), Expected (len: {})",
+                results.len(),
+                expected.len()
+            );
+
+            assert_eq!(
+                results.len(),
+                expected.len(),
+                "Result count mismatch. Expected {}, got {}",
+                expected.len(),
+                results.len()
+            );
+
+            for (i, result) in results.iter().enumerate() {
+                assert!(
+                    (result.distance - expected[i].1).abs() < 1e-10,
+                    "Distance at index {} should be {}, but was {}",
+                    i,
+                    expected[i].1,
+                    result.distance
+                );
+            }
+
+            if matches!(scenario, DataScenario::NoTies) {
+                for (i, result) in results.iter().enumerate() {
+                    let expected_id = expected[i].0;
+                    assert_eq!(
+                        result.item, expected_id as u64,
+                        "Result {}: item ID mismatch. Expected {}, got {}",
+                        i, expected_id, result.item
+                    );
+                }
+            }
+        }
+
+        #[rstest]
+        fn test_within_chebyshev(
+            #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
+            #[values(DataScenario::NoTies, DataScenario::Ties, DataScenario::Gaussian)]
+            scenario: DataScenario,
+            #[values(0.1, 0.5, 1.0, 2.0)] radius: f64,
+            #[values(1, 2, 3, 4)] dim: usize,
+            #[values(true, false)] inclusive: bool,
+        ) {
+            run_within_test_helper::<Chebyshev>(dim, tree_type, scenario, radius, inclusive);
+        }
+
+        #[rstest]
+        fn test_within_squared_euclidean(
+            #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
+            #[values(DataScenario::NoTies, DataScenario::Ties, DataScenario::Gaussian)]
+            scenario: DataScenario,
+            #[values(0.1, 0.5, 1.0, 2.0)] radius: f64,
+            #[values(1, 2, 3, 4)] dim: usize,
+            #[values(true, false)] inclusive: bool,
+        ) {
+            run_within_test_helper::<SquaredEuclidean>(dim, tree_type, scenario, radius, inclusive);
+        }
+
+        #[rstest]
+        fn test_within_manhattan(
+            #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
+            #[values(DataScenario::NoTies, DataScenario::Ties, DataScenario::Gaussian)]
+            scenario: DataScenario,
+            #[values(0.1, 0.5, 1.0, 2.0)] radius: f64,
+            #[values(1, 2, 3, 4)] dim: usize,
+            #[values(true, false)] inclusive: bool,
+        ) {
+            run_within_test_helper::<Manhattan>(dim, tree_type, scenario, radius, inclusive);
+        }
+
+        #[rstest]
+        #[case(true, 1)]
+        #[case(false, 0)]
+        fn test_within_boundary_inclusiveness(
+            #[case] inclusive: bool,
+            #[case] expected_len: usize,
+        ) {
+            let mut kdtree: KdTree<f64, 2> = KdTree::new();
+            kdtree.add(&[1.0, 0.0], 1);
+            kdtree.add(&[2.0, 0.0], 2);
+
+            let query = [0.0, 0.0];
+            let radius = 1.0;
+
+            let results =
+                kdtree.within_with_condition::<SquaredEuclidean>(&query, radius, inclusive);
+            assert_eq!(results.len(), expected_len);
+            if expected_len > 0 {
+                assert_eq!(results[0].item, 1);
+                assert_eq!(results[0].distance, 1.0);
+            }
+
+            // Test nearest_n_within_with_condition
+            let max_qty = std::num::NonZero::new(10).unwrap();
+            let results = kdtree.nearest_n_within_with_condition::<SquaredEuclidean>(
+                &query, radius, max_qty, true, inclusive,
+            );
+            assert_eq!(results.len(), expected_len);
         }
 
         #[test]

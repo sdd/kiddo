@@ -15,6 +15,23 @@ macro_rules! generate_immutable_best_n_within {
                 usize: Cast<T>,
                 D: DistanceMetric<A, K>,
             {
+                self.best_n_within_with_condition::<D>(query, dist, max_qty, true)
+            }
+
+            #[doc = concat!$comments]
+            #[inline]
+            pub fn best_n_within_with_condition<D>(
+                &self,
+                query: &[A; K],
+                dist: A,
+                max_qty: NonZero<usize>,
+                inclusive: bool,
+            ) -> impl Iterator<Item = BestNeighbour<A, T>>
+            where
+                A: LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
+                usize: Cast<T>,
+                D: DistanceMetric<A, K>,
+            {
                 let mut off = [A::zero(); K];
                 let mut best_items: BinaryHeap<BestNeighbour<A, T>> = BinaryHeap::with_capacity(max_qty.into());
 
@@ -35,6 +52,7 @@ macro_rules! generate_immutable_best_n_within {
                     A::zero(),
                     0,
                     0,
+                    inclusive,
                 );
 
                 #[cfg(feature = "modified_van_emde_boas")]
@@ -50,6 +68,7 @@ macro_rules! generate_immutable_best_n_within {
                     0,
                     0,
                     0,
+                    inclusive,
                 );
 
                 best_items.into_iter()
@@ -69,13 +88,14 @@ macro_rules! generate_immutable_best_n_within {
                 rd: A,
                 mut level: usize,
                 mut leaf_idx: usize,
+                inclusive: bool,
             ) where
                 A: LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
                 usize: Cast<T>,
                 D: DistanceMetric<A, K>,
             {
                 if level as isize > i32::from(self.max_stem_level) as isize {
-                    self.search_leaf_for_best_n_within::<D>(query, radius, max_qty, best_items, leaf_idx as usize);
+                    self.search_leaf_for_best_n_within::<D>(query, radius, max_qty, best_items, leaf_idx as usize, inclusive);
                     return;
                 }
 
@@ -107,11 +127,12 @@ macro_rules! generate_immutable_best_n_within {
                     rd,
                     level,
                     closer_leaf_idx,
+                    inclusive,
                 );
 
                 rd = D::accumulate(rd, D::dist1(new_off, old_off));
 
-                if rd <= radius {
+                if if inclusive { rd <= radius } else { rd < radius } {
                     off[split_dim] = new_off;
                     self.best_n_within_recurse::<D>(
                         query,
@@ -124,6 +145,7 @@ macro_rules! generate_immutable_best_n_within {
                         rd,
                         level,
                         further_leaf_idx,
+                        inclusive,
                     );
                     off[split_dim] = old_off;
                 }
@@ -144,6 +166,7 @@ macro_rules! generate_immutable_best_n_within {
                 mut level: i32,
                 mut minor_level: u32,
                 mut leaf_idx: usize,
+                inclusive: bool,
             ) where
                 A: LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
                 usize: Cast<T>,
@@ -153,7 +176,7 @@ macro_rules! generate_immutable_best_n_within {
                 use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 
                 if level > i32::from(self.max_stem_level) {
-                    self.search_leaf_for_best_n_within::<D>(query, radius, max_qty, best_items, leaf_idx as usize);
+                    self.search_leaf_for_best_n_within::<D>(query, radius, max_qty, best_items, leaf_idx as usize, inclusive);
                     return;
                 }
 
@@ -188,11 +211,12 @@ macro_rules! generate_immutable_best_n_within {
                     level,
                     minor_level,
                     closer_leaf_idx,
+                    inclusive,
                 );
 
                 rd = D::accumulate(rd, D::dist1(new_off, old_off));
 
-                if rd <= radius {
+                if if inclusive { rd <= radius } else { rd < radius } {
                     off[split_dim] = new_off;
                     self.best_n_within_recurse::<D>(
                         query,
@@ -206,6 +230,7 @@ macro_rules! generate_immutable_best_n_within {
                         level,
                         minor_level,
                         further_leaf_idx,
+                        inclusive,
                     );
                     off[split_dim] = old_off;
                 }
@@ -219,6 +244,7 @@ macro_rules! generate_immutable_best_n_within {
                 max_qty: usize,
                 results: &mut BinaryHeap<BestNeighbour<A, T>>,
                 leaf_idx: usize,
+                inclusive: bool,
             ) where
                 D: DistanceMetric<A, K>,
             {
@@ -229,6 +255,7 @@ macro_rules! generate_immutable_best_n_within {
                     radius,
                     max_qty,
                     results,
+                    inclusive,
                 );
             }
     };
