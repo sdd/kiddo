@@ -688,16 +688,6 @@ mod tests {
         ///
         /// Test matrix covering all combinations of mutable/immutable trees,
         /// data scenarios (with/out ties), dimensions, and neighbor query counts.
-        ///
-        /// Currently passing tests:
-        /// - All MutableKdTree tests pass
-        /// - ImmutableKdTree with NoTies:
-        ///   - Pass for when just querying the root n=1 or dim=1
-        /// - ImmutableKdTree with Ties: Several pass (one edge case failure for n=6, dim=2)
-        ///
-        /// Currently failing tests (16 of 96):
-        /// - ImmutableKdTree + NoTies: fails for dim>=2 AND n>=2 (15 failures)
-        /// - ImmutableKdTree + Ties: 1 failure (n=6, dim=2)
         #[rstest]
         fn test_nearest_n_chebyshev(
             #[values(TreeType::Mutable, TreeType::Immutable)] tree_type: TreeType,
