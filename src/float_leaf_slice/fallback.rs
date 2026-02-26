@@ -34,6 +34,7 @@ pub(crate) fn update_nearest_dists_within_autovec<A: Axis, T: Content, R>(
     items: &[T],
     radius: A,
     results: &mut R,
+    inclusive: bool,
 ) where
     usize: Cast<T>,
     R: ResultCollection<A, T>,
@@ -42,7 +43,13 @@ pub(crate) fn update_nearest_dists_within_autovec<A: Axis, T: Content, R>(
     dists
         .iter()
         .zip(items.iter())
-        .filter(|(&distance, _)| distance <= radius)
+        .filter(|(&distance, _)| {
+            if inclusive {
+                distance <= radius
+            } else {
+                distance < radius
+            }
+        })
         .for_each(|(&distance, &item)| {
             results.add(NearestNeighbour { distance, item });
         });
@@ -55,6 +62,7 @@ pub(crate) fn update_best_dists_within_autovec<A: Axis, T: Content>(
     radius: A,
     max_qty: usize,
     results: &mut BinaryHeap<BestNeighbour<A, T>>,
+    inclusive: bool,
 ) where
     usize: Cast<T>,
 {
@@ -62,7 +70,13 @@ pub(crate) fn update_best_dists_within_autovec<A: Axis, T: Content>(
     dists
         .iter()
         .zip(items.iter())
-        .filter(|(&distance, _)| distance <= radius)
+        .filter(|(&distance, _)| {
+            if inclusive {
+                distance <= radius
+            } else {
+                distance < radius
+            }
+        })
         .for_each(|(&distance, &item)| {
             if results.len() < max_qty {
                 results.push(BestNeighbour { distance, item });
@@ -125,7 +139,7 @@ mod tests {
             item: 100u32,
         }];
 
-        update_nearest_dists_within_autovec(&dists[..], &items[..], radius, &mut results);
+        update_nearest_dists_within_autovec(&dists[..], &items[..], radius, &mut results, true);
 
         assert_eq!(
             results,
@@ -157,7 +171,14 @@ mod tests {
             item: 100u32,
         });
 
-        update_best_dists_within_autovec(&dists[..], &items[..], radius, max_qty, &mut results);
+        update_best_dists_within_autovec(
+            &dists[..],
+            &items[..],
+            radius,
+            max_qty,
+            &mut results,
+            true,
+        );
 
         let results = results.into_vec();
 

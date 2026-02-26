@@ -12,6 +12,20 @@ macro_rules! generate_within_unsorted_iter {
             where
                 D: DistanceMetric<A, K>,
             {
+                self.within_unsorted_iter_with_condition::<D>(query, dist, true)
+            }
+
+            #[doc = concat!$comments]
+            #[inline]
+            pub fn within_unsorted_iter_with_condition<D>(
+                &'a self,
+                query: &'query [A; K],
+                dist: A,
+                inclusive: bool,
+            ) -> WithinUnsortedIter<'a, A, T>
+            where
+                D: DistanceMetric<A, K>,
+            {
                 let mut off = [A::zero(); K];
                 let root_index: IDX = *transform(&self.root_index);
 
@@ -27,6 +41,7 @@ macro_rules! generate_within_unsorted_iter {
                             gen_scope,
                             &mut off,
                             A::zero(),
+                            inclusive,
                         );
                     }
 
@@ -46,6 +61,7 @@ macro_rules! generate_within_unsorted_iter {
                 mut gen_scope: Scope<'scope, 'a, (), NearestNeighbour<A, T>>,
                 off: &mut [A; K],
                 rd: A,
+                inclusive: bool,
             ) -> Scope<'scope, 'a, (), NearestNeighbour<A, T>>
             where
                 D: DistanceMetric<A, K>,
@@ -76,11 +92,12 @@ macro_rules! generate_within_unsorted_iter {
                         gen_scope,
                         off,
                         rd,
+                        inclusive,
                     );
 
                     rd = D::accumulate(rd, D::dist1(new_off, old_off));
 
-                    if rd <= radius {
+                    if if inclusive { rd <= radius } else { rd < radius } {
                         off[split_dim] = new_off;
                         gen_scope = self.within_unsorted_iter_recurse::<D>(
                             query,
@@ -90,6 +107,7 @@ macro_rules! generate_within_unsorted_iter {
                             gen_scope,
                             off,
                             rd,
+                            inclusive,
                         );
                         off[split_dim] = old_off;
                     }
@@ -108,7 +126,7 @@ macro_rules! generate_within_unsorted_iter {
                         .for_each(|(idx, entry)| {
                             let distance = D::dist(query, transform(entry));
 
-                            if distance <= radius {
+                            if if inclusive { distance <= radius } else { distance < radius } {
                                 let item = unsafe { leaf_node.content_items.get_unchecked(idx) };
                                 let item = *transform(item);
 

@@ -39,6 +39,20 @@ where
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
+        self.within_with_condition(query, dist, distance_fn, true)
+    }
+
+    #[inline]
+    pub fn within_with_condition<F>(
+        &self,
+        query: &[A; K],
+        dist: A,
+        distance_fn: &F,
+        inclusive: bool,
+    ) -> Vec<Neighbour<A, T>>
+    where
+        F: Fn(&[A; K], &[A; K]) -> A,
+    {
         let mut off = [A::zero(); K];
         let mut matching_items: BinaryHeap<Neighbour<A, T>> = BinaryHeap::new();
 
@@ -52,6 +66,7 @@ where
                 &mut matching_items,
                 &mut off,
                 A::zero(),
+                inclusive,
             );
         }
 
@@ -68,6 +83,7 @@ where
         matching_items: &mut BinaryHeap<Neighbour<A, T>>,
         off: &mut [A; K],
         rd: A,
+        inclusive: bool,
     ) where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
@@ -95,13 +111,14 @@ where
                 matching_items,
                 off,
                 rd,
+                inclusive,
             );
 
             // TODO: switch from dist_fn to a dist trait that can apply to 1D as well as KD
             //       so that updating rd is not hardcoded to sq euclidean
             rd = rd + new_off * new_off - old_off * old_off;
 
-            if rd <= radius {
+            if if inclusive { rd <= radius } else { rd < radius } {
                 off[split_dim] = new_off;
                 self.within_recurse(
                     query,
@@ -112,6 +129,7 @@ where
                     matching_items,
                     off,
                     rd,
+                    inclusive,
                 );
                 off[split_dim] = old_off;
             }
@@ -128,7 +146,7 @@ where
                 .for_each(|(idx, entry)| {
                     let distance = distance_fn(query, entry);
 
-                    if distance < radius {
+                    if if inclusive { distance <= radius } else { distance < radius } {
                         matching_items.push(Neighbour {
                             distance,
                             item: *leaf_node.content_items.get_unchecked(idx.az::<usize>()),
@@ -143,6 +161,7 @@ where
 mod tests {
     use crate::float::distance::manhattan;
     use crate::float::kdtree::{Axis, KdTree};
+    use rstest::rstest;
     use rand::Rng;
     use std::cmp::Ordering;
 
@@ -242,6 +261,36 @@ mod tests {
                 .collect();
 
             assert_eq!(result, expected);
+        }
+    }
+
+    #[rstest]
+    #[case(true, 1)]
+    #[case(false, 0)]
+    fn test_within_boundary_inclusiveness(#[case] inclusive: bool, #[case] expected_len: usize) {
+        let mut kdtree: KdTree<f32, u32, 2, 5, u32> = KdTree::new();
+        kdtree.add(&[1.0, 0.0], 1);
+        kdtree.add(&[2.0, 0.0], 2);
+
+        let query = [0.0, 0.0];
+        let radius = 1.0;
+
+        let results = kdtree.within_with_condition(
+            &query,
+            radius,
+            &|a, b| {
+                let mut dist = 0.0;
+                for i in 0..2 {
+                    dist += (a[i] - b[i]) * (a[i] - b[i]);
+                }
+                dist
+            },
+            inclusive,
+        );
+        assert_eq!(results.len(), expected_len);
+        if expected_len > 0 {
+            assert_eq!(results[0].item, 1);
+            assert_eq!(results[0].distance, 1.0);
         }
     }
 

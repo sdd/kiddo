@@ -8,19 +8,28 @@ macro_rules! generate_nearest_n_within_unsorted {
             where
                 D: DistanceMetric<A, K>,
             {
+                self.nearest_n_within_with_condition::<D>(query, dist, max_items, sorted, true)
+            }
+
+            #[doc = concat!$comments]
+            #[inline]
+            pub fn nearest_n_within_with_condition<D>(&self, query: &[A; K], dist: A, max_items: std::num::NonZero<usize>, sorted: bool, inclusive: bool) -> Vec<NearestNeighbour<A, T>>
+            where
+                D: DistanceMetric<A, K>,
+            {
                 if sorted || max_items < std::num::NonZero::new(usize::MAX).unwrap() {
                     if max_items <= std::num::NonZero::new(MAX_VEC_RESULT_SIZE).unwrap() {
-                        self.nearest_n_within_stub::<D, SortedVec<NearestNeighbour<A, T>>>(query, dist, max_items.get(), sorted)
+                        self.nearest_n_within_stub::<D, SortedVec<NearestNeighbour<A, T>>>(query, dist, max_items.get(), sorted, inclusive)
                     } else {
-                        self.nearest_n_within_stub::<D, BinaryHeap<NearestNeighbour<A, T>>>(query, dist, max_items.get(), sorted)
+                        self.nearest_n_within_stub::<D, BinaryHeap<NearestNeighbour<A, T>>>(query, dist, max_items.get(), sorted, inclusive)
                     }
                 } else {
-                    self.nearest_n_within_stub::<D, Vec<NearestNeighbour<A,T>>>(query, dist, 0, sorted)
+                    self.nearest_n_within_stub::<D, Vec<NearestNeighbour<A,T>>>(query, dist, 0, sorted, inclusive)
                 }
             }
 
             fn nearest_n_within_stub<D: DistanceMetric<A, K>, H: ResultCollection<A, T>>(
-                &self, query: &[A; K], dist: A, res_capacity: usize, sorted: bool
+                &self, query: &[A; K], dist: A, res_capacity: usize, sorted: bool, inclusive: bool
             ) -> Vec<NearestNeighbour<A, T>> {
                 let mut matching_items = H::new_with_capacity(res_capacity);
                 let mut off = [A::zero(); K];
@@ -35,6 +44,7 @@ macro_rules! generate_nearest_n_within_unsorted {
                         &mut matching_items,
                         &mut off,
                         A::zero(),
+                        inclusive,
                     );
                 }
 
@@ -55,6 +65,7 @@ macro_rules! generate_nearest_n_within_unsorted {
                 matching_items: &mut R,
                 off: &mut [A; K],
                 rd: A,
+                inclusive: bool,
             ) where
                 D: DistanceMetric<A, K>,
             {
@@ -84,11 +95,12 @@ macro_rules! generate_nearest_n_within_unsorted {
                         matching_items,
                         off,
                         rd,
+                        inclusive,
                     );
 
                     rd = D::accumulate(rd, D::dist1(new_off, old_off));
 
-                    if rd <= radius {
+                    if if inclusive { rd <= radius } else { rd < radius } {
                         off[split_dim] = new_off;
                         self.nearest_n_within_unsorted_recurse::<D, R>(
                             query,
@@ -98,6 +110,7 @@ macro_rules! generate_nearest_n_within_unsorted {
                             matching_items,
                             off,
                             rd,
+                            inclusive,
                         );
                         off[split_dim] = old_off;
                     }
@@ -116,7 +129,7 @@ macro_rules! generate_nearest_n_within_unsorted {
                         .for_each(|(idx, entry)| {
                             let distance = D::dist(query, transform(entry));
 
-                            if distance <= radius {
+                            if if inclusive { distance <= radius } else { distance < radius } {
                                 let item = unsafe { leaf_node.content_items.get_unchecked(idx) };
                                 let item = *transform(item);
 

@@ -8,21 +8,30 @@ macro_rules! generate_immutable_nearest_n_within {
             where
                 D: DistanceMetric<A, K>,
             {
+                self.nearest_n_within_with_condition::<D>(query, dist, max_items, sorted, true)
+            }
+
+            #[doc = concat!$comments]
+            #[inline]
+            pub fn nearest_n_within_with_condition<D>(&self, query: &[A; K], dist: A, max_items: NonZero<usize>, sorted: bool, inclusive: bool) -> Vec<NearestNeighbour<A, T>>
+            where
+                D: DistanceMetric<A, K>,
+            {
                 let max_items = max_items.into();
 
                 if sorted && max_items < usize::MAX {
                     if max_items <= MAX_VEC_RESULT_SIZE {
-                        self.nearest_n_within_stub::<D, SortedVec<NearestNeighbour<A, T>>>(query, dist, max_items, sorted)
+                        self.nearest_n_within_stub::<D, SortedVec<NearestNeighbour<A, T>>>(query, dist, max_items, sorted, inclusive)
                     } else {
-                        self.nearest_n_within_stub::<D, BinaryHeap<NearestNeighbour<A, T>>>(query, dist, max_items, sorted)
+                        self.nearest_n_within_stub::<D, BinaryHeap<NearestNeighbour<A, T>>>(query, dist, max_items, sorted, inclusive)
                     }
                 } else {
-                    self.nearest_n_within_stub::<D, Vec<NearestNeighbour<A,T>>>(query, dist, 0, sorted)
+                    self.nearest_n_within_stub::<D, Vec<NearestNeighbour<A,T>>>(query, dist, 0, sorted, inclusive)
                 }
             }
 
             fn nearest_n_within_stub<D: DistanceMetric<A, K>, H: ResultCollection<A, T>>(
-                &self, query: &[A; K], dist: A, res_capacity: usize, sorted: bool
+                &self, query: &[A; K], dist: A, res_capacity: usize, sorted: bool, inclusive: bool
             ) -> Vec<NearestNeighbour<A, T>> {
                 let mut matching_items = H::new_with_capacity(res_capacity);
                 let mut off = [A::zero(); K];
@@ -38,6 +47,7 @@ macro_rules! generate_immutable_nearest_n_within {
                     A::zero(),
                     0,
                     0,
+                    inclusive,
                 );
 
                 #[cfg(feature = "modified_van_emde_boas")]
@@ -52,6 +62,7 @@ macro_rules! generate_immutable_nearest_n_within {
                     0,
                     0,
                     0,
+                    inclusive,
                 );
 
                 if sorted {
@@ -74,12 +85,13 @@ macro_rules! generate_immutable_nearest_n_within {
                 rd: A,
                 mut level: usize,
                 mut leaf_idx: usize,
+                inclusive: bool,
             ) where
                 D: DistanceMetric<A, K>,
                 R: ResultCollection<A, T>,
             {
                 if level > i32::from(self.max_stem_level) as usize || self.stems.is_empty() {
-                    self.search_leaf_for_nearest_n_within::<D, R>(query, radius, matching_items, leaf_idx as usize);
+                    self.search_leaf_for_nearest_n_within::<D, R>(query, radius, matching_items, leaf_idx as usize, inclusive);
                     return;
                 }
 
@@ -110,11 +122,12 @@ macro_rules! generate_immutable_nearest_n_within {
                     rd,
                     level,
                     closer_leaf_idx,
+                    inclusive,
                 );
 
                 rd = D::accumulate(rd, D::dist1(new_off, old_off));
 
-                if rd <= radius && rd < matching_items.max_dist() {
+                if if inclusive { rd <= radius } else { rd < radius } && rd < matching_items.max_dist() {
                     off[split_dim] = new_off;
                     self.nearest_n_within_recurse::<D, R>(
                         query,
@@ -126,6 +139,7 @@ macro_rules! generate_immutable_nearest_n_within {
                         rd,
                         level,
                         further_leaf_idx,
+                        inclusive,
                     );
                     off[split_dim] = old_off;
                 }
@@ -145,6 +159,7 @@ macro_rules! generate_immutable_nearest_n_within {
                 mut level: i32,
                 mut minor_level: u32,
                 mut leaf_idx: usize,
+                inclusive: bool,
             ) where
                 D: DistanceMetric<A, K>,
                 R: ResultCollection<A, T>,
@@ -153,7 +168,7 @@ macro_rules! generate_immutable_nearest_n_within {
                 use $crate::modified_van_emde_boas::modified_van_emde_boas_get_child_idx_v2_branchless;
 
                 if level > i32::from(self.max_stem_level) || self.stems.is_empty() {
-                    self.search_leaf_for_nearest_n_within::<D, R>(query, radius, matching_items, leaf_idx as usize);
+                    self.search_leaf_for_nearest_n_within::<D, R>(query, radius, matching_items, leaf_idx as usize, inclusive);
                     return;
                 }
 
@@ -187,11 +202,12 @@ macro_rules! generate_immutable_nearest_n_within {
                     level,
                     minor_level,
                     closer_leaf_idx,
+                    inclusive,
                 );
 
                 rd = D::accumulate(rd, D::dist1(new_off, old_off));
 
-                if rd <= radius && rd < matching_items.max_dist() {
+                if if inclusive { rd <= radius } else { rd < radius } && rd < matching_items.max_dist() {
                     off[split_dim] = new_off;
                     self.nearest_n_within_recurse::<D, R>(
                         query,
@@ -204,6 +220,7 @@ macro_rules! generate_immutable_nearest_n_within {
                         level,
                         minor_level,
                         further_leaf_idx,
+                        inclusive,
                     );
                     off[split_dim] = old_off;
                 }
@@ -216,6 +233,7 @@ macro_rules! generate_immutable_nearest_n_within {
                 radius: A,
                 results: &mut R,
                 leaf_idx: usize,
+                inclusive: bool,
             ) where
                 D: DistanceMetric<A, K>,
                 R: ResultCollection<A, T>,
@@ -226,6 +244,7 @@ macro_rules! generate_immutable_nearest_n_within {
                     query,
                     radius,
                     results,
+                    inclusive,
                 );
             }
     };
