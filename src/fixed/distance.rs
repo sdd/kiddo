@@ -588,9 +588,9 @@ mod tests {
     #[case([ZERO, ZERO], [ZERO, ZERO], ZERO)]
     #[case([ZERO, ZERO], [ONE, ZERO], ONE)]
     #[case([ZERO, ZERO], [ZERO, ONE], ONE)]
-    #[case([ZERO, ZERO], [ONE, ONE], FxdU16::lit("2"))]
+    #[case([ZERO, ZERO], [ONE, ONE], TWO)]
     #[case([TWO, TWO], [ZERO, ZERO], FxdU16::lit("8"))]
-    #[case([ONE, TWO], [TWO, ONE], FxdU16::lit("2"))]
+    #[case([ONE, TWO], [TWO, ONE], TWO)]
     fn test_squared_euclidean_distance_2d(
         #[case] a: [FxdU16; 2],
         #[case] b: [FxdU16; 2],
