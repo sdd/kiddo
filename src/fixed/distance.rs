@@ -37,23 +37,13 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
     fn dist(a: &[A; K], b: &[A; K]) -> A {
         a.iter()
             .zip(b.iter())
-            .map(|(&a_val, &b_val)| {
-                if a_val > b_val {
-                    a_val - b_val
-                } else {
-                    b_val - a_val
-                }
-            })
+            .map(|(&a_val, &b_val)| a_val.dist(b_val))
             .fold(A::ZERO, |a, b| a.saturating_add(b))
     }
 
     #[inline]
     fn dist1(a: A, b: A) -> A {
-        if a > b {
-            a - b
-        } else {
-            b - a
-        }
+        a.dist(b)
     }
 
     #[inline]
@@ -91,24 +81,14 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Chebyshev {
     fn dist(a: &[A; K], b: &[A; K]) -> A {
         a.iter()
             .zip(b.iter())
-            .map(|(&a_val, &b_val)| {
-                if a_val > b_val {
-                    a_val - b_val
-                } else {
-                    b_val - a_val
-                }
-            })
+            .map(|(&a_val, &b_val)| a_val.dist(b_val))
             .reduce(|a, b| if a > b { a } else { b })
             .unwrap_or(A::ZERO)
     }
 
     #[inline]
     fn dist1(a: A, b: A) -> A {
-        if a > b {
-            a - b
-        } else {
-            b - a
-        }
+        a.dist(b)
     }
 
     #[inline]
@@ -153,7 +133,7 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for SquaredEuclidean {
             .zip(b.iter())
             .map(|(&a_val, &b_val)| {
                 let diff: A = a_val.dist(b_val);
-                diff * diff
+                diff.saturating_mul(diff)
             })
             .fold(A::ZERO, |a, b| a.saturating_add(b))
     }
@@ -161,7 +141,7 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for SquaredEuclidean {
     #[inline]
     fn dist1(a: A, b: A) -> A {
         let diff: A = a.dist(b);
-        diff * diff
+        diff.saturating_mul(diff)
     }
 
     #[inline]
