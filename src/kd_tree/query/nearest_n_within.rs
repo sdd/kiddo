@@ -5,11 +5,8 @@ use crate::kd_tree::KdTree;
 use crate::stem_strategies::donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4};
 use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, LeafStrategy};
 use crate::{NearestNeighbour, StemStrategy};
-use sorted_vec::SortedVec;
 use std::collections::BinaryHeap;
 use std::num::NonZeroUsize;
-
-const MAX_VEC_RESULT_SIZE: usize = 20;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
@@ -38,19 +35,13 @@ where
     {
         let max_qty: usize = max_qty.get();
 
-        if sorted && max_qty < usize::MAX {
-            if max_qty <= MAX_VEC_RESULT_SIZE {
-                self.nearest_n_within_inner::<D, SortedVec<NearestNeighbour<D::Output, T>>>(
-                    query, max_dist, max_qty, sorted,
-                )
-            } else {
-                self.nearest_n_within_inner::<D, BinaryHeap<NearestNeighbour<D::Output, T>>>(
-                    query, max_dist, max_qty, sorted,
-                )
-            }
-        } else {
+        if max_qty == usize::MAX {
             self.nearest_n_within_inner::<D, Vec<NearestNeighbour<D::Output, T>>>(
                 query, max_dist, 0, sorted,
+            )
+        } else {
+            self.nearest_n_within_inner::<D, BinaryHeap<NearestNeighbour<D::Output, T>>>(
+                query, max_dist, max_qty, sorted,
             )
         }
     }

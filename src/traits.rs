@@ -447,6 +447,7 @@ pub trait StemStrategy: Clone + Sync + Send {
     ///
     /// This method exists to allow strategies to customize backtracking behavior at compile time.
     #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
     fn backtracking_query_with_stack<A, T, O, D, QC, LS, const K2: usize, const B: usize>(
         tree: &crate::kd_tree::KdTree<A, T, Self, LS, K2, B>,
         query_ctx: &mut QC,

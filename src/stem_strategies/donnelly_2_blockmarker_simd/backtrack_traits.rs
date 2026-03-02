@@ -560,7 +560,7 @@ where
         rd: f64,
         best_dist: f64,
     ) -> u8 {
-        simd_backtrack_block3_f64_avx2::<A, Self, K>(
+        simd_backtrack_block3_f64_avx2_squared_euclidean::<A, Self, K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -580,7 +580,7 @@ where
         rd: f64,
         best_dist: f64,
     ) -> u8 {
-        simd_backtrack_block3_f64_avx512::<A, Self, K>(
+        simd_backtrack_block3_f64_avx512_squared_euclidean::<A, Self, K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -600,7 +600,7 @@ where
         rd: f64,
         best_dist: f64,
     ) -> u8 {
-        autovec_backtrack_block3::<f64, A, Self, K>(
+        simd_backtrack_block3_f64_neon_squared_euclidean::<A, Self, K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -645,7 +645,7 @@ where
         rd: f64,
         best_dist: f64,
     ) -> u16 {
-        simd_backtrack_block4_f64_avx2::<A, Self, K>(
+        simd_backtrack_block4_f64_avx2_squared_euclidean::<A, Self, K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -665,7 +665,7 @@ where
         rd: f64,
         best_dist: f64,
     ) -> u16 {
-        simd_backtrack_block4_f64_avx512::<A, Self, K>(
+        simd_backtrack_block4_f64_avx512_squared_euclidean::<A, Self, K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -685,7 +685,7 @@ where
         rd: f64,
         best_dist: f64,
     ) -> u16 {
-        autovec_backtrack_block4::<f64, A, Self, K>(
+        simd_backtrack_block4_f64_neon_squared_euclidean::<A, Self, K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -730,7 +730,7 @@ where
         rd: f32,
         best_dist: f32,
     ) -> u8 {
-        simd_backtrack_block3_f32_avx2::<A, Self, K>(
+        simd_backtrack_block3_f32_avx2_squared_euclidean::<A, Self, K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -750,7 +750,7 @@ where
         rd: f32,
         best_dist: f32,
     ) -> u8 {
-        simd_backtrack_block3_f32_avx512::<A, Self, K>(
+        simd_backtrack_block3_f32_avx512_squared_euclidean::<A, Self, K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -770,7 +770,7 @@ where
         rd: f32,
         best_dist: f32,
     ) -> u8 {
-        autovec_backtrack_block3::<f32, A, Self, K>(
+        simd_backtrack_block3_f32_neon_squared_euclidean::<A, Self, K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -815,7 +815,7 @@ where
         rd: f32,
         best_dist: f32,
     ) -> u16 {
-        simd_backtrack_block4_f32_avx2::<A, Self, K>(
+        simd_backtrack_block4_f32_avx2_squared_euclidean::<A, Self, K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -835,7 +835,7 @@ where
         rd: f32,
         best_dist: f32,
     ) -> u16 {
-        simd_backtrack_block4_f32_avx512::<A, Self, K>(
+        simd_backtrack_block4_f32_avx512_squared_euclidean::<A, Self, K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -855,7 +855,7 @@ where
         rd: f32,
         best_dist: f32,
     ) -> u16 {
-        autovec_backtrack_block4::<f32, A, Self, K>(
+        simd_backtrack_block4_f32_neon_squared_euclidean::<A, Self, K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -889,6 +889,66 @@ where
             best_dist,
         )
     }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    unsafe fn backtrack_block3_avx2(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u8 {
+        simd_backtrack_block3_f64_avx2_manhattan::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    unsafe fn backtrack_block3_avx512(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u8 {
+        simd_backtrack_block3_f64_avx512_manhattan::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+    #[inline(always)]
+    unsafe fn backtrack_block3_neon(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u8 {
+        simd_backtrack_block3_f64_neon_manhattan::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
 }
 
 impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f64> for Manhattan<f64>
@@ -906,6 +966,66 @@ where
         best_dist: f64,
     ) -> u16 {
         autovec_backtrack_block4::<f64, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    unsafe fn backtrack_block4_avx2(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u16 {
+        simd_backtrack_block4_f64_avx2_manhattan::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    unsafe fn backtrack_block4_avx512(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u16 {
+        simd_backtrack_block4_f64_avx512_manhattan::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+    #[inline(always)]
+    unsafe fn backtrack_block4_neon(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u16 {
+        simd_backtrack_block4_f64_neon_manhattan::<A, Self, K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -939,6 +1059,66 @@ where
             best_dist,
         )
     }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    unsafe fn backtrack_block3_avx2(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u8 {
+        simd_backtrack_block3_f32_avx2_manhattan::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    unsafe fn backtrack_block3_avx512(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u8 {
+        simd_backtrack_block3_f32_avx512_manhattan::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+    #[inline(always)]
+    unsafe fn backtrack_block3_neon(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u8 {
+        simd_backtrack_block3_f32_neon_manhattan::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
 }
 
 impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f32> for Manhattan<f32>
@@ -956,6 +1136,66 @@ where
         best_dist: f32,
     ) -> u16 {
         autovec_backtrack_block4::<f32, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    unsafe fn backtrack_block4_avx2(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u16 {
+        simd_backtrack_block4_f32_avx2_manhattan::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    unsafe fn backtrack_block4_avx512(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u16 {
+        simd_backtrack_block4_f32_avx512_manhattan::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+    #[inline(always)]
+    unsafe fn backtrack_block4_neon(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u16 {
+        simd_backtrack_block4_f32_neon_manhattan::<A, Self, K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -1161,7 +1401,7 @@ impl BacktrackBlock4 for f32 {
     not(target_feature = "avx512f")
 ))]
 #[inline(always)]
-unsafe fn simd_backtrack_block3_f64_avx2<
+unsafe fn simd_backtrack_block3_f64_avx2_squared_euclidean<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f64>,
     const K: usize,
@@ -1174,52 +1414,53 @@ unsafe fn simd_backtrack_block3_f64_avx2<
     best_dist: f64,
 ) -> u8 {
     use std::arch::x86_64::*;
+    let _ = core::marker::PhantomData::<D>;
 
-    // Load 8 pivots (7 actual + 1 padding)
     let ptr = stems_ptr.as_ptr().add(block_base_idx * 8) as *const f64;
-    let pivots_low = _mm256_loadu_pd(ptr);
-    let pivots_high = _mm256_loadu_pd(ptr.add(4));
 
-    // Broadcast values
+    // Load pivots contiguously, then reshuffle into child-order interval bounds.
+    let pivots_lo = _mm256_loadu_pd(ptr);
+    let pivots_hi = _mm256_loadu_pd(ptr.add(4));
+    let neg_inf = _mm256_set1_pd(f64::NEG_INFINITY);
+    let pos_inf = _mm256_set1_pd(f64::INFINITY);
+    let p4_broadcast = _mm256_permute4x64_pd(pivots_hi, 0x00);
+
+    let lower_lo_base = _mm256_permute4x64_pd(pivots_lo, 0x1C);
+    let lower_lo_inf_p4 = _mm256_blend_pd(neg_inf, p4_broadcast, 0b1000);
+    let lower_lo = _mm256_blend_pd(lower_lo_base, lower_lo_inf_p4, 0b1001);
+
+    let lower_hi_mix = _mm256_permute4x64_pd(pivots_hi, 0x84);
+    let lower_hi = _mm256_blend_pd(pivots_lo, lower_hi_mix, 0b1010);
+
+    let upper_lo_base = _mm256_permute4x64_pd(pivots_lo, 0x27);
+    let upper_lo = _mm256_blend_pd(upper_lo_base, p4_broadcast, 0b0100);
+
+    let upper_hi_lo = _mm256_permute4x64_pd(pivots_lo, 0x08);
+    let upper_hi_hi = _mm256_permute4x64_pd(pivots_hi, 0x21);
+    let upper_hi_base = _mm256_blend_pd(upper_hi_lo, upper_hi_hi, 0b0101);
+    let upper_hi = _mm256_blend_pd(upper_hi_base, pos_inf, 0b1000);
+
     let query_vec = _mm256_set1_pd(query_wide);
-    let old_off_vec = _mm256_set1_pd(old_off);
+    let old_off_sq_vec = _mm256_set1_pd(old_off * old_off);
     let rd_vec = _mm256_set1_pd(rd);
     let best_dist_vec = _mm256_set1_pd(best_dist);
+    let zero_vec = _mm256_setzero_pd();
 
-    // Compute diff = query - pivot
-    let diff_low = _mm256_sub_pd(query_vec, pivots_low);
-    let diff_high = _mm256_sub_pd(query_vec, pivots_high);
+    let below_lo = _mm256_max_pd(_mm256_sub_pd(lower_lo, query_vec), zero_vec);
+    let above_lo = _mm256_max_pd(_mm256_sub_pd(query_vec, upper_lo), zero_vec);
+    let interval_lo = _mm256_add_pd(below_lo, above_lo);
+    let new_sq_lo = _mm256_mul_pd(interval_lo, interval_lo);
+    let rd_far_lo = _mm256_add_pd(rd_vec, _mm256_sub_pd(new_sq_lo, old_off_sq_vec));
+    let mask_lo = _mm256_movemask_pd(_mm256_cmp_pd(rd_far_lo, best_dist_vec, _CMP_LE_OQ)) as u8;
 
-    // new_off = D::dist1(diff, 0) - for SquaredEuclidean this is diff²
-    // For Manhattan this would be |diff|
-    // TODO: Make this truly metric-generic. For now, assume SquaredEuclidean.
-    let new_off_low = _mm256_mul_pd(diff_low, diff_low);
-    let new_off_high = _mm256_mul_pd(diff_high, diff_high);
+    let below_hi = _mm256_max_pd(_mm256_sub_pd(lower_hi, query_vec), zero_vec);
+    let above_hi = _mm256_max_pd(_mm256_sub_pd(query_vec, upper_hi), zero_vec);
+    let interval_hi = _mm256_add_pd(below_hi, above_hi);
+    let new_sq_hi = _mm256_mul_pd(interval_hi, interval_hi);
+    let rd_far_hi = _mm256_add_pd(rd_vec, _mm256_sub_pd(new_sq_hi, old_off_sq_vec));
+    let mask_hi = _mm256_movemask_pd(_mm256_cmp_pd(rd_far_hi, best_dist_vec, _CMP_LE_OQ)) as u8;
 
-    // rd_far = rd - old_off + new_off
-    let delta_low = _mm256_sub_pd(new_off_low, old_off_vec);
-    let delta_high = _mm256_sub_pd(new_off_high, old_off_vec);
-
-    let rd_far_low = _mm256_add_pd(rd_vec, delta_low);
-    let rd_far_high = _mm256_add_pd(rd_vec, delta_high);
-
-    // Compare rd_far <= best_dist
-    let cmp_low = _mm256_cmp_pd(rd_far_low, best_dist_vec, _CMP_LE_OQ);
-    let cmp_high = _mm256_cmp_pd(rd_far_high, best_dist_vec, _CMP_LE_OQ);
-
-    // Extract masks
-    let mask_low = _mm256_movemask_pd(cmp_low) as u8;
-    let mask_high = _mm256_movemask_pd(cmp_high) as u8;
-    let mask = mask_low | (mask_high << 4);
-
-    // Permute from pivot-indexed to child-indexed
-    // Pivot-to-child mapping: [3, 1, 5, 0, 2, 4, 6, 7]
-    (mask & 0x20)
-        | ((mask & 0x42) << 1)
-        | ((mask & 0x05) << 4)
-        | ((mask & 0x80) >> 7)
-        | ((mask & 0x08) >> 2)
-        | ((mask & 0x10) >> 1)
+    mask_lo | (mask_hi << 4)
 }
 
 #[cfg(all(
@@ -1228,7 +1469,7 @@ unsafe fn simd_backtrack_block3_f64_avx2<
     not(target_feature = "avx512f")
 ))]
 #[inline(always)]
-unsafe fn simd_backtrack_block3_f32_avx2<
+unsafe fn simd_backtrack_block3_f32_avx2_squared_euclidean<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f32>,
     const K: usize,
@@ -1241,38 +1482,46 @@ unsafe fn simd_backtrack_block3_f32_avx2<
     best_dist: f32,
 ) -> u8 {
     use std::arch::x86_64::*;
+    let _ = core::marker::PhantomData::<D>;
 
-    // Load 8 pivots
+    // Load 8 pivots into a scalar array
     let ptr = stems_ptr.as_ptr().add(block_base_idx * 4) as *const f32;
-    let pivots = _mm256_loadu_ps(ptr);
+    let mut pivots = [0.0f32; 8];
+    std::ptr::copy_nonoverlapping(ptr, pivots.as_mut_ptr(), 8);
+
+    // Precompute child-indexed lower/upper bounds
+    let mut lower_vals = [0.0f32; 8];
+    let mut upper_vals = [0.0f32; 8];
+    for i in 0..8 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block3(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f32::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f32::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
 
     // Broadcast values
+    let lower = _mm256_loadu_ps(lower_vals.as_ptr());
+    let upper = _mm256_loadu_ps(upper_vals.as_ptr());
     let query_vec = _mm256_set1_ps(query_wide);
-    let old_off_vec = _mm256_set1_ps(old_off);
+    let old_off_sq_vec = _mm256_set1_ps(old_off * old_off);
     let rd_vec = _mm256_set1_ps(rd);
     let best_dist_vec = _mm256_set1_ps(best_dist);
+    let zero_vec = _mm256_setzero_ps();
 
-    // Compute diff = query - pivot
-    let diff = _mm256_sub_ps(query_vec, pivots);
+    let below = _mm256_max_ps(_mm256_sub_ps(lower, query_vec), zero_vec);
+    let above = _mm256_max_ps(_mm256_sub_ps(query_vec, upper), zero_vec);
+    let interval = _mm256_add_ps(below, above);
+    let new_sq = _mm256_mul_ps(interval, interval);
+    let rd_far = _mm256_add_ps(rd_vec, _mm256_sub_ps(new_sq, old_off_sq_vec));
 
-    // new_off = diff² (SquaredEuclidean)
-    let new_off = _mm256_mul_ps(diff, diff);
-
-    // rd_far = rd - old_off + new_off
-    let delta = _mm256_sub_ps(new_off, old_off_vec);
-    let rd_far = _mm256_add_ps(rd_vec, delta);
-
-    // Compare rd_far <= best_dist
-    let cmp = _mm256_cmp_ps(rd_far, best_dist_vec, _CMP_LE_OQ);
-    let mask = _mm256_movemask_ps(cmp) as u8;
-
-    // Permute from pivot-indexed to child-indexed
-    (mask & 0x20)
-        | ((mask & 0x42) << 1)
-        | ((mask & 0x05) << 4)
-        | ((mask & 0x80) >> 7)
-        | ((mask & 0x08) >> 2)
-        | ((mask & 0x10) >> 1)
+    _mm256_movemask_ps(_mm256_cmp_ps(rd_far, best_dist_vec, _CMP_LE_OQ)) as u8
 }
 
 #[cfg(all(
@@ -1281,7 +1530,7 @@ unsafe fn simd_backtrack_block3_f32_avx2<
     not(target_feature = "avx512f")
 ))]
 #[inline(always)]
-unsafe fn simd_backtrack_block4_f64_avx2<
+unsafe fn simd_backtrack_block4_f64_avx2_squared_euclidean<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f64>,
     const K: usize,
@@ -1293,14 +1542,55 @@ unsafe fn simd_backtrack_block4_f64_avx2<
     rd: f64,
     best_dist: f64,
 ) -> u16 {
-    autovec_backtrack_block4::<f64, A, D, K>(
-        query_wide,
-        stems_ptr,
-        block_base_idx,
-        old_off,
-        rd,
-        best_dist,
-    )
+    use std::arch::x86_64::*;
+    let _ = core::marker::PhantomData::<D>;
+
+    // Load 16 pivots into a scalar array
+    let ptr = stems_ptr.as_ptr().add(block_base_idx * 8) as *const f64;
+    let mut pivots = [0.0f64; 16];
+    std::ptr::copy_nonoverlapping(ptr, pivots.as_mut_ptr(), 16);
+
+    // Precompute child-indexed lower/upper bounds
+    let mut lower_vals = [0.0f64; 16];
+    let mut upper_vals = [0.0f64; 16];
+    for i in 0..16 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block4(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f64::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f64::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let query_vec = _mm256_set1_pd(query_wide);
+    let old_off_sq_vec = _mm256_set1_pd(old_off * old_off);
+    let rd_vec = _mm256_set1_pd(rd);
+    let best_dist_vec = _mm256_set1_pd(best_dist);
+    let zero_vec = _mm256_setzero_pd();
+
+    let mut mask: u16 = 0;
+    for chunk in 0..4 {
+        let idx = chunk * 4;
+        let lower = _mm256_loadu_pd(lower_vals.as_ptr().add(idx));
+        let upper = _mm256_loadu_pd(upper_vals.as_ptr().add(idx));
+
+        let below = _mm256_max_pd(_mm256_sub_pd(lower, query_vec), zero_vec);
+        let above = _mm256_max_pd(_mm256_sub_pd(query_vec, upper), zero_vec);
+        let interval = _mm256_add_pd(below, above);
+
+        let new_sq = _mm256_mul_pd(interval, interval);
+        let rd_far = _mm256_add_pd(rd_vec, _mm256_sub_pd(new_sq, old_off_sq_vec));
+
+        let chunk_mask = _mm256_movemask_pd(_mm256_cmp_pd(rd_far, best_dist_vec, _CMP_LE_OQ));
+        mask |= (chunk_mask as u16) << (chunk * 4);
+    }
+
+    mask
 }
 
 #[cfg(all(
@@ -1309,7 +1599,7 @@ unsafe fn simd_backtrack_block4_f64_avx2<
     not(target_feature = "avx512f")
 ))]
 #[inline(always)]
-unsafe fn simd_backtrack_block4_f32_avx2<
+unsafe fn simd_backtrack_block4_f32_avx2_squared_euclidean<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f32>,
     const K: usize,
@@ -1321,14 +1611,308 @@ unsafe fn simd_backtrack_block4_f32_avx2<
     rd: f32,
     best_dist: f32,
 ) -> u16 {
-    autovec_backtrack_block4::<f32, A, D, K>(
-        query_wide,
-        stems_ptr,
-        block_base_idx,
-        old_off,
-        rd,
-        best_dist,
-    )
+    use std::arch::x86_64::*;
+    let _ = core::marker::PhantomData::<D>;
+
+    // Load 16 pivots into a scalar array
+    let ptr = stems_ptr.as_ptr().add(block_base_idx * 4) as *const f32;
+    let mut pivots = [0.0f32; 16];
+    std::ptr::copy_nonoverlapping(ptr, pivots.as_mut_ptr(), 16);
+
+    // Precompute child-indexed lower/upper bounds
+    let mut lower_vals = [0.0f32; 16];
+    let mut upper_vals = [0.0f32; 16];
+    for i in 0..16 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block4(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f32::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f32::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let query_vec = _mm256_set1_ps(query_wide);
+    let old_off_sq_vec = _mm256_set1_ps(old_off * old_off);
+    let rd_vec = _mm256_set1_ps(rd);
+    let best_dist_vec = _mm256_set1_ps(best_dist);
+    let zero_vec = _mm256_setzero_ps();
+
+    let lower_lo = _mm256_loadu_ps(lower_vals.as_ptr());
+    let upper_lo = _mm256_loadu_ps(upper_vals.as_ptr());
+    let below_lo = _mm256_max_ps(_mm256_sub_ps(lower_lo, query_vec), zero_vec);
+    let above_lo = _mm256_max_ps(_mm256_sub_ps(query_vec, upper_lo), zero_vec);
+    let interval_lo = _mm256_add_ps(below_lo, above_lo);
+    let new_sq_lo = _mm256_mul_ps(interval_lo, interval_lo);
+    let rd_far_lo = _mm256_add_ps(rd_vec, _mm256_sub_ps(new_sq_lo, old_off_sq_vec));
+    let mask_lo = _mm256_movemask_ps(_mm256_cmp_ps(rd_far_lo, best_dist_vec, _CMP_LE_OQ)) as u16;
+
+    let lower_hi = _mm256_loadu_ps(lower_vals.as_ptr().add(8));
+    let upper_hi = _mm256_loadu_ps(upper_vals.as_ptr().add(8));
+    let below_hi = _mm256_max_ps(_mm256_sub_ps(lower_hi, query_vec), zero_vec);
+    let above_hi = _mm256_max_ps(_mm256_sub_ps(query_vec, upper_hi), zero_vec);
+    let interval_hi = _mm256_add_ps(below_hi, above_hi);
+    let new_sq_hi = _mm256_mul_ps(interval_hi, interval_hi);
+    let rd_far_hi = _mm256_add_ps(rd_vec, _mm256_sub_ps(new_sq_hi, old_off_sq_vec));
+    let mask_hi = _mm256_movemask_ps(_mm256_cmp_ps(rd_far_hi, best_dist_vec, _CMP_LE_OQ)) as u16;
+
+    mask_lo | (mask_hi << 8)
+}
+
+#[cfg(all(
+    feature = "simd",
+    target_arch = "x86_64",
+    not(target_feature = "avx512f")
+))]
+#[inline(always)]
+unsafe fn simd_backtrack_block3_f64_avx2_manhattan<
+    A: Copy,
+    D: DistanceMetricUnified<A, K, Output = f64>,
+    const K: usize,
+>(
+    query_wide: f64,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    old_off: f64,
+    rd: f64,
+    best_dist: f64,
+) -> u8 {
+    use std::arch::x86_64::*;
+    let _ = core::marker::PhantomData::<D>;
+
+    let pivots_ptr = stems_ptr.as_ptr().add(block_base_idx * 8) as *const f64;
+    let mut pivots = [0.0f64; 8];
+    std::ptr::copy_nonoverlapping(pivots_ptr, pivots.as_mut_ptr(), 8);
+
+    let mut lower_vals = [0.0f64; 8];
+    let mut upper_vals = [0.0f64; 8];
+    for i in 0..8 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block3(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f64::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f64::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let query_vec = _mm256_set1_pd(query_wide);
+    let old_off_abs_vec = _mm256_set1_pd(old_off.abs());
+    let rd_vec = _mm256_set1_pd(rd);
+    let best_dist_vec = _mm256_set1_pd(best_dist);
+    let zero_vec = _mm256_setzero_pd();
+
+    let lower_lo = _mm256_loadu_pd(lower_vals.as_ptr());
+    let upper_lo = _mm256_loadu_pd(upper_vals.as_ptr());
+    let below_lo = _mm256_max_pd(_mm256_sub_pd(lower_lo, query_vec), zero_vec);
+    let above_lo = _mm256_max_pd(_mm256_sub_pd(query_vec, upper_lo), zero_vec);
+    let interval_lo = _mm256_add_pd(below_lo, above_lo);
+    let rd_far_lo = _mm256_add_pd(rd_vec, _mm256_sub_pd(interval_lo, old_off_abs_vec));
+    let mask_lo = _mm256_movemask_pd(_mm256_cmp_pd(rd_far_lo, best_dist_vec, _CMP_LE_OQ)) as u8;
+
+    let lower_hi = _mm256_loadu_pd(lower_vals.as_ptr().add(4));
+    let upper_hi = _mm256_loadu_pd(upper_vals.as_ptr().add(4));
+    let below_hi = _mm256_max_pd(_mm256_sub_pd(lower_hi, query_vec), zero_vec);
+    let above_hi = _mm256_max_pd(_mm256_sub_pd(query_vec, upper_hi), zero_vec);
+    let interval_hi = _mm256_add_pd(below_hi, above_hi);
+    let rd_far_hi = _mm256_add_pd(rd_vec, _mm256_sub_pd(interval_hi, old_off_abs_vec));
+    let mask_hi = _mm256_movemask_pd(_mm256_cmp_pd(rd_far_hi, best_dist_vec, _CMP_LE_OQ)) as u8;
+
+    mask_lo | (mask_hi << 4)
+}
+
+#[cfg(all(
+    feature = "simd",
+    target_arch = "x86_64",
+    not(target_feature = "avx512f")
+))]
+#[inline(always)]
+unsafe fn simd_backtrack_block3_f32_avx2_manhattan<
+    A: Copy,
+    D: DistanceMetricUnified<A, K, Output = f32>,
+    const K: usize,
+>(
+    query_wide: f32,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    old_off: f32,
+    rd: f32,
+    best_dist: f32,
+) -> u8 {
+    use std::arch::x86_64::*;
+    let _ = core::marker::PhantomData::<D>;
+
+    let pivots_ptr = stems_ptr.as_ptr().add(block_base_idx * 4) as *const f32;
+    let mut pivots = [0.0f32; 8];
+    std::ptr::copy_nonoverlapping(pivots_ptr, pivots.as_mut_ptr(), 8);
+
+    let mut lower_vals = [0.0f32; 8];
+    let mut upper_vals = [0.0f32; 8];
+    for i in 0..8 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block3(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f32::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f32::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let lower = _mm256_loadu_ps(lower_vals.as_ptr());
+    let upper = _mm256_loadu_ps(upper_vals.as_ptr());
+    let query_vec = _mm256_set1_ps(query_wide);
+    let old_off_abs_vec = _mm256_set1_ps(old_off.abs());
+    let rd_vec = _mm256_set1_ps(rd);
+    let best_dist_vec = _mm256_set1_ps(best_dist);
+    let zero_vec = _mm256_setzero_ps();
+
+    let below = _mm256_max_ps(_mm256_sub_ps(lower, query_vec), zero_vec);
+    let above = _mm256_max_ps(_mm256_sub_ps(query_vec, upper), zero_vec);
+    let interval = _mm256_add_ps(below, above);
+    let rd_far = _mm256_add_ps(rd_vec, _mm256_sub_ps(interval, old_off_abs_vec));
+
+    _mm256_movemask_ps(_mm256_cmp_ps(rd_far, best_dist_vec, _CMP_LE_OQ)) as u8
+}
+
+#[cfg(all(
+    feature = "simd",
+    target_arch = "x86_64",
+    not(target_feature = "avx512f")
+))]
+#[inline(always)]
+unsafe fn simd_backtrack_block4_f64_avx2_manhattan<
+    A: Copy,
+    D: DistanceMetricUnified<A, K, Output = f64>,
+    const K: usize,
+>(
+    query_wide: f64,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    old_off: f64,
+    rd: f64,
+    best_dist: f64,
+) -> u16 {
+    use std::arch::x86_64::*;
+    let _ = core::marker::PhantomData::<D>;
+
+    let pivots_ptr = stems_ptr.as_ptr().add(block_base_idx * 8) as *const f64;
+    let mut pivots = [0.0f64; 16];
+    std::ptr::copy_nonoverlapping(pivots_ptr, pivots.as_mut_ptr(), 16);
+
+    let mut lower_vals = [0.0f64; 16];
+    let mut upper_vals = [0.0f64; 16];
+    for i in 0..16 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block4(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f64::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f64::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let query_vec = _mm256_set1_pd(query_wide);
+    let old_off_abs_vec = _mm256_set1_pd(old_off.abs());
+    let rd_vec = _mm256_set1_pd(rd);
+    let best_dist_vec = _mm256_set1_pd(best_dist);
+    let zero_vec = _mm256_setzero_pd();
+
+    let mut mask: u16 = 0;
+    for chunk in 0..4 {
+        let idx = chunk * 4;
+        let lower = _mm256_loadu_pd(lower_vals.as_ptr().add(idx));
+        let upper = _mm256_loadu_pd(upper_vals.as_ptr().add(idx));
+        let below = _mm256_max_pd(_mm256_sub_pd(lower, query_vec), zero_vec);
+        let above = _mm256_max_pd(_mm256_sub_pd(query_vec, upper), zero_vec);
+        let interval = _mm256_add_pd(below, above);
+        let rd_far = _mm256_add_pd(rd_vec, _mm256_sub_pd(interval, old_off_abs_vec));
+        let chunk_mask = _mm256_movemask_pd(_mm256_cmp_pd(rd_far, best_dist_vec, _CMP_LE_OQ));
+        mask |= (chunk_mask as u16) << (chunk * 4);
+    }
+
+    mask
+}
+
+#[cfg(all(
+    feature = "simd",
+    target_arch = "x86_64",
+    not(target_feature = "avx512f")
+))]
+#[inline(always)]
+unsafe fn simd_backtrack_block4_f32_avx2_manhattan<
+    A: Copy,
+    D: DistanceMetricUnified<A, K, Output = f32>,
+    const K: usize,
+>(
+    query_wide: f32,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    old_off: f32,
+    rd: f32,
+    best_dist: f32,
+) -> u16 {
+    use std::arch::x86_64::*;
+    let _ = core::marker::PhantomData::<D>;
+
+    let pivots_ptr = stems_ptr.as_ptr().add(block_base_idx * 4) as *const f32;
+    let mut pivots = [0.0f32; 16];
+    std::ptr::copy_nonoverlapping(pivots_ptr, pivots.as_mut_ptr(), 16);
+
+    let mut lower_vals = [0.0f32; 16];
+    let mut upper_vals = [0.0f32; 16];
+    for i in 0..16 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block4(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f32::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f32::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let query_vec = _mm256_set1_ps(query_wide);
+    let old_off_abs_vec = _mm256_set1_ps(old_off.abs());
+    let rd_vec = _mm256_set1_ps(rd);
+    let best_dist_vec = _mm256_set1_ps(best_dist);
+    let zero_vec = _mm256_setzero_ps();
+
+    let lower_lo = _mm256_loadu_ps(lower_vals.as_ptr());
+    let upper_lo = _mm256_loadu_ps(upper_vals.as_ptr());
+    let below_lo = _mm256_max_ps(_mm256_sub_ps(lower_lo, query_vec), zero_vec);
+    let above_lo = _mm256_max_ps(_mm256_sub_ps(query_vec, upper_lo), zero_vec);
+    let interval_lo = _mm256_add_ps(below_lo, above_lo);
+    let rd_far_lo = _mm256_add_ps(rd_vec, _mm256_sub_ps(interval_lo, old_off_abs_vec));
+    let mask_lo = _mm256_movemask_ps(_mm256_cmp_ps(rd_far_lo, best_dist_vec, _CMP_LE_OQ)) as u16;
+
+    let lower_hi = _mm256_loadu_ps(lower_vals.as_ptr().add(8));
+    let upper_hi = _mm256_loadu_ps(upper_vals.as_ptr().add(8));
+    let below_hi = _mm256_max_ps(_mm256_sub_ps(lower_hi, query_vec), zero_vec);
+    let above_hi = _mm256_max_ps(_mm256_sub_ps(query_vec, upper_hi), zero_vec);
+    let interval_hi = _mm256_add_ps(below_hi, above_hi);
+    let rd_far_hi = _mm256_add_ps(rd_vec, _mm256_sub_ps(interval_hi, old_off_abs_vec));
+    let mask_hi = _mm256_movemask_ps(_mm256_cmp_ps(rd_far_hi, best_dist_vec, _CMP_LE_OQ)) as u16;
+
+    mask_lo | (mask_hi << 8)
 }
 
 // ====================================================================================
@@ -1337,7 +1921,7 @@ unsafe fn simd_backtrack_block4_f32_avx2<
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 #[inline(always)]
-unsafe fn simd_backtrack_block3_f64_avx512<
+unsafe fn simd_backtrack_block3_f64_avx512_squared_euclidean<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f64>,
     const K: usize,
@@ -1400,7 +1984,7 @@ unsafe fn simd_backtrack_block3_f64_avx512<
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 #[inline(always)]
-unsafe fn simd_backtrack_block3_f32_avx512<
+unsafe fn simd_backtrack_block3_f32_avx512_squared_euclidean<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f32>,
     const K: usize,
@@ -1464,7 +2048,7 @@ unsafe fn simd_backtrack_block3_f32_avx512<
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 #[inline(always)]
-unsafe fn simd_backtrack_block4_f64_avx512<
+unsafe fn simd_backtrack_block4_f64_avx512_squared_euclidean<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f64>,
     const K: usize,
@@ -1534,7 +2118,7 @@ unsafe fn simd_backtrack_block4_f64_avx512<
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 #[inline(always)]
-unsafe fn simd_backtrack_block4_f32_avx512<
+unsafe fn simd_backtrack_block4_f32_avx512_squared_euclidean<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f32>,
     const K: usize,
@@ -1595,6 +2179,227 @@ unsafe fn simd_backtrack_block4_f32_avx512<
     _mm512_cmp_ps_mask(rd_far, best_dist_vec, _CMP_LE_OQ)
 }
 
+#[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+#[inline(always)]
+unsafe fn simd_backtrack_block3_f64_avx512_manhattan<
+    A: Copy,
+    D: DistanceMetricUnified<A, K, Output = f64>,
+    const K: usize,
+>(
+    query_wide: f64,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    old_off: f64,
+    rd: f64,
+    best_dist: f64,
+) -> u8 {
+    use std::arch::x86_64::*;
+    let _ = core::marker::PhantomData::<D>;
+
+    let ptr = stems_ptr.as_ptr().add(block_base_idx * 8) as *const f64;
+    let mut pivots = [0.0f64; 8];
+    std::ptr::copy_nonoverlapping(ptr, pivots.as_mut_ptr(), 8);
+
+    let mut lower_vals = [0.0f64; 8];
+    let mut upper_vals = [0.0f64; 8];
+    for i in 0..8 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block3(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f64::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f64::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let lower = _mm512_loadu_pd(lower_vals.as_ptr());
+    let upper = _mm512_loadu_pd(upper_vals.as_ptr());
+    let query_vec = _mm512_set1_pd(query_wide);
+    let old_off_abs_vec = _mm512_set1_pd(old_off.abs());
+    let rd_vec = _mm512_set1_pd(rd);
+    let best_dist_vec = _mm512_set1_pd(best_dist);
+    let zero_vec = _mm512_setzero_pd();
+
+    let below = _mm512_max_pd(_mm512_sub_pd(lower, query_vec), zero_vec);
+    let above = _mm512_max_pd(_mm512_sub_pd(query_vec, upper), zero_vec);
+    let interval = _mm512_add_pd(below, above);
+    let rd_far = _mm512_add_pd(rd_vec, _mm512_sub_pd(interval, old_off_abs_vec));
+
+    _mm512_cmp_pd_mask(rd_far, best_dist_vec, _CMP_LE_OQ)
+}
+
+#[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+#[inline(always)]
+unsafe fn simd_backtrack_block3_f32_avx512_manhattan<
+    A: Copy,
+    D: DistanceMetricUnified<A, K, Output = f32>,
+    const K: usize,
+>(
+    query_wide: f32,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    old_off: f32,
+    rd: f32,
+    best_dist: f32,
+) -> u8 {
+    use std::arch::x86_64::*;
+    let _ = core::marker::PhantomData::<D>;
+
+    let ptr = stems_ptr.as_ptr().add(block_base_idx * 4) as *const f32;
+    let mut pivots = [0.0f32; 8];
+    std::ptr::copy_nonoverlapping(ptr, pivots.as_mut_ptr(), 8);
+
+    let mut lower_vals = [0.0f32; 8];
+    let mut upper_vals = [0.0f32; 8];
+    for i in 0..8 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block3(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f32::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f32::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let lower = _mm256_loadu_ps(lower_vals.as_ptr());
+    let upper = _mm256_loadu_ps(upper_vals.as_ptr());
+    let query_vec = _mm256_set1_ps(query_wide);
+    let old_off_abs_vec = _mm256_set1_ps(old_off.abs());
+    let rd_vec = _mm256_set1_ps(rd);
+    let best_dist_vec = _mm256_set1_ps(best_dist);
+    let zero_vec = _mm256_setzero_ps();
+
+    let below = _mm256_max_ps(_mm256_sub_ps(lower, query_vec), zero_vec);
+    let above = _mm256_max_ps(_mm256_sub_ps(query_vec, upper), zero_vec);
+    let interval = _mm256_add_ps(below, above);
+    let rd_far = _mm256_add_ps(rd_vec, _mm256_sub_ps(interval, old_off_abs_vec));
+
+    _mm256_movemask_ps(_mm256_cmp_ps(rd_far, best_dist_vec, _CMP_LE_OQ)) as u8
+}
+
+#[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+#[inline(always)]
+unsafe fn simd_backtrack_block4_f64_avx512_manhattan<
+    A: Copy,
+    D: DistanceMetricUnified<A, K, Output = f64>,
+    const K: usize,
+>(
+    query_wide: f64,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    old_off: f64,
+    rd: f64,
+    best_dist: f64,
+) -> u16 {
+    use std::arch::x86_64::*;
+    let _ = core::marker::PhantomData::<D>;
+
+    let ptr = stems_ptr.as_ptr().add(block_base_idx * 8) as *const f64;
+    let mut pivots = [0.0f64; 16];
+    std::ptr::copy_nonoverlapping(ptr, pivots.as_mut_ptr(), 16);
+
+    let mut lower_vals = [0.0f64; 16];
+    let mut upper_vals = [0.0f64; 16];
+    for i in 0..16 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block4(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f64::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f64::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let query_vec = _mm512_set1_pd(query_wide);
+    let old_off_abs_vec = _mm512_set1_pd(old_off.abs());
+    let rd_vec = _mm512_set1_pd(rd);
+    let best_dist_vec = _mm512_set1_pd(best_dist);
+    let zero_vec = _mm512_setzero_pd();
+
+    let lower_lo = _mm512_loadu_pd(lower_vals.as_ptr());
+    let upper_lo = _mm512_loadu_pd(upper_vals.as_ptr());
+    let below_lo = _mm512_max_pd(_mm512_sub_pd(lower_lo, query_vec), zero_vec);
+    let above_lo = _mm512_max_pd(_mm512_sub_pd(query_vec, upper_lo), zero_vec);
+    let interval_lo = _mm512_add_pd(below_lo, above_lo);
+    let rd_far_lo = _mm512_add_pd(rd_vec, _mm512_sub_pd(interval_lo, old_off_abs_vec));
+    let mask_lo = _mm512_cmp_pd_mask(rd_far_lo, best_dist_vec, _CMP_LE_OQ);
+
+    let lower_hi = _mm512_loadu_pd(lower_vals.as_ptr().add(8));
+    let upper_hi = _mm512_loadu_pd(upper_vals.as_ptr().add(8));
+    let below_hi = _mm512_max_pd(_mm512_sub_pd(lower_hi, query_vec), zero_vec);
+    let above_hi = _mm512_max_pd(_mm512_sub_pd(query_vec, upper_hi), zero_vec);
+    let interval_hi = _mm512_add_pd(below_hi, above_hi);
+    let rd_far_hi = _mm512_add_pd(rd_vec, _mm512_sub_pd(interval_hi, old_off_abs_vec));
+    let mask_hi = _mm512_cmp_pd_mask(rd_far_hi, best_dist_vec, _CMP_LE_OQ);
+
+    (mask_lo as u16) | ((mask_hi as u16) << 8)
+}
+
+#[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+#[inline(always)]
+unsafe fn simd_backtrack_block4_f32_avx512_manhattan<
+    A: Copy,
+    D: DistanceMetricUnified<A, K, Output = f32>,
+    const K: usize,
+>(
+    query_wide: f32,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    old_off: f32,
+    rd: f32,
+    best_dist: f32,
+) -> u16 {
+    use std::arch::x86_64::*;
+    let _ = core::marker::PhantomData::<D>;
+
+    let ptr = stems_ptr.as_ptr().add(block_base_idx * 4) as *const f32;
+    let mut pivots = [0.0f32; 16];
+    std::ptr::copy_nonoverlapping(ptr, pivots.as_mut_ptr(), 16);
+
+    let mut lower_vals = [0.0f32; 16];
+    let mut upper_vals = [0.0f32; 16];
+    for i in 0..16 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block4(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f32::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f32::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let lower = _mm512_loadu_ps(lower_vals.as_ptr());
+    let upper = _mm512_loadu_ps(upper_vals.as_ptr());
+    let query_vec = _mm512_set1_ps(query_wide);
+    let old_off_abs_vec = _mm512_set1_ps(old_off.abs());
+    let rd_vec = _mm512_set1_ps(rd);
+    let best_dist_vec = _mm512_set1_ps(best_dist);
+    let zero_vec = _mm512_setzero_ps();
+
+    let below = _mm512_max_ps(_mm512_sub_ps(lower, query_vec), zero_vec);
+    let above = _mm512_max_ps(_mm512_sub_ps(query_vec, upper), zero_vec);
+    let interval = _mm512_add_ps(below, above);
+    let rd_far = _mm512_add_ps(rd_vec, _mm512_sub_ps(interval, old_off_abs_vec));
+
+    _mm512_cmp_ps_mask(rd_far, best_dist_vec, _CMP_LE_OQ)
+}
+
 // ====================================================================================
 // aarch64 NEON implementations
 // ====================================================================================
@@ -1602,7 +2407,7 @@ unsafe fn simd_backtrack_block4_f32_avx512<
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
 #[inline(always)]
 #[allow(dead_code)]
-unsafe fn simd_backtrack_block3_f64_neon<
+unsafe fn simd_backtrack_block3_f64_neon_squared_euclidean<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f64>,
     const K: usize,
@@ -1639,7 +2444,7 @@ unsafe fn simd_backtrack_block3_f64_neon<
     }
 
     let query_vec = vdupq_n_f64(query_wide);
-    let old_off_vec = vdupq_n_f64(old_off);
+    let old_off_sq_vec = vmulq_f64(vdupq_n_f64(old_off), vdupq_n_f64(old_off));
     let rd_vec = vdupq_n_f64(rd);
     let best_dist_vec = vdupq_n_f64(best_dist);
     let zero_vec = vdupq_n_f64(0.0);
@@ -1655,9 +2460,8 @@ unsafe fn simd_backtrack_block3_f64_neon<
         let above = vmaxq_f64(vsubq_f64(query_vec, upper), zero_vec);
         let interval = vaddq_f64(below, above);
 
-        // TODO: Make this truly metric-generic. For now, assume SquaredEuclidean.
-        let new_off = vmulq_f64(interval, interval);
-        let delta = vsubq_f64(new_off, old_off_vec);
+        let new_off_sq = vmulq_f64(interval, interval);
+        let delta = vsubq_f64(new_off_sq, old_off_sq_vec);
         let rd_far = vaddq_f64(rd_vec, delta);
 
         let cmp = vcleq_f64(rd_far, best_dist_vec);
@@ -1679,7 +2483,7 @@ unsafe fn simd_backtrack_block3_f64_neon<
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
 #[inline(always)]
 #[allow(dead_code)]
-unsafe fn simd_backtrack_block3_f32_neon<
+unsafe fn simd_backtrack_block3_f32_neon_squared_euclidean<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f32>,
     const K: usize,
@@ -1716,7 +2520,7 @@ unsafe fn simd_backtrack_block3_f32_neon<
     }
 
     let query_vec = vdupq_n_f32(query_wide);
-    let old_off_vec = vdupq_n_f32(old_off);
+    let old_off_sq_vec = vmulq_f32(vdupq_n_f32(old_off), vdupq_n_f32(old_off));
     let rd_vec = vdupq_n_f32(rd);
     let best_dist_vec = vdupq_n_f32(best_dist);
     let zero_vec = vdupq_n_f32(0.0);
@@ -1732,9 +2536,8 @@ unsafe fn simd_backtrack_block3_f32_neon<
         let above = vmaxq_f32(vsubq_f32(query_vec, upper), zero_vec);
         let interval = vaddq_f32(below, above);
 
-        // TODO: Make this truly metric-generic. For now, assume SquaredEuclidean.
-        let new_off = vmulq_f32(interval, interval);
-        let delta = vsubq_f32(new_off, old_off_vec);
+        let new_off_sq = vmulq_f32(interval, interval);
+        let delta = vsubq_f32(new_off_sq, old_off_sq_vec);
         let rd_far = vaddq_f32(rd_vec, delta);
 
         let cmp = vcleq_f32(rd_far, best_dist_vec);
@@ -1754,7 +2557,7 @@ unsafe fn simd_backtrack_block3_f32_neon<
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
 #[inline(always)]
 #[allow(dead_code)]
-unsafe fn simd_backtrack_block4_f64_neon<
+unsafe fn simd_backtrack_block4_f64_neon_squared_euclidean<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f64>,
     const K: usize,
@@ -1791,7 +2594,7 @@ unsafe fn simd_backtrack_block4_f64_neon<
     }
 
     let query_vec = vdupq_n_f64(query_wide);
-    let old_off_vec = vdupq_n_f64(old_off);
+    let old_off_sq_vec = vmulq_f64(vdupq_n_f64(old_off), vdupq_n_f64(old_off));
     let rd_vec = vdupq_n_f64(rd);
     let best_dist_vec = vdupq_n_f64(best_dist);
     let zero_vec = vdupq_n_f64(0.0);
@@ -1807,9 +2610,8 @@ unsafe fn simd_backtrack_block4_f64_neon<
         let above = vmaxq_f64(vsubq_f64(query_vec, upper), zero_vec);
         let interval = vaddq_f64(below, above);
 
-        // TODO: Make this truly metric-generic. For now, assume SquaredEuclidean.
-        let new_off = vmulq_f64(interval, interval);
-        let delta = vsubq_f64(new_off, old_off_vec);
+        let new_off_sq = vmulq_f64(interval, interval);
+        let delta = vsubq_f64(new_off_sq, old_off_sq_vec);
         let rd_far = vaddq_f64(rd_vec, delta);
 
         let cmp = vcleq_f64(rd_far, best_dist_vec);
@@ -1835,7 +2637,7 @@ unsafe fn simd_backtrack_block4_f64_neon<
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
 #[inline(always)]
 #[allow(dead_code)]
-unsafe fn simd_backtrack_block4_f32_neon<
+unsafe fn simd_backtrack_block4_f32_neon_squared_euclidean<
     A: Copy,
     D: DistanceMetricUnified<A, K, Output = f32>,
     const K: usize,
@@ -1872,7 +2674,7 @@ unsafe fn simd_backtrack_block4_f32_neon<
     }
 
     let query_vec = vdupq_n_f32(query_wide);
-    let old_off_vec = vdupq_n_f32(old_off);
+    let old_off_sq_vec = vmulq_f32(vdupq_n_f32(old_off), vdupq_n_f32(old_off));
     let rd_vec = vdupq_n_f32(rd);
     let best_dist_vec = vdupq_n_f32(best_dist);
     let zero_vec = vdupq_n_f32(0.0);
@@ -1888,9 +2690,310 @@ unsafe fn simd_backtrack_block4_f32_neon<
         let above = vmaxq_f32(vsubq_f32(query_vec, upper), zero_vec);
         let interval = vaddq_f32(below, above);
 
-        // TODO: Make this truly metric-generic. For now, assume SquaredEuclidean.
-        let new_off = vmulq_f32(interval, interval);
-        let delta = vsubq_f32(new_off, old_off_vec);
+        let new_off_sq = vmulq_f32(interval, interval);
+        let delta = vsubq_f32(new_off_sq, old_off_sq_vec);
+        let rd_far = vaddq_f32(rd_vec, delta);
+
+        let cmp = vcleq_f32(rd_far, best_dist_vec);
+
+        let weights = match chunk {
+            0 => [1u32, 2u32, 4u32, 8u32],
+            1 => [16u32, 32u32, 64u32, 128u32],
+            2 => [256u32, 512u32, 1024u32, 2048u32],
+            _ => [4096u32, 8192u32, 16384u32, 32768u32],
+        };
+
+        let mask_chunk = vaddvq_u32(vandq_u32(cmp, vld1q_u32(weights.as_ptr())));
+        mask |= mask_chunk as u16;
+    }
+
+    mask
+}
+
+#[cfg(all(feature = "simd", target_arch = "aarch64"))]
+#[inline(always)]
+#[allow(dead_code)]
+unsafe fn simd_backtrack_block3_f64_neon_manhattan<
+    A: Copy,
+    D: DistanceMetricUnified<A, K, Output = f64>,
+    const K: usize,
+>(
+    query_wide: f64,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    old_off: f64,
+    rd: f64,
+    best_dist: f64,
+) -> u8 {
+    use core::arch::aarch64::*;
+    let _ = core::marker::PhantomData::<D>;
+
+    let pivots_ptr = stems_ptr.as_ptr().add(block_base_idx * 8) as *const f64;
+    let mut pivots = [0.0f64; 8];
+    core::ptr::copy_nonoverlapping(pivots_ptr, pivots.as_mut_ptr(), 8);
+
+    let mut lower_vals = [0.0f64; 8];
+    let mut upper_vals = [0.0f64; 8];
+
+    for i in 0..8 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block3(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f64::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f64::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let query_vec = vdupq_n_f64(query_wide);
+    let old_off_abs_vec = vabsq_f64(vdupq_n_f64(old_off));
+    let rd_vec = vdupq_n_f64(rd);
+    let best_dist_vec = vdupq_n_f64(best_dist);
+    let zero_vec = vdupq_n_f64(0.0);
+
+    let mut mask: u8 = 0;
+
+    for chunk in 0..4 {
+        let idx = chunk * 2;
+        let lower = vld1q_f64(lower_vals.as_ptr().add(idx));
+        let upper = vld1q_f64(upper_vals.as_ptr().add(idx));
+
+        let below = vmaxq_f64(vsubq_f64(lower, query_vec), zero_vec);
+        let above = vmaxq_f64(vsubq_f64(query_vec, upper), zero_vec);
+        let interval = vaddq_f64(below, above);
+
+        let delta = vsubq_f64(interval, old_off_abs_vec);
+        let rd_far = vaddq_f64(rd_vec, delta);
+
+        let cmp = vcleq_f64(rd_far, best_dist_vec);
+
+        let weights = match chunk {
+            0 => [1u64, 2u64],
+            1 => [4u64, 8u64],
+            2 => [16u64, 32u64],
+            _ => [64u64, 128u64],
+        };
+
+        let mask_chunk = vaddvq_u64(vandq_u64(cmp, vld1q_u64(weights.as_ptr())));
+        mask |= mask_chunk as u8;
+    }
+
+    mask
+}
+
+#[cfg(all(feature = "simd", target_arch = "aarch64"))]
+#[inline(always)]
+#[allow(dead_code)]
+unsafe fn simd_backtrack_block3_f32_neon_manhattan<
+    A: Copy,
+    D: DistanceMetricUnified<A, K, Output = f32>,
+    const K: usize,
+>(
+    query_wide: f32,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    old_off: f32,
+    rd: f32,
+    best_dist: f32,
+) -> u8 {
+    use core::arch::aarch64::*;
+    let _ = core::marker::PhantomData::<D>;
+
+    let pivots_ptr = stems_ptr.as_ptr().add(block_base_idx * 4) as *const f32;
+    let mut pivots = [0.0f32; 8];
+    core::ptr::copy_nonoverlapping(pivots_ptr, pivots.as_mut_ptr(), 8);
+
+    let mut lower_vals = [0.0f32; 8];
+    let mut upper_vals = [0.0f32; 8];
+
+    for i in 0..8 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block3(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f32::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f32::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let query_vec = vdupq_n_f32(query_wide);
+    let old_off_abs_vec = vabsq_f32(vdupq_n_f32(old_off));
+    let rd_vec = vdupq_n_f32(rd);
+    let best_dist_vec = vdupq_n_f32(best_dist);
+    let zero_vec = vdupq_n_f32(0.0);
+
+    let mut mask: u8 = 0;
+
+    for chunk in 0..2 {
+        let idx = chunk * 4;
+        let lower = vld1q_f32(lower_vals.as_ptr().add(idx));
+        let upper = vld1q_f32(upper_vals.as_ptr().add(idx));
+
+        let below = vmaxq_f32(vsubq_f32(lower, query_vec), zero_vec);
+        let above = vmaxq_f32(vsubq_f32(query_vec, upper), zero_vec);
+        let interval = vaddq_f32(below, above);
+
+        let delta = vsubq_f32(interval, old_off_abs_vec);
+        let rd_far = vaddq_f32(rd_vec, delta);
+
+        let cmp = vcleq_f32(rd_far, best_dist_vec);
+
+        let weights = match chunk {
+            0 => [1u32, 2u32, 4u32, 8u32],
+            _ => [16u32, 32u32, 64u32, 128u32],
+        };
+
+        let mask_chunk = vaddvq_u32(vandq_u32(cmp, vld1q_u32(weights.as_ptr())));
+        mask |= mask_chunk as u8;
+    }
+
+    mask
+}
+
+#[cfg(all(feature = "simd", target_arch = "aarch64"))]
+#[inline(always)]
+#[allow(dead_code)]
+unsafe fn simd_backtrack_block4_f64_neon_manhattan<
+    A: Copy,
+    D: DistanceMetricUnified<A, K, Output = f64>,
+    const K: usize,
+>(
+    query_wide: f64,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    old_off: f64,
+    rd: f64,
+    best_dist: f64,
+) -> u16 {
+    use core::arch::aarch64::*;
+    let _ = core::marker::PhantomData::<D>;
+
+    let pivots_ptr = stems_ptr.as_ptr().add(block_base_idx * 8) as *const f64;
+    let mut pivots = [0.0f64; 16];
+    core::ptr::copy_nonoverlapping(pivots_ptr, pivots.as_mut_ptr(), 16);
+
+    let mut lower_vals = [0.0f64; 16];
+    let mut upper_vals = [0.0f64; 16];
+
+    for i in 0..16 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block4(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f64::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f64::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let query_vec = vdupq_n_f64(query_wide);
+    let old_off_abs_vec = vabsq_f64(vdupq_n_f64(old_off));
+    let rd_vec = vdupq_n_f64(rd);
+    let best_dist_vec = vdupq_n_f64(best_dist);
+    let zero_vec = vdupq_n_f64(0.0);
+
+    let mut mask: u16 = 0;
+
+    for chunk in 0..8 {
+        let idx = chunk * 2;
+        let lower = vld1q_f64(lower_vals.as_ptr().add(idx));
+        let upper = vld1q_f64(upper_vals.as_ptr().add(idx));
+
+        let below = vmaxq_f64(vsubq_f64(lower, query_vec), zero_vec);
+        let above = vmaxq_f64(vsubq_f64(query_vec, upper), zero_vec);
+        let interval = vaddq_f64(below, above);
+
+        let delta = vsubq_f64(interval, old_off_abs_vec);
+        let rd_far = vaddq_f64(rd_vec, delta);
+
+        let cmp = vcleq_f64(rd_far, best_dist_vec);
+
+        let weights = match chunk {
+            0 => [1u64, 2u64],
+            1 => [4u64, 8u64],
+            2 => [16u64, 32u64],
+            3 => [64u64, 128u64],
+            4 => [256u64, 512u64],
+            5 => [1024u64, 2048u64],
+            6 => [4096u64, 8192u64],
+            _ => [16384u64, 32768u64],
+        };
+
+        let mask_chunk = vaddvq_u64(vandq_u64(cmp, vld1q_u64(weights.as_ptr())));
+        mask |= mask_chunk as u16;
+    }
+
+    mask
+}
+
+#[cfg(all(feature = "simd", target_arch = "aarch64"))]
+#[inline(always)]
+#[allow(dead_code)]
+unsafe fn simd_backtrack_block4_f32_neon_manhattan<
+    A: Copy,
+    D: DistanceMetricUnified<A, K, Output = f32>,
+    const K: usize,
+>(
+    query_wide: f32,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    old_off: f32,
+    rd: f32,
+    best_dist: f32,
+) -> u16 {
+    use core::arch::aarch64::*;
+    let _ = core::marker::PhantomData::<D>;
+
+    let pivots_ptr = stems_ptr.as_ptr().add(block_base_idx * 4) as *const f32;
+    let mut pivots = [0.0f32; 16];
+    core::ptr::copy_nonoverlapping(pivots_ptr, pivots.as_mut_ptr(), 16);
+
+    let mut lower_vals = [0.0f32; 16];
+    let mut upper_vals = [0.0f32; 16];
+
+    for i in 0..16 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block4(i);
+        lower_vals[i] = if lower_offset == 255 {
+            f32::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        upper_vals[i] = if upper_offset == 255 {
+            f32::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let query_vec = vdupq_n_f32(query_wide);
+    let old_off_abs_vec = vabsq_f32(vdupq_n_f32(old_off));
+    let rd_vec = vdupq_n_f32(rd);
+    let best_dist_vec = vdupq_n_f32(best_dist);
+    let zero_vec = vdupq_n_f32(0.0);
+
+    let mut mask: u16 = 0;
+
+    for chunk in 0..4 {
+        let idx = chunk * 4;
+        let lower = vld1q_f32(lower_vals.as_ptr().add(idx));
+        let upper = vld1q_f32(upper_vals.as_ptr().add(idx));
+
+        let below = vmaxq_f32(vsubq_f32(lower, query_vec), zero_vec);
+        let above = vmaxq_f32(vsubq_f32(query_vec, upper), zero_vec);
+        let interval = vaddq_f32(below, above);
+
+        let delta = vsubq_f32(interval, old_off_abs_vec);
         let rd_far = vaddq_f32(rd_vec, delta);
 
         let cmp = vcleq_f32(rd_far, best_dist_vec);
@@ -2600,6 +3703,114 @@ mod tests {
                 query, stems_ptr, 0, old_off, rd, best_dist,
             );
             let autovec_mask = autovec_backtrack_block3::<f32, f32, SquaredEuclidean<f32>, 3>(
+                query, stems_ptr, 0, old_off, rd, best_dist,
+            );
+            assert_eq!(
+                simd_mask, autovec_mask,
+                "query={query}, old_off={old_off}, rd={rd}, best_dist={best_dist}"
+            );
+        }
+    }
+
+    #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
+    #[test]
+    fn test_block3_f64_manhattan_simd_vs_autovec() {
+        let mut pivots = build_block3_pivots_f64();
+        let stems_ptr = NonNull::new(pivots.as_mut_ptr() as *mut u8).unwrap();
+
+        let cases = [
+            (4.5, 0.0, 0.0, 4.0),
+            (1.2, 0.5, 1.0, 2.5),
+            (6.9, 0.0, 0.0, 1.0),
+            (3.7, -1.25, 2.0, 6.0),
+        ];
+
+        for (query, old_off, rd, best_dist) in cases {
+            let simd_mask = f64::backtrack_block3::<f64, Manhattan<f64>, 3>(
+                query, stems_ptr, 0, old_off, rd, best_dist,
+            );
+            let autovec_mask = autovec_backtrack_block3::<f64, f64, Manhattan<f64>, 3>(
+                query, stems_ptr, 0, old_off, rd, best_dist,
+            );
+            assert_eq!(
+                simd_mask, autovec_mask,
+                "query={query}, old_off={old_off}, rd={rd}, best_dist={best_dist}"
+            );
+        }
+    }
+
+    #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
+    #[test]
+    fn test_block3_f32_manhattan_simd_vs_autovec() {
+        let mut pivots = build_block3_pivots_f32();
+        let stems_ptr = NonNull::new(pivots.as_mut_ptr() as *mut u8).unwrap();
+
+        let cases = [
+            (4.5f32, 0.0f32, 0.0f32, 4.0f32),
+            (1.2f32, 0.5f32, 1.0f32, 2.5f32),
+            (6.9f32, 0.0f32, 0.0f32, 1.0f32),
+            (3.7f32, -1.25f32, 2.0f32, 6.0f32),
+        ];
+
+        for (query, old_off, rd, best_dist) in cases {
+            let simd_mask = f32::backtrack_block3::<f32, Manhattan<f32>, 3>(
+                query, stems_ptr, 0, old_off, rd, best_dist,
+            );
+            let autovec_mask = autovec_backtrack_block3::<f32, f32, Manhattan<f32>, 3>(
+                query, stems_ptr, 0, old_off, rd, best_dist,
+            );
+            assert_eq!(
+                simd_mask, autovec_mask,
+                "query={query}, old_off={old_off}, rd={rd}, best_dist={best_dist}"
+            );
+        }
+    }
+
+    #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
+    #[test]
+    fn test_block4_f64_manhattan_simd_vs_autovec() {
+        let mut pivots = build_block4_pivots_f64();
+        let stems_ptr = NonNull::new(pivots.as_mut_ptr() as *mut u8).unwrap();
+
+        let cases = [
+            (4.5, 0.0, 0.0, 4.0),
+            (9.2, 1.0, 2.0, 9.0),
+            (0.25, 0.0, 0.0, 0.5),
+            (6.7, -0.75, 1.5, 4.0),
+        ];
+
+        for (query, old_off, rd, best_dist) in cases {
+            let simd_mask = f64::backtrack_block4::<f64, Manhattan<f64>, 3>(
+                query, stems_ptr, 0, old_off, rd, best_dist,
+            );
+            let autovec_mask = autovec_backtrack_block4::<f64, f64, Manhattan<f64>, 3>(
+                query, stems_ptr, 0, old_off, rd, best_dist,
+            );
+            assert_eq!(
+                simd_mask, autovec_mask,
+                "query={query}, old_off={old_off}, rd={rd}, best_dist={best_dist}"
+            );
+        }
+    }
+
+    #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
+    #[test]
+    fn test_block4_f32_manhattan_simd_vs_autovec() {
+        let mut pivots = build_block4_pivots_f32();
+        let stems_ptr = NonNull::new(pivots.as_mut_ptr() as *mut u8).unwrap();
+
+        let cases = [
+            (4.5f32, 0.0f32, 0.0f32, 4.0f32),
+            (9.2f32, 1.0f32, 2.0f32, 9.0f32),
+            (0.25f32, 0.0f32, 0.0f32, 0.5f32),
+            (6.7f32, -0.75f32, 1.5f32, 4.0f32),
+        ];
+
+        for (query, old_off, rd, best_dist) in cases {
+            let simd_mask = f32::backtrack_block4::<f32, Manhattan<f32>, 3>(
+                query, stems_ptr, 0, old_off, rd, best_dist,
+            );
+            let autovec_mask = autovec_backtrack_block4::<f32, f32, Manhattan<f32>, 3>(
                 query, stems_ptr, 0, old_off, rd, best_dist,
             );
             assert_eq!(

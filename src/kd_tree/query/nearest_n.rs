@@ -38,6 +38,7 @@ mod tests {
     use rand::rngs::StdRng;
     use rand::Rng;
     use rand::SeedableRng;
+    use std::array;
     use std::num::NonZero;
 
     use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
@@ -174,5 +175,107 @@ mod tests {
         }
 
         results
+    }
+
+    fn random_point_f32<const K: usize>(rng: &mut StdRng) -> [f32; K] {
+        array::from_fn(|_| rng.random_range(-1.0f32..1.0f32))
+    }
+
+    fn random_point_f64<const K: usize>(rng: &mut StdRng) -> [f64; K] {
+        array::from_fn(|_| rng.random_range(-1.0f64..1.0f64))
+    }
+
+    fn sort_by_distance_then_item_f32(items: &mut [(f32, usize)]) {
+        items.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap().then_with(|| a.1.cmp(&b.1)));
+    }
+
+    fn sort_by_distance_then_item_f64(items: &mut [(f64, usize)]) {
+        items.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap().then_with(|| a.1.cmp(&b.1)));
+    }
+
+    #[test]
+    fn v6_query_nearest_n_unsorted_respects_max_qty_mutable_f32_regression() {
+        const K: usize = 2;
+        const B: usize = 32;
+        const POINT_COUNT: usize = 1024;
+        const CONTENT_SEED: u64 = 1_260_253_197;
+        const QUERY_SEED: u64 = 13_787_848_794_416_797_126;
+
+        let mut rng_content = StdRng::seed_from_u64(CONTENT_SEED);
+        let points: Vec<[f32; K]> = (0..POINT_COUNT)
+            .map(|_| random_point_f32::<K>(&mut rng_content))
+            .collect();
+
+        let mut tree: KdTree<f32, usize, Eytzinger<K>, VecOfArrays<f32, usize, K, B>, K, B> =
+            KdTree::default();
+        for (idx, point) in points.iter().enumerate() {
+            tree.add(point, idx);
+        }
+
+        let mut rng_query = StdRng::seed_from_u64(QUERY_SEED);
+        let query = random_point_f32::<K>(&mut rng_query);
+        let max_qty = NonZero::new(20).unwrap();
+
+        let mut unsorted: Vec<(f32, usize)> = tree
+            .nearest_n::<SquaredEuclidean<f32>>(&query, max_qty, false)
+            .into_iter()
+            .map(|n| (n.distance, n.item))
+            .collect();
+
+        assert_eq!(unsorted.len(), max_qty.get());
+
+        let mut sorted: Vec<(f32, usize)> = tree
+            .nearest_n::<SquaredEuclidean<f32>>(&query, max_qty, true)
+            .into_iter()
+            .map(|n| (n.distance, n.item))
+            .collect();
+
+        sort_by_distance_then_item_f32(&mut unsorted);
+        sort_by_distance_then_item_f32(&mut sorted);
+
+        assert_eq!(unsorted, sorted);
+    }
+
+    #[test]
+    fn v6_query_nearest_n_unsorted_respects_max_qty_mutable_f64_regression() {
+        const K: usize = 2;
+        const B: usize = 32;
+        const POINT_COUNT: usize = 1024;
+        const CONTENT_SEED: u64 = 1_260_253_197;
+        const QUERY_SEED: u64 = 13_787_848_794_416_797_126;
+
+        let mut rng_content = StdRng::seed_from_u64(CONTENT_SEED);
+        let points: Vec<[f64; K]> = (0..POINT_COUNT)
+            .map(|_| random_point_f64::<K>(&mut rng_content))
+            .collect();
+
+        let mut tree: KdTree<f64, usize, Eytzinger<K>, VecOfArrays<f64, usize, K, B>, K, B> =
+            KdTree::default();
+        for (idx, point) in points.iter().enumerate() {
+            tree.add(point, idx);
+        }
+
+        let mut rng_query = StdRng::seed_from_u64(QUERY_SEED);
+        let query = random_point_f64::<K>(&mut rng_query);
+        let max_qty = NonZero::new(15).unwrap();
+
+        let mut unsorted: Vec<(f64, usize)> = tree
+            .nearest_n::<SquaredEuclidean<f64>>(&query, max_qty, false)
+            .into_iter()
+            .map(|n| (n.distance, n.item))
+            .collect();
+
+        assert_eq!(unsorted.len(), max_qty.get());
+
+        let mut sorted: Vec<(f64, usize)> = tree
+            .nearest_n::<SquaredEuclidean<f64>>(&query, max_qty, true)
+            .into_iter()
+            .map(|n| (n.distance, n.item))
+            .collect();
+
+        sort_by_distance_then_item_f64(&mut unsorted);
+        sort_by_distance_then_item_f64(&mut sorted);
+
+        assert_eq!(unsorted, sorted);
     }
 }

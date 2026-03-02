@@ -31,7 +31,7 @@ fuzz-kd-tree-v6-simd:
     RUST_TEST_THREADS=1 KIDDO_FUZZ_V6_RUN_NON_SIMD=0 KIDDO_FUZZ_V6_RUN_SIMD=1 cargo test --release --features simd --test kd_tree_fuzz_v6 -- --ignored --nocapture
 
 fuzz-kd-tree-v6-simd-fast:
-    RUST_TEST_THREADS=1 KIDDO_FUZZ_V6_RUN_NON_SIMD=0 KIDDO_FUZZ_V6_RUN_SIMD=1 KIDDO_FUZZ_V6_SIMD_FAST=1 cargo test --release --features simd --test kd_tree_fuzz_v6 -- --ignored --nocapture
+    RUST_TEST_THREADS=1 KIDDO_FUZZ_V6_RUN_NON_SIMD=0 KIDDO_FUZZ_V6_RUN_SIMD=1 KIDDO_FUZZ_V6_SIMD_FAST=1 cargo test --profile fast-tests --features simd --test kd_tree_fuzz_v6 -- --ignored --nocapture
 
 bench-d-v2:
     cargo bench --bench donnelly_v2
