@@ -158,9 +158,7 @@ pub struct Minkowski<const P: u32> {}
 impl<const P: u32> Minkowski<P> {
     const CHECK_P: () = {
         if P == 1 {
-            panic!(
-                "Minkowski<1> is not recommended. Use `kiddo::Manhattan` metric instead."
-            );
+            panic!("Minkowski<1> is not recommended. Use `kiddo::Manhattan` metric instead.");
         }
         if P == 2 {
             panic!(
