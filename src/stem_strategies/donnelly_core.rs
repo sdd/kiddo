@@ -330,6 +330,7 @@ impl<const CL: u32, const VB: u32, const K: usize> DonnellyCore<CL, VB, K> {
         (result, minor_level)
     }
 
+    #[allow(unused)]
     #[inline(always)]
     fn step_pure_block(curr_idx: u32, child_idx: u8) -> u32 {
         curr_idx

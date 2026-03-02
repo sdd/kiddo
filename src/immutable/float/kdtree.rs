@@ -442,6 +442,24 @@ where
     }
 }
 
+#[cfg(feature = "cargo_asm")]
+pub mod cargo_asm {
+    use crate::immutable::float::kdtree::ImmutableKdTree;
+    use crate::{Eytzinger, NearestNeighbour, SquaredEuclidean};
+
+    const K: usize = 3;
+    const BUCKET_SIZE: usize = 64;
+
+    type A = f64;
+    type T = u32;
+    type KdT = ImmutableKdTree<A, T, Eytzinger<K>, K, BUCKET_SIZE>;
+
+    /// hook for cargo-asm to render a nearest-one call
+    pub fn v5_nearest_one_immutable(tree: &KdT, query: [f64; 3]) -> NearestNeighbour<A, T> {
+        tree.nearest_one::<SquaredEuclidean>(&query)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::immutable::float::kdtree::ImmutableKdTree;

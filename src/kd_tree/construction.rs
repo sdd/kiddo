@@ -712,14 +712,14 @@ where
 
             sort_index.sort_unstable_by(|&ia, &ib| A::cmp(source[ia][dim], source[ib][dim]));
 
-            while pivot < sort_index.len()
+            while pivot <= sort_index.len()
                 && source[sort_index[pivot]][dim] == source[sort_index[pivot + 1]][dim]
             {
                 pivot += 1;
             }
 
-            if pivot == sort_index.len() {
-                // if we end up here with pivot == sort_index.len(), then the source slice is unsplittable
+            if pivot >= sort_index.len() {
+                // if we end up here at the end of the slice, then the source slice is unsplittable
                 // in this dimension due to all entries having the same value on the given dimension
                 tracing::debug!(
                     slice_len = %sort_index.len(),

@@ -81,10 +81,29 @@ where
 
 #[cfg(feature = "cargo_asm")]
 pub mod cargo_asm {
-    use crate::distance::float::SquaredEuclidean;
-    use crate::immutable::float::kdtree::ImmutableKdTree;
-    use crate::stem_strategies::*;
     use rand::{Rng, SeedableRng};
+
+    use crate::kd_tree::leaf_strategies::FlatVec;
+    use crate::kd_tree::KdTree;
+    use crate::stem_strategies::*;
+    use crate::traits_unified_2::SquaredEuclidean;
+
+    const K: usize = 3;
+    const BUCKET_SIZE: usize = 64;
+
+    type KdT = KdTree<
+        f64,
+        usize,
+        Donnelly<3, 64, 8, K>,
+        FlatVec<f64, usize, K, BUCKET_SIZE>,
+        K,
+        BUCKET_SIZE,
+    >;
+
+    /// hook for cargo-asm to render a nearest-one call
+    pub fn v6_nearest_one_eytzinger(tree: &KdT, query: [f64; 3]) -> (f64, usize) {
+        tree.nearest_one::<SquaredEuclidean<f64>>(&query)
+    }
 
     // /// hook for cargo-asm to render a nearest-one call
     // pub fn nearest_one_donnelly() {
@@ -112,28 +131,27 @@ pub mod cargo_asm {
     //     }
     // }
 
-    // /// hook for cargo-asm to render a nearest-one call
-    pub fn nearest_one_eytzinger() {
+    /// hook for cargo-asm to render a nearest-one call
+    pub fn nearest_one_eytzinger_run() {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(3);
 
         const TREE_SIZE: usize = 100_000;
         const NUM_QUERIES: usize = 1000;
 
-        let content_to_add: Vec<[f32; 4]> =
-            (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
+        let content_to_add: Vec<[f64; 3]> =
+            (0..TREE_SIZE).map(|_| rng.random::<[f64; 3]>()).collect();
 
-        let tree: ImmutableKdTree<f32, u32, Eytzinger<4>, 4, 32> =
-            ImmutableKdTree::new_from_slice(&content_to_add);
+        let tree: KdT = KdT::new_from_slice(&content_to_add);
 
         assert_eq!(tree.size(), TREE_SIZE);
 
-        let query_points: Vec<[f32; 4]> = (0..NUM_QUERIES)
-            .map(|_| rand::random::<[f32; 4]>())
+        let query_points: Vec<[f64; 3]> = (0..NUM_QUERIES)
+            .map(|_| rand::random::<[f64; 3]>())
             .collect();
 
         for (i, query_point) in query_points.iter().enumerate() {
             println!("query #{i:?}");
-            let result = tree.nearest_one::<SquaredEuclidean>(query_point);
+            let result = tree.nearest_one::<SquaredEuclidean<f64>>(query_point);
             println!("Result: #{i:?}: {result:?}");
         }
     }
