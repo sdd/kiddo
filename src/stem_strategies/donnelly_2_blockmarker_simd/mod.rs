@@ -186,6 +186,7 @@ where
     const ROOT_IDX: usize = 0;
     const BLOCK_SIZE: usize = 3;
 
+    type DeferredState = Self;
     type StackContext<A> = crate::kd_tree::query_stack_simd::SimdQueryStackContext<A, Self>;
     type Stack<A> = crate::kd_tree::query_stack_simd::SimdQueryStack<A, Self>;
 
@@ -202,6 +203,16 @@ where
     #[inline(always)]
     fn stem_idx(&self) -> usize {
         self.core.stem_idx()
+    }
+
+    #[inline(always)]
+    fn deferred_state(&self) -> Self::DeferredState {
+        *self
+    }
+
+    #[inline(always)]
+    fn rehydrate_deferred_state(&mut self, state: Self::DeferredState) {
+        *self = state;
     }
 
     #[inline(always)]
@@ -612,7 +623,7 @@ where
         tree: &crate::kd_tree::KdTree<A, T, Self, LS, K2, B>,
         query_ctx: &mut QC,
         stack: &mut Self::Stack<O>,
-        process_leaf: impl FnMut(&crate::kd_tree::leaf_view::LeafView<A, T, K2, B>, &mut QC),
+        process_leaf: impl FnMut(&crate::kd_tree::leaf_view::LeafView<A, T, K2, B>, &[O; K2], &mut QC),
     ) where
         Self: Sized,
         A: crate::traits_unified_2::AxisUnified<Coord = A>,
@@ -639,6 +650,7 @@ where
     const ROOT_IDX: usize = 0;
     const BLOCK_SIZE: usize = 4;
 
+    type DeferredState = Self;
     type StackContext<A> = crate::kd_tree::query_stack_simd::SimdQueryStackContext<A, Self>;
     type Stack<A> = crate::kd_tree::query_stack_simd::SimdQueryStack<A, Self>;
 
@@ -655,6 +667,16 @@ where
     #[inline(always)]
     fn stem_idx(&self) -> usize {
         self.core.stem_idx()
+    }
+
+    #[inline(always)]
+    fn deferred_state(&self) -> Self::DeferredState {
+        *self
+    }
+
+    #[inline(always)]
+    fn rehydrate_deferred_state(&mut self, state: Self::DeferredState) {
+        *self = state;
     }
 
     #[inline(always)]
@@ -1022,7 +1044,7 @@ where
         tree: &crate::kd_tree::KdTree<A, T, Self, LS, K2, B>,
         query_ctx: &mut QC,
         stack: &mut Self::Stack<O>,
-        process_leaf: impl FnMut(&crate::kd_tree::leaf_view::LeafView<A, T, K2, B>, &mut QC),
+        process_leaf: impl FnMut(&crate::kd_tree::leaf_view::LeafView<A, T, K2, B>, &[O; K2], &mut QC),
     ) where
         Self: Sized,
         A: crate::traits_unified_2::AxisUnified<Coord = A>,

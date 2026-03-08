@@ -189,6 +189,12 @@ pub trait StemStrategy: Clone + Sync + Send {
     /// The default is 1, which means that the strategy is not block-based.
     const BLOCK_SIZE: usize = 1;
 
+    /// Compact state persisted on scalar backtracking stacks.
+    ///
+    /// Scalar strategies can use this to store only the state needed to resume a deferred branch.
+    /// SIMD / block strategies may ignore this and continue to use custom stack types.
+    type DeferredState: Sized;
+
     /// Query stack context type for backtracking queries.
     ///
     /// Non-block strategies use simple scalar stack context (QueryStackContext).
@@ -224,6 +230,14 @@ pub trait StemStrategy: Clone + Sync + Send {
 
     /// Get the current stem index this strategy points to.
     fn stem_idx(&self) -> usize;
+
+    /// Snapshot the minimal scalar deferred state needed to resume traversal later.
+    fn deferred_state(&self) -> Self::DeferredState;
+
+    /// Restore this strategy from deferred scalar traversal state.
+    ///
+    /// Implementations may assume `self` already holds a valid `stems_ptr`.
+    fn rehydrate_deferred_state(&mut self, state: Self::DeferredState);
 
     /// Get the current leaf index this strategy points to.
     fn leaf_idx(&self) -> usize;
@@ -418,19 +432,13 @@ pub trait StemStrategy: Clone + Sync + Send {
 
             // Only push if the sibling is worth exploring
             if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
-                use crate::kd_tree::query_stack::{QueryStackContext, StackTrait as _};
-                // Safety: This default implementation is only used by scalar strategies
-                // which use QueryStack with QueryStackContext. SIMD strategies override
-                // this entire method.
-                let ctx = QueryStackContext {
-                    stem_strat: far_ctx,
-                    old_off: new_off,
-                    rd: rd_far,
-                };
-                let ctx_any: <Self::Stack<O> as StackTrait<O, Self>>::Context =
-                    unsafe { std::mem::transmute_copy(&ctx) };
-                stack.push(ctx_any);
-                std::mem::forget(ctx);
+                stack.push(
+                    crate::kd_tree::query_stack::scalar_ctx_from_parts::<O, Self>(
+                        far_ctx.deferred_state(),
+                        new_off,
+                        rd_far,
+                    ),
+                );
             }
         } else {
             self.traverse(false);
@@ -452,7 +460,7 @@ pub trait StemStrategy: Clone + Sync + Send {
         tree: &crate::kd_tree::KdTree<A, T, Self, LS, K2, B>,
         query_ctx: &mut QC,
         stack: &mut Self::Stack<O>,
-        process_leaf: impl FnMut(&crate::kd_tree::leaf_view::LeafView<A, T, K2, B>, &mut QC),
+        process_leaf: impl FnMut(&crate::kd_tree::leaf_view::LeafView<A, T, K2, B>, &[O; K2], &mut QC),
     ) where
         Self: Sized,
         A: AxisUnified<Coord = A>,

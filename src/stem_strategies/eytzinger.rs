@@ -20,7 +20,8 @@ unsafe impl<const K: usize> Sync for Eytzinger<K> {}
 impl<const K: usize> StemStrategy for Eytzinger<K> {
     const ROOT_IDX: usize = 1;
 
-    type StackContext<A> = crate::kd_tree::query_stack::QueryStackContext<A, Self>;
+    type DeferredState = u32;
+    type StackContext<A> = crate::kd_tree::query_stack::QueryStackContext<A, Self::DeferredState>;
     type Stack<A> = crate::kd_tree::query_stack::QueryStack<A, Self>;
 
     fn new(stems_ptr: NonNull<u8>) -> Self {
@@ -34,6 +35,14 @@ impl<const K: usize> StemStrategy for Eytzinger<K> {
 
     fn stem_idx(&self) -> usize {
         self.stem_idx as usize
+    }
+    fn deferred_state(&self) -> Self::DeferredState {
+        self.stem_idx
+    }
+    fn rehydrate_deferred_state(&mut self, state: Self::DeferredState) {
+        self.stem_idx = state;
+        self.level = state.ilog2() as i32;
+        self.dim = self.level as usize % K;
     }
     fn leaf_idx(&self) -> usize {
         let mask = 1u32.wrapping_shl(self.level as u32);

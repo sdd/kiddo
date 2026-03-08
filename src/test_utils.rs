@@ -3,8 +3,8 @@ use az::Cast;
 use fixed::types::extra::Unsigned;
 use fixed::FixedU16;
 use rand::distr::{Distribution, StandardUniform};
-use rayon::iter::ParallelIterator;
-use rayon::prelude::{IntoParallelRefIterator, ParallelSlice};
+// use rayon::iter::ParallelIterator;
+// use rayon::prelude::{IntoParallelRefIterator, ParallelSlice};
 use std::array;
 use std::hint::black_box;
 
@@ -396,7 +396,7 @@ where
         move |(kdtree, points_to_query): (KdTree<A, T, K, B, IDX>, Vec<[A; K]>)| {
             black_box(
                 points_to_query
-                    .par_iter()
+                    .iter()
                     .for_each(|point| black_box(query(&kdtree, point))),
             )
         },
@@ -422,7 +422,7 @@ where
 {
     Box::new(
         move |(kdtree, points_to_query): (ImmutableKdTree<A, T, SO, K, B>, Vec<[A; K]>)| {
-            black_box(points_to_query.par_chunks(10_000).for_each(|chunk| {
+            black_box(points_to_query.chunks(10_000).for_each(|chunk| {
                 chunk
                     .iter()
                     .for_each(|point| black_box(query(&kdtree, point)))

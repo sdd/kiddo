@@ -1,3 +1,4 @@
+use crate::kd_tree::leaf_view::TlsLeafScratch;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, LeafStrategy};
@@ -5,7 +6,7 @@ use crate::StemStrategy;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A>,
+    A: AxisUnified<Coord = A> + 'static,
     T: Basics + Copy + Default + PartialOrd + PartialEq,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
@@ -17,17 +18,23 @@ where
     pub fn approx_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         D: DistanceMetricUnified<A, K>,
+        D::Output: TlsLeafScratch + 'static,
     {
         let req_ctx = ApproxNearestOneReqCtx::<A, D::Output, K> {
             query,
             _phantom: std::marker::PhantomData,
         };
 
+        let mut query_wide = [D::Output::zero(); K];
+        for dim in 0..K {
+            query_wide[dim] = D::widen_coord(query[dim]);
+        }
+
         let mut best_dist = D::Output::max_value();
         let mut best_item = T::default();
 
         self.straight_query(req_ctx, |leaf| {
-            leaf.nearest_one::<D>(query, &mut best_dist, &mut best_item);
+            leaf.nearest_one_with_query_wide::<D>(&query_wide, &mut best_dist, &mut best_item);
         });
 
         (best_dist, best_item)

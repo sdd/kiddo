@@ -1,3 +1,4 @@
+use crate::kd_tree::leaf_view::TlsLeafScratch;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::result_collection::ResultCollection;
 use crate::kd_tree::traits::QueryContext;
@@ -10,7 +11,7 @@ use std::num::NonZeroUsize;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A>,
+    A: AxisUnified<Coord = A> + 'static,
     T: Basics + Ord,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
@@ -30,8 +31,12 @@ where
         D: DistanceMetricUnified<A, K>
             + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, D::Output>
             + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, D::Output>,
-        D::Output: crate::stem_strategies::SimdPrune + BacktrackBlock3 + BacktrackBlock4,
-        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+        D::Output: crate::stem_strategies::SimdPrune
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
         let max_qty: usize = max_qty.get();
 
@@ -57,9 +62,13 @@ where
         D: DistanceMetricUnified<A, K>
             + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, D::Output>
             + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, D::Output>,
-        D::Output: crate::stem_strategies::SimdPrune + BacktrackBlock3 + BacktrackBlock4,
+        D::Output: crate::stem_strategies::SimdPrune
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
         R: ResultCollection<D::Output, T>,
-        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
         let mut req_ctx = NearestNWithinReqCtx {
             query,
@@ -70,8 +79,12 @@ where
             _phantom: std::marker::PhantomData,
         };
 
-        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf, req_ctx| {
-            leaf.nearest_n_within::<D, R>(query, max_dist, &mut req_ctx.results);
+        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf, query_wide, req_ctx| {
+            leaf.nearest_n_within_with_query_wide::<D, R>(
+                query_wide,
+                max_dist,
+                &mut req_ctx.results,
+            );
         });
 
         if sorted {

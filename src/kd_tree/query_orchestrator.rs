@@ -1,5 +1,7 @@
 use crate::kd_tree::leaf_view::LeafView;
-use crate::kd_tree::query_stack::{QueryStack, QueryStackContext, StackTrait};
+use crate::kd_tree::query_stack::{
+    scalar_ctx_from_parts, scalar_ctx_into_parts, QueryStack, StackTrait,
+};
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::stem_strategies::{
@@ -10,9 +12,34 @@ use crate::traits_unified_2::{
     AxisUnified, Basics, DistanceMetricUnified, LeafStrategy, Mutability,
 };
 use crate::StemStrategy;
+use std::any::{Any, TypeId};
+use std::cell::UnsafeCell;
+use std::collections::HashMap;
 use std::ptr::NonNull;
 
 mod simd;
+
+thread_local! {
+    static QUERY_STACKS: UnsafeCell<HashMap<TypeId, Box<dyn Any>>> =
+        UnsafeCell::new(HashMap::new());
+}
+
+#[inline]
+pub(crate) fn with_tls_query_stack<S, R>(f: impl FnOnce(&mut S) -> R) -> R
+where
+    S: Default + 'static,
+{
+    QUERY_STACKS.with(|stacks| {
+        let stacks = unsafe { &mut *stacks.get() };
+        let entry = stacks
+            .entry(TypeId::of::<S>())
+            .or_insert_with(|| Box::new(S::default()));
+        let stack = entry
+            .downcast_mut::<S>()
+            .expect("query stack type mismatch");
+        f(stack)
+    })
+}
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
@@ -123,17 +150,19 @@ where
     pub(crate) fn backtracking_query<QC, O, D>(
         &self,
         query_ctx: &mut QC,
-        process_leaf: impl FnMut(&LeafView<A, T, K, B>, &mut QC),
+        process_leaf: impl FnMut(&LeafView<A, T, K, B>, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
         O: AxisUnified<Coord = O> + SimdPrune + BacktrackBlock3 + BacktrackBlock4,
         D: DistanceMetricUnified<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
-        SS::Stack<O>: StackTrait<O, SS>,
+        SS::Stack<O>: StackTrait<O, SS> + Default + 'static,
     {
-        let mut stack = SS::Stack::<O>::default();
-        self.backtracking_query_with_stack::<QC, O, D>(query_ctx, &mut stack, process_leaf);
+        with_tls_query_stack::<SS::Stack<O>, _>(|stack| {
+            stack.clear();
+            self.backtracking_query_with_stack::<QC, O, D>(query_ctx, stack, process_leaf);
+        });
     }
 
     /// Backtracking query with explicit stack
@@ -142,7 +171,7 @@ where
         &self,
         query_ctx: &mut QC,
         stack: &mut SS::Stack<O>,
-        process_leaf: impl FnMut(&LeafView<A, T, K, B>, &mut QC),
+        process_leaf: impl FnMut(&LeafView<A, T, K, B>, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
         O: AxisUnified<Coord = O> + SimdPrune + BacktrackBlock3 + BacktrackBlock4,
@@ -167,7 +196,7 @@ where
         &self,
         query_ctx: &mut QC,
         stack: &mut QueryStack<O, SS>,
-        mut process_leaf: impl FnMut(&LeafView<A, T, K, B>, &mut QC),
+        mut process_leaf: impl FnMut(&LeafView<A, T, K, B>, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
         O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
@@ -176,7 +205,7 @@ where
             + DistanceMetricSimdBlock4<A, K, O>,
     {
         let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
-        let stem_strat: SS = SS::new(stems_ptr);
+        let mut stem_strat: SS = SS::new(stems_ptr);
 
         let query: [A; K] = *query_ctx.query();
         let mut query_wide: [O; K] = [O::zero(); K];
@@ -185,10 +214,15 @@ where
         }
 
         let mut off = [O::zero(); K];
-        stack.push(QueryStackContext::new(stem_strat));
+        stack.push(scalar_ctx_from_parts::<O, SS>(
+            stem_strat.deferred_state(),
+            O::zero(),
+            O::zero(),
+        ));
 
         while let Some(stack_ctx) = stack.pop() {
-            let (mut stem_strat, old_off, rd) = stack_ctx.into_parts();
+            let (stem_state, old_off, rd) = scalar_ctx_into_parts::<O, SS>(stack_ctx);
+            stem_strat.rehydrate_deferred_state(stem_state);
             let mut dim = stem_strat.dim();
             tracing::trace!(%dim, %old_off, %rd, ?off, "Popped stack context");
 
@@ -204,8 +238,13 @@ where
             }
             tracing::trace!(%rd, %max_dist, "SCALAR Prune check: VISIT");
 
-            tracing::trace!("Restoring off[{}]. was {}, now {}", dim, off[dim], old_off);
-            off[dim] = old_off;
+            tracing::trace!(
+                "Restoring off[{}]. was {}, now {}",
+                dim,
+                unsafe { *off.get_unchecked(dim) },
+                old_off
+            );
+            unsafe { *off.get_unchecked_mut(dim) = old_off };
 
             let best_dist = query_ctx.max_dist();
             if let Some(leaf_idx) = self.traverse_to_leaf::<O, D>(
@@ -220,7 +259,7 @@ where
             ) {
                 tracing::trace!(%leaf_idx, "processing leaf");
                 let leaf_view = self.leaves.leaf_view(leaf_idx);
-                process_leaf(&leaf_view, query_ctx);
+                process_leaf(&leaf_view, &query_wide, query_ctx);
             }
         }
     }
@@ -275,19 +314,19 @@ where
             }
         }
 
-        if !self.subtree_may_contain_leaf(
-            stem_strat.stem_idx(),
-            stem_strat.level(),
-            stem_strat.leaf_idx(),
-        ) {
-            tracing::warn!(
-                stem_idx = stem_strat.stem_idx(),
-                level = stem_strat.level(),
-                leaf_idx_prefix = stem_strat.leaf_idx(),
-                "traverse_to_leaf reached structurally invalid subtree; skipping leaf"
-            );
-            return None;
-        }
+        // if !self.subtree_may_contain_leaf(
+        //     stem_strat.stem_idx(),
+        //     stem_strat.level(),
+        //     stem_strat.leaf_idx(),
+        // ) {
+        //     tracing::warn!(
+        //         stem_idx = stem_strat.stem_idx(),
+        //         level = stem_strat.level(),
+        //         leaf_idx_prefix = stem_strat.leaf_idx(),
+        //         "traverse_to_leaf reached structurally invalid subtree; skipping leaf"
+        //     );
+        //     return None;
+        // }
 
         Some(
             self.stem_leaf_resolution
@@ -302,13 +341,16 @@ where
         &self,
         query_ctx: &mut QC,
         stack: &mut crate::kd_tree::query_stack_simd::SimdQueryStack<O, SS>,
-        mut process_leaf: impl FnMut(&LeafView<A, T, K, B>, &mut QC),
+        mut process_leaf: impl FnMut(&LeafView<A, T, K, B>, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
         O: AxisUnified<Coord = O> + SimdPrune + BacktrackBlock3 + BacktrackBlock4,
         D: DistanceMetricUnified<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
+        SS: StemStrategy<
+            StackContext<O> = crate::kd_tree::query_stack_simd::SimdQueryStackContext<O, SS>,
+        >,
     {
         use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
 
@@ -348,8 +390,13 @@ where
                     }
                     tracing::trace!(%rd, %max_dist, "SIMD Prune check: VISIT");
 
-                    tracing::trace!("Restoring off[{}]. was {}, now {}", dim, off[dim], old_off);
-                    off[dim] = old_off;
+                    tracing::trace!(
+                        "Restoring off[{}]. was {}, now {}",
+                        dim,
+                        unsafe { *off.get_unchecked(dim) },
+                        old_off
+                    );
+                    unsafe { *off.get_unchecked_mut(dim) = old_off };
 
                     let best_dist = query_ctx.max_dist();
                     if let Some(leaf_idx) = self.traverse_to_leaf_simd::<O, D>(
@@ -364,7 +411,7 @@ where
                     ) {
                         tracing::trace!(%leaf_idx, "processing leaf");
                         let leaf_view = self.leaves.leaf_view(leaf_idx);
-                        process_leaf(&leaf_view, query_ctx);
+                        process_leaf(&leaf_view, &query_wide, query_ctx);
                     }
                 }
                 SimdQueryStackContext::Block {
@@ -377,7 +424,7 @@ where
                 } => {
                     tracing::trace!(%dim_val, %old_off, ?rd_values, %sibling_mask, "Popped block context");
                     // Restore the parent split-dimension offset captured for this block context.
-                    off[dim_val] = old_off;
+                    unsafe { *off.get_unchecked_mut(dim_val) = old_off };
 
                     // SIMD pruning: check which siblings pass the backtrack test
                     let max_dist = query_ctx.max_dist();
@@ -403,20 +450,20 @@ where
                             let mut ss = siblings[sibling_idx].clone();
                             let rd = rd_values[sibling_idx];
                             let new_off = new_off_values[sibling_idx];
-                            if !self.subtree_may_contain_leaf(
-                                ss.stem_idx(),
-                                ss.level(),
-                                ss.leaf_idx(),
-                            ) {
-                                tracing::warn!(
-                                    sibling_idx,
-                                    stem_idx = ss.stem_idx(),
-                                    leaf_idx_prefix = ss.leaf_idx(),
-                                    level = ss.level(),
-                                    "SIMD block sibling points to structurally invalid leaf-prefix subtree; skipping"
-                                );
-                                continue;
-                            }
+                            // if !self.subtree_may_contain_leaf(
+                            //     ss.stem_idx(),
+                            //     ss.level(),
+                            //     ss.leaf_idx(),
+                            // ) {
+                            //     tracing::warn!(
+                            //         sibling_idx,
+                            //         stem_idx = ss.stem_idx(),
+                            //         leaf_idx_prefix = ss.leaf_idx(),
+                            //         level = ss.level(),
+                            //         "SIMD block sibling points to structurally invalid leaf-prefix subtree; skipping"
+                            //     );
+                            //     continue;
+                            // }
                             let mut dim = ss.dim();
 
                             // Restore off array to saved state, then update the split dimension
@@ -425,14 +472,14 @@ where
                             tracing::trace!(
                                 "Restoring off[{}]. was {}, now {} (interval dist for sibling {}). Parent dim was {}, sibling dim is {}",
                                 dim_val,
-                                off[dim_val],
+                                unsafe { *off.get_unchecked(dim_val) },
                                 new_off,
                                 sibling_idx,
                                 dim_val,
                                 dim
                             );
                             // The interval distance was computed for the parent block's split dim.
-                            off[dim_val] = new_off;
+                            unsafe { *off.get_unchecked_mut(dim_val) = new_off };
 
                             let best_dist = query_ctx.max_dist();
                             if let Some(leaf_idx) = self.traverse_to_leaf_simd::<O, D>(
@@ -447,7 +494,7 @@ where
                             ) {
                                 tracing::trace!(%leaf_idx, "processing leaf");
                                 let leaf_view = self.leaves.leaf_view(leaf_idx);
-                                process_leaf(&leaf_view, query_ctx);
+                                process_leaf(&leaf_view, &query_wide, query_ctx);
                             }
                         }
                     }
@@ -474,6 +521,9 @@ where
         D: DistanceMetricUnified<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
+        SS: StemStrategy<
+            StackContext<O> = crate::kd_tree::query_stack_simd::SimdQueryStackContext<O, SS>,
+        >,
     {
         let use_scalar_step = matches!(
             self.stem_leaf_resolution,
@@ -586,19 +636,19 @@ where
             }
         }
 
-        if !self.subtree_may_contain_leaf(
-            stem_strat.stem_idx(),
-            stem_strat.level(),
-            stem_strat.leaf_idx(),
-        ) {
-            tracing::warn!(
-                stem_idx = stem_strat.stem_idx(),
-                level = stem_strat.level(),
-                leaf_idx_prefix = stem_strat.leaf_idx(),
-                "traverse_to_leaf_simd reached structurally invalid subtree; skipping leaf"
-            );
-            return None;
-        }
+        // if !self.subtree_may_contain_leaf(
+        //     stem_strat.stem_idx(),
+        //     stem_strat.level(),
+        //     stem_strat.leaf_idx(),
+        // ) {
+        //     tracing::warn!(
+        //         stem_idx = stem_strat.stem_idx(),
+        //         level = stem_strat.level(),
+        //         leaf_idx_prefix = stem_strat.leaf_idx(),
+        //         "traverse_to_leaf_simd reached structurally invalid subtree; skipping leaf"
+        //     );
+        //     return None;
+        // }
 
         Some(
             self.stem_leaf_resolution
