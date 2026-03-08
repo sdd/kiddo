@@ -53,6 +53,41 @@ asm-m4:
     @echo "Assembly output written to target/donnelly_get_idx_v2_apple_m2.s"
     @echo "Search for 'donnelly_get_idx_v2' in the file to find the function"
 
+
+asm-k6-nearest-one-eytz:
+    cargo asm --features cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=3" "kiddo::immutable::float::query::nearest_one::cargo_asm::v6_nearest_one_eytzinger_with_stack" > v6_nearest_one_eytzinger.asm
+
+objdump-k6-nearest-one-eytz:
+    cargo objdump --release --lib --features cargo_asm,logging_off -- --disassemble-symbols="kiddo::immutable::float::query::nearest_one::cargo_asm::v6_nearest_one_eytzinger_with_stack" --demangle > v6_nearest_one_eytzinger.objdump
+
+objdump-k5-nearest-one:
+    cd ../kiddo-v5 && cargo objdump --release --lib -- --disassemble-symbols="kiddo::immutable::float::kdtree::cargo_asm::v5_nearest_one_immutable" --demangle > v5_immutable_nearest_one.objdump
+
+objdump-k5-symbols:
+    cd ../kiddo-v5 && cargo objdump --release --lib -- --syms --demangle > v5_symbols.objdump
+
+objdump-k5-nearest-one-recurse SYMBOL:
+    cd ../kiddo-v5 && cargo objdump --release --lib -- --disassemble-symbols="{{SYMBOL}}" --demangle > v5_nearest_one_recurse.objdump
+
+objdump-profile-v5-symbols:
+    cargo objdump --release --bin profile_v5_nearest_one_eytzinger --features profile_v5 -- --syms --demangle > profile_v5_symbols.objdump
+
+objdump-profile-v5-symbol SYMBOL:
+    cargo objdump --release --bin profile_v5_nearest_one_eytzinger --features profile_v5 -- --disassemble-symbols="{{SYMBOL}}" --demangle > profile_v5_symbol.objdump
+
+build-profile-v6-nearest-one-eytz:
+    cargo build --release --features test_utils --bin profile_v6_nearest_one_eytzinger
+
+profile-v6-nearest-one-eytz-samply: build-profile-v6-nearest-one-eytz
+    KIDDO_PROFILE_QUERY_BATCH_REPEATS=2000 samply record ./target/release/profile_v6_nearest_one_eytzinger
+
+build-profile-v5-nearest-one-eytz:
+    cargo build --release --features profile_v5 --bin profile_v5_nearest_one_eytzinger
+
+profile-v5-nearest-one-eytz-samply: build-profile-v5-nearest-one-eytz
+    KIDDO_PROFILE_QUERY_BATCH_REPEATS=2000 samply record ./target/release/profile_v5_nearest_one_eytzinger
+
+
 build:
     RUSTFLAGS="-C target-cpu=znver3 -C opt-level=3" cargo build --release --example immutable-large-ann-donnelly --example immutable-large-ann-eytzinger
 
@@ -88,7 +123,6 @@ uprof-eytzinger:
         -w /home/scotty/projects/kiddo \
         -o ./uprof-output-eytz \
         target/release/examples/immutable-large-ann-eytzinger-deserialize-and-query
-
 
 uprof-donnelly:
     /opt/AMD/AMDuProf_Linux_x64_5.1.701/bin/AMDuProfCLI collect \

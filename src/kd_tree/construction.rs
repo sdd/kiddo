@@ -306,6 +306,11 @@ where
                 LS::Mutability::initial_stem_leaf_resolution::<SS>(stems_depth, leaf_node_count)
             };
 
+        let max_leaf_len = Self::initial_max_leaf_len();
+        // TODO: if we keep max_leaf_len, populate this from the actual constructed leaf sizes
+        // rather than the current B / (B * 2) heuristic.
+        crate::kd_tree::leaf_view::assert_leaf_scratch_capacity(max_leaf_len);
+
         // println!("Stems: {:?}", &stems);
         Self {
             stems,
@@ -313,6 +318,7 @@ where
             stem_leaf_resolution,
             size: item_count,
             max_stem_level: actual_max_stem_level,
+            max_leaf_len,
             _phantom: Default::default(),
         }
     }
@@ -346,12 +352,18 @@ where
         let stem_leaf_resolution =
             LS::Mutability::initial_stem_leaf_resolution::<SS>(0, leaves.leaf_count());
 
+        let max_leaf_len = Self::initial_max_leaf_len();
+        // TODO: if we keep max_leaf_len, populate this from the actual constructed leaf sizes
+        // rather than the current B / (B * 2) heuristic.
+        crate::kd_tree::leaf_view::assert_leaf_scratch_capacity(max_leaf_len);
+
         Self {
             stems: avec![A::max_value(); 0],
             leaves,
             stem_leaf_resolution,
             size: item_count,
             max_stem_level: -1,
+            max_leaf_len,
             _phantom: Default::default(),
         }
     }

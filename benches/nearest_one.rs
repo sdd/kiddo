@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use az::Cast;
 use codspeed_criterion_compat::{
     criterion_group, criterion_main, measurement::WallTime, AxisScale, BatchSize, BenchmarkGroup,

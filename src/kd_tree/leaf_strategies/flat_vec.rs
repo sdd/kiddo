@@ -50,12 +50,15 @@ where
     }
 
     fn leaf_view(&self, leaf_idx: usize) -> LeafView<'_, AX, T, K, B> {
-        let (start, end) = self.leaf_extents[leaf_idx];
+        let (start, end) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
+        let start = start as usize;
+        let end = end as usize;
 
-        let leaf_points_view =
-            array_init::array_init(|i| &self.leaf_points[i][start as usize..end as usize]);
+        let leaf_points_view = array_init::array_init(|i| unsafe {
+            self.leaf_points.get_unchecked(i).get_unchecked(start..end)
+        });
 
-        let leaf_items_view = &self.leaf_items[start as usize..end as usize];
+        let leaf_items_view = unsafe { self.leaf_items.get_unchecked(start..end) };
 
         LeafView::new(leaf_points_view, leaf_items_view)
     }

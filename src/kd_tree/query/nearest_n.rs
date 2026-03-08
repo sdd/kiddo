@@ -1,3 +1,4 @@
+use crate::kd_tree::leaf_view::TlsLeafScratch;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::KdTree;
 use crate::stem_strategies::donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4};
@@ -7,7 +8,7 @@ use std::num::NonZero;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A>,
+    A: AxisUnified<Coord = A> + 'static,
     T: Basics + Ord,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
@@ -25,8 +26,12 @@ where
         D: DistanceMetricUnified<A, K>
             + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, D::Output>
             + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, D::Output>,
-        D::Output: crate::stem_strategies::SimdPrune + BacktrackBlock3 + BacktrackBlock4,
-        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+        D::Output: crate::stem_strategies::SimdPrune
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
         self.nearest_n_within::<D>(query, D::Output::max_value(), max_qty, sorted)
     }

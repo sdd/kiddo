@@ -19,11 +19,20 @@ all-features = true
 cargo_asm = ["dep:rand", "dep:rand_chacha"]
 csv = ["dep:csv"]
 default = ["tracing", "fixed"]
+leaf_view_chunked = []
 modified_van_emde_boas = []
 f16 = ["dep:half"]
 fixed = ["dep:fixed"]
+logging_off = [
+    "dep:log",
+    "tracing/max_level_off",
+    "tracing/release_max_level_off",
+    "log/max_level_off",
+    "log/release_max_level_off",
+]
 no_inline = []
 las = ["dep:las"]
+profile_v5 = ["dep:kiddo_v5", "dep:rand", "dep:rand_chacha"]
 serde = [
     "dep:serde",
     "serde/derive",

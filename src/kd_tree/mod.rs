@@ -5,6 +5,8 @@ mod construction;
 pub mod leaf_strategies;
 /// Leaf view abstraction for accessing leaf data
 pub mod leaf_view;
+#[cfg(feature = "leaf_view_chunked")]
+pub(crate) mod leaf_view_chunked;
 mod query;
 mod query_orchestrator;
 pub(crate) mod query_stack;
@@ -159,6 +161,7 @@ pub struct KdTree<
 
     size: usize,
     max_stem_level: i32,
+    pub(crate) max_leaf_len: usize,
     pub(crate) _phantom: std::marker::PhantomData<(SS, T)>,
 }
 
@@ -208,6 +211,7 @@ where
             stem_leaf_resolution,
             size: 0,
             max_stem_level,
+            max_leaf_len: Self::initial_max_leaf_len(),
             _phantom: std::marker::PhantomData,
         }
     }
@@ -220,6 +224,16 @@ where
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
+    #[inline(always)]
+    pub(crate) fn initial_max_leaf_len() -> usize {
+        match LS::BUCKET_LIMIT_TYPE {
+            // TODO: replace this heuristic with the actual observed maximum leaf size during
+            // construction / deserialization if we keep this field.
+            crate::traits_unified_2::BucketLimitType::Hard => B,
+            crate::traits_unified_2::BucketLimitType::Soft => B * 2,
+        }
+    }
+
     /// Returns `true` if the tree contains no points.
     #[inline]
     pub fn is_empty(&self) -> bool {
@@ -242,6 +256,12 @@ where
     #[inline]
     pub fn leaf_count(&self) -> usize {
         self.leaves.leaf_count()
+    }
+
+    #[inline]
+    /// Returns the configured maximum leaf size heuristic used to size hot-path scratch buffers.
+    pub fn max_leaf_len(&self) -> usize {
+        self.max_leaf_len
     }
 
     /// Find which leaf contains a specific item.

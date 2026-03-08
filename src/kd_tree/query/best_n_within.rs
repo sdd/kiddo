@@ -1,3 +1,4 @@
+use crate::kd_tree::leaf_view::TlsLeafScratch;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
@@ -9,7 +10,7 @@ use std::num::NonZero;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A>,
+    A: AxisUnified<Coord = A> + 'static,
     T: Basics + Ord,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
@@ -28,8 +29,12 @@ where
         D: DistanceMetricUnified<A, K>
             + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, D::Output>
             + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, D::Output>,
-        D::Output: crate::stem_strategies::SimdPrune + BacktrackBlock3 + BacktrackBlock4,
-        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+        D::Output: crate::stem_strategies::SimdPrune
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
         let max_qty = max_qty.into();
         let mut req_ctx = BestNWithinReqCtx::<A, T, <D as DistanceMetricUnified<A, K>>::Output, K> {
@@ -39,8 +44,8 @@ where
             results: BinaryHeap::with_capacity(max_qty),
         };
 
-        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf, req_ctx| {
-            leaf.best_n_within::<D>(query, max_dist, &mut req_ctx.results);
+        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf, query_wide, req_ctx| {
+            leaf.best_n_within_with_query_wide::<D>(query_wide, max_dist, &mut req_ctx.results);
         });
 
         req_ctx.results

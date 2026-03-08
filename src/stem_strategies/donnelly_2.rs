@@ -41,7 +41,8 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
 {
     const ROOT_IDX: usize = 0;
 
-    type StackContext<A> = crate::kd_tree::query_stack::QueryStackContext<A, Self>;
+    type DeferredState = Self;
+    type StackContext<A> = crate::kd_tree::query_stack::QueryStackContext<A, Self::DeferredState>;
     type Stack<A> = crate::kd_tree::query_stack::QueryStack<A, Self>;
 
     fn new(stems_ptr: NonNull<u8>) -> Self {
@@ -64,6 +65,12 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
 
     fn stem_idx(&self) -> usize {
         self.stem_idx as usize
+    }
+    fn deferred_state(&self) -> Self::DeferredState {
+        *self
+    }
+    fn rehydrate_deferred_state(&mut self, state: Self::DeferredState) {
+        *self = state;
     }
 
     fn leaf_idx(&self) -> usize {

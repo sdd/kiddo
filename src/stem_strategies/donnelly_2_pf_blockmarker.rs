@@ -31,7 +31,8 @@ macro_rules! impl_donnelly_stem_strategy {
         {
             const ROOT_IDX: usize = 0;
 
-            type StackContext<A> = crate::kd_tree::query_stack::QueryStackContext<A, Self>;
+            type DeferredState = Self;
+            type StackContext<A> = crate::kd_tree::query_stack::QueryStackContext<A, Self::DeferredState>;
             type Stack<A> = crate::kd_tree::query_stack::QueryStack<A, Self>;
 
             #[inline(always)]
@@ -44,6 +45,12 @@ macro_rules! impl_donnelly_stem_strategy {
 
             #[inline(always)]
             fn stem_idx(&self) -> usize { self.core.stem_idx() }
+
+            #[inline(always)]
+            fn deferred_state(&self) -> Self::DeferredState { *self }
+
+            #[inline(always)]
+            fn rehydrate_deferred_state(&mut self, state: Self::DeferredState) { *self = state; }
 
             #[inline(always)]
             fn leaf_idx(&self) -> usize { self.core.leaf_idx() }

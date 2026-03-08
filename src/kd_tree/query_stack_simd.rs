@@ -1,14 +1,19 @@
 use crate::kd_tree::query_stack::StackTrait;
 use crate::traits_unified_2::AxisUnified;
+use crate::StemStrategy;
+use std::mem::MaybeUninit;
+
+const INLINE_SIMD_QUERY_STACK_CAPACITY: usize = 50;
 
 #[derive(Debug)]
-pub struct SimdQueryStack<A, SS> {
-    stack: Vec<SimdQueryStackContext<A, SS>>,
+pub struct SimdQueryStack<A, SS: StemStrategy> {
+    stack: [MaybeUninit<SS::StackContext<A>>; INLINE_SIMD_QUERY_STACK_CAPACITY],
+    len: usize,
 }
 
-impl<A, SS> Default for SimdQueryStack<A, SS> {
+impl<A, SS: StemStrategy> Default for SimdQueryStack<A, SS> {
     fn default() -> Self {
-        Self { stack: Vec::new() }
+        Self::new()
     }
 }
 
@@ -29,34 +34,56 @@ pub enum SimdQueryStackContext<A, SS> {
     },
 }
 
-impl<A, SS> StackTrait<A, SS> for SimdQueryStack<A, SS> {
-    type Context = SimdQueryStackContext<A, SS>;
-
+impl<A, SS: StemStrategy> StackTrait<A, SS> for SimdQueryStack<A, SS> {
     #[inline]
-    fn push(&mut self, item: Self::Context) {
-        self.stack.push(item);
+    fn push(&mut self, item: SS::StackContext<A>) {
+        debug_assert!(self.len < INLINE_SIMD_QUERY_STACK_CAPACITY);
+        unsafe { self.stack.get_unchecked_mut(self.len) }.write(item);
+        self.len += 1;
     }
 
     #[inline]
-    fn pop(&mut self) -> Option<Self::Context> {
-        self.stack.pop()
+    fn pop(&mut self) -> Option<SS::StackContext<A>> {
+        if self.len == 0 {
+            None
+        } else {
+            self.len -= 1;
+            Some(unsafe { self.stack.get_unchecked(self.len).assume_init_read() })
+        }
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        while self.len > 0 {
+            self.len -= 1;
+            unsafe { self.stack.get_unchecked_mut(self.len).assume_init_drop() };
+        }
     }
 }
 
-impl<A, SS> SimdQueryStack<A, SS> {
+impl<A, SS: StemStrategy> SimdQueryStack<A, SS> {
     #[inline]
-    pub fn new() -> Self {
-        Self { stack: Vec::new() }
+    pub const fn new() -> Self {
+        Self {
+            stack: [const { MaybeUninit::uninit() }; INLINE_SIMD_QUERY_STACK_CAPACITY],
+            len: 0,
+        }
     }
 
     #[inline]
-    pub fn push(&mut self, item: SimdQueryStackContext<A, SS>) {
-        self.stack.push(item);
+    pub fn push(&mut self, item: SS::StackContext<A>) {
+        <Self as StackTrait<A, SS>>::push(self, item);
     }
 
     #[inline]
-    pub fn pop(&mut self) -> Option<SimdQueryStackContext<A, SS>> {
-        self.stack.pop()
+    pub fn pop(&mut self) -> Option<SS::StackContext<A>> {
+        <Self as StackTrait<A, SS>>::pop(self)
+    }
+}
+
+impl<A, SS: StemStrategy> Drop for SimdQueryStack<A, SS> {
+    fn drop(&mut self) {
+        self.clear();
     }
 }
 
