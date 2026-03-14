@@ -45,8 +45,6 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for Manhattan {
     fn accumulate(rd: A, delta: A) -> A {
         rd + delta
     }
-
-    const IS_MAX_BASED: bool = false;
 }
 
 /// Returns the Chebyshev / L-infinity distance between two points.
@@ -127,8 +125,6 @@ impl<A: Axis, const K: usize> DistanceMetric<A, K> for SquaredEuclidean {
     fn accumulate(rd: A, delta: A) -> A {
         rd + delta
     }
-
-    const IS_MAX_BASED: bool = false;
 }
 
 /// Returns the Minkowski distance (power distance) between two points.
