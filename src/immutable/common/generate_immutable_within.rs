@@ -19,6 +19,10 @@ macro_rules! generate_immutable_within {
                 A: LeafSliceFloat<T> + LeafSliceFloatChunk<T, K>,
                 D: DistanceMetric<A, K>,
                 usize: Cast<T>,            {
+                // Like [`within`] but allows controlling boundary inclusiveness.
+                //
+                // When `inclusive` is true, points at exactly the maximum distance are included.
+                // When false, only points strictly less than the maximum distance are included.
                 self.nearest_n_within_exclusive::<D>(query, dist, std::num::NonZero::new(usize::MAX).unwrap(), true, inclusive)
             }
     };

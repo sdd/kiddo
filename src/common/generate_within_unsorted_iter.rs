@@ -26,6 +26,10 @@ macro_rules! generate_within_unsorted_iter {
             where
                 D: DistanceMetric<A, K>,
             {
+                // Like [`within_unsorted_iter`] but allows controlling boundary inclusiveness.
+                //
+                // When `inclusive` is true, points at exactly the maximum distance are included.
+                // When false, only points strictly less than the maximum distance are included.
                 let mut off = [A::zero(); K];
                 let root_index: IDX = *transform(&self.root_index);
 

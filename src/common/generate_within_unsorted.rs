@@ -17,6 +17,10 @@ macro_rules! generate_within_unsorted {
             where
                 D: DistanceMetric<A, K>,
             {
+                // Like [`within_unsorted`] but allows controlling boundary inclusiveness.
+                //
+                // When `inclusive` is true, points at exactly the maximum distance are included.
+                // When false, only points strictly less than the maximum distance are included.
                 let mut off = [A::zero(); K];
                 let mut matching_items = Vec::new();
                 let root_index: IDX = *transform(&self.root_index);

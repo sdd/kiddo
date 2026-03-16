@@ -17,6 +17,10 @@ macro_rules! generate_nearest_n_within_unsorted {
             where
                 D: DistanceMetric<A, K>,
             {
+                // Like [`nearest_n_within`] but allows controlling boundary inclusiveness.
+                //
+                // When `inclusive` is true, points at exactly the maximum distance are included.
+                // When false, only points strictly less than the maximum distance are included.
                 if sorted || max_items < std::num::NonZero::new(usize::MAX).unwrap() {
                     if max_items <= std::num::NonZero::new(MAX_VEC_RESULT_SIZE).unwrap() {
                         self.nearest_n_within_stub::<D, SortedVec<NearestNeighbour<A, T>>>(query, dist, max_items.get(), sorted, inclusive)

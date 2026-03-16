@@ -17,6 +17,10 @@ macro_rules! generate_immutable_nearest_n_within {
             where
                 D: DistanceMetric<A, K>,
             {
+                // Like [`nearest_n_within`] but allows controlling boundary inclusiveness.
+                //
+                // When `inclusive` is true, points at exactly the maximum distance are included.
+                // When false, only points strictly less than the maximum distance are included.
                 let max_items = max_items.into();
 
                 if sorted && max_items < usize::MAX {

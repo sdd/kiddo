@@ -44,6 +44,10 @@ where
         self.within_unsorted_exclusive(query, dist, distance_fn, true)
     }
 
+    /// Like [`within_unsorted`] but allows controlling boundary inclusiveness.
+    ///
+    /// When `inclusive` is true, points at exactly the maximum distance are included.
+    /// When false, only points strictly less than the maximum distance are included.
     #[inline]
     pub fn within_unsorted_exclusive<F>(
         &self,
