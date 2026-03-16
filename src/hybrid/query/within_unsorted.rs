@@ -41,11 +41,11 @@ where
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
-        self.within_unsorted_with_condition(query, dist, distance_fn, true)
+        self.within_unsorted_exclusive(query, dist, distance_fn, true)
     }
 
     #[inline]
-    pub fn within_unsorted_with_condition<F>(
+    pub fn within_unsorted_exclusive<F>(
         &self,
         query: &[A; K],
         dist: A,
@@ -148,7 +148,11 @@ where
                 .for_each(|(idx, entry)| {
                     let distance = distance_fn(query, entry);
 
-                    if if inclusive { distance <= radius } else { distance < radius } {
+                    if if inclusive {
+                        distance <= radius
+                    } else {
+                        distance < radius
+                    } {
                         matching_items.push(Neighbour {
                             distance,
                             item: *leaf_node.content_items.get_unchecked(idx.az::<usize>()),
@@ -163,8 +167,8 @@ where
 mod tests {
     use crate::float::distance::squared_euclidean;
     use crate::float::kdtree::{Axis, KdTree};
-    use rstest::rstest;
     use rand::Rng;
+    use rstest::rstest;
     use std::cmp::Ordering;
 
     type AX = f32;
@@ -269,7 +273,10 @@ mod tests {
     #[rstest]
     #[case(true, 1)]
     #[case(false, 0)]
-    fn test_within_unsorted_boundary_inclusiveness(#[case] inclusive: bool, #[case] expected_len: usize) {
+    fn test_within_unsorted_boundary_inclusiveness(
+        #[case] inclusive: bool,
+        #[case] expected_len: usize,
+    ) {
         let mut kdtree: KdTree<f32, u32, 2, 5, u32> = KdTree::new();
         kdtree.add(&[1.0, 0.0], 1);
         kdtree.add(&[2.0, 0.0], 2);
@@ -277,7 +284,7 @@ mod tests {
         let query = [0.0, 0.0];
         let radius = 1.0;
 
-        let results = kdtree.within_unsorted_with_condition(
+        let results = kdtree.within_unsorted_exclusive(
             &query,
             radius,
             &|a, b| {

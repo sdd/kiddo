@@ -1416,12 +1416,12 @@ mod tests {
                     for (i, point) in points.iter().enumerate() {
                         tree.add(point, i as u64);
                     }
-                    tree.within_with_condition::<D>(&query_arr, radius, inclusive)
+                    tree.within_exclusive::<D>(&query_arr, radius, inclusive)
                 }
                 TreeType::Immutable => {
                     let tree: crate::immutable::float::kdtree::ImmutableKdTree<f64, u64, 6, 2048> =
                         crate::immutable::float::kdtree::ImmutableKdTree::new_from_slice(&points);
-                    tree.within_with_condition::<D>(&query_arr, radius, inclusive)
+                    tree.within_exclusive::<D>(&query_arr, radius, inclusive)
                 }
             };
 
@@ -1513,17 +1513,16 @@ mod tests {
             let query = [0.0, 0.0];
             let radius = 1.0;
 
-            let results =
-                kdtree.within_with_condition::<SquaredEuclidean>(&query, radius, inclusive);
+            let results = kdtree.within_exclusive::<SquaredEuclidean>(&query, radius, inclusive);
             assert_eq!(results.len(), expected_len);
             if expected_len > 0 {
                 assert_eq!(results[0].item, 1);
                 assert_eq!(results[0].distance, 1.0);
             }
 
-            // Test nearest_n_within_with_condition
+            // Test nearest_n_within_exclusive
             let max_qty = std::num::NonZero::new(10).unwrap();
-            let results = kdtree.nearest_n_within_with_condition::<SquaredEuclidean>(
+            let results = kdtree.nearest_n_within_exclusive::<SquaredEuclidean>(
                 &query, radius, max_qty, true, inclusive,
             );
             assert_eq!(results.len(), expected_len);

@@ -15,12 +15,12 @@ macro_rules! generate_immutable_best_n_within {
                 usize: Cast<T>,
                 D: DistanceMetric<A, K>,
             {
-                self.best_n_within_with_condition::<D>(query, dist, max_qty, true)
+                self.best_n_within_exclusive::<D>(query, dist, max_qty, true)
             }
 
             #[doc = concat!$comments]
             #[inline]
-            pub fn best_n_within_with_condition<D>(
+            pub fn best_n_within_exclusive<D>(
                 &self,
                 query: &[A; K],
                 dist: A,

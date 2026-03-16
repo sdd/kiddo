@@ -166,7 +166,7 @@ mod tests {
         let query = [n(0.0), n(0.0)];
         let radius = n(1.0);
 
-        let results = kdtree.within_with_condition::<Manhattan>(&query, radius, inclusive);
+        let results = kdtree.within_exclusive::<Manhattan>(&query, radius, inclusive);
         assert_eq!(results.len(), expected_len);
         if expected_len > 0 {
             assert_eq!(results[0].item, 1);

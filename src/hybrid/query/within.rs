@@ -39,11 +39,11 @@ where
     where
         F: Fn(&[A; K], &[A; K]) -> A,
     {
-        self.within_with_condition(query, dist, distance_fn, true)
+        self.within_exclusive(query, dist, distance_fn, true)
     }
 
     #[inline]
-    pub fn within_with_condition<F>(
+    pub fn within_exclusive<F>(
         &self,
         query: &[A; K],
         dist: A,
@@ -146,7 +146,11 @@ where
                 .for_each(|(idx, entry)| {
                     let distance = distance_fn(query, entry);
 
-                    if if inclusive { distance <= radius } else { distance < radius } {
+                    if if inclusive {
+                        distance <= radius
+                    } else {
+                        distance < radius
+                    } {
                         matching_items.push(Neighbour {
                             distance,
                             item: *leaf_node.content_items.get_unchecked(idx.az::<usize>()),
@@ -161,8 +165,8 @@ where
 mod tests {
     use crate::float::distance::manhattan;
     use crate::float::kdtree::{Axis, KdTree};
-    use rstest::rstest;
     use rand::Rng;
+    use rstest::rstest;
     use std::cmp::Ordering;
 
     type AX = f32;
@@ -275,7 +279,7 @@ mod tests {
         let query = [0.0, 0.0];
         let radius = 1.0;
 
-        let results = kdtree.within_with_condition(
+        let results = kdtree.within_exclusive(
             &query,
             radius,
             &|a, b| {

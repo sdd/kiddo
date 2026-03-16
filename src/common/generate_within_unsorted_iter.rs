@@ -12,12 +12,12 @@ macro_rules! generate_within_unsorted_iter {
             where
                 D: DistanceMetric<A, K>,
             {
-                self.within_unsorted_iter_with_condition::<D>(query, dist, true)
+                self.within_unsorted_iter_exclusive::<D>(query, dist, true)
             }
 
             #[doc = concat!$comments]
             #[inline]
-            pub fn within_unsorted_iter_with_condition<D>(
+            pub fn within_unsorted_iter_exclusive<D>(
                 &'a self,
                 query: &'query [A; K],
                 dist: A,

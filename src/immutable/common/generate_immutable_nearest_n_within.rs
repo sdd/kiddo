@@ -8,12 +8,12 @@ macro_rules! generate_immutable_nearest_n_within {
             where
                 D: DistanceMetric<A, K>,
             {
-                self.nearest_n_within_with_condition::<D>(query, dist, max_items, sorted, true)
+                self.nearest_n_within_exclusive::<D>(query, dist, max_items, sorted, true)
             }
 
             #[doc = concat!$comments]
             #[inline]
-            pub fn nearest_n_within_with_condition<D>(&self, query: &[A; K], dist: A, max_items: NonZero<usize>, sorted: bool, inclusive: bool) -> Vec<NearestNeighbour<A, T>>
+            pub fn nearest_n_within_exclusive<D>(&self, query: &[A; K], dist: A, max_items: NonZero<usize>, sorted: bool, inclusive: bool) -> Vec<NearestNeighbour<A, T>>
             where
                 D: DistanceMetric<A, K>,
             {
