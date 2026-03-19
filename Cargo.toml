@@ -1,6 +1,6 @@
 [package]
 name = "kiddo"
-version = "5.2.4"
+version = "5.3.0"
 edition = "2021"
 authors = ["Scott Donnelly <scott@donnel.ly>"]
 description = "A high-performance, flexible, ergonomic k-d tree library. Ideal for geo- and astro- nearest-neighbour and k-nearest-neighbor queries"
@@ -27,7 +27,7 @@ opt-level = 3
 aligned-vec = "0.6.1"
 array-init = "2.1.0"
 az = "1"
-cmov = "0.4"
+cmov = "0.5"
 divrem = "1"
 num-traits = "0.2"
 ordered-float = "5"

@@ -10,6 +10,30 @@ I'm hoping to have v6 available soon, which will include both these changes as w
 - Improve the flexibility of T type, KdTree.size. Add generate nearest_one_point (https://github.com/sdd/kiddo/pull/214, @pjkundert)
 - Fix broken test of custom struct as T. Add test for `()` as T (https://github.com/sdd/kiddo/pull/243 @pjkundert)
 
+## [5.3.0] - 2026-03-19
+
+I'm extremely grateful to @cbueth for his fantastic set of contributions to this release. The new distance metrics are a great addition to the library,
+come with extensive tests, and he was even able to contribute a big fix and some welcome refactors along the way. Thanks very much, Carlson!
+
+### ✨ Features
+
+- Add Chebyshev (L_∞ norm) distance metric (https://github.com/sdd/kiddo/pull/290, @cbueth)
+- Add Generalised Minkowski (L_p norm) distance metric (https://github.com/sdd/kiddo/pull/291, @cbueth)
+- Add `*_exclusive` methods for querying with an exclusive (`<`) rather than inclusive (`<=`) boundary check (https://github.com/sdd/kiddo/pull/294, @cbueth)
+
+### 🐛 Bug Fixes
+
+- Ensure that all existing query methods have boundary checks that are inclusive (`<=`), in line with typical k-d tree expectations (@cbueth)
+  If you were relying on these checks being exclusive, switch over to using the new `*_exclusive` variants of the query methods.
+
+### Docs
+
+- Correct a mistake in the docs for `fixed::distance::Manhattan` (https://github.com/sdd/kiddo/pull/283, @Luca-spopo)
+
+### Deps
+
+- update cmov dep from 0.4 to 0.5 (@sdd)
+
 ## [5.2.4] - 2026-01-01 (Happy New Year! 🎉)
 
 ### Deps
