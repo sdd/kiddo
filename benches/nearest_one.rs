@@ -20,7 +20,7 @@ use kiddo::traits::{Axis, AxisFixed, Content, Index};
 use rand::distr::StandardUniform;
 use rand_distr::Distribution;
 
-const BUCKET_SIZE: usize = 32;
+const BUCKET_SIZE: usize = 64;
 const QUERY_POINTS_PER_LOOP: usize = 1000;
 
 type Fxd = U8; // FixedU16<U8>;
@@ -55,30 +55,38 @@ pub fn nearest_one(c: &mut Criterion) {
     let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
     group.plot_config(plot_config);
 
-    batch_benches!(
-        group,
-        bench_float,
-        [(f64, 2), (f64, 3), (f64, 4), (f32, 3)],
-        [
-            (100, u16, u16),
-            (1_000, u16, u16),
-            (10_000, u16, u16),
-            (100_000, u32, u16),
-            (1_000_000, u32, u32)
-        ]
+    bench_query_nearest_one_float::<f64, u32, 3, u32>(
+        &mut group,
+        10_000_000,
+        QUERY_POINTS_PER_LOOP,
+        "f64 3D",
     );
-    batch_benches!(
-        group,
-        bench_fixed,
-        [(Fxd, 3)],
-        [
-            (100, u16, u16),
-            (1_000, u16, u16),
-            (10_000, u16, u16),
-            (100_000, u32, u16),
-            (1_000_000, u32, u32)
-        ]
-    );
+
+    // batch_benches!(
+    //     group,
+    //     bench_float,
+    //     [(f64, 2), (f64, 3), (f64, 4), (f32, 3)],
+    //     [
+    //         (100, u16, u16),
+    //         (1_000, u16, u16),
+    //         (10_000, u16, u16),
+    //         (100_000, u32, u16),
+    //         (1_000_000, u32, u32)
+    //     ]
+    // );
+
+    // batch_benches!(
+    //     group,
+    //     bench_fixed,
+    //     [(Fxd, 3)],
+    //     [
+    //         (100, u16, u16),
+    //         (1_000, u16, u16),
+    //         (10_000, u16, u16),
+    //         (100_000, u32, u16),
+    //         (1_000_000, u32, u32)
+    //     ]
+    // );
 
     group.finish();
 }

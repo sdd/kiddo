@@ -3,6 +3,9 @@
 //! For cross-compilation to systems with 128-byte cache lines, override with:
 //!     RUSTFLAGS="--cfg cache_line_128" cargo build --target <target>
 
+#[cfg(target_arch = "x86_64")]
+mod ultimate_f64_avx512_nearest_one_sq_euc_kernel;
+
 fn main() {
     // Register the custom cfg to avoid warnings
     println!("cargo::rustc-check-cfg=cfg(cache_line_128)");

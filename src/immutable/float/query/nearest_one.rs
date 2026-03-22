@@ -84,6 +84,7 @@ pub mod cargo_asm {
     use rand::{Rng, SeedableRng};
 
     use crate::kd_tree::leaf_strategies::FlatVec;
+    use crate::kd_tree::query_stack::QueryStack;
     use crate::kd_tree::KdTree;
     use crate::stem_strategies::*;
     use crate::traits_unified_2::SquaredEuclidean;
@@ -94,7 +95,8 @@ pub mod cargo_asm {
     type KdT = KdTree<
         f64,
         usize,
-        Donnelly<3, 64, 8, K>,
+        // Donnelly<3, 64, 8, K>,
+        Eytzinger<3>,
         FlatVec<f64, usize, K, BUCKET_SIZE>,
         K,
         BUCKET_SIZE,
@@ -102,7 +104,17 @@ pub mod cargo_asm {
 
     /// hook for cargo-asm to render a nearest-one call
     pub fn v6_nearest_one_eytzinger(tree: &KdT, query: [f64; 3]) -> (f64, usize) {
-        tree.nearest_one::<SquaredEuclidean<f64>>(&query)
+        let mut stack: QueryStack<f64, Eytzinger<3>> = QueryStack::default();
+        tree.nearest_one_with_stack::<SquaredEuclidean<f64>>(&query, &mut stack)
+    }
+
+    /// hook for cargo-asm to render the nearest-one core with a prebuilt stack
+    pub fn v6_nearest_one_eytzinger_with_stack(
+        tree: &KdT,
+        query: [f64; 3],
+        stack: &mut QueryStack<f64, Eytzinger<3>>,
+    ) -> (f64, usize) {
+        tree.nearest_one_with_stack::<SquaredEuclidean<f64>>(&query, stack)
     }
 
     // /// hook for cargo-asm to render a nearest-one call

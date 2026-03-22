@@ -40,7 +40,7 @@
 //! Add `kiddo` to `Cargo.toml`
 //! ```toml
 //! [dependencies]
-//! kiddo = "5.2.0"
+//! kiddo = "5.3.0"
 //! ```
 //!
 //! ## Usage
@@ -125,6 +125,7 @@ pub mod within_unsorted_iter;
 #[cfg(feature = "simulator")]
 pub mod cache_simulator;
 
+pub mod dist;
 pub mod distance;
 mod donnelly_stem_layout;
 pub mod kd_tree;
