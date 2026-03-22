@@ -5,8 +5,9 @@ mod construction;
 pub mod leaf_strategies;
 /// Leaf view abstraction for accessing leaf data
 pub mod leaf_view;
-#[cfg(feature = "leaf_view_chunked")]
+// #[cfg(feature = "leaf_view_chunked")]
 pub(crate) mod leaf_view_chunked;
+pub(crate) mod leaf_view_chunked_v2;
 mod query;
 mod query_orchestrator;
 pub(crate) mod query_stack;

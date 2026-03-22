@@ -25,7 +25,7 @@ unsurprisingly named `rkyv_08`. There are some caveats to Rkyv 0.8 support:
   crate only supports Rkyv 0.7 at version 2.4.1 and below, and only supports Rkyv 0.8 at versions
   2.5.0+.
 * Supporting both Rkyv 0.7 and 0.8 in the Kiddo crate at the same time is a massive pain and will add significant maintenance burden
-  going forward. As such, **this 5.2.0 version will be the only one that supports both Rkyv 0.7 and Rkyv 0.8. An upcoming version 6
+  going forward. As such, **this 5.x.x branch will be the only one that supports both Rkyv 0.7 and Rkyv 0.8. An upcoming version 6
   of Kiddo will remove support for Rkyv 0.7 entirely and only support Rkyv 0.8.** At this point the annoying non-standard `ArchivedR8`
   prefix for the rkyv 0.8 types will be dropped in favour of the default naming scheme.
 *

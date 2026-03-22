@@ -117,13 +117,11 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
         (self.points, self.items)
     }
 
-    #[cfg(feature = "leaf_view_chunked")]
     #[inline(always)]
     pub(crate) fn points(&self) -> [&'a [AX]; K] {
         self.points
     }
 
-    #[cfg(feature = "leaf_view_chunked")]
     #[inline(always)]
     pub(crate) fn items(&self) -> &'a [T] {
         self.items
@@ -166,7 +164,6 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
         D::Output: TlsLeafScratch,
         AX: 'static,
     {
-        #[cfg(feature = "leaf_view_chunked")]
         if crate::kd_tree::leaf_view_chunked::try_nearest_one_with_query_wide::<AX, T, D, K, B>(
             self, query_wide, best_dist, best_item,
         ) {

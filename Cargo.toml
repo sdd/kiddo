@@ -82,6 +82,15 @@ version = "0.9"
 optional = true
 features = ["laz-parallel"]
 
+[dependencies.log]
+version = "0.4"
+optional = true
+
+[dependencies.kiddo_v5]
+package = "kiddo"
+path = "../kiddo-v5"
+optional = true
+
 [dependencies.rand]
 version = "0.9"
 optional = true
@@ -382,6 +391,11 @@ required-features = ["csv", "serde"]
 name = "fuzz-case-repro"
 path = "src/bin/fuzz-case-repro.rs"
 required-features = ["test_utils"]
+
+[[bin]]
+name = "profile_v5_nearest_one_eytzinger"
+path = "src/bin/profile_v5_nearest_one_eytzinger.rs"
+required-features = ["profile_v5"]
 
 [build-dependencies]
 yep-cache-line-size = "0.9"

@@ -57,6 +57,18 @@ asm-m4:
 asm-k6-nearest-one-eytz:
     cargo asm --features cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=3" "kiddo::immutable::float::query::nearest_one::cargo_asm::v6_nearest_one_eytzinger_with_stack" > v6_nearest_one_eytzinger.asm
 
+asm-k6-nearest-one-eytz-v3:
+    cargo asm --features cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=3" "v6_nearest_one_eytzinger_cargo_asm_hook" > v6_nearest_one_eytzinger_v3.asm
+
+asm-k6-nearest-one-eytz-v3-core:
+    cargo asm --features cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=3" "v6_nearest_one_eytzinger_arithmetic_core_cargo_asm_hook" > v6_nearest_one_eytzinger_v3_core.asm
+
+asm-k6-nearest-one-eytz-v3-avx512:
+    cargo asm --features cargo_asm,logging_off --lib --target x86_64-apple-darwin -C="opt-level=2" -C="target-cpu=skylake-avx512" -C="target-feature=+avx512f,+avx512vl,+avx2,+fma" "v6_nearest_one_eytzinger_cargo_asm_hook" > v6_nearest_one_eytzinger_v3_avx512.asm
+
+asm-k6-nearest-one-eytz-v3-core-avx512:
+    cargo asm --features cargo_asm,logging_off --lib --target x86_64-apple-darwin -C="opt-level=2" -C="target-cpu=skylake-avx512" -C="target-feature=+avx512f,+avx512vl,+avx2,+fma" "v6_nearest_one_eytzinger_arithmetic_core_cargo_asm_hook" > v6_nearest_one_eytzinger_v3_core_avx512.asm
+
 objdump-k6-nearest-one-eytz:
     cargo objdump --release --lib --features cargo_asm,logging_off -- --disassemble-symbols="kiddo::immutable::float::query::nearest_one::cargo_asm::v6_nearest_one_eytzinger_with_stack" --demangle > v6_nearest_one_eytzinger.objdump
 

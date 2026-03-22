@@ -442,6 +442,7 @@ where
     }
 }
 
+#[allow(missing_docs)]
 #[cfg(feature = "cargo_asm")]
 pub mod cargo_asm {
     use crate::immutable::float::kdtree::ImmutableKdTree;

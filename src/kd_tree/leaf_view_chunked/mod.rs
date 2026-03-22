@@ -1,9 +1,22 @@
+mod nearest_one;
 use crate::kd_tree::leaf_view::{try_identity_widen_axis, LeafView};
-use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified};
+use crate::traits_unified_2::{
+    AxisUnified, Basics, DistanceMetricUnified as DistanceMetricUnifiedV2,
+};
 use array_init::array_init;
 use std::mem::MaybeUninit;
 
 const CHUNK_SIZE: usize = 32;
+
+/// A view into a leaf node's data.
+///
+/// Provides a unified interface for accessing leaf data regardless of the underlying
+/// storage strategy.
+#[derive(Debug)]
+pub struct LeafViewChunked<'a, AX, T, const K: usize> {
+    points: [&'a [AX]; K],
+    items: &'a [T],
+}
 
 #[inline(always)]
 pub(crate) fn try_nearest_one_with_query_wide<AX, T, D, const K: usize, const B: usize>(
@@ -15,7 +28,7 @@ pub(crate) fn try_nearest_one_with_query_wide<AX, T, D, const K: usize, const B:
 where
     AX: AxisUnified<Coord = AX> + 'static,
     T: Basics,
-    D: DistanceMetricUnified<AX, K>,
+    D: DistanceMetricUnifiedV2<AX, K>,
     D::Output: AxisUnified<Coord = D::Output> + 'static,
 {
     let points = leaf.points();
@@ -83,7 +96,7 @@ fn dists_for_chunk<A, D, const K: usize, const C: usize>(
 ) -> [D::Output; C]
 where
     A: Copy,
-    D: DistanceMetricUnified<A, K>,
+    D: DistanceMetricUnifiedV2<A, K>,
 {
     let mut acc = [const { MaybeUninit::<D::Output>::uninit() }; C];
     let acc_ptr = acc.as_mut_ptr() as *mut D::Output;
@@ -109,6 +122,82 @@ where
     }
 
     unsafe { std::ptr::read(acc.as_ptr() as *const [D::Output; C]) }
+}
+
+/// Scalar nearest-one adapter for the V3 distance-metric trait stack.
+///
+/// This path is intended to be testable on any architecture and acts as the
+/// non-SIMD baseline for the new `leaf_view_chunked` module.
+#[inline(always)]
+pub(crate) fn try_nearest_one_with_query_wide_v3<AX, T, D, const K: usize, const B: usize>(
+    leaf: &LeafView<'_, AX, T, K, B>,
+    query_wide: &[D::Output; K],
+    best_dist: &mut D::Output,
+    best_item: &mut T,
+) -> bool
+where
+    AX: AxisUnified<Coord = AX> + 'static,
+    T: Basics,
+    D: DistanceMetricUnifiedV2<AX, K>,
+    D::Output: AxisUnified<Coord = D::Output> + 'static,
+{
+    nearest_one::nearest_one_with_query_wide_fallback::<AX, T, D, K, B>(
+        leaf, query_wide, best_dist, best_item,
+    );
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::try_nearest_one_with_query_wide_v3;
+    use crate::kd_tree::leaf_view::LeafView;
+    use crate::traits_unified_2::{Manhattan, SquaredEuclidean};
+
+    #[test]
+    fn v3_scalar_nearest_one_f64_squared_euclidean() {
+        let x = [0.0f64, 2.0, 5.0, -1.0];
+        let y = [0.0f64, 1.0, 3.0, 7.0];
+        let items = [10u32, 11u32, 12u32, 13u32];
+        let leaf = LeafView::<f64, u32, 2, 32>::new([&x, &y], &items);
+
+        let query = [1.8f64, 1.2f64];
+        let mut best_dist = f64::INFINITY;
+        let mut best_item = 0u32;
+
+        let handled = try_nearest_one_with_query_wide_v3::<f64, u32, SquaredEuclidean<f64>, 2, 32>(
+            &leaf,
+            &query,
+            &mut best_dist,
+            &mut best_item,
+        );
+
+        assert!(handled);
+        assert_eq!(best_item, 11);
+        assert!((best_dist - 0.08).abs() < 1e-12);
+    }
+
+    #[test]
+    fn v3_scalar_nearest_one_f32_manhattan() {
+        let x = [0.0f32, 2.0, 5.0, -1.0];
+        let y = [0.0f32, 1.0, 3.0, 7.0];
+        let items = [20u32, 21u32, 22u32, 23u32];
+        let leaf = LeafView::<f32, u32, 2, 32>::new([&x, &y], &items);
+
+        let query = [1.8f32, 1.2f32];
+        let mut best_dist = f32::INFINITY;
+        let mut best_item = 0u32;
+
+        let handled = try_nearest_one_with_query_wide_v3::<f32, u32, Manhattan<f32>, 2, 32>(
+            &leaf,
+            &query,
+            &mut best_dist,
+            &mut best_item,
+        );
+
+        assert!(handled);
+        assert_eq!(best_item, 21);
+        assert!((best_dist - 0.4).abs() < 1e-6);
+    }
 }
 
 #[inline(always)]
