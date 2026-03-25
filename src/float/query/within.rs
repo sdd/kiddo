@@ -43,6 +43,28 @@ let mut tree: KdTree<f64, 3> = KdTree::new();
 tree.add(&[1.0, 2.0, 5.0], 100);
 tree.add(&[2.0, 3.0, 6.0], 101);"
     );
+
+    /// Finds all elements within `dist` of `query` with periodic boundary conditions.
+    ///
+    /// `box_size` gives the periodic box length for each axis. Query points are expected
+    /// to be wrapped into the same principal cell as the points stored in the tree.
+    ///
+    /// Results are returned sorted nearest-first.
+    #[inline]
+    pub fn within_periodic<D>(
+        &self,
+        query: &[A; K],
+        dist: A,
+        box_size: &[A; K],
+    ) -> Vec<NearestNeighbour<A, T>>
+    where
+        D: DistanceMetric<A, K>,
+        T: std::hash::Hash + Eq,
+    {
+        let mut matching_items = self.within_unsorted_periodic::<D>(query, dist, box_size);
+        matching_items.sort();
+        matching_items
+    }
 }
 
 #[cfg(feature = "rkyv")]
@@ -93,7 +115,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::Manhattan;
+    use crate::float::distance::{Manhattan, SquaredEuclidean};
     use crate::float::kdtree::{Axis, KdTree};
     use crate::nearest_neighbour::NearestNeighbour;
     use crate::traits::DistanceMetric;
@@ -190,6 +212,33 @@ mod tests {
 
             assert_eq!(result, expected);
         }
+    }
+
+    #[test]
+    fn can_query_items_within_periodic_boundaries() {
+        let mut tree: KdTree<f64, u32, 2, 8, u32> = KdTree::new();
+        let content_to_add = [
+            ([0.95f64, 0.50f64], 1),
+            ([0.92f64, 0.55f64], 2),
+            ([0.40f64, 0.50f64], 3),
+            ([0.10f64, 0.10f64], 4),
+        ];
+
+        for (point, item) in content_to_add {
+            tree.add(&point, item);
+        }
+
+        let query_point = [0.05f64, 0.50f64];
+        let box_size = [1.0f64, 1.0f64];
+        let radius = 0.03f64;
+
+        let result = tree.within_periodic::<SquaredEuclidean>(&query_point, radius, &box_size);
+
+        assert_eq!(result.len(), 2);
+        assert!((result[0].distance - 0.01f64).abs() < f64::EPSILON);
+        assert_eq!(result[0].item, 1);
+        assert!((result[1].distance - 0.0194f64).abs() < f64::EPSILON);
+        assert_eq!(result[1].item, 2);
     }
 
     fn linear_search<A: Axis, const K: usize>(

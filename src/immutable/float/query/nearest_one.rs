@@ -49,6 +49,79 @@ where
 
         let tree: ImmutableKdTree<f64, 3> = ImmutableKdTree::new_from_slice(&content);"
     );
+
+    /// Finds the nearest element to `query` with periodic boundary conditions.
+    ///
+    /// `box_size` gives the periodic box length for each axis. Query points are expected
+    /// to be wrapped into the same principal cell as the points stored in the tree.
+    ///
+    /// This first implementation checks all `3^K` wrapped query images and reuses the
+    /// existing nearest-neighbour search for each one.
+    #[inline]
+    pub fn nearest_one_periodic<D>(
+        &self,
+        query: &[A; K],
+        box_size: &[A; K],
+    ) -> NearestNeighbour<A, T>
+    where
+        D: DistanceMetric<A, K>,
+    {
+        box_size.iter().for_each(|axis_len| {
+            assert!(
+                *axis_len > A::zero(),
+                "periodic box sizes must be strictly positive"
+            );
+        });
+
+        let mut wrapped_query = *query;
+        let mut best = NearestNeighbour {
+            distance: A::infinity(),
+            item: T::default(),
+        };
+
+        self.nearest_one_periodic_recurse::<D>(
+            query,
+            box_size,
+            0,
+            &mut wrapped_query,
+            &mut best,
+        );
+
+        best
+    }
+
+    fn nearest_one_periodic_recurse<D>(
+        &self,
+        query: &[A; K],
+        box_size: &[A; K],
+        axis: usize,
+        wrapped_query: &mut [A; K],
+        best: &mut NearestNeighbour<A, T>,
+    ) where
+        D: DistanceMetric<A, K>,
+    {
+        if axis == K {
+            let candidate = self.nearest_one::<D>(wrapped_query);
+            if candidate.distance < best.distance {
+                *best = candidate;
+            }
+            return;
+        }
+
+        let original = query[axis];
+        let axis_len = box_size[axis];
+
+        wrapped_query[axis] = original - axis_len;
+        self.nearest_one_periodic_recurse::<D>(query, box_size, axis + 1, wrapped_query, best);
+
+        wrapped_query[axis] = original;
+        self.nearest_one_periodic_recurse::<D>(query, box_size, axis + 1, wrapped_query, best);
+
+        wrapped_query[axis] = original + axis_len;
+        self.nearest_one_periodic_recurse::<D>(query, box_size, axis + 1, wrapped_query, best);
+
+        wrapped_query[axis] = original;
+    }
 }
 
 #[cfg(feature = "rkyv")]
@@ -246,6 +319,43 @@ mod tests {
     }
 
     #[test]
+    fn can_query_nearest_one_item_with_periodic_boundaries_f64() {
+        let content_to_add = [
+            [0.95f64, 0.50f64],
+            [0.92f64, 0.55f64],
+            [0.40f64, 0.50f64],
+            [0.10f64, 0.10f64],
+        ];
+
+        let tree: ImmutableKdTree<f64, u32, 2, 8> = ImmutableKdTree::new_from_slice(&content_to_add);
+        let query_point = [0.05f64, 0.50f64];
+        let box_size = [1.0f64, 1.0f64];
+
+        let result = tree.nearest_one_periodic::<SquaredEuclidean>(&query_point, &box_size);
+        assert!((result.distance - 0.01f64).abs() < f64::EPSILON);
+        assert_eq!(result.item, 0);
+    }
+
+    #[test]
+    fn can_query_nearest_one_item_with_periodic_boundaries_large_scale_f32() {
+        const TREE_SIZE: usize = 10_000;
+        const NUM_QUERIES: usize = 200;
+
+        let content_to_add: Vec<[f32; 3]> = (0..TREE_SIZE).map(|_| rand::random::<[f32; 3]>()).collect();
+        let tree: ImmutableKdTree<f32, u32, 3, 32> = ImmutableKdTree::new_from_slice(&content_to_add);
+        let box_size = [1.0f32, 1.0f32, 1.0f32];
+        let query_points: Vec<[f32; 3]> = (0..NUM_QUERIES).map(|_| rand::random::<[f32; 3]>()).collect();
+
+        for query_point in query_points.iter() {
+            let expected = linear_search_periodic(&content_to_add, query_point, &box_size);
+            let result = tree.nearest_one_periodic::<SquaredEuclidean>(query_point, &box_size);
+
+            assert!((result.distance - expected.distance).abs() < 1e-5);
+            assert_eq!(result.item, expected.item);
+        }
+    }
+
+    #[test]
     fn can_query_nearest_one_item_large_scale_f32() {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(3);
 
@@ -293,5 +403,42 @@ mod tests {
             distance: best_dist,
             item: best_item,
         }
+    }
+
+    fn linear_search_periodic<A: Axis, const K: usize>(
+        content: &[[A; K]],
+        query_point: &[A; K],
+        box_size: &[A; K],
+    ) -> NearestNeighbour<A, u32> {
+        let mut best = NearestNeighbour {
+            distance: A::infinity(),
+            item: u32::MAX,
+        };
+
+        for (idx, point) in content.iter().enumerate() {
+            let distance = periodic_dist(query_point, point, box_size);
+            if distance < best.distance {
+                best = NearestNeighbour {
+                    distance,
+                    item: idx as u32,
+                };
+            }
+        }
+
+        best
+    }
+
+    fn periodic_dist<A: Axis, const K: usize>(
+        query: &[A; K],
+        point: &[A; K],
+        box_size: &[A; K],
+    ) -> A {
+        (0..K)
+            .map(|axis| {
+                let diff = (query[axis] - point[axis]).abs();
+                let wrapped_diff = diff.min(box_size[axis] - diff);
+                wrapped_diff * wrapped_diff
+            })
+            .fold(A::zero(), std::ops::Add::add)
     }
 }

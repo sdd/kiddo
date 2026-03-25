@@ -46,6 +46,22 @@ where
 
         let tree: ImmutableKdTree<f64, 3> = ImmutableKdTree::new_from_slice(&content);"
     );
+
+    #[inline]
+    pub fn within_periodic<D>(
+        &self,
+        query: &[A; K],
+        dist: A,
+        box_size: &[A; K],
+    ) -> Vec<NearestNeighbour<A, T>>
+    where
+        D: DistanceMetric<A, K>,
+        T: std::hash::Hash + Eq,
+    {
+        let mut matching_items = self.within_unsorted_periodic::<D>(query, dist, box_size);
+        matching_items.sort();
+        matching_items
+    }
 }
 
 #[cfg(feature = "rkyv")]
@@ -96,7 +112,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::Manhattan;
+    use crate::float::distance::{Manhattan, SquaredEuclidean};
     use crate::float::kdtree::Axis;
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use crate::traits::DistanceMetric;
@@ -195,6 +211,29 @@ mod tests {
 
             assert_eq!(result, expected);
         }
+    }
+
+    #[test]
+    fn can_query_items_within_periodic_boundaries() {
+        let content_to_add = [
+            [0.95f64, 0.50f64],
+            [0.92f64, 0.55f64],
+            [0.40f64, 0.50f64],
+            [0.10f64, 0.10f64],
+        ];
+
+        let tree: ImmutableKdTree<f64, u32, 2, 8> =
+            ImmutableKdTree::new_from_slice(&content_to_add);
+        let query_point = [0.05f64, 0.50f64];
+        let box_size = [1.0f64, 1.0f64];
+        let radius = 0.03f64;
+
+        let result = tree.within_periodic::<SquaredEuclidean>(&query_point, radius, &box_size);
+        assert_eq!(result.len(), 2);
+        assert!((result[0].distance - 0.01f64).abs() < f64::EPSILON);
+        assert_eq!(result[0].item, 0);
+        assert!((result[1].distance - 0.0194f64).abs() < f64::EPSILON);
+        assert_eq!(result[1].item, 1);
     }
 
     fn linear_search<A: Axis, const K: usize>(

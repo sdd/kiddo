@@ -62,6 +62,45 @@ assert_eq!(
     vec![(0f64, 0), (2f64, 1), (8f64, 2)]
 );
 ```
+
+## Periodic Boundary Conditions
+
+Kiddo supports periodic boundary conditions (PBCs) for float `KdTree` and `ImmutableKdTree` queries. Currently, periodic queries have a considerable performance penalty compared to non-periodic queries.
+
+Periodic queries take a `box_size` argument, where each entry is the period of one axis.
+
+```rust
+use kiddo::{KdTree, SquaredEuclidean};
+
+let mut tree: KdTree<f64, 2> = KdTree::new();
+tree.add(&[0.95, 0.50], 100);
+tree.add(&[0.40, 0.50], 101);
+
+let query = [0.05, 0.50];
+let box_size = [1.0, 1.0];
+
+let nearest = tree.nearest_one_periodic::<SquaredEuclidean>(&query, &box_size);
+assert_eq!(nearest.item, 100);
+assert!((nearest.distance - 0.01).abs() < f64::EPSILON);
+```
+
+Available periodic query methods:
+* `nearest_one_periodic`
+* `nearest_n_periodic`
+* `within_periodic`
+* `within_unsorted_periodic`
+* `nearest_n_within_periodic`
+
+The same API is available on `ImmutableKdTree`.
+
+Notes:
+* `box_size[i]` must be strictly positive for every axis
+* points are expected to be stored in a principal cell such as `[0, box_size[i])`
+* queries should also be supplied in that same cell
+* the current implementation evaluates wrapped query images, so performance cost grows with dimension as `3^K`
+
+See [examples/periodic-boundaries.rs](./examples/periodic-boundaries.rs) and [examples/immutable-periodic-boundaries.rs](./examples/immutable-periodic-boundaries.rs).
+
 See the [examples documentation](https://github.com/sdd/kiddo/tree/master/examples) for some more detailed examples.
 
 ## Optional Features

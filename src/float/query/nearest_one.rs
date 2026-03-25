@@ -58,6 +58,134 @@ where
     tree.add(&[1.0, 2.0, 5.0], 100);
     tree.add(&[2.0, 3.0, 6.0], 101);"
     );
+
+    /// Finds the nearest element to `query` with periodic boundary conditions.
+    ///
+    /// `box_size` gives the periodic box length for each axis. Query points are expected
+    /// to be wrapped into the same principal cell as the points stored in the tree.
+    ///
+    /// This first implementation checks all `3^K` wrapped query images and reuses the
+    /// existing nearest-neighbour search for each one.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use kiddo::KdTree;
+    /// use kiddo::SquaredEuclidean;
+    ///
+    /// let mut tree: KdTree<f64, 2> = KdTree::new();
+    /// tree.add(&[0.95, 0.5], 1);
+    /// tree.add(&[0.40, 0.5], 2);
+    ///
+    /// let nearest = tree.nearest_one_periodic::<SquaredEuclidean>(&[0.05, 0.5], &[1.0, 1.0]);
+    ///
+    /// assert_eq!(nearest.item, 1);
+    /// assert!((nearest.distance - 0.01).abs() < f64::EPSILON);
+    /// ```
+    #[inline]
+    pub fn nearest_one_periodic<D>(
+        &self,
+        query: &[A; K],
+        box_size: &[A; K],
+    ) -> NearestNeighbour<A, T>
+    where
+        D: DistanceMetric<A, K>,
+    {
+        self.nearest_one_periodic_point::<D>(query, box_size).0
+    }
+
+    /// Finds the nearest element to `query` with periodic boundary conditions and also
+    /// returns the coordinates of the nearest point stored in the tree.
+    #[inline]
+    pub fn nearest_one_periodic_point<D>(
+        &self,
+        query: &[A; K],
+        box_size: &[A; K],
+    ) -> (NearestNeighbour<A, T>, [A; K])
+    where
+        D: DistanceMetric<A, K>,
+    {
+        box_size.iter().for_each(|axis_len| {
+            assert!(
+                *axis_len > A::zero(),
+                "periodic box sizes must be strictly positive"
+            );
+        });
+
+        let mut wrapped_query = *query;
+        let mut best = NearestNeighbour {
+            distance: A::infinity(),
+            item: T::default(),
+        };
+        let mut best_point = [A::zero(); K];
+
+        self.nearest_one_periodic_point_recurse::<D>(
+            query,
+            box_size,
+            0,
+            &mut wrapped_query,
+            &mut best,
+            &mut best_point,
+        );
+
+        (best, best_point)
+    }
+
+    fn nearest_one_periodic_point_recurse<D>(
+        &self,
+        query: &[A; K],
+        box_size: &[A; K],
+        axis: usize,
+        wrapped_query: &mut [A; K],
+        best: &mut NearestNeighbour<A, T>,
+        best_point: &mut [A; K],
+    ) where
+        D: DistanceMetric<A, K>,
+    {
+        if axis == K {
+            let (candidate, candidate_point) = self.nearest_one_point::<D>(wrapped_query);
+            if candidate.distance < best.distance {
+                *best = candidate;
+                best_point.copy_from_slice(&candidate_point);
+            }
+            return;
+        }
+
+        let original = query[axis];
+        let axis_len = box_size[axis];
+
+        wrapped_query[axis] = original - axis_len;
+        self.nearest_one_periodic_point_recurse::<D>(
+            query,
+            box_size,
+            axis + 1,
+            wrapped_query,
+            best,
+            best_point,
+        );
+
+        wrapped_query[axis] = original;
+        self.nearest_one_periodic_point_recurse::<D>(
+            query,
+            box_size,
+            axis + 1,
+            wrapped_query,
+            best,
+            best_point,
+        );
+
+        wrapped_query[axis] = original + axis_len;
+        self.nearest_one_periodic_point_recurse::<D>(
+            query,
+            box_size,
+            axis + 1,
+            wrapped_query,
+            best,
+            best_point,
+        );
+
+        wrapped_query[axis] = original;
+    }
 }
 
 #[cfg(feature = "rkyv")]
@@ -110,7 +238,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::float::distance::Manhattan;
+    use crate::float::distance::{Manhattan, SquaredEuclidean};
     use crate::float::kdtree::{Axis, KdTree};
     use crate::nearest_neighbour::NearestNeighbour;
     use crate::traits::DistanceMetric;
@@ -202,6 +330,68 @@ mod tests {
         }
     }
 
+    #[test]
+    fn can_query_nearest_one_item_with_periodic_boundaries() {
+        let mut tree: KdTree<f64, u32, 2, 8, u32> = KdTree::new();
+        let content_to_add = [
+            ([0.95f64, 0.50f64], 1),
+            ([0.40f64, 0.50f64], 2),
+            ([0.10f64, 0.10f64], 3),
+            ([0.75f64, 0.90f64], 4),
+        ];
+
+        for (point, item) in content_to_add {
+            tree.add(&point, item);
+        }
+
+        let query_point = [0.05f64, 0.50f64];
+        let box_size = [1.0f64, 1.0f64];
+
+        let expected = NearestNeighbour {
+            distance: 0.01f64,
+            item: 1,
+        };
+
+        let result = tree.nearest_one_periodic::<SquaredEuclidean>(&query_point, &box_size);
+        assert!((result.distance - expected.distance).abs() < f64::EPSILON);
+        assert_eq!(result.item, expected.item);
+
+        let (result, result_point) =
+            tree.nearest_one_periodic_point::<SquaredEuclidean>(&query_point, &box_size);
+        assert!((result.distance - expected.distance).abs() < f64::EPSILON);
+        assert_eq!(result.item, expected.item);
+        assert_eq!(result_point, [0.95f64, 0.50f64]);
+    }
+
+    #[test]
+    fn can_query_nearest_one_item_with_periodic_boundaries_large_scale() {
+        const TREE_SIZE: usize = 10_000;
+        const NUM_QUERIES: usize = 200;
+
+        let content_to_add: Vec<([f32; 3], u32)> = (0..TREE_SIZE)
+            .map(|_| rand::random::<([f32; 3], u32)>())
+            .collect();
+
+        let mut tree: KdTree<f32, u32, 3, 32, u32> = KdTree::with_capacity(TREE_SIZE);
+        content_to_add
+            .iter()
+            .for_each(|(point, content)| tree.add(point, *content));
+
+        let box_size = [1.0f32, 1.0f32, 1.0f32];
+        let query_points: Vec<[f32; 3]> = (0..NUM_QUERIES)
+            .map(|_| rand::random::<[f32; 3]>())
+            .collect();
+
+        for query_point in query_points {
+            let expected =
+                linear_search_periodic::<SquaredEuclidean, _, 3>(&content_to_add, &query_point, &box_size);
+            let result = tree.nearest_one_periodic::<SquaredEuclidean>(&query_point, &box_size);
+
+            assert!((result.distance - expected.distance).abs() < 1e-5);
+            assert_eq!(result.item, expected.item);
+        }
+    }
+
     fn linear_search<A: Axis, const K: usize>(
         content: &[([A; K], u32)],
         query_point: &[A; K],
@@ -221,5 +411,47 @@ mod tests {
             distance: best_dist,
             item: best_item,
         }
+    }
+
+    fn linear_search_periodic<D, A: Axis, const K: usize>(
+        content: &[([A; K], u32)],
+        query_point: &[A; K],
+        box_size: &[A; K],
+    ) -> NearestNeighbour<A, u32>
+    where
+        D: DistanceMetric<A, K>,
+    {
+        let mut best = NearestNeighbour {
+            distance: A::infinity(),
+            item: u32::MAX,
+        };
+
+        for &(point, item) in content {
+            let distance = periodic_dist::<D, _, K>(query_point, &point, box_size);
+            if distance < best.distance {
+                best = NearestNeighbour { distance, item };
+            }
+        }
+
+        best
+    }
+
+    fn periodic_dist<D, A: Axis, const K: usize>(
+        query: &[A; K],
+        point: &[A; K],
+        box_size: &[A; K],
+    ) -> A
+    where
+        D: DistanceMetric<A, K>,
+    {
+        let wrapped: [A; K] = std::array::from_fn(|axis| {
+            let diff = (query[axis] - point[axis]).abs();
+            diff.min(box_size[axis] - diff)
+        });
+
+        wrapped
+            .into_iter()
+            .map(|axis_dist| D::dist1(axis_dist, A::zero()))
+            .fold(A::zero(), std::ops::Add::add)
     }
 }
