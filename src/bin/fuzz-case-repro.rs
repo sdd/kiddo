@@ -857,7 +857,7 @@ fn run_v6_mutable_case_f32<const K: usize, const B: usize, SO>(
     params: &ReproParams,
 ) -> Result<(), String>
 where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
 {
     let cfg = fuzz_config_from_env();
     let points = generate_points_f32::<K>(params, cfg)?;
@@ -910,7 +910,8 @@ fn run_v6_mutable_case_f64<const K: usize, const B: usize, SO>(
     params: &ReproParams,
 ) -> Result<(), String>
 where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f64>: 'static,
 {
     let cfg = fuzz_config_from_env();
     let points = generate_points_f64::<K>(params, cfg)?;
@@ -963,7 +964,7 @@ fn run_v6_immutable_case_f32<const K: usize, const B: usize, SO>(
     params: &ReproParams,
 ) -> Result<(), String>
 where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
 {
     let cfg = fuzz_config_from_env();
     let points = generate_points_f32::<K>(params, cfg)?;
@@ -1013,7 +1014,7 @@ fn run_v6_immutable_case_f64<const K: usize, const B: usize, SO>(
     params: &ReproParams,
 ) -> Result<(), String>
 where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
 {
     let cfg = fuzz_config_from_env();
     let points = generate_points_f64::<K>(params, cfg)?;

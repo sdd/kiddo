@@ -314,6 +314,7 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
         })
     }
 
+    #[allow(dead_code)]
     #[cfg_attr(not(feature = "no_inline"), inline)]
     pub(crate) fn update_nearest_dist<O>(
         dists: &[O],

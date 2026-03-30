@@ -2,7 +2,6 @@
 #![allow(clippy::too_many_arguments)]
 
 use std::arch::x86_64::*;
-use std::mem::MaybeUninit;
 
 pub const CHUNK_SIZE: usize = 32;
 
@@ -89,9 +88,18 @@ unsafe fn dists_for_chunk_nozero_fma_x4(
                 // stem data cache-resident, rather than replacing them in
                 // the cache with leaf data that is unlikely to be re-loaded
                 // any time soon
-                _mm_prefetch(axis0.as_ptr().add(p) as *const i8, _MM_HINT_NTA);
-                _mm_prefetch(axis1.as_ptr().add(p) as *const i8, _MM_HINT_NTA);
-                _mm_prefetch(axis2.as_ptr().add(p) as *const i8, _MM_HINT_NTA);
+                _mm_prefetch(
+                    axis0.as_ptr().add(base + $off * 8) as *const i8,
+                    _MM_HINT_NTA,
+                );
+                _mm_prefetch(
+                    axis1.as_ptr().add(base + $off * 8) as *const i8,
+                    _MM_HINT_NTA,
+                );
+                _mm_prefetch(
+                    axis2.as_ptr().add(base + $off * 8) as *const i8,
+                    _MM_HINT_NTA,
+                );
             }
 
             let a0 = _mm512_loadu_pd(axis0.as_ptr().add(base + $off * 8));

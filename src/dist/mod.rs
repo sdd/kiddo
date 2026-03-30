@@ -1,14 +1,27 @@
+/// AVX2 distance metric trait
 #[cfg(all(feature = "simd", target_feature = "avx2"))]
 pub mod distance_metric_avx2;
+
+/// AVX512 distance metric trait
 #[cfg(all(feature = "simd", target_feature = "avx512f"))]
 pub mod distance_metric_avx512;
+
+/// Core distance metric trait
 pub mod distance_metric_core;
+
+/// NEON distance metric trait
 #[cfg(all(feature = "simd", target_feature = "neon"))]
 pub mod distance_metric_neon;
 
+/// Dot Product distance metric
 pub mod dot_product;
+
+/// Manhattan distance metric
 pub mod manhattan;
+
+/// Squared Euclidean distance metric
 pub mod squared_euclidean;
+
 mod traits_unified_2_adapters;
 
 pub use distance_metric_core::DistanceMetricCore;
@@ -31,6 +44,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
     /// Whether a specialized AVX512 path is provided by this metric impl.
     const HAS_AVX512_SPECIALIZATION: bool = false;
 
+    /// Type that provides implementations of the AVX512 leaf ops
     #[cfg(all(feature = "simd", target_feature = "avx512f"))]
     type Avx512F64Ops: distance_metric_avx512::Avx512F64LeafOps;
 }
@@ -40,6 +54,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
     /// Whether a specialized AVX2 path is provided by this metric impl.
     const HAS_AVX2_SPECIALIZATION: bool = false;
 
+    /// Type that provides implementations of the AVX2 leaf ops
     #[cfg(all(feature = "simd", target_feature = "avx2"))]
     type Avx2LeafOps: distance_metric_avx2::Avx2LeafOps;
 }
@@ -49,6 +64,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     /// Whether a specialized NEON path is provided by this metric impl.
     const HAS_NEON_SPECIALIZATION: bool = false;
 
+    /// Type that provides implementations of the NEON leaf ops
     #[cfg(all(feature = "simd", target_feature = "neon"))]
     type NeonLeafOps: distance_metric_neon::NeonLeafOps;
 }

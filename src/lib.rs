@@ -125,6 +125,7 @@ pub mod within_unsorted_iter;
 #[cfg(feature = "simulator")]
 pub mod cache_simulator;
 
+/// Distance metrics
 pub mod dist;
 pub mod distance;
 mod donnelly_stem_layout;
