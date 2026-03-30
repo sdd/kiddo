@@ -791,7 +791,8 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
     label: &str,
     meta: ReproMeta,
 ) where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f32>: 'static,
 {
     let mut progress = ProgressReporter::new(label, cfg.cases, cfg.query_count);
     for case_idx in 0..cfg.cases {
@@ -1168,7 +1169,8 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
     label: &str,
     meta: ReproMeta,
 ) where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f64>: 'static,
 {
     let mut progress = ProgressReporter::new(label, cfg.cases, cfg.query_count);
     for case_idx in 0..cfg.cases {
@@ -1545,7 +1547,8 @@ fn run_immutable_case_f32<const K: usize, const B: usize, SO>(
     label: &str,
     meta: ReproMeta,
 ) where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f32>: 'static,
 {
     let mut progress = ProgressReporter::new(label, cfg.cases, cfg.query_count);
     for case_idx in 0..cfg.cases {
@@ -1918,7 +1921,8 @@ fn run_immutable_case_f64<const K: usize, const B: usize, SO>(
     label: &str,
     meta: ReproMeta,
 ) where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f64>: 'static,
 {
     let mut progress = ProgressReporter::new(label, cfg.cases, cfg.query_count);
     for case_idx in 0..cfg.cases {
@@ -3010,7 +3014,8 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
     query: &[f32; 2],
     context: &str,
 ) where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f32>: 'static,
     LS: LeafStrategy<f32, usize, SO, 2, B>,
 {
     let max_qty = ADVERSARIAL_MAX_QTY;
@@ -3240,7 +3245,8 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
     query: &[f64; 2],
     context: &str,
 ) where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f64>: 'static,
     LS: LeafStrategy<f64, usize, SO, 2, B>,
 {
     let max_qty = ADVERSARIAL_MAX_QTY;
@@ -3465,7 +3471,8 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
 
 fn run_adversarial_immutable_f32<SO>(label: &str)
 where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f32>: 'static,
 {
     let queries = adversarial_queries_f32();
 
@@ -3509,7 +3516,8 @@ where
 
 fn run_adversarial_mutable_f32<SO>(label: &str)
 where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f32>: 'static,
 {
     let queries = adversarial_queries_f32();
 
@@ -3584,7 +3592,8 @@ where
 #[cfg(feature = "simd")]
 fn run_adversarial_immutable_f64<SO>(label: &str)
 where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f64>: 'static,
 {
     let queries = adversarial_queries_f64();
 
@@ -3655,7 +3664,8 @@ fn assert_approx_invariants_f32<SO, LS, const B: usize>(
     query: &[f32; 2],
     context: &str,
 ) where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f32>: 'static,
     LS: LeafStrategy<f32, usize, SO, 2, B>,
 {
     if entries.is_empty() {
@@ -3756,7 +3766,8 @@ fn assert_approx_invariants_f64<SO, LS, const B: usize>(
     query: &[f64; 2],
     context: &str,
 ) where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f64>: 'static,
     LS: LeafStrategy<f64, usize, SO, 2, B>,
 {
     if entries.is_empty() {
@@ -3852,7 +3863,8 @@ fn assert_approx_invariants_f64<SO, LS, const B: usize>(
 
 fn run_approx_hard_immutable_f32<SO>(label: &str)
 where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f32>: 'static,
 {
     let queries = adversarial_queries_f32();
     for &size in &ADVERSARIAL_SIZES {
@@ -3892,7 +3904,8 @@ where
 
 fn run_approx_hard_mutable_f32<SO>(label: &str)
 where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f32>: 'static,
 {
     let queries = adversarial_queries_f32();
     for &size in &ADVERSARIAL_SIZES {
@@ -3963,7 +3976,8 @@ where
 #[cfg(feature = "simd")]
 fn run_approx_hard_immutable_f64<SO>(label: &str)
 where
-    SO: StemStrategy,
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f64>: 'static,
 {
     let queries = adversarial_queries_f64();
     for &size in &ADVERSARIAL_SIZES {

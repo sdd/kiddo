@@ -550,7 +550,12 @@ where
         )
     }
 
-    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[cfg(all(
+        feature = "simd",
+        target_arch = "x86_64",
+        target_feature = "avx2",
+        not(target_feature = "avx512f")
+    ))]
     #[inline(always)]
     unsafe fn backtrack_block3_avx2(
         query_wide: f64,
@@ -635,7 +640,12 @@ where
         )
     }
 
-    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[cfg(all(
+        feature = "simd",
+        target_arch = "x86_64",
+        target_feature = "avx2",
+        not(target_feature = "avx512f")
+    ))]
     #[inline(always)]
     unsafe fn backtrack_block4_avx2(
         query_wide: f64,
@@ -720,7 +730,12 @@ where
         )
     }
 
-    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[cfg(all(
+        feature = "simd",
+        target_arch = "x86_64",
+        target_feature = "avx2",
+        not(target_feature = "avx512f")
+    ))]
     #[inline(always)]
     unsafe fn backtrack_block3_avx2(
         query_wide: f32,
@@ -805,7 +820,12 @@ where
         )
     }
 
-    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[cfg(all(
+        feature = "simd",
+        target_arch = "x86_64",
+        target_feature = "avx2",
+        not(target_feature = "avx512f")
+    ))]
     #[inline(always)]
     unsafe fn backtrack_block4_avx2(
         query_wide: f32,
@@ -890,7 +910,12 @@ where
         )
     }
 
-    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[cfg(all(
+        feature = "simd",
+        target_arch = "x86_64",
+        target_feature = "avx2",
+        not(target_feature = "avx512f")
+    ))]
     #[inline(always)]
     unsafe fn backtrack_block3_avx2(
         query_wide: f64,
@@ -975,7 +1000,12 @@ where
         )
     }
 
-    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[cfg(all(
+        feature = "simd",
+        target_arch = "x86_64",
+        target_feature = "avx2",
+        not(target_feature = "avx512f")
+    ))]
     #[inline(always)]
     unsafe fn backtrack_block4_avx2(
         query_wide: f64,
@@ -1060,7 +1090,12 @@ where
         )
     }
 
-    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[cfg(all(
+        feature = "simd",
+        target_arch = "x86_64",
+        target_feature = "avx2",
+        not(target_feature = "avx512f")
+    ))]
     #[inline(always)]
     unsafe fn backtrack_block3_avx2(
         query_wide: f32,
@@ -1145,7 +1180,12 @@ where
         )
     }
 
-    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[cfg(all(
+        feature = "simd",
+        target_arch = "x86_64",
+        target_feature = "avx2",
+        not(target_feature = "avx512f")
+    ))]
     #[inline(always)]
     unsafe fn backtrack_block4_avx2(
         query_wide: f32,
