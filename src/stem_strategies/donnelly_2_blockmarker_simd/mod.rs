@@ -1066,6 +1066,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dist::SquaredEuclidean;
 
     fn build_test_block3_pivots_f64() -> [f64; 8] {
         [0.2, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f64::INFINITY]

@@ -4,11 +4,22 @@ use core::arch::x86_64::{__m256d, __m512d};
 ///
 /// Mirrors the shape used by the hand-tuned `ultimate_*` AVX512 kernel.
 pub trait Avx512F64LeafOps {
+    /// calculate distance on 8 f64's at once (dimension 0, ie set initial accumulator value)
     unsafe fn dist_k0_f64x8(delta: __m512d) -> __m512d;
+
+    /// calculate distance on 8 f64's at once (dimensions 1+, ie add to accumulator)
     unsafe fn dist_kn_f64x8(acc: __m512d, delta: __m512d) -> __m512d;
+
+    /// calculate distance on 4 f64's at once (dimension 0, ie set initial accumulator value)
     unsafe fn dist_k0_f64x4(delta: __m256d) -> __m256d;
+
+    /// calculate distance on 4 f64's at once (dimensions 1+, ie add to accumulator)
     unsafe fn dist_kn_f64x4(acc: __m256d, delta: __m256d) -> __m256d;
+
+    /// calculate distance on scalar f64 (dimension 0, ie set initial accumulator value)
     fn dist_k0_f64x1(delta: f64) -> f64;
+
+    /// calculate distance on scalar f64 (dimensions 1+, ie add to accumulator)
     fn dist_kn_f64x1(acc: f64, delta: f64) -> f64;
 }
 
@@ -16,31 +27,37 @@ pub trait Avx512F64LeafOps {
 pub struct UnsupportedAvx512F64LeafOps;
 
 impl Avx512F64LeafOps for UnsupportedAvx512F64LeafOps {
+    /// calculate distance on 8 f64's at once (dimension 0, ie set initial accumulator value)
     #[inline(always)]
     unsafe fn dist_k0_f64x8(_delta: __m512d) -> __m512d {
         panic!("AVX512 f64 leaf ops are not implemented for this metric")
     }
 
+    /// calculate distance on 8 f64's at once (dimensions 1+, ie add to accumulator)
     #[inline(always)]
     unsafe fn dist_kn_f64x8(_acc: __m512d, _delta: __m512d) -> __m512d {
         panic!("AVX512 f64 leaf ops are not implemented for this metric")
     }
 
+    /// calculate distance on 4 f64's at once (dimension 0, ie set initial accumulator value)
     #[inline(always)]
     unsafe fn dist_k0_f64x4(_delta: __m256d) -> __m256d {
         panic!("AVX512 f64 leaf ops are not implemented for this metric")
     }
 
+    /// calculate distance on 4 f64's at once (dimensions 1+, ie add to accumulator)
     #[inline(always)]
     unsafe fn dist_kn_f64x4(_acc: __m256d, _delta: __m256d) -> __m256d {
         panic!("AVX512 f64 leaf ops are not implemented for this metric")
     }
 
+    /// calculate distance on scalar f64 (dimension 0, ie set initial accumulator value)
     #[inline(always)]
     fn dist_k0_f64x1(_delta: f64) -> f64 {
         panic!("AVX512 f64 leaf ops are not implemented for this metric")
     }
 
+    /// calculate distance on scalar f64 (dimensions 1+, ie add to accumulator)
     #[inline(always)]
     fn dist_kn_f64x1(_acc: f64, _delta: f64) -> f64 {
         panic!("AVX512 f64 leaf ops are not implemented for this metric")

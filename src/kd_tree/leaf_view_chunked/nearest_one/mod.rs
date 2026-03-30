@@ -6,8 +6,8 @@ mod avx512;
 use crate::kd_tree::leaf_view::LeafView;
 use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified};
 
-#[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
-pub(crate) use avx512::nearest_one_avx512_unchecked;
+// #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+// pub(crate) use avx512::nearest_one_avx512_unchecked;
 
 pub(crate) use fallback::nearest_one_with_query_wide_fallback;
 

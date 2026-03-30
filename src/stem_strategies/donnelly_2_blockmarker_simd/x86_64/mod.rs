@@ -9,7 +9,7 @@ pub mod avx512;
 
 // Re-export comparison functions based on available features
 #[cfg(target_feature = "avx512f")]
-pub use avx512::{compare_block3_f64_avx512, compare_block4_f32_avx512};
+pub use avx512::{compare_block3_f32_avx512, compare_block3_f64_avx512, compare_block4_f32_avx512};
 
 #[cfg(all(target_feature = "avx2", not(target_feature = "avx512f")))]
 pub use avx2::{compare_block3_f32_avx2, compare_block3_f64_avx2, compare_block4_f32_avx2};
