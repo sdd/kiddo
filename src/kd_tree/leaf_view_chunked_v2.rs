@@ -8,6 +8,7 @@ use crate::traits_unified_2::{
 ///
 /// This is a direct leaf kernel (no orchestrator traversal logic) and is intended
 /// as the baseline/fallback path for V3 integration.
+#[allow(unused)]
 #[inline(always)]
 pub(crate) fn nearest_one_scalar_with_query_wide<AX, T, D, const K: usize, const B: usize>(
     leaf: LeafView<'_, AX, T, K, B>,
@@ -71,6 +72,7 @@ pub(crate) fn nearest_one_scalar_with_query_wide<AX, T, D, const K: usize, const
 
 /// Scalar nearest-one leaf processing entrypoint compatible with the existing
 /// V2 `DistanceMetricUnified` query path.
+#[allow(unused)]
 #[inline(always)]
 pub(crate) fn nearest_one_scalar_with_query_wide_v2<AX, T, D, const K: usize, const B: usize>(
     leaf: LeafView<'_, AX, T, K, B>,

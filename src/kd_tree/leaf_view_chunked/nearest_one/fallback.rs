@@ -1,4 +1,4 @@
-use crate::kd_tree::leaf_view::{try_identity_widen_axis, LeafView};
+use crate::kd_tree::leaf_view::{try_identity_widen_axis, LeafArena, LeafView};
 use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified};
 
 #[inline(always)]
@@ -55,5 +55,61 @@ pub(crate) fn nearest_one_with_query_wide_fallback<AX, T, D, const K: usize, con
             *best_dist = dist;
             *best_item = unsafe { *items.get_unchecked(idx) };
         }
+    }
+}
+
+#[inline(always)]
+pub(crate) fn nearest_one_with_query_wide_arena_fallback<AX, T, D, const K: usize>(
+    arena: &LeafArena<'_, AX, T, K>,
+    query_wide: &[D::Output; K],
+    best_dist: &mut D::Output,
+    best_item: &mut T,
+) where
+    AX: AxisUnified<Coord = AX> + 'static,
+    T: Basics,
+    D: DistanceMetricUnified<AX, K>,
+    D::Output: AxisUnified<Coord = D::Output> + 'static,
+{
+    if arena.is_empty() {
+        return;
+    }
+
+    arena.for_each_tiled_chunk(|tile| {
+        for idx in 0..tile.len() {
+            let mut dist = D::Output::zero();
+
+            for dim in 0..K {
+                let coord = unsafe { tile.point_unaligned(dim, idx) };
+                dist += D::dist1(D::widen_coord(coord), unsafe {
+                    *query_wide.get_unchecked(dim)
+                });
+            }
+
+            if dist < *best_dist {
+                *best_dist = dist;
+                *best_item = unsafe { tile.item_unaligned(idx) };
+            }
+        }
+    });
+}
+
+#[cfg(feature = "cargo_asm")]
+pub mod cargo_asm {
+    use super::nearest_one_with_query_wide_arena_fallback;
+    use crate::dist::SquaredEuclidean;
+    use crate::kd_tree::leaf_view::LeafArena;
+
+    /// Hook for cargo-asm to render the scalar arena nearest-one fallback directly.
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_nearest_one_with_query_wide_arena_fallback_cargo_asm_hook(
+        arena: &LeafArena<'_, f64, usize, 3>,
+        query: [f64; 3],
+        best_dist: &mut f64,
+        best_item: &mut usize,
+    ) {
+        nearest_one_with_query_wide_arena_fallback::<f64, usize, SquaredEuclidean<f64>, 3>(
+            arena, &query, best_dist, best_item,
+        );
     }
 }

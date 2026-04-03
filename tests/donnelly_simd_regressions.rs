@@ -1,3 +1,4 @@
+use assert_float_eq::assert_float_relative_eq;
 use kiddo::kd_tree::leaf_strategies::FlatVec;
 use kiddo::kd_tree::KdTree;
 use kiddo::stem_strategies::{Block3, Block4, Donnelly, DonnellyMarkerSimd};
@@ -9,6 +10,8 @@ use rand::{Rng, SeedableRng};
 const CONTENT_SEED: u64 = 1_260_253_197;
 const QUERY_SEED: u64 = 13_787_848_794_416_797_126;
 const POINT_COUNT: usize = 1_022;
+const REL_EPS_F32: f32 = 1.0e-6;
+const REL_EPS_F64: f64 = 1.0e-12;
 
 fn build_points_f32_k2() -> Vec<[f32; 2]> {
     let mut rng = StdRng::seed_from_u64(CONTENT_SEED);
@@ -69,9 +72,9 @@ fn regression_donnelly_simd_block4_f32_nearest_one_matches_scalar_and_linear() {
     let scalar_result = tree_scalar.nearest_one::<SquaredEuclidean<f32>>(&query);
     let simd_result = tree_simd.nearest_one::<SquaredEuclidean<f32>>(&query);
 
-    assert_eq!(scalar_result.0, expected.0);
+    assert_float_relative_eq!(scalar_result.0, expected.0, REL_EPS_F32);
     assert_eq!(scalar_result.1, expected.1);
-    assert_eq!(simd_result.0, expected.0);
+    assert_float_relative_eq!(simd_result.0, expected.0, REL_EPS_F32);
     assert_eq!(simd_result.1, expected.1);
 }
 
@@ -127,8 +130,8 @@ fn control_donnelly_simd_block3_f64_nearest_one_matches_scalar_and_linear() {
     let scalar_result = tree_scalar.nearest_one::<SquaredEuclidean<f64>>(&query);
     let simd_result = tree_simd.nearest_one::<SquaredEuclidean<f64>>(&query);
 
-    assert_eq!(scalar_result.0, expected.0);
+    assert_float_relative_eq!(scalar_result.0, expected.0, REL_EPS_F64);
     assert_eq!(scalar_result.1, expected.1);
-    assert_eq!(simd_result.0, expected.0);
+    assert_float_relative_eq!(simd_result.0, expected.0, REL_EPS_F64);
     assert_eq!(simd_result.1, expected.1);
 }

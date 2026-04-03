@@ -26,6 +26,16 @@ impl Avx512F64LeafOps for SquaredEuclideanAvx512F64LeafOps {
     }
 
     #[inline(always)]
+    unsafe fn dist_k0_f64x2(delta: __m128d) -> __m128d {
+        _mm_mul_pd(delta, delta)
+    }
+
+    #[inline(always)]
+    unsafe fn dist_kn_f64x2(acc: __m128d, delta: __m128d) -> __m128d {
+        _mm_fmadd_pd(delta, delta, acc)
+    }
+
+    #[inline(always)]
     fn dist_k0_f64x1(delta: f64) -> f64 {
         delta * delta
     }

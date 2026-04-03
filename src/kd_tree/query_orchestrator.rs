@@ -1,4 +1,3 @@
-use crate::kd_tree::leaf_view::LeafView;
 use crate::kd_tree::query_stack::{
     scalar_ctx_from_parts, scalar_ctx_into_parts, QueryStack, StackTrait,
 };
@@ -55,18 +54,14 @@ where
 
     /// Non-backtracking query
     #[inline]
-    pub(crate) fn straight_query<QC, O>(
-        &self,
-        query_ctx: QC,
-        mut process_leaf: impl FnMut(&LeafView<A, T, K, B>),
-    ) where
+    pub(crate) fn straight_query<QC, O>(&self, query_ctx: QC, mut process_leaf: impl FnMut(usize))
+    where
         QC: QueryContext<A, O, K>,
     {
         let leaf_idx = LS::Mutability::get_leaf_idx(self, query_ctx.query());
 
         tracing::trace!(%leaf_idx, "processing leaf");
-        let leaf_view = self.leaves.leaf_view(leaf_idx);
-        process_leaf(&leaf_view);
+        process_leaf(leaf_idx);
     }
 
     /// Get the leaf index for a query (unmapped leaves)
@@ -109,6 +104,7 @@ where
         }
     }
 
+    #[allow(unused)]
     #[inline(always)]
     fn subtree_may_contain_leaf(
         &self,
@@ -150,7 +146,7 @@ where
     pub(crate) fn backtracking_query<QC, O, D>(
         &self,
         query_ctx: &mut QC,
-        process_leaf: impl FnMut(&LeafView<A, T, K, B>, &[O; K], &mut QC),
+        process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
         O: AxisUnified<Coord = O> + SimdPrune + BacktrackBlock3 + BacktrackBlock4,
@@ -171,7 +167,7 @@ where
         &self,
         query_ctx: &mut QC,
         stack: &mut SS::Stack<O>,
-        process_leaf: impl FnMut(&LeafView<A, T, K, B>, &[O; K], &mut QC),
+        process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
         O: AxisUnified<Coord = O> + SimdPrune + BacktrackBlock3 + BacktrackBlock4,
@@ -196,7 +192,7 @@ where
         &self,
         query_ctx: &mut QC,
         stack: &mut QueryStack<O, SS>,
-        mut process_leaf: impl FnMut(&LeafView<A, T, K, B>, &[O; K], &mut QC),
+        mut process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
         O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
@@ -258,8 +254,7 @@ where
                 stack,
             ) {
                 tracing::trace!(%leaf_idx, "processing leaf");
-                let leaf_view = self.leaves.leaf_view(leaf_idx);
-                process_leaf(&leaf_view, &query_wide, query_ctx);
+                process_leaf(leaf_idx, &query_wide, query_ctx);
             }
         }
     }
@@ -341,7 +336,7 @@ where
         &self,
         query_ctx: &mut QC,
         stack: &mut crate::kd_tree::query_stack_simd::SimdQueryStack<O, SS>,
-        mut process_leaf: impl FnMut(&LeafView<A, T, K, B>, &[O; K], &mut QC),
+        mut process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
         O: AxisUnified<Coord = O> + SimdPrune + BacktrackBlock3 + BacktrackBlock4,
@@ -410,8 +405,7 @@ where
                         stack,
                     ) {
                         tracing::trace!(%leaf_idx, "processing leaf");
-                        let leaf_view = self.leaves.leaf_view(leaf_idx);
-                        process_leaf(&leaf_view, &query_wide, query_ctx);
+                        process_leaf(leaf_idx, &query_wide, query_ctx);
                     }
                 }
                 SimdQueryStackContext::Block {
@@ -493,8 +487,7 @@ where
                                 stack,
                             ) {
                                 tracing::trace!(%leaf_idx, "processing leaf");
-                                let leaf_view = self.leaves.leaf_view(leaf_idx);
-                                process_leaf(&leaf_view, &query_wide, query_ctx);
+                                process_leaf(leaf_idx, &query_wide, query_ctx);
                             }
                         }
                     }

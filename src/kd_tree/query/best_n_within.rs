@@ -44,7 +44,8 @@ where
             results: BinaryHeap::with_capacity(max_qty),
         };
 
-        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf, query_wide, req_ctx| {
+        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
+            let leaf = self.leaves.leaf_view(leaf_idx);
             leaf.best_n_within_with_query_wide::<D>(query_wide, max_dist, &mut req_ctx.results);
         });
 

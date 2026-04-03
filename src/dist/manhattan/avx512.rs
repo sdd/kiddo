@@ -13,6 +13,12 @@ unsafe fn abs_pd_256(x: __m256d) -> __m256d {
     _mm256_andnot_pd(sign, x)
 }
 
+#[inline(always)]
+unsafe fn abs_pd_128(x: __m128d) -> __m128d {
+    let sign = _mm_set1_pd(-0.0);
+    _mm_andnot_pd(sign, x)
+}
+
 pub struct ManhattanAvx512F64LeafOps;
 
 impl Avx512F64LeafOps for ManhattanAvx512F64LeafOps {
@@ -34,6 +40,16 @@ impl Avx512F64LeafOps for ManhattanAvx512F64LeafOps {
     #[inline(always)]
     unsafe fn dist_kn_f64x4(acc: __m256d, delta: __m256d) -> __m256d {
         _mm256_add_pd(acc, abs_pd_256(delta))
+    }
+
+    #[inline(always)]
+    unsafe fn dist_k0_f64x2(delta: __m128d) -> __m128d {
+        abs_pd_128(delta)
+    }
+
+    #[inline(always)]
+    unsafe fn dist_kn_f64x2(acc: __m128d, delta: __m128d) -> __m128d {
+        _mm_add_pd(acc, abs_pd_128(delta))
     }
 
     #[inline(always)]
