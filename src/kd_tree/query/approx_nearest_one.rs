@@ -1,4 +1,4 @@
-use crate::kd_tree::leaf_view::TlsLeafScratch;
+use crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, LeafStrategy};
@@ -11,30 +11,54 @@ where
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
+    #[inline(always)]
+    fn process_leaf_approx_nearest_one<D>(
+        &self,
+        leaf_idx: usize,
+        query_wide: &[D::Output; K],
+        best_dist: &mut D::Output,
+        best_item: &mut T,
+    ) where
+        D: DistanceMetricUnified<A, K, Output = A>,
+    {
+        if let Some(arena) = self.leaves.leaf_arena(leaf_idx) {
+            crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide_arena::<
+                A,
+                T,
+                D,
+                K,
+            >(&arena, query_wide, best_dist, best_item);
+            return;
+        }
+
+        let leaf = self.leaves.leaf_view(leaf_idx);
+        nearest_one_with_query_wide::<A, T, D, K, B>(&leaf, query_wide, best_dist, best_item);
+    }
+
     /// Finds an approximate nearest point to the query point.
     ///
     /// This is faster than `nearest_one` but may not return the true nearest neighbour.
     /// It searches only the leaf that the query point falls into.
+    #[inline(always)]
     pub fn approx_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
-        D: DistanceMetricUnified<A, K>,
-        D::Output: TlsLeafScratch + 'static,
+        D: DistanceMetricUnified<A, K, Output = A>,
     {
         let req_ctx = ApproxNearestOneReqCtx::<A, D::Output, K> {
             query,
             _phantom: std::marker::PhantomData,
         };
 
-        let mut query_wide = [D::Output::zero(); K];
-        for dim in 0..K {
-            query_wide[dim] = D::widen_coord(query[dim]);
-        }
-
-        let mut best_dist = D::Output::max_value();
+        let mut best_dist = A::max_value();
         let mut best_item = T::default();
 
-        self.straight_query(req_ctx, |leaf| {
-            leaf.nearest_one_with_query_wide::<D>(&query_wide, &mut best_dist, &mut best_item);
+        self.straight_query(req_ctx, |leaf_idx| {
+            self.process_leaf_approx_nearest_one::<D>(
+                leaf_idx,
+                query,
+                &mut best_dist,
+                &mut best_item,
+            );
         });
 
         (best_dist, best_item)
@@ -56,13 +80,61 @@ impl<A, O, const K: usize> QueryContext<A, O, K> for ApproxNearestOneReqCtx<'_, 
     }
 }
 
+#[cfg(feature = "cargo_asm")]
+pub mod cargo_asm {
+    use crate::dist::SquaredEuclidean;
+    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
+    use crate::kd_tree::KdTree;
+    use crate::Eytzinger;
+
+    const K: usize = 3;
+    const BUCKET_SIZE: usize = 64;
+
+    type FlatVecKdT =
+        KdTree<f64, usize, Eytzinger<K>, FlatVec<f64, usize, K, BUCKET_SIZE>, K, BUCKET_SIZE>;
+    type VecOfArraysKdT =
+        KdTree<f64, usize, Eytzinger<K>, VecOfArrays<f64, usize, K, BUCKET_SIZE>, K, BUCKET_SIZE>;
+    type VecOfArenasKdT =
+        KdTree<f64, usize, Eytzinger<K>, VecOfArenas<f64, usize, K, BUCKET_SIZE>, K, BUCKET_SIZE>;
+
+    /// Hook for cargo-asm to render the v6 approx-nearest-one call path.
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_approx_nearest_one_eytzinger_cargo_asm_hook(
+        tree: &FlatVecKdT,
+        query: [f64; 3],
+    ) -> (f64, usize) {
+        tree.approx_nearest_one::<SquaredEuclidean<f64>>(&query)
+    }
+
+    /// Hook for cargo-asm to render the v6 approx-nearest-one call path with VecOfArrays leaves.
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_approx_nearest_one_eytzinger_vec_of_arrays_cargo_asm_hook(
+        tree: &VecOfArraysKdT,
+        query: [f64; 3],
+    ) -> (f64, usize) {
+        tree.approx_nearest_one::<SquaredEuclidean<f64>>(&query)
+    }
+
+    /// Hook for cargo-asm to render the v6 approx-nearest-one call path with VecOfArenas leaves.
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_approx_nearest_one_eytzinger_vec_of_arenas_cargo_asm_hook(
+        tree: &VecOfArenasKdT,
+        query: [f64; 3],
+    ) -> (f64, usize) {
+        tree.approx_nearest_one::<SquaredEuclidean<f64>>(&query)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use rand::rngs::StdRng;
     use rand::Rng;
     use rand::SeedableRng;
 
-    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
+    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
     use crate::stem_strategies::{Donnelly, DonnellyMarkerPf};
 
@@ -123,6 +195,28 @@ mod tests {
         let results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
 
         assert_eq!(results, (0.0014114721, 19074));
+    }
+
+    #[test]
+    fn v6_approx_nearest_one_vec_of_arenas_matches_flat_vec_f32() {
+        let points = vec![
+            [0.1f32, 0.2, 0.3],
+            [0.9, 0.8, 0.7],
+            [0.41, 0.52, 0.63],
+            [0.4, 0.5, 0.6],
+            [0.7, 0.1, 0.2],
+        ];
+        let query = [0.39f32, 0.51, 0.61];
+
+        let flat_tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+        let arena_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+
+        let flat_result = flat_tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query);
+        let arena_result = arena_tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query);
+
+        assert_eq!(arena_result, flat_result);
     }
 
     #[test]
@@ -573,7 +667,11 @@ mod tests {
         let query_point = [0.5, 0.5, 0.5, 0.5];
         let results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
 
-        assert!(results.0 < 0.2, "Distance should be reasonably small");
+        assert!(
+            results.0 < 0.2,
+            "Distance ({}) should be reasonably small",
+            results.0
+        );
         assert!(results.1 < 2_097_152, "Item index should be valid");
     }
 }

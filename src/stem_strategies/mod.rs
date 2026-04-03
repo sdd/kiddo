@@ -33,3 +33,10 @@ pub use eytzinger_pf::EytzingerPf;
 
 pub use block_size::BlockSizeMarker;
 pub use block_size::{Block3, Block4, Block5, Block6, Block7};
+
+// TODO: modified Donnelly Block stem strategy that pads to the point where
+//       the bottom row of the last block is free. Then, use that bottom row
+//       to store the offset and leaf size for each left and right child of
+//       the level above, eliminating the need for extents to be stored in the
+//       leaf strategy, and avoiding the need for one layer of indirection when
+//       retrieving the leaf offset

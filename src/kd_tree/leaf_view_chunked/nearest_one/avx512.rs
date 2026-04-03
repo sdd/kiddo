@@ -21,6 +21,12 @@ struct BestResult<T: Basics> {
 
 type Ops<M, AX> = <M as DistanceMetricAvx512<AX>>::Avx512F64Ops;
 
+#[cfg(feature = "leaf_nta_prefetch")]
+#[inline(always)]
+unsafe fn prefetch_nta(ptr: *const u8) {
+    _mm_prefetch::<{ _MM_HINT_NTA }>(ptr as *const i8);
+}
+
 #[inline(always)]
 unsafe fn update_best_chunk_avx512_raw<T: Basics>(
     d0: __m512d,
@@ -68,7 +74,7 @@ unsafe fn update_best_chunk_avx512_raw<T: Basics>(
     core::hint::assert_unchecked(combined != 0);
     let idx = combined.trailing_zeros() as usize;
 
-    (chunk_min, *items.add(base + idx))
+    (chunk_min, std::ptr::read_unaligned(items.add(base + idx)))
 }
 
 #[inline(always)]
@@ -104,7 +110,7 @@ unsafe fn update_best_line_avx512_raw<T: Basics>(
     core::hint::assert_unchecked(eq0 != 0);
     let idx = eq0.trailing_zeros() as usize;
 
-    (chunk_min, *items.add(base + idx))
+    (chunk_min, std::ptr::read_unaligned(items.add(base + idx)))
 }
 
 #[inline(always)]
@@ -135,7 +141,34 @@ unsafe fn update_best_line_avx2_raw<T: Basics>(
     core::hint::assert_unchecked(eq0 != 0);
     let idx = eq0.trailing_zeros() as usize;
 
-    (chunk_min, *items.add(base + idx))
+    (chunk_min, std::ptr::read_unaligned(items.add(base + idx)))
+}
+
+#[inline(always)]
+unsafe fn update_best_line_avx128_raw<T: Basics>(
+    d0: __m128d,
+    items: *const T,
+    base: usize,
+    best_dist: f64,
+    best_item: T,
+) -> (f64, T) {
+    let bb = _mm_set1_pd(best_dist);
+    let m0 = _mm_movemask_pd(_mm_cmplt_pd(d0, bb)) as u32;
+
+    if m0 == 0 {
+        return (best_dist, best_item);
+    }
+
+    let hi64 = _mm_unpackhi_pd(d0, d0);
+    let min_scalar = _mm_min_sd(d0, hi64);
+    let chunk_min = _mm_cvtsd_f64(min_scalar);
+
+    let bcast = _mm_set1_pd(chunk_min);
+    let eq0 = _mm_movemask_pd(_mm_cmpeq_pd(d0, bcast)) as u32;
+    core::hint::assert_unchecked(eq0 != 0);
+    let idx = eq0.trailing_zeros() as usize;
+
+    (chunk_min, std::ptr::read_unaligned(items.add(base + idx)))
 }
 
 macro_rules! impl_leaf_kernel_k {
@@ -242,7 +275,7 @@ macro_rules! impl_leaf_kernel_k {
                 )*
                 if d < best_dist {
                     best_dist = d;
-                    best_item = *items.add(idx);
+                    best_item = std::ptr::read_unaligned(items.add(idx));
                 }
             }
 
@@ -314,6 +347,236 @@ impl_leaf_kernel_k!(
     ]
 );
 
+macro_rules! impl_leaf_arena_kernel_k {
+    ($extern_name:ident, $k:expr, [$(($dim:literal, $p:ident, $qs:ident, $qv:ident, $qy:ident, $qx:ident)),*]) => {
+        #[target_feature(enable = "avx512f,avx512vl,fma")]
+        pub(crate) unsafe fn $extern_name<AX, M, T>(
+            tile_base: *const u8,
+            len: usize,
+            query: *const f64,
+            best_dist: &mut f64,
+            best_item: &mut T,
+        )
+        where
+            AX: AxisUnified<Coord = AX>,
+            M: DistanceMetricUnified<AX> + DistanceMetricCore<AX, Output = AX>,
+            T: Basics,
+        {
+            if len == 0 {
+                return;
+            }
+
+            let p0 = tile_base as *const f64;
+            let items = tile_base.add($k * len * std::mem::size_of::<f64>()) as *const T;
+            let q0s = *query.add(0);
+            $(
+                let $p = p0.add($dim * len);
+                let $qs = *query.add($dim);
+            )*
+
+            let qv0 = _mm512_set1_pd(q0s);
+            let qy0 = _mm512_castpd512_pd256(qv0);
+            let qx0 = _mm256_castpd256_pd128(qy0);
+            $(
+                let $qv = _mm512_set1_pd($qs);
+                let $qy = _mm512_castpd512_pd256($qv);
+                let $qx = _mm256_castpd256_pd128($qy);
+            )*
+
+            let mut best_dist_val = *best_dist;
+            let mut best_item_val = *best_item;
+            let mut base = 0usize;
+
+            if base + CHUNK_SIZE <= len {
+                #[cfg(feature = "leaf_nta_prefetch")]
+                {
+                    // perf shows that the "base + 0" prefetches are
+                    // too late to be useful but still seem to have some
+                    // benefit.
+                    // TODO: revisit this once we can ZC-deserealize a tree
+                    //       via rkyv so that we get less noise in the perf output
+
+                    // prefetch_nta(p0.add(base) as *const u8);
+                    prefetch_nta(p0.add(base + 8) as *const u8);
+                    prefetch_nta(p0.add(base + 16) as *const u8);
+                    prefetch_nta(p0.add(base + 24) as *const u8);
+                    $(
+                        // prefetch_nta($p.add(base) as *const u8);
+                        prefetch_nta($p.add(base + 8) as *const u8);
+                        prefetch_nta($p.add(base + 16) as *const u8);
+                        prefetch_nta($p.add(base + 24) as *const u8);
+                    )*
+                }
+
+                let x0 = _mm512_loadu_pd(p0.add(base));
+                let x1 = _mm512_loadu_pd(p0.add(base + 8));
+                let x2 = _mm512_loadu_pd(p0.add(base + 16));
+                let x3 = _mm512_loadu_pd(p0.add(base + 24));
+
+                let dx0 = _mm512_sub_pd(x0, qv0);
+                let dx1 = _mm512_sub_pd(x1, qv0);
+                let dx2 = _mm512_sub_pd(x2, qv0);
+                let dx3 = _mm512_sub_pd(x3, qv0);
+
+                #[allow(unused_mut)]
+                let mut d0 = Ops::<M, AX>::dist_k0_f64x8(dx0);
+                #[allow(unused_mut)]
+                let mut d1 = Ops::<M, AX>::dist_k0_f64x8(dx1);
+                #[allow(unused_mut)]
+                let mut d2 = Ops::<M, AX>::dist_k0_f64x8(dx2);
+                #[allow(unused_mut)]
+                let mut d3 = Ops::<M, AX>::dist_k0_f64x8(dx3);
+
+                $(
+                    let y0 = _mm512_loadu_pd($p.add(base));
+                    let y1 = _mm512_loadu_pd($p.add(base + 8));
+                    let y2 = _mm512_loadu_pd($p.add(base + 16));
+                    let y3 = _mm512_loadu_pd($p.add(base + 24));
+
+                    let dy0 = _mm512_sub_pd(y0, $qv);
+                    let dy1 = _mm512_sub_pd(y1, $qv);
+                    let dy2 = _mm512_sub_pd(y2, $qv);
+                    let dy3 = _mm512_sub_pd(y3, $qv);
+
+                    d0 = Ops::<M, AX>::dist_kn_f64x8(d0, dy0);
+                    d1 = Ops::<M, AX>::dist_kn_f64x8(d1, dy1);
+                    d2 = Ops::<M, AX>::dist_kn_f64x8(d2, dy2);
+                    d3 = Ops::<M, AX>::dist_kn_f64x8(d3, dy3);
+                )*
+
+                (best_dist_val, best_item_val) = update_best_chunk_avx512_raw(
+                    d0,
+                    d1,
+                    d2,
+                    d3,
+                    items,
+                    base,
+                    best_dist_val,
+                    best_item_val,
+                );
+
+                base += CHUNK_SIZE;
+            }
+
+            if base + LINE_SIZE <= len {
+                #[cfg(feature = "leaf_nta_prefetch")]
+                {
+                    prefetch_nta(p0.add(base) as *const u8);
+                    $(
+                        prefetch_nta($p.add(base) as *const u8);
+                    )*
+                }
+
+                let a0 = _mm512_loadu_pd(p0.add(base));
+                let d0 = _mm512_sub_pd(a0, qv0);
+                #[allow(unused_mut)]
+                let mut acc = Ops::<M, AX>::dist_k0_f64x8(d0);
+
+                $(
+                    let a = _mm512_loadu_pd($p.add(base));
+                    let d = _mm512_sub_pd(a, $qv);
+                    acc = Ops::<M, AX>::dist_kn_f64x8(acc, d);
+                )*
+
+                (best_dist_val, best_item_val) = update_best_line_avx512_raw(
+                    acc,
+                    items,
+                    base,
+                    best_dist_val,
+                    best_item_val,
+                );
+
+                base += LINE_SIZE;
+            }
+
+            if base + AVX2_LINE_SIZE <= len {
+                let a0 = _mm256_loadu_pd(p0.add(base));
+                let d0 = _mm256_sub_pd(a0, qy0);
+                #[allow(unused_mut)]
+                let mut acc = Ops::<M, AX>::dist_k0_f64x4(d0);
+
+                $(
+                    let a = _mm256_loadu_pd($p.add(base));
+                    let d = _mm256_sub_pd(a, $qy);
+                    acc = Ops::<M, AX>::dist_kn_f64x4(acc, d);
+                )*
+
+                (best_dist_val, best_item_val) = update_best_line_avx2_raw(
+                    acc,
+                    items,
+                    base,
+                    best_dist_val,
+                    best_item_val,
+                );
+
+                base += AVX2_LINE_SIZE;
+            }
+
+            if base + 2 <= len {
+                let a0 = _mm_loadu_pd(p0.add(base));
+                let d0 = _mm_sub_pd(a0, qx0);
+                #[allow(unused_mut)]
+                let mut acc = Ops::<M, AX>::dist_k0_f64x2(d0);
+
+                $(
+                    let a = _mm_loadu_pd($p.add(base));
+                    let d = _mm_sub_pd(a, $qx);
+                    acc = Ops::<M, AX>::dist_kn_f64x2(acc, d);
+                )*
+
+                (best_dist_val, best_item_val) = update_best_line_avx128_raw(
+                    acc,
+                    items,
+                    base,
+                    best_dist_val,
+                    best_item_val,
+                );
+
+                base += 2;
+            }
+
+            while base < len {
+                #[allow(unused_mut)]
+                let mut d = Ops::<M, AX>::dist_k0_f64x1(*p0.add(base) - q0s);
+                $(
+                    d = Ops::<M, AX>::dist_kn_f64x1(d, *$p.add(base) - $qs);
+                )*
+
+                if d < best_dist_val {
+                    best_dist_val = d;
+                    best_item_val = std::ptr::read_unaligned(items.add(base));
+                }
+
+                base += 1;
+            }
+
+            *best_dist = best_dist_val;
+            *best_item = best_item_val;
+        }
+    };
+}
+
+impl_leaf_arena_kernel_k!(leaf_nearest_one_arena_nozero_f64_k1, 1, []);
+impl_leaf_arena_kernel_k!(
+    leaf_nearest_one_arena_nozero_f64_k2,
+    2,
+    [(1, p1, q1s, qv1, qy1, qx1)]
+);
+impl_leaf_arena_kernel_k!(
+    leaf_nearest_one_arena_nozero_f64_k3,
+    3,
+    [(1, p1, q1s, qv1, qy1, qx1), (2, p2, q2s, qv2, qy2, qx2)]
+);
+impl_leaf_arena_kernel_k!(
+    leaf_nearest_one_arena_nozero_f64_k4,
+    4,
+    [
+        (1, p1, q1s, qv1, qy1, qx1),
+        (2, p2, q2s, qv2, qy2, qx2),
+        (3, p3, q3s, qv3, qy3, qx3)
+    ]
+);
+
 #[inline(always)]
 unsafe fn scalar_fallback_dynamic<AX, M, T>(
     points: *const *const f64,
@@ -353,6 +616,40 @@ where
         dist: best_dist,
         item: best_item,
     }
+}
+
+#[inline(always)]
+unsafe fn scalar_fallback_arena_dynamic<AX, M, T>(
+    tile_base: *const u8,
+    len: usize,
+    k: usize,
+    query: *const f64,
+    best_dist: &mut f64,
+    best_item: &mut T,
+) where
+    AX: AxisUnified<Coord = AX>,
+    M: DistanceMetricUnified<AX> + DistanceMetricCore<AX, Output = AX>,
+    T: Basics,
+{
+    let points = tile_base as *const f64;
+    let items = tile_base.add(k * len * std::mem::size_of::<f64>()) as *const T;
+    let mut best_dist_val = *best_dist;
+    let mut best_item_val = *best_item;
+
+    for idx in 0..len {
+        let mut d = Ops::<M, AX>::dist_k0_f64x1(*points.add(idx) - *query.add(0));
+        for dim in 1..k {
+            let axis = points.add(dim * len);
+            d = Ops::<M, AX>::dist_kn_f64x1(d, *axis.add(idx) - *query.add(dim));
+        }
+        if d < best_dist_val {
+            best_dist_val = d;
+            best_item_val = std::ptr::read_unaligned(items.add(idx));
+        }
+    }
+
+    *best_dist = best_dist_val;
+    *best_item = best_item_val;
 }
 
 #[inline(always)]
@@ -448,6 +745,90 @@ where
 }
 
 #[inline(always)]
+unsafe fn leaf_nearest_one_arena_nozero_f64_selector<AX, M, T>(
+    k: usize,
+    tile_base: *const u8,
+    len: usize,
+    query: *const f64,
+    best_dist: &mut f64,
+    best_item: &mut T,
+) where
+    AX: AxisUnified<Coord = AX>,
+    M: DistanceMetricUnified<AX> + DistanceMetricCore<AX, Output = AX>,
+    T: Basics,
+{
+    match k {
+        1 => leaf_nearest_one_arena_nozero_f64_k1::<AX, M, T>(
+            tile_base, len, query, best_dist, best_item,
+        ),
+        2 => leaf_nearest_one_arena_nozero_f64_k2::<AX, M, T>(
+            tile_base, len, query, best_dist, best_item,
+        ),
+        3 => leaf_nearest_one_arena_nozero_f64_k3::<AX, M, T>(
+            tile_base, len, query, best_dist, best_item,
+        ),
+        4 => leaf_nearest_one_arena_nozero_f64_k4::<AX, M, T>(
+            tile_base, len, query, best_dist, best_item,
+        ),
+        _ => scalar_fallback_arena_dynamic::<AX, M, T>(
+            tile_base, len, k, query, best_dist, best_item,
+        ),
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn nearest_one_avx512_raw_unchecked<AX, T, D, const K: usize>(
+    points: [*const AX; K],
+    items: *const T,
+    len: usize,
+    query_wide: &[AX; K],
+    best_dist: &mut AX,
+    best_item: &mut T,
+) where
+    AX: AxisUnified<Coord = AX>,
+    D: DistanceMetricUnified<AX> + DistanceMetricCore<AX, Output = AX>,
+    T: Basics,
+{
+    if len == 0 {
+        return;
+    }
+
+    let points_ptrs: [*const f64; K] = std::array::from_fn(|dim| points[dim] as *const f64);
+    let query_ptr = query_wide.as_ptr() as *const f64;
+    let best_dist_ptr = best_dist as *mut AX as *mut f64;
+
+    let result = leaf_nearest_one_chunked_nozero_f64_selector::<AX, D, T>(
+        K,
+        points_ptrs.as_ptr(),
+        items,
+        len,
+        query_ptr,
+        *best_dist_ptr,
+        *best_item,
+    );
+
+    *best_dist_ptr = result.dist;
+    *best_item = result.item;
+}
+
+#[inline(always)]
+pub(crate) unsafe fn nearest_one_avx512_arena_unchecked<AX, T, D, const K: usize>(
+    tile_base: *const u8,
+    len: usize,
+    query: *const f64,
+    best_dist: &mut f64,
+    best_item: &mut T,
+) where
+    AX: AxisUnified<Coord = AX>,
+    D: DistanceMetricUnified<AX> + DistanceMetricCore<AX, Output = AX>,
+    T: Basics,
+{
+    leaf_nearest_one_arena_nozero_f64_selector::<AX, D, T>(
+        K, tile_base, len, query, best_dist, best_item,
+    );
+}
+
+#[inline(always)]
 pub(crate) unsafe fn nearest_one_avx512_unchecked<AX, T, D, const K: usize, const B: usize>(
     leaf: &LeafView<'_, AX, T, K, B>,
     query_wide: &[AX; K],
@@ -458,27 +839,15 @@ pub(crate) unsafe fn nearest_one_avx512_unchecked<AX, T, D, const K: usize, cons
     D: DistanceMetricUnified<AX> + DistanceMetricCore<AX, Output = AX>,
     T: Basics,
 {
-    let items = leaf.items();
-    if items.is_empty() {
-        return;
-    }
-
     let points = leaf.points();
-    let points_ptrs: [*const f64; K] =
-        std::array::from_fn(|dim| points[dim].as_ptr() as *const f64);
-    let query_ptr = query_wide.as_ptr() as *const f64;
-    let best_dist_ptr = best_dist as *mut AX as *mut f64;
+    let point_ptrs = std::array::from_fn(|dim| points[dim].as_ptr());
 
-    let result = leaf_nearest_one_chunked_nozero_f64_selector::<AX, D, T>(
-        K,
-        points_ptrs.as_ptr(),
-        items.as_ptr(),
-        items.len(),
-        query_ptr,
-        *best_dist_ptr,
-        *best_item,
+    nearest_one_avx512_raw_unchecked::<AX, T, D, K>(
+        point_ptrs,
+        leaf.items().as_ptr(),
+        leaf.items().len(),
+        query_wide,
+        best_dist,
+        best_item,
     );
-
-    *best_dist_ptr = result.dist;
-    *best_item = result.item;
 }

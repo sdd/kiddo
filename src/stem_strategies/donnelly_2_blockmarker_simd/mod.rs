@@ -623,7 +623,7 @@ where
         tree: &crate::kd_tree::KdTree<A, T, Self, LS, K2, B>,
         query_ctx: &mut QC,
         stack: &mut Self::Stack<O>,
-        process_leaf: impl FnMut(&crate::kd_tree::leaf_view::LeafView<A, T, K2, B>, &[O; K2], &mut QC),
+        process_leaf: impl FnMut(usize, &[O; K2], &mut QC),
     ) where
         Self: Sized,
         A: crate::traits_unified_2::AxisUnified<Coord = A>,
@@ -1044,7 +1044,7 @@ where
         tree: &crate::kd_tree::KdTree<A, T, Self, LS, K2, B>,
         query_ctx: &mut QC,
         stack: &mut Self::Stack<O>,
-        process_leaf: impl FnMut(&crate::kd_tree::leaf_view::LeafView<A, T, K2, B>, &[O; K2], &mut QC),
+        process_leaf: impl FnMut(usize, &[O; K2], &mut QC),
     ) where
         Self: Sized,
         A: crate::traits_unified_2::AxisUnified<Coord = A>,

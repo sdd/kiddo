@@ -1,4 +1,4 @@
-mod nearest_one;
+pub(crate) mod nearest_one;
 use crate::kd_tree::leaf_view::{try_identity_widen_axis, LeafView};
 use crate::traits_unified_2::{
     AxisUnified, Basics, DistanceMetricUnified as DistanceMetricUnifiedV2,
@@ -12,6 +12,7 @@ const CHUNK_SIZE: usize = 32;
 ///
 /// Provides a unified interface for accessing leaf data regardless of the underlying
 /// storage strategy.
+#[allow(unused)]
 #[derive(Debug)]
 pub struct LeafViewChunked<'a, AX, T, const K: usize> {
     points: [&'a [AX]; K],
@@ -43,7 +44,7 @@ where
     let mut points_iterators = widened_points.map(|axis| axis.chunks_exact(CHUNK_SIZE));
     let mut items_iterator = items.chunks_exact(CHUNK_SIZE);
 
-    while let Some(items_chunk_slice) = items_iterator.next() {
+    for items_chunk_slice in items_iterator.by_ref() {
         let points_chunk: [&[D::Output; CHUNK_SIZE]; K] = array_init(|dim| {
             points_iterators[dim]
                 .next()
@@ -128,6 +129,7 @@ where
 ///
 /// This path is intended to be testable on any architecture and acts as the
 /// non-SIMD baseline for the new `leaf_view_chunked` module.
+#[allow(unused)]
 #[inline(always)]
 pub(crate) fn try_nearest_one_with_query_wide_v3<AX, T, D, const K: usize, const B: usize>(
     leaf: &LeafView<'_, AX, T, K, B>,

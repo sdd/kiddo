@@ -79,7 +79,8 @@ where
             _phantom: std::marker::PhantomData,
         };
 
-        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf, query_wide, req_ctx| {
+        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
+            let leaf = self.leaves.leaf_view(leaf_idx);
             leaf.nearest_n_within_with_query_wide::<D, R>(
                 query_wide,
                 max_dist,

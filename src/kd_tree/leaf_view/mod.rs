@@ -10,11 +10,35 @@ use fixed::{
     types::extra::{U0, U16, U8},
     FixedI32, FixedU16,
 };
+use std::marker::PhantomData;
 
 // TODO: chunking
 #[allow(unused)]
 const CHUNK_SIZE: usize = 32;
 pub(crate) const LEAF_SCRATCH_CAPACITY: usize = 1024;
+pub(crate) const LEAF_ARENA_TILE_WIDTHS: [usize; 5] = [32, 8, 4, 2, 1];
+
+#[inline(always)]
+pub(crate) fn leaf_arena_tile_len(remaining: usize) -> usize {
+    for width in LEAF_ARENA_TILE_WIDTHS {
+        if remaining >= width {
+            return width;
+        }
+    }
+
+    1
+}
+
+#[inline(always)]
+pub(crate) fn for_each_leaf_arena_tile_len(len: usize, mut f: impl FnMut(usize)) {
+    let mut remaining = len;
+
+    while remaining != 0 {
+        let tile_len = leaf_arena_tile_len(remaining);
+        f(tile_len);
+        remaining -= tile_len;
+    }
+}
 
 struct LeafScratch<O> {
     acc: [MaybeUninit<O>; LEAF_SCRATCH_CAPACITY],
@@ -103,6 +127,22 @@ impl_tls_leaf_scratch!(LEAF_SCRATCH_F16, half::f16);
 pub struct LeafView<'a, AX, T, const K: usize, const B: usize> {
     points: [&'a [AX]; K],
     items: &'a [T],
+}
+
+/// Arena-backed view over one encoded leaf.
+#[derive(Clone, Copy, Debug)]
+pub struct LeafArena<'a, AX, T, const K: usize> {
+    bytes: *const u8,
+    len: usize,
+    _phantom: PhantomData<(&'a AX, &'a T)>,
+}
+
+/// Arena-backed view over one encoded tile within a leaf.
+#[derive(Clone, Copy, Debug)]
+pub struct LeafArenaTile<'a, AX, T, const K: usize> {
+    bytes: *const u8,
+    len: usize,
+    _phantom: PhantomData<(&'a AX, &'a T)>,
 }
 
 impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
@@ -350,6 +390,96 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
                 });
             }
         })
+    }
+}
+
+impl<'a, AX, T, const K: usize> LeafArena<'a, AX, T, K>
+where
+    AX: Copy,
+    T: Copy,
+{
+    pub(crate) fn new(bytes: *const u8, len: usize) -> Self {
+        Self {
+            bytes,
+            len,
+            _phantom: PhantomData,
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    pub(crate) fn len(&self) -> usize {
+        self.len
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    pub(crate) fn as_ptr(&self) -> *const u8 {
+        self.bytes
+    }
+
+    #[cfg(any(debug_assertions, test))]
+    #[inline(always)]
+    pub(crate) fn encoded_len_bytes(len: usize) -> usize {
+        let mut total = 0usize;
+
+        for_each_leaf_arena_tile_len(len, |tile_len| {
+            total += K * tile_len * std::mem::size_of::<AX>();
+            total += tile_len * std::mem::size_of::<T>();
+        });
+
+        total
+    }
+
+    #[inline(always)]
+    pub(crate) fn for_each_tiled_chunk(&self, mut f: impl FnMut(LeafArenaTile<'a, AX, T, K>)) {
+        let mut byte_offset = 0usize;
+
+        for_each_leaf_arena_tile_len(self.len, |tile_len| {
+            let tile_byte_len =
+                K * tile_len * std::mem::size_of::<AX>() + tile_len * std::mem::size_of::<T>();
+
+            f(LeafArenaTile {
+                bytes: unsafe { self.bytes.add(byte_offset) },
+                len: tile_len,
+                _phantom: PhantomData,
+            });
+
+            byte_offset += tile_byte_len;
+        });
+    }
+}
+
+impl<AX, T, const K: usize> LeafArenaTile<'_, AX, T, K>
+where
+    AX: Copy,
+    T: Copy,
+{
+    #[inline(always)]
+    pub(crate) fn len(&self) -> usize {
+        self.len
+    }
+
+    #[inline(always)]
+    pub(crate) unsafe fn point_unaligned(&self, dim: usize, idx: usize) -> AX {
+        debug_assert!(dim < K);
+        debug_assert!(idx < self.len);
+
+        let point_offset = (dim * self.len + idx) * std::mem::size_of::<AX>();
+        std::ptr::read_unaligned(self.bytes.add(point_offset) as *const AX)
+    }
+
+    #[inline(always)]
+    pub(crate) unsafe fn item_unaligned(&self, idx: usize) -> T {
+        debug_assert!(idx < self.len);
+
+        let item_offset = K * self.len * std::mem::size_of::<AX>() + idx * std::mem::size_of::<T>();
+        std::ptr::read_unaligned(self.bytes.add(item_offset) as *const T)
     }
 }
 
