@@ -122,6 +122,7 @@ version = "0.3"
 optional = true
 
 [dev-dependencies]
+assert_float_eq = "1.2"
 bincode = { version = "2", features = ["serde"] }
 codspeed-criterion-compat = "2.10"
 criterion = "0.7"
@@ -201,6 +202,11 @@ required-features = ["test_utils"]
 
 [[bench]]
 name = "approx_nearest_one_immutable"
+harness = false
+required-features = ["test_utils"]
+
+[[bench]]
+name = "v6_leaf_strategies"
 harness = false
 required-features = ["test_utils"]
 
@@ -401,6 +407,11 @@ required-features = ["profile_v5"]
 [[bin]]
 name = "profile_v6_nearest_one_eytzinger"
 path = "src/bin/profile_v6_nearest_one_eytzinger.rs"
+required-features = ["profile_v5"]
+
+[[bin]]
+name = "profile_v6_leaf_strategies"
+path = "src/bin/profile_v6_leaf_strategies.rs"
 required-features = ["profile_v5"]
 
 [build-dependencies]

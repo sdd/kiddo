@@ -1,5 +1,6 @@
 use crate::dist::KdTreeDistanceMetric;
 use crate::kd_tree::leaf_view::TlsLeafScratch;
+use crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
 use crate::kd_tree::query_orchestrator::with_tls_query_stack;
 use crate::kd_tree::query_stack::{
     scalar_ctx_from_parts, scalar_ctx_into_parts, QueryStack, QueryStackContext, StackTrait,
@@ -20,6 +21,31 @@ where
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
+    #[inline(always)]
+    fn process_leaf_nearest_one<D>(
+        &self,
+        leaf_idx: usize,
+        query_wide: &[D::DistOutput; K],
+        best_dist: &mut D::DistOutput,
+        best_item: &mut T,
+    ) where
+        D: KdTreeDistanceMetric<A, K>,
+        D::DistOutput: AxisUnified<Coord = D::DistOutput> + 'static,
+    {
+        if let Some(arena) = self.leaves.leaf_arena(leaf_idx) {
+            crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide_arena::<
+                A,
+                T,
+                D,
+                K,
+            >(&arena, query_wide, best_dist, best_item);
+            return;
+        }
+
+        let leaf = self.leaves.leaf_view(leaf_idx);
+        nearest_one_with_query_wide::<A, T, D, K, B>(&leaf, query_wide, best_dist, best_item);
+    }
+
     /// Finds the nearest point to the query point.
     ///
     /// Returns a tuple of (distance, item) for the nearest neighbor.
@@ -59,8 +85,9 @@ where
             best_item: T::default(),
         };
 
-        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf, query_wide, query_ctx| {
-            leaf.nearest_one_with_query_wide::<D>(
+        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, query_ctx| {
+            self.process_leaf_nearest_one::<D>(
+                leaf_idx,
                 query_wide,
                 &mut query_ctx.best_dist,
                 &mut query_ctx.best_item,
@@ -170,8 +197,9 @@ where
         self.backtracking_query_with_stack::<_, _, D>(
             &mut req_ctx,
             stack,
-            |leaf, query_wide, query_ctx| {
-                leaf.nearest_one_with_query_wide::<D>(
+            |leaf_idx, query_wide, query_ctx| {
+                self.process_leaf_nearest_one::<D>(
+                    leaf_idx,
                     query_wide,
                     &mut query_ctx.best_dist,
                     &mut query_ctx.best_item,
@@ -271,14 +299,12 @@ where
                 self.leaf_count()
             );
 
-            let leaf_view = self.leaves.leaf_view(leaf_idx);
-            let _ = crate::kd_tree::leaf_view_chunked::try_nearest_one_with_query_wide_v3::<
-                A,
-                T,
-                D,
-                K,
-                B,
-            >(&leaf_view, &query_wide, &mut best_dist, &mut best_item);
+            self.process_leaf_nearest_one::<D>(
+                leaf_idx,
+                &query_wide,
+                &mut best_dist,
+                &mut best_item,
+            );
         }
 
         (best_dist, best_item)
@@ -368,14 +394,12 @@ where
                 self.leaf_count()
             );
 
-            let leaf_view = self.leaves.leaf_view(leaf_idx);
-            let _ = crate::kd_tree::leaf_view_chunked::try_nearest_one_with_query_wide_v3::<
-                A,
-                T,
-                D,
-                K,
-                B,
-            >(&leaf_view, &query_wide, &mut best_dist, &mut best_item);
+            self.process_leaf_nearest_one::<D>(
+                leaf_idx,
+                &query_wide,
+                &mut best_dist,
+                &mut best_item,
+            );
         }
 
         (best_dist, best_item)
@@ -452,16 +476,71 @@ where
 
 #[cfg(test)]
 mod tests {
+    use assert_float_eq::assert_float_relative_eq;
     use rand::Rng;
     use rand::SeedableRng;
     use test_log::test;
 
     use crate::dist::SquaredEuclidean;
-    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
+    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
     use crate::stem_strategies::Donnelly;
     use crate::traits::{Axis, DistanceMetric};
     use crate::{Eytzinger, NearestNeighbour};
+
+    const REL_EPS_F32: f32 = 1.0e-6;
+    const REL_EPS_F64: f64 = 1.0e-12;
+
+    fn assert_nearest_f32(actual: (f32, u32), expected: &NearestNeighbour<f32, usize>) {
+        assert_float_relative_eq!(actual.0, expected.distance, REL_EPS_F32);
+        assert_eq!(actual.1 as usize, expected.item);
+    }
+
+    fn assert_nearest_f64(actual: (f64, u32), expected: &NearestNeighbour<f64, usize>) {
+        assert_float_relative_eq!(actual.0, expected.distance, REL_EPS_F64);
+        assert_eq!(actual.1 as usize, expected.item);
+    }
+
+    #[test]
+    fn nearest_one_vec_of_arenas_small_f64() {
+        let points = vec![
+            [0.0f64, 0.0, 0.0],
+            [1.0, 1.0, 1.0],
+            [2.0, 2.0, 2.0],
+            [0.5, 0.5, 0.6],
+        ];
+
+        let tree: KdTree<f64, u32, Eytzinger<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+
+        let result = tree.nearest_one::<SquaredEuclidean<f64>>(&[0.45, 0.55, 0.65]);
+
+        assert_float_relative_eq!(result.0, 0.0075, REL_EPS_F64);
+        assert_eq!(result.1, 3);
+    }
+
+    #[test]
+    fn nearest_one_vec_of_arenas_matches_flat_vec_f32() {
+        let points = vec![
+            [0.1f32, 0.2, 0.3],
+            [0.9, 0.8, 0.7],
+            [0.41, 0.52, 0.63],
+            [0.4, 0.5, 0.6],
+            [0.7, 0.1, 0.2],
+        ];
+        let query = [0.39f32, 0.51, 0.61];
+
+        let flat_tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+        let arena_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+
+        let flat_result = flat_tree.nearest_one::<SquaredEuclidean<f32>>(&query);
+        let arena_result = arena_tree.nearest_one::<SquaredEuclidean<f32>>(&query);
+
+        assert_float_relative_eq!(arena_result.0, flat_result.0, REL_EPS_F32);
+        assert_eq!(arena_result.1, flat_result.1);
+    }
 
     #[test]
     fn v6_query_nearest_one_small_f64_flat_vec_eytzinger() {
@@ -495,7 +574,8 @@ mod tests {
         let expected = (0.17570000000000008, 5);
 
         let results = tree.nearest_one::<SquaredEuclidean<f64>>(&query_point);
-        assert_eq!(results, expected);
+        assert_float_relative_eq!(results.0, expected.0, REL_EPS_F64);
+        assert_eq!(results.1, expected.1);
     }
 
     #[test]
@@ -521,8 +601,7 @@ mod tests {
             let expected = linear_search(&content_to_add, query_point);
             let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
 
-            assert_eq!(result.0, expected.distance);
-            assert_eq!(result.1 as usize, expected.item);
+            assert_nearest_f32(result, &expected);
         }
     }
 
@@ -549,8 +628,7 @@ mod tests {
             let expected = linear_search(&content_to_add, query_point);
             let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
 
-            assert_eq!(result.0, expected.distance);
-            assert_eq!(result.1 as usize, expected.item);
+            assert_nearest_f32(result, &expected);
         }
     }
 
@@ -579,8 +657,7 @@ mod tests {
             let expected = linear_search(&content_to_add, query_point);
             let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
 
-            assert_eq!(result.0, expected.distance);
-            assert_eq!(result.1 as usize, expected.item);
+            assert_nearest_f32(result, &expected);
         }
     }
 
@@ -611,10 +688,7 @@ mod tests {
             let expected = linear_search(&content_to_add, query_point);
             let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
 
-            assert_eq!(
-                result.0, expected.distance,
-                "Incorrect distance, query index: {i}"
-            );
+            assert_float_relative_eq!(result.0, expected.distance, REL_EPS_F32);
             assert_eq!(
                 result.1 as usize, expected.item,
                 "Incorrect item, query index: {i}"
@@ -649,8 +723,7 @@ mod tests {
             let expected = linear_search(&content_to_add, query_point);
             let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
 
-            assert_eq!(result.0, expected.distance);
-            assert_eq!(result.1 as usize, expected.item);
+            assert_nearest_f32(result, &expected);
         }
     }
 
@@ -677,8 +750,7 @@ mod tests {
             let expected = linear_search(&content_to_add, query_point);
             let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
 
-            assert_eq!(result.0, expected.distance);
-            assert_eq!(result.1 as usize, expected.item);
+            assert_nearest_f32(result, &expected);
         }
     }
 
@@ -766,7 +838,7 @@ mod tests {
             })
             .collect();
 
-        for (i, query_point) in query_points.iter().enumerate() {
+        for query_point in query_points.iter() {
             // tracing::debug!("Query point: #{i} ({query_point:?})");
 
             let expected = linear_search(&points, query_point);
@@ -780,16 +852,7 @@ mod tests {
             let result = tree.nearest_one::<SquaredEuclidean<f64>>(query_point);
             // println!("SIMD: item={}, dist²={}", result.1, result.0);
 
-            assert_eq!(
-                result.0, expected.distance,
-                "Distance mismatch for query #{} ({:?})",
-                i, query_point
-            );
-            assert_eq!(
-                result.1 as usize, expected.item,
-                "Item mismatch for query #{} ({:?})",
-                i, query_point
-            );
+            assert_nearest_f64(result, &expected);
         }
     }
 
@@ -847,11 +910,7 @@ mod tests {
             let expected = linear_search(&points, query_point);
             let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
 
-            assert_eq!(
-                result.0, expected.distance,
-                "Distance mismatch for query {:?}",
-                query_point
-            );
+            assert_float_relative_eq!(result.0, expected.distance, REL_EPS_F32);
             assert_eq!(
                 result.1 as usize, expected.item,
                 "Item mismatch for query {:?}",

@@ -1,6 +1,6 @@
 //! Definitions and implementations for some traits that are used by KdTree, LeafStrategies, StemStrategies and DistanceMEtrics
 
-use crate::kd_tree::leaf_view::LeafView;
+use crate::kd_tree::leaf_view::{LeafArena, LeafView};
 use crate::kd_tree::KdTree;
 use crate::StemStrategy;
 use fixed::traits::LossyFrom;
@@ -302,6 +302,12 @@ where
 
     /// Returns a view into the specified leaf's data.
     fn leaf_view(&self, leaf_idx: usize) -> LeafView<'_, AX, T, K, B>;
+
+    /// Returns arena-backed access for the specified leaf when the strategy supports it.
+    #[inline(always)]
+    fn leaf_arena(&self, _leaf_idx: usize) -> Option<LeafArena<'_, AX, T, K>> {
+        None
+    }
 
     /// Appends a new leaf to the storage.
     fn append_leaf(&mut self, leaf_points: &[&[AX]; K], leaf_items: &[T]);
@@ -671,6 +677,7 @@ impl AxisUnified for half::f16 {
         coord.is_infinite() && coord.is_sign_positive()
     }
 
+    #[allow(clippy::ifs_same_cond)]
     #[inline(always)]
     fn cmp(a: Self::Coord, b: Self::Coord) -> std::cmp::Ordering {
         if a < b {
