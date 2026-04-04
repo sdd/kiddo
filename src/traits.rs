@@ -1,6 +1,6 @@
 //! Definitions and implementations for some traits that are common between the [`float`](crate::mutable::float), [`immutable`](crate::immutable) and [`fixed`](crate::mutable::fixed)  modules
 // use std::num::NonZero;
-use crate::kd_tree::query_stack::StackTrait;
+use crate::kd_tree::query_stack::{ScalarStackContext, StackTrait};
 use crate::stem_strategies::donnelly_2_blockmarker_simd::backtrack_traits::{
     BacktrackBlock3, BacktrackBlock4,
 };
@@ -200,6 +200,7 @@ pub trait StemStrategy: Clone + Sync + Send {
     /// Non-block strategies use simple scalar stack context (QueryStackContext).
     /// Block-based SIMD strategies use SimdQueryStackContext.
     type StackContext<A>: Sized
+        + crate::kd_tree::query_stack::ScalarStackContext<A, Self::DeferredState>
     where
         Self: Sized;
 
@@ -432,13 +433,11 @@ pub trait StemStrategy: Clone + Sync + Send {
 
             // Only push if the sibling is worth exploring
             if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
-                stack.push(
-                    crate::kd_tree::query_stack::scalar_ctx_from_parts::<O, Self>(
-                        far_ctx.deferred_state(),
-                        new_off,
-                        rd_far,
-                    ),
-                );
+                stack.push(Self::StackContext::<O>::from_parts(
+                    far_ctx.deferred_state(),
+                    new_off,
+                    rd_far,
+                ));
             }
         } else {
             self.traverse(false);
@@ -476,15 +475,33 @@ pub trait StemStrategy: Clone + Sync + Send {
         LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
         Self::Stack<O>: StackTrait<O, Self>,
     {
-        // Default implementation - delegates to KdTree's scalar implementation
-        // Requires Stack = QueryStack. SIMD strategies must fully override this method.
-        // Safety: This default implementation is only used by scalar strategies which use QueryStack.
-        // SIMD strategies override this entire method.
-        let stack_ref = unsafe {
-            &mut *(stack as *mut Self::Stack<O>
-                as *mut crate::kd_tree::query_stack::QueryStack<O, Self>)
-        };
-        tree.backtracking_query_with_stack_impl::<QC, O, D>(query_ctx, stack_ref, process_leaf);
+        tree.backtracking_query_with_stack_impl::<QC, O, D>(query_ctx, stack, process_leaf);
+    }
+
+    /// Execute arithmetic-resolution backtracking query with explicit stack.
+    ///
+    /// Default implementation delegates to KdTree's scalar arithmetic implementation.
+    /// Strategies may override this to provide a more specialized arithmetic walk.
+    #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
+    fn arithmetic_query_with_stack<A, T, O, D, QC, LS, const K2: usize, const B: usize>(
+        tree: &crate::kd_tree::KdTree<A, T, Self, LS, K2, B>,
+        query_ctx: &mut QC,
+        stack: &mut Self::Stack<O>,
+        process_leaf: impl FnMut(usize, &[O; K2], &mut QC),
+    ) where
+        Self: Sized,
+        A: AxisUnified<Coord = A>,
+        T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
+        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
+        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
+            + crate::stem_strategies::DistanceMetricSimdBlock3<A, K2, O>
+            + crate::stem_strategies::DistanceMetricSimdBlock4<A, K2, O>,
+        QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
+        LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
+        Self::Stack<O>: StackTrait<O, Self>,
+    {
+        tree.arithmetic_query_with_stack_impl::<QC, O, D>(query_ctx, stack, process_leaf);
     }
 }
 

@@ -5,10 +5,6 @@ use std::ptr::NonNull;
 /// Compare query value against 7 pivots in a Block3 (f64, AVX2)
 ///
 /// Returns the child index (0-7) based on how many pivots the query exceeds.
-///
-/// # Safety
-/// The caller must ensure the referenced block exists and contains enough contiguous
-/// pivot values for the unaligned AVX2 loads performed here.
 #[target_feature(enable = "avx2,popcnt")]
 #[inline(always)]
 pub unsafe fn compare_block3_f64_avx2(
@@ -37,10 +33,6 @@ pub unsafe fn compare_block3_f64_avx2(
 /// Compare query value against 7 pivots in a Block3 (f32, AVX2)
 ///
 /// Returns the child index (0-7) based on how many pivots the query exceeds.
-///
-/// # Safety
-/// The caller must ensure the referenced block exists and contains enough contiguous
-/// pivot values for the unaligned AVX2 loads performed here.
 #[target_feature(enable = "avx2,popcnt")]
 #[inline(always)]
 pub unsafe fn compare_block3_f32_avx2(
@@ -65,10 +57,6 @@ pub unsafe fn compare_block3_f32_avx2(
 /// Compare query value against 15 pivots in a Block4 (f32, AVX2)
 ///
 /// Returns the child index (0-15) based on how many pivots the query exceeds.
-///
-/// # Safety
-/// The caller must ensure the referenced block exists and contains enough contiguous
-/// pivot values for the unaligned AVX2 loads performed here.
 #[target_feature(enable = "avx2,popcnt")]
 #[inline(always)]
 pub unsafe fn compare_block4_f32_avx2(

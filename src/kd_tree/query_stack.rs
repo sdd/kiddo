@@ -1,8 +1,13 @@
 use crate::traits_unified_2::AxisUnified;
 use crate::StemStrategy;
-use std::mem::{ManuallyDrop, MaybeUninit};
+use std::mem::MaybeUninit;
 
 const INLINE_QUERY_STACK_CAPACITY: usize = 50;
+
+pub trait ScalarStackContext<A, S>: Sized {
+    fn from_parts(stem_state: S, old_off: A, rd: A) -> Self;
+    fn into_parts(self) -> (S, A, A);
+}
 
 /// Trait for query stack types to enable generic backtracking implementations
 pub trait StackTrait<A, SS: StemStrategy> {
@@ -93,59 +98,26 @@ impl<A: AxisUnified<Coord = A>, S> QueryStackContext<A, S> {
             rd: A::zero(),
         }
     }
+}
 
+impl<A, S> QueryStackContext<A, S> {
     pub fn into_parts(self) -> (S, /*usize,*/ A, A) {
         (self.stem_state, /*self.dim,*/ self.old_off, self.rd)
     }
 }
 
-#[inline(always)]
-pub(crate) fn scalar_ctx_from_parts<A, SS>(
-    stem_state: SS::DeferredState,
-    old_off: A,
-    rd: A,
-) -> SS::StackContext<A>
-where
-    A: AxisUnified<Coord = A>,
-    SS: StemStrategy,
-{
-    debug_assert_eq!(SS::BLOCK_SIZE, 1);
-    debug_assert_eq!(
-        std::mem::size_of::<SS::StackContext<A>>(),
-        std::mem::size_of::<QueryStackContext<A, SS::DeferredState>>()
-    );
-    debug_assert_eq!(
-        std::mem::align_of::<SS::StackContext<A>>(),
-        std::mem::align_of::<QueryStackContext<A, SS::DeferredState>>()
-    );
+impl<A, S> ScalarStackContext<A, S> for QueryStackContext<A, S> {
+    #[inline(always)]
+    fn from_parts(stem_state: S, old_off: A, rd: A) -> Self {
+        Self {
+            stem_state,
+            old_off,
+            rd,
+        }
+    }
 
-    let ctx = ManuallyDrop::new(QueryStackContext {
-        stem_state,
-        old_off,
-        rd,
-    });
-
-    unsafe { std::ptr::read((&*ctx as *const QueryStackContext<A, SS::DeferredState>).cast()) }
-}
-
-#[inline(always)]
-pub(crate) fn scalar_ctx_into_parts<A, SS>(ctx: SS::StackContext<A>) -> (SS::DeferredState, A, A)
-where
-    A: AxisUnified<Coord = A>,
-    SS: StemStrategy,
-{
-    debug_assert_eq!(SS::BLOCK_SIZE, 1);
-    debug_assert_eq!(
-        std::mem::size_of::<SS::StackContext<A>>(),
-        std::mem::size_of::<QueryStackContext<A, SS::DeferredState>>()
-    );
-    debug_assert_eq!(
-        std::mem::align_of::<SS::StackContext<A>>(),
-        std::mem::align_of::<QueryStackContext<A, SS::DeferredState>>()
-    );
-
-    let ctx = ManuallyDrop::new(ctx);
-    let scalar_ctx: QueryStackContext<A, SS::DeferredState> =
-        unsafe { std::ptr::read((&*ctx as *const SS::StackContext<A>).cast()) };
-    scalar_ctx.into_parts()
+    #[inline(always)]
+    fn into_parts(self) -> (S, A, A) {
+        QueryStackContext::into_parts(self)
+    }
 }

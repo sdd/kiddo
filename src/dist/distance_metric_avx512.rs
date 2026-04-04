@@ -5,39 +5,21 @@ use core::arch::x86_64::{__m128d, __m256d, __m512d};
 /// Mirrors the shape used by the hand-tuned `ultimate_*` AVX512 kernel.
 pub trait Avx512F64LeafOps {
     /// calculate distance on 8 f64's at once (dimension 0, ie set initial accumulator value)
-    ///
-    /// # Safety
-    /// Callers must ensure the active target supports the required AVX-512 features.
     unsafe fn dist_k0_f64x8(delta: __m512d) -> __m512d;
 
     /// calculate distance on 8 f64's at once (dimensions 1+, ie add to accumulator)
-    ///
-    /// # Safety
-    /// Callers must ensure the active target supports the required AVX-512 features.
     unsafe fn dist_kn_f64x8(acc: __m512d, delta: __m512d) -> __m512d;
 
     /// calculate distance on 4 f64's at once (dimension 0, ie set initial accumulator value)
-    ///
-    /// # Safety
-    /// Callers must ensure the active target supports the required vector features.
     unsafe fn dist_k0_f64x4(delta: __m256d) -> __m256d;
 
     /// calculate distance on 4 f64's at once (dimensions 1+, ie add to accumulator)
-    ///
-    /// # Safety
-    /// Callers must ensure the active target supports the required vector features.
     unsafe fn dist_kn_f64x4(acc: __m256d, delta: __m256d) -> __m256d;
 
     /// calculate distance on 2 f64's at once (dimension 0, ie set initial accumulator value)
-    ///
-    /// # Safety
-    /// Callers must ensure the active target supports the required vector features.
     unsafe fn dist_k0_f64x2(delta: __m128d) -> __m128d;
 
     /// calculate distance on 2 f64's at once (dimensions 1+, ie add to accumulator)
-    ///
-    /// # Safety
-    /// Callers must ensure the active target supports the required vector features.
     unsafe fn dist_kn_f64x2(acc: __m128d, delta: __m128d) -> __m128d;
 
     /// calculate distance on scalar f64 (dimension 0, ie set initial accumulator value)
