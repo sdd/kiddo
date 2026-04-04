@@ -236,6 +236,11 @@ harness = false
 required-features = ["test_utils"]
 
 [[bench]]
+name = "v6_stem_strategies"
+harness = false
+required-features = ["test_utils"]
+
+[[bench]]
 name = "get_leaf_idx_immutable"
 harness = false
 required-features = ["test_utils"]

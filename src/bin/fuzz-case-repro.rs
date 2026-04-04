@@ -1066,7 +1066,6 @@ enum Metric {
     Manhattan,
 }
 
-#[allow(clippy::too_many_arguments)]
 fn run_checks<A, const K: usize, F1, F2, F3>(
     params: &ReproParams,
     points: &[[A; K]],
@@ -1347,7 +1346,7 @@ fn random_point_count(cfg: FuzzConfig, rng: &mut StdRng) -> usize {
     }
 }
 
-fn sort_by_distance_then_index<A: Axis>(items: &mut [(A, usize)]) {
+fn sort_by_distance_then_index<A: Axis>(items: &mut Vec<(A, usize)>) {
     items.sort_by(|a, b| {
         a.0.partial_cmp(&b.0)
             .expect("NaN distance in sort")
@@ -1423,12 +1422,10 @@ fn compare_nearest_n_sorted<A: Axis + std::fmt::Debug>(
     Ok(())
 }
 
-type WithinMismatch<A> = (usize, (A, usize), (A, usize));
-
 fn first_within_mismatch<A: Axis + std::fmt::Debug>(
     expected: &[(A, usize)],
     got: &[(A, usize)],
-) -> Option<WithinMismatch<A>> {
+) -> Option<(usize, (A, usize), (A, usize))> {
     let len = expected.len().min(got.len());
     for idx in 0..len {
         if expected[idx] != got[idx] {

@@ -1,18 +1,12 @@
 use crate::dist::KdTreeDistanceMetric;
 use crate::kd_tree::leaf_view::TlsLeafScratch;
 use crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
-use crate::kd_tree::query_orchestrator::with_tls_query_stack;
-use crate::kd_tree::query_stack::{
-    scalar_ctx_from_parts, scalar_ctx_into_parts, QueryStack, QueryStackContext, StackTrait,
-};
+use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::stem_strategies::donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4};
 use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
-use crate::{Eytzinger, StemStrategy};
-use std::any::TypeId;
-use std::cmp::Ordering;
-use std::ptr::NonNull;
+use crate::StemStrategy;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
@@ -113,10 +107,22 @@ where
             return self.nearest_one_mapped::<D>(query);
         }
 
-        with_tls_query_stack::<SS::Stack<D::DistOutput>, _>(|stack| {
-            stack.clear();
-            self.nearest_one_arithmetic_with_stack::<D>(query, stack)
-        })
+        let mut req_ctx = NearestOneReqCtx {
+            query,
+            best_dist: D::DistOutput::max_value(),
+            best_item: T::default(),
+        };
+
+        self.arithmetic_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, query_ctx| {
+            self.process_leaf_nearest_one::<D>(
+                leaf_idx,
+                query_wide,
+                &mut query_ctx.best_dist,
+                &mut query_ctx.best_item,
+            );
+        });
+
+        (req_ctx.best_dist, req_ctx.best_item)
     }
 
     #[inline(always)]
@@ -133,20 +139,27 @@ where
             + TlsLeafScratch
             + 'static,
         SS::Stack<D::DistOutput>: StackTrait<D::DistOutput, SS>,
-        SS: 'static,
     {
-        if TypeId::of::<SS>() == TypeId::of::<Eytzinger<K>>() {
-            let stack = unsafe {
-                &mut *(stack as *mut SS::Stack<D::DistOutput>
-                    as *mut QueryStack<D::DistOutput, Eytzinger<K>>)
-            };
-            return self.nearest_one_arithmetic_eytzinger_with_query_stack::<D>(query, stack);
-        }
-
-        let stack = unsafe {
-            &mut *(stack as *mut SS::Stack<D::DistOutput> as *mut QueryStack<D::DistOutput, SS>)
+        let mut req_ctx = NearestOneReqCtx {
+            query,
+            best_dist: D::DistOutput::max_value(),
+            best_item: T::default(),
         };
-        self.nearest_one_arithmetic_scalar_with_query_stack::<D>(query, stack)
+
+        self.arithmetic_query_with_stack::<_, _, D>(
+            &mut req_ctx,
+            stack,
+            |leaf_idx, query_wide, query_ctx| {
+                self.process_leaf_nearest_one::<D>(
+                    leaf_idx,
+                    query_wide,
+                    &mut query_ctx.best_dist,
+                    &mut query_ctx.best_item,
+                );
+            },
+        );
+
+        (req_ctx.best_dist, req_ctx.best_item)
     }
 
     #[cfg_attr(not(feature = "cargo_asm"), allow(dead_code))]
@@ -164,7 +177,6 @@ where
             + TlsLeafScratch
             + 'static,
         SS::Stack<D::DistOutput>: StackTrait<D::DistOutput, SS>,
-        SS: 'static,
     {
         if self.stem_leaf_resolution.uses_arithmetic() {
             return self.nearest_one_arithmetic_with_stack::<D>(query, stack);
@@ -209,201 +221,6 @@ where
 
         (req_ctx.best_dist, req_ctx.best_item)
     }
-
-    #[inline(always)]
-    fn nearest_one_arithmetic_scalar_with_query_stack<D>(
-        &self,
-        query: &[A; K],
-        stack: &mut QueryStack<D::DistOutput, SS>,
-    ) -> (D::DistOutput, T)
-    where
-        D: KdTreeDistanceMetric<A, K>,
-        D::DistOutput: BacktrackBlock3 + BacktrackBlock4 + TlsLeafScratch,
-    {
-        if self.is_empty() {
-            return (D::DistOutput::max_value(), T::default());
-        }
-
-        let stems_ptr =
-            NonNull::new(self.stems.as_ptr() as *mut u8).unwrap_or_else(NonNull::dangling);
-        let mut query_wide: [D::DistOutput; K] = [D::DistOutput::zero(); K];
-        for dim in 0..K {
-            query_wide[dim] = <D as KdTreeDistanceMetric<A, K>>::widen_coord(query[dim]);
-        }
-
-        let mut best_dist = D::DistOutput::max_value();
-        let mut best_item = T::default();
-        let mut off = [D::DistOutput::zero(); K];
-
-        let mut stem_strat = SS::new(stems_ptr);
-        stack.clear();
-        stack.push(scalar_ctx_from_parts::<D::DistOutput, SS>(
-            stem_strat.deferred_state(),
-            D::DistOutput::zero(),
-            D::DistOutput::zero(),
-        ));
-
-        while let Some(stack_ctx) = stack.pop() {
-            let (stem_state, old_off, rd) = scalar_ctx_into_parts::<D::DistOutput, SS>(stack_ctx);
-            stem_strat.rehydrate_deferred_state(stem_state);
-            let mut dim = stem_strat.dim();
-
-            if D::DistOutput::cmp(rd, best_dist) != Ordering::Less {
-                continue;
-            }
-
-            unsafe { *off.get_unchecked_mut(dim) = old_off };
-
-            loop {
-                if stem_strat.level() > self.max_stem_level {
-                    break;
-                }
-
-                let pivot = unsafe { *self.stems.get_unchecked(stem_strat.stem_idx()) };
-                if pivot < A::max_value() {
-                    let query_elem = unsafe { *query.get_unchecked(dim) };
-                    let is_right_child = query_elem >= pivot;
-                    let far_ctx = stem_strat.branch_relative(is_right_child);
-
-                    let pivot_wide: D::DistOutput =
-                        <D as KdTreeDistanceMetric<A, K>>::widen_coord(pivot);
-                    let query_elem_wide = unsafe { *query_wide.get_unchecked(dim) };
-                    let new_off = D::DistOutput::saturating_dist(query_elem_wide, pivot_wide);
-                    let old_off = unsafe { *off.get_unchecked(dim) };
-
-                    let new_dist1 =
-                        <D as KdTreeDistanceMetric<A, K>>::dist1(new_off, D::DistOutput::zero());
-                    let old_dist1 =
-                        <D as KdTreeDistanceMetric<A, K>>::dist1(old_off, D::DistOutput::zero());
-                    let rd_far = D::DistOutput::saturating_add(rd - old_dist1, new_dist1);
-
-                    if D::DistOutput::cmp(rd_far, best_dist) != Ordering::Greater {
-                        stack.push(scalar_ctx_from_parts::<D::DistOutput, SS>(
-                            far_ctx.deferred_state(),
-                            new_off,
-                            rd_far,
-                        ));
-                    }
-                } else {
-                    stem_strat.traverse(false);
-                }
-
-                dim = stem_strat.dim();
-            }
-
-            let leaf_idx = stem_strat.leaf_idx();
-            debug_assert!(
-                leaf_idx < self.leaf_count(),
-                "arithmetic nearest_one resolved invalid leaf_idx={} leaf_count={}",
-                leaf_idx,
-                self.leaf_count()
-            );
-
-            self.process_leaf_nearest_one::<D>(
-                leaf_idx,
-                &query_wide,
-                &mut best_dist,
-                &mut best_item,
-            );
-        }
-
-        (best_dist, best_item)
-    }
-    #[inline(always)]
-    fn nearest_one_arithmetic_eytzinger_with_query_stack<D>(
-        &self,
-        query: &[A; K],
-        stack: &mut QueryStack<D::DistOutput, Eytzinger<K>>,
-    ) -> (D::DistOutput, T)
-    where
-        D: KdTreeDistanceMetric<A, K>,
-        D::DistOutput: BacktrackBlock3 + BacktrackBlock4 + TlsLeafScratch,
-    {
-        if self.is_empty() {
-            return (D::DistOutput::max_value(), T::default());
-        }
-
-        let stems_ptr =
-            NonNull::new(self.stems.as_ptr() as *mut u8).unwrap_or_else(NonNull::dangling);
-        let mut query_wide: [D::DistOutput; K] = [D::DistOutput::zero(); K];
-        for dim in 0..K {
-            query_wide[dim] = <D as KdTreeDistanceMetric<A, K>>::widen_coord(query[dim]);
-        }
-
-        let mut best_dist = D::DistOutput::max_value();
-        let mut best_item = T::default();
-        let mut off = [D::DistOutput::zero(); K];
-
-        let mut stem_strat = Eytzinger::<K>::new(stems_ptr);
-        stack.clear();
-        stack.push(QueryStackContext::new(stem_strat.deferred_state()));
-
-        while let Some(stack_ctx) = stack.pop() {
-            let (stem_state, old_off, rd) = stack_ctx.into_parts();
-            stem_strat.rehydrate_deferred_state(stem_state);
-            let mut dim = stem_strat.dim();
-
-            if D::DistOutput::cmp(rd, best_dist) != Ordering::Less {
-                continue;
-            }
-
-            unsafe { *off.get_unchecked_mut(dim) = old_off };
-
-            loop {
-                if stem_strat.level() > self.max_stem_level {
-                    break;
-                }
-
-                let pivot = unsafe { *self.stems.get_unchecked(stem_strat.stem_idx()) };
-                if pivot < A::max_value() {
-                    let query_elem = unsafe { *query.get_unchecked(dim) };
-                    let is_right_child = query_elem >= pivot;
-                    let far_ctx = stem_strat.branch_relative(is_right_child);
-
-                    let pivot_wide: D::DistOutput =
-                        <D as KdTreeDistanceMetric<A, K>>::widen_coord(pivot);
-                    let query_elem_wide = unsafe { *query_wide.get_unchecked(dim) };
-                    let new_off = D::DistOutput::saturating_dist(query_elem_wide, pivot_wide);
-                    let old_off = unsafe { *off.get_unchecked(dim) };
-
-                    let new_dist1 =
-                        <D as KdTreeDistanceMetric<A, K>>::dist1(new_off, D::DistOutput::zero());
-                    let old_dist1 =
-                        <D as KdTreeDistanceMetric<A, K>>::dist1(old_off, D::DistOutput::zero());
-                    let rd_far = D::DistOutput::saturating_add(rd - old_dist1, new_dist1);
-
-                    if D::DistOutput::cmp(rd_far, best_dist) != Ordering::Greater {
-                        stack.push(QueryStackContext {
-                            stem_state: far_ctx.deferred_state(),
-                            old_off: new_off,
-                            rd: rd_far,
-                        });
-                    }
-                } else {
-                    stem_strat.traverse(false);
-                }
-
-                dim = stem_strat.dim();
-            }
-
-            let leaf_idx = stem_strat.leaf_idx();
-            debug_assert!(
-                leaf_idx < self.leaf_count(),
-                "arithmetic Eytzinger nearest_one resolved invalid leaf_idx={} leaf_count={}",
-                leaf_idx,
-                self.leaf_count()
-            );
-
-            self.process_leaf_nearest_one::<D>(
-                leaf_idx,
-                &query_wide,
-                &mut best_dist,
-                &mut best_item,
-            );
-        }
-
-        (best_dist, best_item)
-    }
 }
 
 #[allow(missing_docs)]
@@ -440,9 +257,7 @@ pub mod cargo_asm {
         query: [f64; 3],
         stack: &mut QueryStack<f64, Eytzinger<3>>,
     ) -> (f64, usize) {
-        tree.nearest_one_arithmetic_eytzinger_with_query_stack::<SquaredEuclidean<f64>>(
-            &query, stack,
-        )
+        tree.nearest_one_arithmetic_with_stack::<SquaredEuclidean<f64>>(&query, stack)
     }
 }
 
