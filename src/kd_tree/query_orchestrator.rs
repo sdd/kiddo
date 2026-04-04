@@ -1,6 +1,4 @@
-use crate::kd_tree::query_stack::{
-    scalar_ctx_from_parts, scalar_ctx_into_parts, QueryStack, StackTrait,
-};
+use crate::kd_tree::query_stack::{ScalarStackContext, StackTrait};
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::stem_strategies::{
@@ -191,7 +189,7 @@ where
     pub(crate) fn backtracking_query_with_stack_impl<QC, O, D>(
         &self,
         query_ctx: &mut QC,
-        stack: &mut QueryStack<O, SS>,
+        stack: &mut SS::Stack<O>,
         mut process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
@@ -199,6 +197,8 @@ where
         D: DistanceMetricUnified<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
+        SS::Stack<O>: StackTrait<O, SS>,
+        SS::StackContext<O>: ScalarStackContext<O, SS::DeferredState>,
     {
         let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
         let mut stem_strat: SS = SS::new(stems_ptr);
@@ -210,14 +210,14 @@ where
         }
 
         let mut off = [O::zero(); K];
-        stack.push(scalar_ctx_from_parts::<O, SS>(
+        stack.push(SS::StackContext::<O>::from_parts(
             stem_strat.deferred_state(),
             O::zero(),
             O::zero(),
         ));
 
         while let Some(stack_ctx) = stack.pop() {
-            let (stem_state, old_off, rd) = scalar_ctx_into_parts::<O, SS>(stack_ctx);
+            let (stem_state, old_off, rd) = SS::StackContext::<O>::into_parts(stack_ctx);
             stem_strat.rehydrate_deferred_state(stem_state);
             let mut dim = stem_strat.dim();
             tracing::trace!(%dim, %old_off, %rd, ?off, "Popped stack context");
@@ -259,6 +259,147 @@ where
         }
     }
 
+    /// Arithmetic-resolution backtracking query.
+    #[inline(always)]
+    pub(crate) fn arithmetic_query<QC, O, D>(
+        &self,
+        query_ctx: &mut QC,
+        process_leaf: impl FnMut(usize, &[O; K], &mut QC),
+    ) where
+        QC: QueryContext<A, O, K>,
+        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
+        D: DistanceMetricUnified<A, K, Output = O>
+            + DistanceMetricSimdBlock3<A, K, O>
+            + DistanceMetricSimdBlock4<A, K, O>,
+        SS::Stack<O>: StackTrait<O, SS> + Default + 'static,
+    {
+        with_tls_query_stack::<SS::Stack<O>, _>(|stack| {
+            self.arithmetic_query_with_stack::<QC, O, D>(query_ctx, stack, process_leaf);
+        });
+    }
+
+    /// Arithmetic-resolution backtracking query with explicit stack.
+    #[inline(always)]
+    pub(crate) fn arithmetic_query_with_stack<QC, O, D>(
+        &self,
+        query_ctx: &mut QC,
+        stack: &mut SS::Stack<O>,
+        process_leaf: impl FnMut(usize, &[O; K], &mut QC),
+    ) where
+        QC: QueryContext<A, O, K>,
+        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
+        D: DistanceMetricUnified<A, K, Output = O>
+            + DistanceMetricSimdBlock3<A, K, O>
+            + DistanceMetricSimdBlock4<A, K, O>,
+        SS::Stack<O>: StackTrait<O, SS>,
+        SS::StackContext<O>: ScalarStackContext<O, SS::DeferredState>,
+    {
+        SS::arithmetic_query_with_stack::<A, T, O, D, QC, LS, K, B>(
+            self,
+            query_ctx,
+            stack,
+            process_leaf,
+        );
+    }
+
+    /// Implementation of arithmetic-resolution query with scalar stack.
+    /// Called by default StemStrategy::arithmetic_query_with_stack implementation.
+    #[inline(always)]
+    pub(crate) fn arithmetic_query_with_stack_impl<QC, O, D>(
+        &self,
+        query_ctx: &mut QC,
+        stack: &mut SS::Stack<O>,
+        mut process_leaf: impl FnMut(usize, &[O; K], &mut QC),
+    ) where
+        QC: QueryContext<A, O, K>,
+        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
+        D: DistanceMetricUnified<A, K, Output = O>
+            + DistanceMetricSimdBlock3<A, K, O>
+            + DistanceMetricSimdBlock4<A, K, O>,
+        SS::Stack<O>: StackTrait<O, SS>,
+    {
+        if self.is_empty() {
+            return;
+        }
+
+        let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
+        let mut stem_strat: SS = SS::new(stems_ptr);
+
+        let query: [A; K] = *query_ctx.query();
+        let mut query_wide: [O; K] = [O::zero(); K];
+        for dim in 0..K {
+            query_wide[dim] = D::widen_coord(query[dim]);
+        }
+
+        let mut off = [O::zero(); K];
+        stack.clear();
+        stack.push(SS::StackContext::<O>::from_parts(
+            stem_strat.deferred_state(),
+            O::zero(),
+            O::zero(),
+        ));
+
+        while let Some(stack_ctx) = stack.pop() {
+            let (stem_state, old_off, rd) = SS::StackContext::<O>::into_parts(stack_ctx);
+            stem_strat.rehydrate_deferred_state(stem_state);
+            let mut dim = stem_strat.dim();
+
+            let rd_vs_max = O::cmp(rd, query_ctx.max_dist());
+            let should_prune = rd_vs_max == std::cmp::Ordering::Greater
+                || (query_ctx.prune_on_equal_max_dist() && rd_vs_max == std::cmp::Ordering::Equal);
+            if should_prune {
+                continue;
+            }
+
+            unsafe { *off.get_unchecked_mut(dim) = old_off };
+            let best_dist = query_ctx.max_dist();
+
+            loop {
+                if stem_strat.level() > self.max_stem_level {
+                    break;
+                }
+
+                let pivot = unsafe { *self.stems.get_unchecked(stem_strat.stem_idx()) };
+                if pivot < A::max_value() {
+                    let query_elem = unsafe { *query.get_unchecked(dim) };
+                    let is_right_child = query_elem >= pivot;
+                    let far_ctx = stem_strat.branch_relative(is_right_child);
+
+                    let pivot_wide = D::widen_coord(pivot);
+                    let query_elem_wide = unsafe { *query_wide.get_unchecked(dim) };
+                    let new_off = O::saturating_dist(query_elem_wide, pivot_wide);
+                    let old_off = unsafe { *off.get_unchecked(dim) };
+
+                    let new_dist1 = D::dist1(new_off, O::zero());
+                    let old_dist1 = D::dist1(old_off, O::zero());
+                    let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
+
+                    if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
+                        stack.push(SS::StackContext::<O>::from_parts(
+                            far_ctx.deferred_state(),
+                            new_off,
+                            rd_far,
+                        ));
+                    }
+                } else {
+                    stem_strat.traverse(false);
+                }
+
+                dim = stem_strat.dim();
+            }
+
+            let leaf_idx = stem_strat.leaf_idx();
+            debug_assert!(
+                leaf_idx < self.leaf_count(),
+                "arithmetic query resolved invalid leaf_idx={} leaf_count={}",
+                leaf_idx,
+                self.leaf_count()
+            );
+
+            process_leaf(leaf_idx, &query_wide, query_ctx);
+        }
+    }
+
     /// traverse to leaf
     #[inline(always)]
     fn traverse_to_leaf<O, D>(
@@ -270,13 +411,15 @@ where
         dim: &mut usize,
         rd: O,
         best_dist: O,
-        stack: &mut QueryStack<O, SS>,
+        stack: &mut SS::Stack<O>,
     ) -> Option<usize>
     where
         O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
         D: DistanceMetricUnified<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
+        SS::Stack<O>: StackTrait<O, SS>,
+        SS::StackContext<O>: ScalarStackContext<O, SS::DeferredState>,
     {
         loop {
             // Check if current stem points directly to a leaf
@@ -290,8 +433,6 @@ where
 
             // Delegate to stem strategy for traversal step
             // Default impl does level-by-level, block-based strategies do block-at-once
-            // SAFETY: Cast concrete QueryStack to associated type SS::Stack for trait call
-            let stack_ref = unsafe { &mut *(stack as *mut QueryStack<O, SS> as *mut SS::Stack<O>) };
             let should_continue = stem_strat.backtracking_traverse_step::<A, O, D, K>(
                 &self.stems,
                 query,
@@ -301,7 +442,7 @@ where
                 rd,
                 self.max_stem_level,
                 best_dist,
-                stack_ref,
+                stack,
             );
 
             if !should_continue {

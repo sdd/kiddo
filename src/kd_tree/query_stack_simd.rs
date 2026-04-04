@@ -1,4 +1,4 @@
-use crate::kd_tree::query_stack::StackTrait;
+use crate::kd_tree::query_stack::{ScalarStackContext, StackTrait};
 use crate::traits_unified_2::AxisUnified;
 use crate::StemStrategy;
 use std::mem::MaybeUninit;
@@ -123,5 +123,17 @@ impl<A: AxisUnified<Coord = A>, SS> SimdQueryStackContext<A, SS> {
             } => (stem_strat, old_off, rd),
             Self::Block { .. } => panic!("into_parts called on Block variant"),
         }
+    }
+}
+
+impl<A, SS, S> ScalarStackContext<A, S> for SimdQueryStackContext<A, SS> {
+    #[inline(always)]
+    fn from_parts(_stem_state: S, _old_off: A, _rd: A) -> Self {
+        unreachable!("SIMD stack contexts do not support scalar stack packing")
+    }
+
+    #[inline(always)]
+    fn into_parts(self) -> (S, A, A) {
+        unreachable!("SIMD stack contexts do not support scalar stack unpacking")
     }
 }

@@ -107,13 +107,13 @@ impl CompareBlock3 for f64 {
         {
             #[cfg(target_feature = "avx512f")]
             {
-                unsafe {
+                return unsafe {
                     crate::stem_strategies::donnelly_2_blockmarker_simd::x86_64::compare_block3_f64_avx512(
                         stems_ptr,
                         block_base_idx,
                         query_val,
                     )
-                }
+                };
             }
 
             #[cfg(not(target_feature = "avx512f"))]
@@ -180,13 +180,13 @@ impl CompareBlock3 for f32 {
         {
             #[cfg(target_feature = "avx512f")]
             {
-                unsafe {
+                return unsafe {
                     crate::stem_strategies::donnelly_2_blockmarker_simd::x86_64::compare_block3_f32_avx512(
                         stems_ptr,
                         block_base_idx,
                         query_val,
                     )
-                }
+                };
             }
 
             #[cfg(not(target_feature = "avx512f"))]
@@ -235,13 +235,13 @@ impl CompareBlock4 for f32 {
         {
             #[cfg(target_feature = "avx512f")]
             {
-                unsafe {
+                return unsafe {
                     crate::stem_strategies::donnelly_2_blockmarker_simd::x86_64::compare_block4_f32_avx512(
                         stems_ptr,
                         block_base_idx,
                         query_val,
                     )
-                }
+                };
             }
 
             #[cfg(not(target_feature = "avx512f"))]
