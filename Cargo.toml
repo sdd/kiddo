@@ -423,11 +423,11 @@ required-features = ["csv", "rkyv_08"]
 name = "serde"
 path = "examples/serde.rs"
 required-features = ["csv", "serde"]
-
-[[bin]]
-name = "fuzz-case-repro"
-path = "src/bin/fuzz-case-repro.rs"
-required-features = ["test_utils"]
+#
+#[[bin]]
+#name = "fuzz-case-repro"
+#path = "src/bin/fuzz-case-repro.rs"
+#required-features = ["test_utils"]
 
 [[bin]]
 name = "profile_v5_nearest_one_eytzinger"

@@ -3,6 +3,7 @@
 pub mod donnelly_2;
 pub mod donnelly_2_pf;
 pub mod donnelly_3;
+pub mod donnelly_simd_descent;
 // pub mod donnelly_4;
 // pub mod donnelly_5;
 
@@ -22,12 +23,13 @@ pub mod donnelly_2_blockmarker_simd;
 
 pub use donnelly_2_blockmarker_simd::{
     CompareBlock3, CompareBlock4, DistanceMetricSimdBlock3, DistanceMetricSimdBlock4,
-    DonnellyMarkerSimd, SimdPrune,
+    DonnellyMarkerSimd, SimdPrune, SimdSelectBestChildBlock3,
 };
 
 pub use donnelly_2::Donnelly;
 pub use donnelly_2_pf_blockmarker::DonnellyMarkerPf;
 pub use donnelly_3::DonnellySwPre;
+pub use donnelly_simd_descent::DonnellySimdDescent;
 pub use eytzinger::Eytzinger;
 pub use eytzinger_pf::EytzingerPf;
 

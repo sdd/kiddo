@@ -90,6 +90,12 @@ asm-k6-nearest-one-arena-fallback-v3:
 asm-k6-nearest-one-arena-fallback-v3-clean:
     RUSTC_WRAPPER= cargo asm --simplify --features cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" "v6_nearest_one_with_query_wide_arena_fallback_cargo_asm_hook" | python3 scripts/clean_cargo_asm.py > v6_nearest_one_with_query_wide_arena_fallback_v3_clean.asm
 
+asm-k6-nearest-one-donnelly-block3-fill-avx512-clean:
+    RUSTC_WRAPPER= cargo asm --simplify --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "donnelly_block3_fill_backtrack_f64_cargo_asm_hook" | python3 scripts/clean_cargo_asm.py > v6_nearest_one_donnelly_block3_fill_avx512_clean.asm
+
+asm-k6-nearest-one-donnelly-block3-pending-select-avx512-clean:
+    RUSTC_WRAPPER= cargo asm --simplify --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "donnelly_block3_pending_select_f64_cargo_asm_hook" | python3 scripts/clean_cargo_asm.py > v6_nearest_one_donnelly_block3_pending_select_avx512_clean.asm
+
 asm-k6-nearest-one-eytz-v3-core-avx512:
     cargo asm --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "v6_nearest_one_eytzinger_arithmetic_core_cargo_asm_hook" > v6_nearest_one_eytzinger_v3_core_avx512.asm
 

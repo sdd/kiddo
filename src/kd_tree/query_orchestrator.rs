@@ -3,7 +3,7 @@ use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::stem_strategies::{
     donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4},
-    DistanceMetricSimdBlock3, DistanceMetricSimdBlock4, SimdPrune,
+    DistanceMetricSimdBlock3, DistanceMetricSimdBlock4, SimdPrune, SimdSelectBestChildBlock3,
 };
 use crate::traits_unified_2::{
     AxisUnified, Basics, DistanceMetricUnified, LeafStrategy, Mutability,
@@ -36,6 +36,67 @@ where
             .expect("query stack type mismatch");
         f(stack)
     })
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Block3PendingSelection<O> {
+    child_idx: u8,
+    remaining_mask: u8,
+    child_rd: O,
+    child_off: O,
+}
+
+#[inline(always)]
+fn select_block3_pending_child<O>(
+    rd_values: &[O; 8],
+    new_off_values: &[O; 8],
+    pending_mask: u8,
+    max_dist: O,
+) -> Option<Block3PendingSelection<O>>
+where
+    O: AxisUnified<Coord = O> + SimdPrune + SimdSelectBestChildBlock3,
+{
+    let candidate_mask = simd::simd_prune_block::<O>(rd_values, max_dist, pending_mask);
+
+    if candidate_mask == 0 {
+        return None;
+    }
+
+    let child_idx =
+        O::simd_select_best_child_block3(rd_values, candidate_mask).expect("candidate_mask != 0");
+
+    Some(Block3PendingSelection {
+        child_idx,
+        remaining_mask: candidate_mask & !(1u8 << child_idx),
+        child_rd: rd_values[child_idx as usize],
+        child_off: new_off_values[child_idx as usize],
+    })
+}
+
+#[cfg(feature = "cargo_asm")]
+pub mod cargo_asm {
+    use super::select_block3_pending_child;
+
+    /// Hook for cargo-asm to render the exact Block3 pending prune/select kernel directly.
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn donnelly_block3_pending_select_f64_cargo_asm_hook(
+        rd_values: &[f64; 8],
+        new_off_values: &[f64; 8],
+        pending_mask: u8,
+        max_dist: f64,
+    ) -> Option<(u8, u8, f64, f64)> {
+        select_block3_pending_child(rd_values, new_off_values, pending_mask, max_dist).map(
+            |selection| {
+                (
+                    selection.child_idx,
+                    selection.remaining_mask,
+                    selection.child_rd,
+                    selection.child_off,
+                )
+            },
+        )
+    }
 }
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
@@ -147,7 +208,11 @@ where
         process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
-        O: AxisUnified<Coord = O> + SimdPrune + BacktrackBlock3 + BacktrackBlock4,
+        O: AxisUnified<Coord = O>
+            + SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4,
         D: DistanceMetricUnified<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
@@ -168,7 +233,11 @@ where
         process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
-        O: AxisUnified<Coord = O> + SimdPrune + BacktrackBlock3 + BacktrackBlock4,
+        O: AxisUnified<Coord = O>
+            + SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4,
         D: DistanceMetricUnified<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
@@ -217,9 +286,11 @@ where
         ));
 
         while let Some(stack_ctx) = stack.pop() {
-            let (stem_state, old_off, rd) = SS::StackContext::<O>::into_parts(stack_ctx);
+            let (stem_state, restore_dim, old_off, rd) =
+                SS::StackContext::<O>::into_parts_with_restore_dim(stack_ctx);
             stem_strat.rehydrate_deferred_state(stem_state);
             let mut dim = stem_strat.dim();
+            let restore_dim = restore_dim.unwrap_or(dim);
             tracing::trace!(%dim, %old_off, %rd, ?off, "Popped stack context");
 
             let max_dist = query_ctx.max_dist();
@@ -236,11 +307,11 @@ where
 
             tracing::trace!(
                 "Restoring off[{}]. was {}, now {}",
-                dim,
-                unsafe { *off.get_unchecked(dim) },
+                restore_dim,
+                unsafe { *off.get_unchecked(restore_dim) },
                 old_off
             );
-            unsafe { *off.get_unchecked_mut(dim) = old_off };
+            unsafe { *off.get_unchecked_mut(restore_dim) = old_off };
 
             let best_dist = query_ctx.max_dist();
             if let Some(leaf_idx) = self.traverse_to_leaf::<O, D>(
@@ -340,9 +411,11 @@ where
         ));
 
         while let Some(stack_ctx) = stack.pop() {
-            let (stem_state, old_off, rd) = SS::StackContext::<O>::into_parts(stack_ctx);
+            let (stem_state, restore_dim, old_off, rd) =
+                SS::StackContext::<O>::into_parts_with_restore_dim(stack_ctx);
             stem_strat.rehydrate_deferred_state(stem_state);
             let mut dim = stem_strat.dim();
+            let restore_dim = restore_dim.unwrap_or(dim);
 
             let rd_vs_max = O::cmp(rd, query_ctx.max_dist());
             let should_prune = rd_vs_max == std::cmp::Ordering::Greater
@@ -351,7 +424,7 @@ where
                 continue;
             }
 
-            unsafe { *off.get_unchecked_mut(dim) = old_off };
+            unsafe { *off.get_unchecked_mut(restore_dim) = old_off };
             let best_dist = query_ctx.max_dist();
 
             loop {
@@ -480,13 +553,17 @@ where
         mut process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
-        O: AxisUnified<Coord = O> + SimdPrune + BacktrackBlock3 + BacktrackBlock4,
+        O: AxisUnified<Coord = O>
+            + SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4,
         D: DistanceMetricUnified<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS: StemStrategy<
-            StackContext<O> = crate::kd_tree::query_stack_simd::SimdQueryStackContext<O, SS>,
-        >,
+                StackContext<O> = crate::kd_tree::query_stack_simd::SimdQueryStackContext<O, SS>,
+            > + crate::stem_strategies::donnelly_2_blockmarker_simd::DeferredBlockTraversal,
     {
         use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
 
@@ -500,6 +577,8 @@ where
         }
 
         let mut off = [O::zero(); K];
+        let mut lower = [O::min_value(); K];
+        let mut upper = [O::max_value(); K];
         stack.push(SimdQueryStackContext::new_single(stem_strat));
 
         // Backtracking loop
@@ -507,11 +586,14 @@ where
             match ctx {
                 SimdQueryStackContext::Single {
                     stem_strat: mut ss,
+                    dim: dim_val,
+                    lower_bound,
+                    upper_bound,
                     old_off,
                     rd,
                 } => {
                     // Single entry - standard scalar processing
-                    let mut dim = ss.dim();
+                    let mut dim = dim_val;
                     tracing::trace!(%dim, %old_off, %rd, ?off, "Popped single context");
 
                     let max_dist = query_ctx.max_dist();
@@ -526,22 +608,93 @@ where
                     }
                     tracing::trace!(%rd, %max_dist, "SIMD Prune check: VISIT");
 
-                    tracing::trace!(
-                        "Restoring off[{}]. was {}, now {}",
-                        dim,
-                        unsafe { *off.get_unchecked(dim) },
-                        old_off
-                    );
-                    unsafe { *off.get_unchecked_mut(dim) = old_off };
+                    tracing::trace!("Restoring interval state for dim {}", dim);
+                    unsafe {
+                        *off.get_unchecked_mut(dim) = old_off;
+                        *lower.get_unchecked_mut(dim) = lower_bound;
+                        *upper.get_unchecked_mut(dim) = upper_bound;
+                    }
 
                     let best_dist = query_ctx.max_dist();
                     if let Some(leaf_idx) = self.traverse_to_leaf_simd::<O, D>(
                         &query,
                         &query_wide,
                         &mut ss,
+                        &mut lower,
+                        &mut upper,
                         &mut off,
                         &mut dim,
                         rd,
+                        best_dist,
+                        stack,
+                    ) {
+                        tracing::trace!(%leaf_idx, "processing leaf");
+                        process_leaf(leaf_idx, &query_wide, query_ctx);
+                    }
+                }
+                SimdQueryStackContext::Block3Pending {
+                    base,
+                    rd_values,
+                    new_off_values,
+                    pending_mask,
+                    dim: dim_val,
+                    old_off,
+                    lower_bound,
+                    upper_bound,
+                } => {
+                    tracing::trace!(
+                        %dim_val,
+                        %old_off,
+                        ?rd_values,
+                        %pending_mask,
+                        "Popped Block3 pending context"
+                    );
+                    unsafe {
+                        *off.get_unchecked_mut(dim_val) = old_off;
+                        *lower.get_unchecked_mut(dim_val) = lower_bound;
+                        *upper.get_unchecked_mut(dim_val) = upper_bound;
+                    }
+
+                    let Some(selection) = select_block3_pending_child(
+                        &rd_values,
+                        &new_off_values,
+                        pending_mask,
+                        query_ctx.max_dist(),
+                    ) else {
+                        tracing::trace!("All Block3 children pruned");
+                        continue;
+                    };
+
+                    if selection.remaining_mask != 0 {
+                        stack.push(SimdQueryStackContext::new_block3_pending(
+                            base,
+                            rd_values,
+                            new_off_values,
+                            selection.remaining_mask,
+                            dim_val,
+                            old_off,
+                            lower_bound,
+                            upper_bound,
+                        ));
+                    }
+
+                    let mut ss = base.block_child(selection.child_idx);
+                    let mut dim = ss.dim();
+
+                    unsafe {
+                        *off.get_unchecked_mut(dim_val) = selection.child_off;
+                    }
+
+                    let best_dist = query_ctx.max_dist();
+                    if let Some(leaf_idx) = self.traverse_to_leaf_simd::<O, D>(
+                        &query,
+                        &query_wide,
+                        &mut ss,
+                        &mut lower,
+                        &mut upper,
+                        &mut off,
+                        &mut dim,
+                        selection.child_rd,
                         best_dist,
                         stack,
                     ) {
@@ -553,13 +706,21 @@ where
                     siblings,
                     rd_values,
                     new_off_values,
+                    lower_bounds,
+                    upper_bounds,
                     sibling_mask,
                     dim: dim_val,
                     old_off,
+                    lower_bound,
+                    upper_bound,
                 } => {
                     tracing::trace!(%dim_val, %old_off, ?rd_values, %sibling_mask, "Popped block context");
                     // Restore the parent split-dimension offset captured for this block context.
-                    unsafe { *off.get_unchecked_mut(dim_val) = old_off };
+                    unsafe {
+                        *off.get_unchecked_mut(dim_val) = old_off;
+                        *lower.get_unchecked_mut(dim_val) = lower_bound;
+                        *upper.get_unchecked_mut(dim_val) = upper_bound;
+                    }
 
                     // SIMD pruning: check which siblings pass the backtrack test
                     let max_dist = query_ctx.max_dist();
@@ -578,6 +739,8 @@ where
 
                     // Save the current off state before processing siblings
                     let saved_off = off;
+                    let saved_lower = lower;
+                    let saved_upper = upper;
 
                     // Process each surviving sibling
                     for sibling_idx in 0..8 {
@@ -604,6 +767,8 @@ where
                             // Restore off array to saved state, then update the split dimension
                             // Use the per-sibling new_off value (e.g., interval distance)
                             off = saved_off;
+                            lower = saved_lower;
+                            upper = saved_upper;
                             tracing::trace!(
                                 "Restoring off[{}]. was {}, now {} (interval dist for sibling {}). Parent dim was {}, sibling dim is {}",
                                 dim_val,
@@ -614,13 +779,94 @@ where
                                 dim
                             );
                             // The interval distance was computed for the parent block's split dim.
-                            unsafe { *off.get_unchecked_mut(dim_val) = new_off };
+                            unsafe {
+                                *off.get_unchecked_mut(dim_val) = new_off;
+                                *lower.get_unchecked_mut(dim_val) = lower_bounds[sibling_idx];
+                                *upper.get_unchecked_mut(dim_val) = upper_bounds[sibling_idx];
+                            }
 
                             let best_dist = query_ctx.max_dist();
                             if let Some(leaf_idx) = self.traverse_to_leaf_simd::<O, D>(
                                 &query,
                                 &query_wide,
                                 &mut ss,
+                                &mut lower,
+                                &mut upper,
+                                &mut off,
+                                &mut dim,
+                                rd,
+                                best_dist,
+                                stack,
+                            ) {
+                                tracing::trace!(%leaf_idx, "processing leaf");
+                                process_leaf(leaf_idx, &query_wide, query_ctx);
+                            }
+                        }
+                    }
+                }
+                SimdQueryStackContext::DeferredBlock {
+                    base,
+                    child_base,
+                    rd_values,
+                    new_off_values,
+                    lower_bounds,
+                    upper_bounds,
+                    sibling_mask,
+                    dim: dim_val,
+                    old_off,
+                    lower_bound,
+                    upper_bound,
+                } => {
+                    tracing::trace!(
+                        %dim_val,
+                        %old_off,
+                        ?rd_values,
+                        %sibling_mask,
+                        %child_base,
+                        "Popped deferred block context"
+                    );
+                    unsafe {
+                        *off.get_unchecked_mut(dim_val) = old_off;
+                        *lower.get_unchecked_mut(dim_val) = lower_bound;
+                        *upper.get_unchecked_mut(dim_val) = upper_bound;
+                    }
+
+                    let max_dist = query_ctx.max_dist();
+                    let surviving_mask =
+                        simd::simd_prune_block::<O>(&rd_values, max_dist, sibling_mask);
+
+                    if surviving_mask == 0 {
+                        tracing::trace!("All deferred block siblings pruned");
+                        continue;
+                    }
+
+                    let saved_off = off;
+                    let saved_lower = lower;
+                    let saved_upper = upper;
+
+                    for sibling_idx in 0..8 {
+                        if surviving_mask & (1 << sibling_idx) != 0 {
+                            let mut ss = base.block_child(child_base + sibling_idx as u8);
+                            let rd = rd_values[sibling_idx];
+                            let new_off = new_off_values[sibling_idx];
+                            let mut dim = ss.dim();
+
+                            off = saved_off;
+                            lower = saved_lower;
+                            upper = saved_upper;
+                            unsafe {
+                                *off.get_unchecked_mut(dim_val) = new_off;
+                                *lower.get_unchecked_mut(dim_val) = lower_bounds[sibling_idx];
+                                *upper.get_unchecked_mut(dim_val) = upper_bounds[sibling_idx];
+                            }
+
+                            let best_dist = query_ctx.max_dist();
+                            if let Some(leaf_idx) = self.traverse_to_leaf_simd::<O, D>(
+                                &query,
+                                &query_wide,
+                                &mut ss,
+                                &mut lower,
+                                &mut upper,
                                 &mut off,
                                 &mut dim,
                                 rd,
@@ -644,6 +890,8 @@ where
         query: &[A; K],
         query_wide: &[O; K],
         stem_strat: &mut SS,
+        lower: &mut [O; K],
+        upper: &mut [O; K],
         off: &mut [O; K],
         dim: &mut usize,
         rd: O,
@@ -651,13 +899,13 @@ where
         stack: &mut crate::kd_tree::query_stack_simd::SimdQueryStack<O, SS>,
     ) -> Option<usize>
     where
-        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
+        O: AxisUnified<Coord = O> + SimdSelectBestChildBlock3 + BacktrackBlock3 + BacktrackBlock4,
         D: DistanceMetricUnified<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS: StemStrategy<
-            StackContext<O> = crate::kd_tree::query_stack_simd::SimdQueryStackContext<O, SS>,
-        >,
+                StackContext<O> = crate::kd_tree::query_stack_simd::SimdQueryStackContext<O, SS>,
+            > + crate::stem_strategies::donnelly_2_blockmarker_simd::DeferredBlockTraversal,
     {
         let use_scalar_step = matches!(
             self.stem_leaf_resolution,
@@ -715,12 +963,50 @@ where
                         let old_dist1 = D::dist1(old_off, O::zero());
                         let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
 
+                        let old_lower = unsafe { *lower.get_unchecked(dim_val) };
+                        let old_upper = unsafe { *upper.get_unchecked(dim_val) };
+                        let near_lower;
+                        let near_upper;
+                        let far_lower;
+                        let far_upper;
+
+                        if is_right_child {
+                            near_lower = O::max(old_lower, pivot_wide);
+                            near_upper = old_upper;
+                            far_lower = old_lower;
+                            far_upper = if O::cmp(old_upper, pivot_wide) == std::cmp::Ordering::Less
+                            {
+                                old_upper
+                            } else {
+                                pivot_wide
+                            };
+                        } else {
+                            near_lower = old_lower;
+                            near_upper =
+                                if O::cmp(old_upper, pivot_wide) == std::cmp::Ordering::Less {
+                                    old_upper
+                                } else {
+                                    pivot_wide
+                                };
+                            far_lower = O::max(old_lower, pivot_wide);
+                            far_upper = old_upper;
+                        }
+
                         if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
                             stack.push(SimdQueryStackContext::Single {
                                 stem_strat: far_ctx,
+                                dim: dim_val,
+                                lower_bound: far_lower,
+                                upper_bound: far_upper,
                                 old_off: new_off,
                                 rd: rd_far,
                             });
+                        }
+
+                        unsafe {
+                            *lower.get_unchecked_mut(dim_val) = near_lower;
+                            *upper.get_unchecked_mut(dim_val) = near_upper;
+                            *off.get_unchecked_mut(dim_val) = O::zero();
                         }
                     } else {
                         // +Inf pivots can still encode structural branches in left-aligned trees.
@@ -729,6 +1015,9 @@ where
                         if O::cmp(rd, best_dist) != std::cmp::Ordering::Greater {
                             stack.push(SimdQueryStackContext::Single {
                                 stem_strat: far_ctx,
+                                dim: dim_val,
+                                lower_bound: unsafe { *lower.get_unchecked(dim_val) },
+                                upper_bound: unsafe { *upper.get_unchecked(dim_val) },
                                 old_off,
                                 rd,
                             });
@@ -745,10 +1034,12 @@ where
                     &mut *(stack as *mut crate::kd_tree::query_stack_simd::SimdQueryStack<O, SS>
                         as *mut SS::Stack<O>)
                 };
-                stem_strat.backtracking_traverse_step::<A, O, D, K>(
+                stem_strat.backtracking_traverse_step_with_bounds::<A, O, D, K>(
                     &self.stems,
                     query,
                     query_wide,
+                    lower,
+                    upper,
                     off,
                     dim,
                     rd,
