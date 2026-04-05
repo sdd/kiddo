@@ -4,7 +4,9 @@ use crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
-use crate::stem_strategies::donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4};
+use crate::stem_strategies::donnelly_2_blockmarker_simd::{
+    BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
+};
 use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
 use crate::StemStrategy;
 
@@ -48,6 +50,7 @@ where
     where
         D: KdTreeDistanceMetric<A, K>,
         D::DistOutput: crate::stem_strategies::SimdPrune
+            + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
             + TlsLeafScratch
@@ -67,6 +70,7 @@ where
     where
         D: KdTreeDistanceMetric<A, K>,
         D::DistOutput: crate::stem_strategies::SimdPrune
+            + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
             + TlsLeafScratch
@@ -96,6 +100,7 @@ where
     where
         D: KdTreeDistanceMetric<A, K>,
         D::DistOutput: crate::stem_strategies::SimdPrune
+            + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
             + TlsLeafScratch
@@ -134,6 +139,7 @@ where
     where
         D: KdTreeDistanceMetric<A, K>,
         D::DistOutput: crate::stem_strategies::SimdPrune
+            + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
             + TlsLeafScratch
@@ -172,6 +178,7 @@ where
     where
         D: KdTreeDistanceMetric<A, K>,
         D::DistOutput: crate::stem_strategies::SimdPrune
+            + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
             + TlsLeafScratch
@@ -194,6 +201,7 @@ where
     where
         D: KdTreeDistanceMetric<A, K>,
         D::DistOutput: crate::stem_strategies::SimdPrune
+            + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
             + TlsLeafScratch

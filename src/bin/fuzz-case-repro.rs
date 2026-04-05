@@ -50,29 +50,29 @@ struct ReproParams {
 }
 
 fn main() {
-    let arg = env::args().nth(1).unwrap_or_else(|| {
-        eprintln!(
-            "Usage: cargo run --bin fuzz-case-repro -- <repro-id>\n\
-             Example: failure-kind_immutable-ty_f32-strategy_donnelly-b_32-k_4-size_12345-content_seed_1-query_seed_2\n\
-             Example (v6): failure-kind_v6_mutable-leaf_vec_of_arrays-ty_f32-strategy_eytzinger-b_32-k_4-size_12345-content_seed_1-query_seed_2"
-        );
-        std::process::exit(2);
-    });
-
-    let params = match parse_repro_id(&arg) {
-        Ok(params) => params,
-        Err(err) => {
-            eprintln!("Invalid repro id: {err}");
-            std::process::exit(2);
-        }
-    };
-
-    if let Err(err) = run_repro(&params) {
-        eprintln!("Repro failed: {err}");
-        std::process::exit(1);
-    }
+    // let arg = env::args().nth(1).unwrap_or_else(|| {
+    //     eprintln!(
+    //         "Usage: cargo run --bin fuzz-case-repro -- <repro-id>\n\
+    //          Example: failure-kind_immutable-ty_f32-strategy_donnelly-b_32-k_4-size_12345-content_seed_1-query_seed_2\n\
+    //          Example (v6): failure-kind_v6_mutable-leaf_vec_of_arrays-ty_f32-strategy_eytzinger-b_32-k_4-size_12345-content_seed_1-query_seed_2"
+    //     );
+    //     std::process::exit(2);
+    // });
+    //
+    // let params = match parse_repro_id(&arg) {
+    //     Ok(params) => params,
+    //     Err(err) => {
+    //         eprintln!("Invalid repro id: {err}");
+    //         std::process::exit(2);
+    //     }
+    // };
+    //
+    // if let Err(err) = run_repro(&params) {
+    //     eprintln!("Repro failed: {err}");
+    //     std::process::exit(1);
+    //}
 }
-
+/*
 fn parse_repro_id(input: &str) -> Result<ReproParams, String> {
     let trimmed = input.trim();
     let trimmed = trimmed.strip_prefix("repro=").unwrap_or(trimmed);
@@ -1536,3 +1536,4 @@ where
 
     (sq, man)
 }
+*/

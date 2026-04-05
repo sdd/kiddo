@@ -447,6 +447,52 @@ pub trait StemStrategy: Clone + Sync + Send {
         true
     }
 
+    /// Single step of backtracking traversal for interval-aware SIMD exact paths.
+    ///
+    /// Default implementation ignores the interval bounds and delegates to
+    /// `backtracking_traverse_step`.
+    #[inline(always)]
+    fn backtracking_traverse_step_with_bounds<A, O, D, const K: usize>(
+        &mut self,
+        stems: &[A],
+        query: &[A; K],
+        query_wide: &[O; K],
+        lower: &mut [O; K],
+        upper: &mut [O; K],
+        off: &mut [O; K],
+        dim: &mut usize,
+        rd: O,
+        max_stem_level: i32,
+        best_dist: O,
+        stack: &mut Self::Stack<O>,
+    ) -> bool
+    where
+        Self: Sized,
+        A: AxisUnified<Coord = A>,
+        O: AxisUnified<Coord = O>
+            + crate::stem_strategies::SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4,
+        D: crate::traits_unified_2::DistanceMetricUnified<A, K, Output = O>
+            + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, O>
+            + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, O>,
+        Self::Stack<O>: StackTrait<O, Self>,
+    {
+        let _ = lower;
+        let _ = upper;
+        self.backtracking_traverse_step::<A, O, D, K>(
+            stems,
+            query,
+            query_wide,
+            off,
+            dim,
+            rd,
+            max_stem_level,
+            best_dist,
+            stack,
+        )
+    }
+
     /// Execute backtracking query with explicit stack.
     ///
     /// Default implementation delegates to KdTree's backtracking_query_with_stack_impl.
@@ -466,6 +512,7 @@ pub trait StemStrategy: Clone + Sync + Send {
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
         O: AxisUnified<Coord = O>
             + crate::stem_strategies::SimdPrune
+            + crate::stem_strategies::SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
