@@ -14,14 +14,11 @@ pub unsafe fn compare_block3_f32_avx512(
 ) -> u8 {
     use std::arch::x86_64::*;
 
-    let ptr = stems_ptr.as_ptr().add(cache_line_base * 8) as *const f32;
-    let pivots = _mm512_loadu_ps(ptr);
-    let query_vec = _mm512_set1_ps(query_val);
+    let ptr = stems_ptr.as_ptr().add(cache_line_base * 4) as *const f32;
+    let pivots = _mm256_loadu_ps(ptr);
+    let query_vec = _mm256_set1_ps(query_val);
 
-    let mask = _mm512_cmp_ps_mask(query_vec, pivots, _CMP_GE_OQ);
-
-    // unset the second half of the mask
-    let mask = mask & 0xFF00;
+    let mask = _mm256_cmp_ps_mask(query_vec, pivots, _CMP_GE_OQ);
 
     _popcnt32(mask as i32) as u8
 }
@@ -58,7 +55,7 @@ pub unsafe fn compare_block4_f32_avx512(
 ) -> u8 {
     use std::arch::x86_64::*;
 
-    let ptr = stems_ptr.as_ptr().add(cache_line_base * 8) as *const f32;
+    let ptr = stems_ptr.as_ptr().add(cache_line_base * 4) as *const f32;
     let pivots = _mm512_loadu_ps(ptr);
     let query_vec = _mm512_set1_ps(query_val);
 

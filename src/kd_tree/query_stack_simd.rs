@@ -21,16 +21,46 @@ impl<A, SS: StemStrategy> Default for SimdQueryStack<A, SS> {
 pub enum SimdQueryStackContext<A, SS> {
     Single {
         stem_strat: SS,
+        dim: usize,
+        lower_bound: A,
+        upper_bound: A,
         old_off: A,
         rd: A,
+    },
+    Block3Pending {
+        base: SS,
+        rd_values: [A; 8],
+        new_off_values: [A; 8],
+        pending_mask: u8,
+        dim: usize,
+        old_off: A,
+        lower_bound: A,
+        upper_bound: A,
+    },
+    DeferredBlock {
+        base: SS,
+        child_base: u8,
+        rd_values: [A; 8],
+        new_off_values: [A; 8],
+        lower_bounds: [A; 8],
+        upper_bounds: [A; 8],
+        sibling_mask: u8,
+        dim: usize,
+        old_off: A,
+        lower_bound: A,
+        upper_bound: A,
     },
     Block {
         siblings: [SS; 8],
         rd_values: [A; 8],
         new_off_values: [A; 8], // Per-sibling offset values (e.g., interval distances)
+        lower_bounds: [A; 8],
+        upper_bounds: [A; 8],
         sibling_mask: u8,
         dim: usize,
         old_off: A,
+        lower_bound: A,
+        upper_bound: A,
     },
 }
 
@@ -87,9 +117,12 @@ impl<A, SS: StemStrategy> Drop for SimdQueryStack<A, SS> {
     }
 }
 
-impl<A: AxisUnified<Coord = A>, SS> SimdQueryStackContext<A, SS> {
+impl<A: AxisUnified<Coord = A>, SS: StemStrategy> SimdQueryStackContext<A, SS> {
     pub fn new_single(stem_strat: SS) -> Self {
         Self::Single {
+            dim: stem_strat.dim(),
+            lower_bound: A::min_value(),
+            upper_bound: A::max_value(),
             stem_strat,
             old_off: A::zero(),
             rd: A::zero(),
@@ -100,17 +133,75 @@ impl<A: AxisUnified<Coord = A>, SS> SimdQueryStackContext<A, SS> {
         siblings: [SS; 8],
         rd_values: [A; 8],
         new_off_values: [A; 8],
+        lower_bounds: [A; 8],
+        upper_bounds: [A; 8],
         sibling_mask: u8,
         dim: usize,
         old_off: A,
+        lower_bound: A,
+        upper_bound: A,
     ) -> Self {
         Self::Block {
             siblings,
             rd_values,
             new_off_values,
+            lower_bounds,
+            upper_bounds,
             sibling_mask,
             dim,
             old_off,
+            lower_bound,
+            upper_bound,
+        }
+    }
+
+    pub fn new_deferred_block(
+        base: SS,
+        child_base: u8,
+        rd_values: [A; 8],
+        new_off_values: [A; 8],
+        lower_bounds: [A; 8],
+        upper_bounds: [A; 8],
+        sibling_mask: u8,
+        dim: usize,
+        old_off: A,
+        lower_bound: A,
+        upper_bound: A,
+    ) -> Self {
+        Self::DeferredBlock {
+            base,
+            child_base,
+            rd_values,
+            new_off_values,
+            lower_bounds,
+            upper_bounds,
+            sibling_mask,
+            dim,
+            old_off,
+            lower_bound,
+            upper_bound,
+        }
+    }
+
+    pub fn new_block3_pending(
+        base: SS,
+        rd_values: [A; 8],
+        new_off_values: [A; 8],
+        pending_mask: u8,
+        dim: usize,
+        old_off: A,
+        lower_bound: A,
+        upper_bound: A,
+    ) -> Self {
+        Self::Block3Pending {
+            base,
+            rd_values,
+            new_off_values,
+            pending_mask,
+            dim,
+            old_off,
+            lower_bound,
+            upper_bound,
         }
     }
 
@@ -118,10 +209,15 @@ impl<A: AxisUnified<Coord = A>, SS> SimdQueryStackContext<A, SS> {
         match self {
             Self::Single {
                 stem_strat,
+                dim: _,
+                lower_bound: _,
+                upper_bound: _,
                 old_off,
                 rd,
             } => (stem_strat, old_off, rd),
-            Self::Block { .. } => panic!("into_parts called on Block variant"),
+            Self::Block3Pending { .. } | Self::DeferredBlock { .. } | Self::Block { .. } => {
+                panic!("into_parts called on block variant")
+            }
         }
     }
 }

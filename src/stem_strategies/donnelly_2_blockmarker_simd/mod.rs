@@ -6,6 +6,7 @@
 use crate::stem_strategies::donnelly_core::DonnellyCore;
 use crate::stem_strategies::{Block3, Block4, BlockSizeMarker};
 use crate::traits_unified_2::AxisUnified;
+use crate::StemStrategy;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -26,7 +27,7 @@ mod autovec;
 
 // Pruning traits for SIMD dispatch
 mod prune_traits;
-pub use prune_traits::SimdPrune;
+pub use prune_traits::{SimdPrune, SimdSelectBestChildBlock3};
 
 // Comparison traits for type-specific dispatch
 mod compare_traits;
@@ -37,6 +38,10 @@ pub mod backtrack_traits;
 pub use backtrack_traits::{
     BacktrackBlock3, BacktrackBlock4, DistanceMetricSimdBlock3, DistanceMetricSimdBlock4,
 };
+
+pub(crate) trait DeferredBlockTraversal: crate::StemStrategy + Copy {
+    fn block_child(&self, child_idx: u8) -> Self;
+}
 
 /// Block3 interval lower bounds encoded as u64 literal.
 /// Each 8-bit segment contains the lower bound pivot offset for a child (255 = -∞).
@@ -135,6 +140,146 @@ where
     O::saturating_add(below, above)
 }
 
+#[inline(always)]
+fn coord_min<O>(a: O, b: O) -> O
+where
+    O: AxisUnified<Coord = O>,
+{
+    if O::cmp(a, b) == std::cmp::Ordering::Greater {
+        b
+    } else {
+        a
+    }
+}
+
+#[inline(always)]
+fn fill_block3_backtrack_values<A, O, D, const K2: usize>(
+    stems: &[A],
+    block_base_idx: usize,
+    query_wide: O,
+    old_off: O,
+    rd: O,
+    best_dist: O,
+    new_off_values: &mut [O; 8],
+    rd_values: &mut [O; 8],
+) -> u8
+where
+    A: AxisUnified<Coord = A>,
+    O: AxisUnified<Coord = O>,
+    D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
+{
+    // Block3 exact backtracking intentionally uses the same off[dim]-only lower-bound model
+    // as DonnellySimdDescent. Clipping by parent interval bounds was correct but destroyed
+    // pruning in practice by making this path explore far too many leaves.
+    let old_dist1 = D::dist1(old_off, O::zero());
+    let mut mask = 0u8;
+
+    for sibling_idx in 0..8 {
+        let (lower_offset, upper_offset) = child_interval_bounds_block3(sibling_idx);
+
+        let lower = if lower_offset == 255 {
+            A::min_value()
+        } else {
+            unsafe { *stems.get_unchecked(block_base_idx + lower_offset as usize) }
+        };
+
+        let upper = if upper_offset == 255 {
+            A::max_value()
+        } else {
+            unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
+        };
+
+        let effective_lower = D::widen_coord(lower);
+        let effective_upper = D::widen_coord(upper);
+
+        if O::cmp(effective_lower, effective_upper) != std::cmp::Ordering::Less {
+            new_off_values[sibling_idx] = O::max_value();
+            rd_values[sibling_idx] = O::max_value();
+            continue;
+        }
+
+        let new_off = interval_distance_1d(query_wide, effective_lower, effective_upper);
+        new_off_values[sibling_idx] = new_off;
+
+        let new_dist1 = D::dist1(new_off, O::zero());
+        let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
+        rd_values[sibling_idx] = rd_far;
+
+        if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
+            mask |= 1 << sibling_idx;
+        }
+    }
+
+    mask
+}
+
+#[inline(always)]
+fn fill_block4_backtrack_values_and_bounds<A, O, D, const K2: usize>(
+    stems: &[A],
+    block_base_idx: usize,
+    query_wide: O,
+    parent_lower_bound: O,
+    parent_upper_bound: O,
+    old_off: O,
+    rd: O,
+    best_dist: O,
+    new_off_values: &mut [O; 16],
+    rd_values: &mut [O; 16],
+    lower_bounds: &mut [O; 16],
+    upper_bounds: &mut [O; 16],
+) -> u16
+where
+    A: AxisUnified<Coord = A>,
+    O: AxisUnified<Coord = O>,
+    D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
+{
+    let old_dist1 = D::dist1(old_off, O::zero());
+    let mut mask = 0u16;
+
+    for sibling_idx in 0..16 {
+        let (lower_offset, upper_offset) = child_interval_bounds_block4(sibling_idx);
+
+        let lower = if lower_offset == 255 {
+            A::min_value()
+        } else {
+            unsafe { *stems.get_unchecked(block_base_idx + lower_offset as usize) }
+        };
+
+        let upper = if upper_offset == 255 {
+            A::max_value()
+        } else {
+            unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
+        };
+
+        let raw_lower = D::widen_coord(lower);
+        let raw_upper = D::widen_coord(upper);
+        let effective_lower = O::max(parent_lower_bound, raw_lower);
+        let effective_upper = coord_min(parent_upper_bound, raw_upper);
+
+        lower_bounds[sibling_idx] = effective_lower;
+        upper_bounds[sibling_idx] = effective_upper;
+
+        if O::cmp(effective_lower, effective_upper) == std::cmp::Ordering::Greater {
+            new_off_values[sibling_idx] = O::max_value();
+            rd_values[sibling_idx] = O::max_value();
+            continue;
+        }
+
+        let new_off = interval_distance_1d(query_wide, effective_lower, effective_upper);
+        new_off_values[sibling_idx] = new_off;
+
+        let new_dist1 = D::dist1(new_off, O::zero());
+        let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
+        rd_values[sibling_idx] = rd_far;
+
+        if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
+            mask |= 1u16 << sibling_idx;
+        }
+    }
+
+    mask
+}
+
 /// Donnelly SIMD Strategy
 ///
 /// Donnelly ordering, block-at-once evaluation.
@@ -172,6 +317,38 @@ where
 {
     let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
     A::compare_block4_impl(stems_ptr, query_val, block_base_idx)
+}
+
+/// `cargo-asm` hooks for isolating Block3 exact backtrack kernels.
+#[cfg(feature = "cargo_asm")]
+pub mod cargo_asm {
+    use super::fill_block3_backtrack_values;
+    use crate::dist::SquaredEuclidean;
+
+    /// Hook for cargo-asm to render the exact Block3 backtrack fill kernel directly.
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn donnelly_block3_fill_backtrack_f64_cargo_asm_hook(
+        stems: &[f64],
+        block_base_idx: usize,
+        query_wide: f64,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+        new_off_values: &mut [f64; 8],
+        rd_values: &mut [f64; 8],
+    ) -> u8 {
+        fill_block3_backtrack_values::<f64, f64, SquaredEuclidean<f64>, 3>(
+            stems,
+            block_base_idx,
+            query_wide,
+            old_off,
+            rd,
+            best_dist,
+            new_off_values,
+            rd_values,
+        )
+    }
 }
 
 // ====================================================================================
@@ -295,11 +472,13 @@ where
     }
 
     #[inline(always)]
-    fn backtracking_traverse_step<A, O, D, const K2: usize>(
+    fn backtracking_traverse_step_with_bounds<A, O, D, const K2: usize>(
         &mut self,
         stems: &[A],
         query: &[A; K2],
         query_wide: &[O; K2],
+        lower: &mut [O; K2],
+        upper: &mut [O; K2],
         off: &mut [O; K2],
         dim: &mut usize,
         rd: O,
@@ -310,7 +489,7 @@ where
     where
         Self: Sized,
         A: AxisUnified<Coord = A>,
-        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
+        O: AxisUnified<Coord = O> + SimdSelectBestChildBlock3 + BacktrackBlock3 + BacktrackBlock4,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
             + crate::stem_strategies::donnelly_2_blockmarker_simd::backtrack_traits::DistanceMetricSimdBlock3<
                 A,
@@ -329,14 +508,15 @@ where
         let query_wide_val = unsafe { *query_wide.get_unchecked(dim_val) };
 
         let old_off_val = unsafe { *off.get_unchecked(dim_val) };
+        let lower_bound = unsafe { *lower.get_unchecked(dim_val) };
+        let upper_bound = unsafe { *upper.get_unchecked(dim_val) };
         let block_base_idx = self.stem_idx();
         let block_width = 1usize << Self::BLOCK_SIZE;
         let minor_tri_height = (64 / VB).ilog2();
         let can_take_full_block = self.level() + Self::BLOCK_SIZE as i32 - 1 <= max_stem_level
             && block_base_idx + block_width <= stems.len()
             && Self::BLOCK_SIZE as u32 == minor_tri_height
-            && self.core.minor_level() == 0
-            && old_off_val == O::zero();
+            && self.core.minor_level() == 0;
 
         // TODO: this fallback should not be required. Refactor to avoid the need for it
         if !can_take_full_block {
@@ -372,6 +552,9 @@ where
                 if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
                     stack.push(SimdQueryStackContext::Single {
                         stem_strat: far_ctx,
+                        dim: dim_val,
+                        lower_bound,
+                        upper_bound,
                         old_off: new_off,
                         rd: rd_far,
                     });
@@ -383,6 +566,9 @@ where
                 if O::cmp(rd, best_dist) != std::cmp::Ordering::Greater {
                     stack.push(SimdQueryStackContext::Single {
                         stem_strat: far_ctx,
+                        dim: dim_val,
+                        lower_bound,
+                        upper_bound,
                         old_off: old_off_val,
                         rd,
                     });
@@ -393,225 +579,39 @@ where
             return true;
         }
 
-        // SIMD comparison to get child index
+        let mut rd_values = [O::zero(); 8];
+        let mut new_off_values = [O::zero(); 8];
         let child_idx = compare_block3(stems, query_val, block_base_idx);
-        tracing::trace!("child_idx = {}", child_idx);
 
-        let child_idx_mask = 1 << child_idx;
-
-        // SIMD distance check to get backtrack mask (trait-based dispatch).
-        #[cfg(feature = "simd")]
-        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
-
-        #[cfg(feature = "simd")]
-        let backtrack_mask = O::backtrack_block3::<A, D, K2>(
-            query_wide_val,
-            stems_ptr,
+        let candidate_mask = fill_block3_backtrack_values::<A, O, D, K2>(
+            stems,
             block_base_idx,
+            query_wide_val,
             old_off_val,
             rd,
             best_dist,
-        ) & !child_idx_mask;
+            &mut new_off_values,
+            &mut rd_values,
+        ) & !(1u8 << child_idx);
 
-        #[cfg(not(feature = "simd"))]
-        let (backtrack_mask, siblings, rd_values, new_off_values) = {
-            let mut siblings = [*self; 8];
-            let mut rd_values = [O::zero(); 8];
-            let mut new_off_values = [O::zero(); 8];
-            let mut mask = 0u8;
-
-            for sibling_idx in 0..8 {
-                siblings[sibling_idx]
-                    .core
-                    .traverse_block(sibling_idx as u8, Self::BLOCK_SIZE as u32);
-
-                let (lower_offset, upper_offset) = child_interval_bounds_block3(sibling_idx);
-
-                let lower = if lower_offset == 255 {
-                    A::min_value()
-                } else {
-                    unsafe { *stems.get_unchecked(block_base_idx + lower_offset as usize) }
-                };
-
-                let upper = if upper_offset == 255 {
-                    A::max_value()
-                } else {
-                    unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
-                };
-
-                let query_val = unsafe { *query.get_unchecked(*dim) };
-                let query_wide = D::widen_coord(query_val);
-                let lower_wide = D::widen_coord(lower);
-                let upper_wide = D::widen_coord(upper);
-                let new_off = interval_distance_1d(query_wide, lower_wide, upper_wide);
-
-                new_off_values[sibling_idx] = new_off;
-
-                let old_dist1 = D::dist1(old_off_val, O::zero());
-                let new_dist1 = D::dist1(new_off, O::zero());
-                let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
-                rd_values[sibling_idx] = rd_far;
-
-                let passes_threshold = rd_far <= best_dist;
-                if passes_threshold {
-                    mask |= 1 << sibling_idx;
-                }
-
-                tracing::debug!(
-                    sibling_idx,
-                    stem_idx = self.core.stem_idx(),
-                    dim = *dim,
-                    lower_offset,
-                    upper_offset,
-                    ?lower,
-                    ?upper,
-                    ?lower_wide,
-                    ?upper_wide,
-                    ?query_wide,
-                    ?new_off,
-                    ?old_off_val,
-                    ?rd,
-                    ?rd_far,
-                    ?best_dist,
-                    passes_threshold,
-                    in_backtrack_mask = passes_threshold,
-                    "SIMD Block3: sibling interval calc"
-                );
-            }
-
-            let mask = mask & !child_idx_mask;
-            (mask, siblings, rd_values, new_off_values)
-        };
-
-        let pivots: Vec<A> = (0..7)
-            .map(|i| unsafe { *stems.get_unchecked(block_base_idx + i) })
-            .collect();
-
-        tracing::trace!(
-            child_idx,
-            stem_idx = self.core.stem_idx(),
-            dim = *dim,
-            backtrack_mask_before = backtrack_mask | child_idx_mask,
-            backtrack_mask_after = backtrack_mask,
-            taking_path = format!("child {}", child_idx),
-            pivots = ?pivots,
-            "Block3: backtrack mask"
-        );
-
-        #[cfg(feature = "simd")]
-        if backtrack_mask != 0 {
+        if candidate_mask != 0 {
             use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
 
-            // TODO: this is too slow. Need to:
-            //   * Just store a clone of self, rather than creating all the siblings and traversing them
-            //     all here. We should only create the sibling and traverse it after we perform the SIMD prune.
-            //   * In cases where D == O, widen is a no-op. In this case we can use SIMD ops to calc new_off
-            //     and rd_values in parallel for all siblings.
-
-            let mut siblings = [*self; 8];
-            let mut rd_values = [O::zero(); 8];
-            let mut new_off_values = [O::zero(); 8];
-
-            for sibling_idx in 0..8 {
-                siblings[sibling_idx]
-                    .core
-                    .traverse_block(sibling_idx as u8, Self::BLOCK_SIZE as u32);
-
-                let (lower_offset, upper_offset) = child_interval_bounds_block3(sibling_idx);
-
-                let lower = if lower_offset == 255 {
-                    A::min_value()
-                } else {
-                    unsafe { *stems.get_unchecked(block_base_idx + lower_offset as usize) }
-                };
-
-                let upper = if upper_offset == 255 {
-                    A::max_value()
-                } else {
-                    unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
-                };
-
-                let query_val = unsafe { *query.get_unchecked(*dim) };
-                let query_wide = D::widen_coord(query_val);
-                let lower_wide = D::widen_coord(lower);
-                let upper_wide = D::widen_coord(upper);
-                let new_off = interval_distance_1d(query_wide, lower_wide, upper_wide);
-
-                new_off_values[sibling_idx] = new_off;
-
-                let old_dist1 = D::dist1(old_off_val, O::zero());
-                let new_dist1 = D::dist1(new_off, O::zero());
-                let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
-                rd_values[sibling_idx] = rd_far;
-
-                tracing::debug!(
-                    sibling_idx,
-                    stem_idx = self.core.stem_idx(),
-                    dim = *dim,
-                    lower_offset,
-                    upper_offset,
-                    ?lower,
-                    ?upper,
-                    ?lower_wide,
-                    ?upper_wide,
-                    ?query_wide,
-                    ?new_off,
-                    ?old_off_val,
-                    ?rd,
-                    ?rd_far,
-                    ?best_dist,
-                    passes_threshold = rd_far <= best_dist,
-                    in_backtrack_mask = (backtrack_mask & (1 << sibling_idx)) != 0,
-                    "SIMD Block3: sibling interval calc"
-                );
-            }
-
-            for sibling_idx in 0..8 {
-                if (backtrack_mask & (1 << sibling_idx)) != 0 {
-                    stack.push(SimdQueryStackContext::Single {
-                        stem_strat: siblings[sibling_idx],
-                        old_off: new_off_values[sibling_idx],
-                        rd: rd_values[sibling_idx],
-                    });
-                }
-            }
-        }
-
-        #[cfg(not(feature = "simd"))]
-        if backtrack_mask != 0 {
-            use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
-
-            stack.push(SimdQueryStackContext::Block {
-                siblings,
+            stack.push(SimdQueryStackContext::new_block3_pending(
+                *self,
                 rd_values,
                 new_off_values,
-                sibling_mask: backtrack_mask,
-                dim: dim_val,
-                old_off: old_off_val,
-            });
+                candidate_mask,
+                dim_val,
+                old_off_val,
+                lower_bound,
+                upper_bound,
+            ));
         }
 
-        let (lower_offset, upper_offset) = child_interval_bounds_block3(child_idx as usize);
-
-        let lower = if lower_offset == 255 {
-            A::min_value()
-        } else {
-            unsafe { *stems.get_unchecked(block_base_idx + lower_offset as usize) }
-        };
-
-        let upper = if upper_offset == 255 {
-            A::max_value()
-        } else {
-            unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
-        };
-
-        let query_val = unsafe { *query.get_unchecked(dim_val) };
-        let query_wide = D::widen_coord(query_val);
-        let lower_wide = D::widen_coord(lower);
-        let upper_wide = D::widen_coord(upper);
-
-        let new_off = interval_distance_1d(query_wide, lower_wide, upper_wide);
-        unsafe { *off.get_unchecked_mut(dim_val) = new_off };
+        unsafe {
+            *off.get_unchecked_mut(dim_val) = new_off_values[child_idx as usize];
+        }
 
         self.core.traverse_block(child_idx, Self::BLOCK_SIZE as u32);
         *dim = self.dim();
@@ -630,6 +630,7 @@ where
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
         O: crate::traits_unified_2::AxisUnified<Coord = O>
             + crate::stem_strategies::SimdPrune
+            + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
@@ -639,6 +640,20 @@ where
         LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
     {
         tree.backtracking_query_with_simd_stack_impl::<QC, O, D>(query_ctx, stack, process_leaf);
+    }
+}
+
+impl<const VB: u32, const K: usize> DeferredBlockTraversal for DonnellyMarkerSimd<Block3, 64, VB, K>
+where
+    Self: ValidBlock3Config64,
+{
+    #[inline(always)]
+    fn block_child(&self, child_idx: u8) -> Self {
+        let mut child = *self;
+        child
+            .core
+            .traverse_block(child_idx, Self::BLOCK_SIZE as u32);
+        child
     }
 }
 
@@ -765,11 +780,13 @@ where
     }
 
     #[inline(always)]
-    fn backtracking_traverse_step<A, O, D, const K2: usize>(
+    fn backtracking_traverse_step_with_bounds<A, O, D, const K2: usize>(
         &mut self,
         stems: &[A],
         query: &[A; K2],
         query_wide: &[O; K2],
+        lower: &mut [O; K2],
+        upper: &mut [O; K2],
         off: &mut [O; K2],
         dim: &mut usize,
         rd: O,
@@ -797,6 +814,8 @@ where
         // used by simd code below, but is also the only code that uses query_wide arg
         let query_wide_val = unsafe { *query_wide.get_unchecked(dim_val) };
         let old_off_val = unsafe { *off.get_unchecked(dim_val) };
+        let lower_bound = unsafe { *lower.get_unchecked(dim_val) };
+        let upper_bound = unsafe { *upper.get_unchecked(dim_val) };
         let block_base_idx = self.stem_idx();
         let block_width = 1usize << Self::BLOCK_SIZE;
         let can_take_full_block = self.level() + Self::BLOCK_SIZE as i32 - 1 <= max_stem_level
@@ -832,12 +851,36 @@ where
                 let new_dist1 = D::dist1(new_off, O::zero());
                 let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
 
+                let (near_lower, near_upper, far_lower, far_upper) = if is_right_child {
+                    (
+                        O::max(lower_bound, pivot_wide),
+                        upper_bound,
+                        lower_bound,
+                        coord_min(upper_bound, pivot_wide),
+                    )
+                } else {
+                    (
+                        lower_bound,
+                        coord_min(upper_bound, pivot_wide),
+                        O::max(lower_bound, pivot_wide),
+                        upper_bound,
+                    )
+                };
+
                 if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
                     stack.push(SimdQueryStackContext::Single {
                         stem_strat: far_ctx,
+                        dim: dim_val,
+                        lower_bound: far_lower,
+                        upper_bound: far_upper,
                         old_off: new_off,
                         rd: rd_far,
                     });
+                }
+
+                unsafe {
+                    *lower.get_unchecked_mut(dim_val) = near_lower;
+                    *upper.get_unchecked_mut(dim_val) = near_upper;
                 }
             } else {
                 // +Inf can represent structural padding in left-aligned trees.
@@ -846,6 +889,9 @@ where
                 if O::cmp(rd, best_dist) != std::cmp::Ordering::Greater {
                     stack.push(SimdQueryStackContext::Single {
                         stem_strat: far_ctx,
+                        dim: dim_val,
+                        lower_bound,
+                        upper_bound,
                         old_off: old_off_val,
                         rd,
                     });
@@ -860,179 +906,82 @@ where
 
         let child_idx_mask = 1u16 << child_idx;
 
-        #[cfg(feature = "simd")]
-        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
-
-        #[cfg(feature = "simd")]
-        let backtrack_mask = O::backtrack_block4::<A, D, K2>(
-            query_wide_val,
-            stems_ptr,
+        let mut rd_values = [O::zero(); 16];
+        let mut new_off_values = [O::zero(); 16];
+        let mut lower_bounds = [O::zero(); 16];
+        let mut upper_bounds = [O::zero(); 16];
+        let backtrack_mask = fill_block4_backtrack_values_and_bounds::<A, O, D, K2>(
+            stems,
             block_base_idx,
+            query_wide_val,
+            lower_bound,
+            upper_bound,
             old_off_val,
             rd,
             best_dist,
+            &mut new_off_values,
+            &mut rd_values,
+            &mut lower_bounds,
+            &mut upper_bounds,
         ) & !child_idx_mask;
 
-        #[cfg(not(feature = "simd"))]
-        let (backtrack_mask, siblings, rd_values, new_off_values) = {
-            let mut siblings = [*self; 16];
-            let mut rd_values = [O::zero(); 16];
-            let mut new_off_values = [O::zero(); 16];
-            let mut mask: u16 = 0;
+        use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
 
-            for sibling_idx in 0..16 {
-                siblings[sibling_idx]
-                    .core
-                    .traverse_block(sibling_idx as u8, Self::BLOCK_SIZE as u32);
-
-                let (lower_offset, upper_offset) = child_interval_bounds_block4(sibling_idx);
-
-                let lower = if lower_offset == 255 {
-                    A::min_value()
-                } else {
-                    unsafe { *stems.get_unchecked(block_base_idx + lower_offset as usize) }
-                };
-
-                let upper = if upper_offset == 255 {
-                    A::max_value()
-                } else {
-                    unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
-                };
-
-                let query_wide = D::widen_coord(query_val);
-                let lower_wide = D::widen_coord(lower);
-                let upper_wide = D::widen_coord(upper);
-                let new_off = interval_distance_1d(query_wide, lower_wide, upper_wide);
-
-                new_off_values[sibling_idx] = new_off;
-
-                let old_dist1 = D::dist1(old_off_val, O::zero());
-                let new_dist1 = D::dist1(new_off, O::zero());
-                let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
-                rd_values[sibling_idx] = rd_far;
-
-                if rd_far <= best_dist {
-                    mask |= 1u16 << sibling_idx;
-                }
-            }
-
-            let mask = mask & !child_idx_mask;
-            (mask, siblings, rd_values, new_off_values)
-        };
-
-        #[cfg(feature = "simd")]
-        if backtrack_mask != 0 {
-            use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
-
-            let mut siblings = [*self; 16];
-            let mut rd_values = [O::zero(); 16];
-            let mut new_off_values = [O::zero(); 16];
-
-            for sibling_idx in 0..16 {
-                siblings[sibling_idx]
-                    .core
-                    .traverse_block(sibling_idx as u8, Self::BLOCK_SIZE as u32);
-
-                let (lower_offset, upper_offset) = child_interval_bounds_block4(sibling_idx);
-
-                let lower = if lower_offset == 255 {
-                    A::min_value()
-                } else {
-                    unsafe { *stems.get_unchecked(block_base_idx + lower_offset as usize) }
-                };
-
-                let upper = if upper_offset == 255 {
-                    A::max_value()
-                } else {
-                    unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
-                };
-
-                let query_wide = D::widen_coord(query_val);
-                let lower_wide = D::widen_coord(lower);
-                let upper_wide = D::widen_coord(upper);
-                let new_off = interval_distance_1d(query_wide, lower_wide, upper_wide);
-
-                new_off_values[sibling_idx] = new_off;
-
-                let old_dist1 = D::dist1(old_off_val, O::zero());
-                let new_dist1 = D::dist1(new_off, O::zero());
-                let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
-                rd_values[sibling_idx] = rd_far;
-            }
-
-            for sibling_idx in 0..16 {
-                if (backtrack_mask & (1u16 << sibling_idx)) != 0 {
-                    stack.push(SimdQueryStackContext::Single {
-                        stem_strat: siblings[sibling_idx],
-                        old_off: new_off_values[sibling_idx],
-                        rd: rd_values[sibling_idx],
-                    });
-                }
-            }
+        let high_mask = (backtrack_mask >> 8) as u8;
+        if high_mask != 0 {
+            let mut high_rd_values = [O::zero(); 8];
+            let mut high_new_off_values = [O::zero(); 8];
+            let mut high_lower_bounds = [O::zero(); 8];
+            let mut high_upper_bounds = [O::zero(); 8];
+            high_rd_values.copy_from_slice(&rd_values[8..16]);
+            high_new_off_values.copy_from_slice(&new_off_values[8..16]);
+            high_lower_bounds.copy_from_slice(&lower_bounds[8..16]);
+            high_upper_bounds.copy_from_slice(&upper_bounds[8..16]);
+            stack.push(SimdQueryStackContext::new_deferred_block(
+                *self,
+                8,
+                high_rd_values,
+                high_new_off_values,
+                high_lower_bounds,
+                high_upper_bounds,
+                high_mask,
+                dim_val,
+                old_off_val,
+                lower_bound,
+                upper_bound,
+            ));
         }
 
-        #[cfg(not(feature = "simd"))]
-        if backtrack_mask != 0 {
-            use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
-
-            let high_mask = (backtrack_mask >> 8) as u8;
-            if high_mask != 0 {
-                let mut high_siblings = [*self; 8];
-                let mut high_rd_values = [O::zero(); 8];
-                let mut high_new_off_values = [O::zero(); 8];
-                high_siblings.copy_from_slice(&siblings[8..16]);
-                high_rd_values.copy_from_slice(&rd_values[8..16]);
-                high_new_off_values.copy_from_slice(&new_off_values[8..16]);
-                stack.push(SimdQueryStackContext::Block {
-                    siblings: high_siblings,
-                    rd_values: high_rd_values,
-                    new_off_values: high_new_off_values,
-                    sibling_mask: high_mask,
-                    dim: dim_val,
-                    old_off: old_off_val,
-                });
-            }
-
-            let low_mask = backtrack_mask as u8;
-            if low_mask != 0 {
-                let mut low_siblings = [*self; 8];
-                let mut low_rd_values = [O::zero(); 8];
-                let mut low_new_off_values = [O::zero(); 8];
-                low_siblings.copy_from_slice(&siblings[..8]);
-                low_rd_values.copy_from_slice(&rd_values[..8]);
-                low_new_off_values.copy_from_slice(&new_off_values[..8]);
-                stack.push(SimdQueryStackContext::Block {
-                    siblings: low_siblings,
-                    rd_values: low_rd_values,
-                    new_off_values: low_new_off_values,
-                    sibling_mask: low_mask,
-                    dim: dim_val,
-                    old_off: old_off_val,
-                });
-            }
+        let low_mask = backtrack_mask as u8;
+        if low_mask != 0 {
+            let mut low_rd_values = [O::zero(); 8];
+            let mut low_new_off_values = [O::zero(); 8];
+            let mut low_lower_bounds = [O::zero(); 8];
+            let mut low_upper_bounds = [O::zero(); 8];
+            low_rd_values.copy_from_slice(&rd_values[..8]);
+            low_new_off_values.copy_from_slice(&new_off_values[..8]);
+            low_lower_bounds.copy_from_slice(&lower_bounds[..8]);
+            low_upper_bounds.copy_from_slice(&upper_bounds[..8]);
+            stack.push(SimdQueryStackContext::new_deferred_block(
+                *self,
+                0,
+                low_rd_values,
+                low_new_off_values,
+                low_lower_bounds,
+                low_upper_bounds,
+                low_mask,
+                dim_val,
+                old_off_val,
+                lower_bound,
+                upper_bound,
+            ));
         }
 
-        let (lower_offset, upper_offset) = child_interval_bounds_block4(child_idx as usize);
-
-        let lower = if lower_offset == 255 {
-            A::min_value()
-        } else {
-            unsafe { *stems.get_unchecked(block_base_idx + lower_offset as usize) }
-        };
-
-        let upper = if upper_offset == 255 {
-            A::max_value()
-        } else {
-            unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
-        };
-
-        let query_val = unsafe { *query.get_unchecked(dim_val) };
-        let query_wide = D::widen_coord(query_val);
-        let lower_wide = D::widen_coord(lower);
-        let upper_wide = D::widen_coord(upper);
-
-        let new_off = interval_distance_1d(query_wide, lower_wide, upper_wide);
-        unsafe { *off.get_unchecked_mut(dim_val) = new_off };
+        unsafe {
+            *off.get_unchecked_mut(dim_val) = new_off_values[child_idx as usize];
+            *lower.get_unchecked_mut(dim_val) = lower_bounds[child_idx as usize];
+            *upper.get_unchecked_mut(dim_val) = upper_bounds[child_idx as usize];
+        }
 
         self.core.traverse_block(child_idx, Self::BLOCK_SIZE as u32);
         *dim = self.dim();
@@ -1051,6 +1000,7 @@ where
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
         O: crate::traits_unified_2::AxisUnified<Coord = O>
             + crate::stem_strategies::SimdPrune
+            + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
         D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
@@ -1060,6 +1010,20 @@ where
         LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
     {
         tree.backtracking_query_with_simd_stack_impl::<QC, O, D>(query_ctx, stack, process_leaf);
+    }
+}
+
+impl<const VB: u32, const K: usize> DeferredBlockTraversal for DonnellyMarkerSimd<Block4, 64, VB, K>
+where
+    Self: ValidBlock4Config64,
+{
+    #[inline(always)]
+    fn block_child(&self, child_idx: u8) -> Self {
+        let mut child = *self;
+        child
+            .core
+            .traverse_block(child_idx, Self::BLOCK_SIZE as u32);
+        child
     }
 }
 
@@ -1076,6 +1040,27 @@ mod tests {
         [0.2, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f32::INFINITY]
     }
 
+    fn build_test_block4_pivots_f32() -> [f32; 16] {
+        [
+            0.7,
+            0.3,
+            1.1,
+            0.1,
+            0.5,
+            0.9,
+            1.3,
+            0.0,
+            0.2,
+            0.4,
+            0.6,
+            0.8,
+            1.0,
+            1.2,
+            1.4,
+            f32::INFINITY,
+        ]
+    }
+
     fn select_child_scalar_f64(query: f64, pivots: &[f64; 8]) -> u8 {
         let mut count = 0u8;
         for i in 0..8 {
@@ -1089,6 +1074,16 @@ mod tests {
     fn select_child_scalar_f32(query: f32, pivots: &[f32; 8]) -> u8 {
         let mut count = 0u8;
         for i in 0..8 {
+            if query >= pivots[i] {
+                count += 1;
+            }
+        }
+        count
+    }
+
+    fn select_child_scalar_block4_f32(query: f32, pivots: &[f32; 16]) -> u8 {
+        let mut count = 0u8;
+        for i in 0..16 {
             if query >= pivots[i] {
                 count += 1;
             }
@@ -1588,6 +1583,24 @@ mod tests {
             assert_eq!(
                 actual, expected,
                 "compare_block3 (f32) mismatch for query {}: expected child {}, got {}",
+                query, expected, actual
+            );
+        }
+    }
+
+    #[test]
+    fn test_block4_child_selection_via_compare_block4_f32() {
+        let pivots = build_test_block4_pivots_f32();
+
+        let test_queries = [-100.0f32, 0.0f32, 0.15f32, 0.55f32, 1.05f32, 100.0f32];
+
+        for &query in &test_queries {
+            let expected = select_child_scalar_block4_f32(query, &pivots);
+            let actual = compare_block4(&pivots, query, 0);
+
+            assert_eq!(
+                actual, expected,
+                "compare_block4 (f32) mismatch for query {}: expected child {}, got {}",
                 query, expected, actual
             );
         }

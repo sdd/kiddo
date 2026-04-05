@@ -7,6 +7,17 @@ const INLINE_QUERY_STACK_CAPACITY: usize = 50;
 pub trait ScalarStackContext<A, S>: Sized {
     fn from_parts(stem_state: S, old_off: A, rd: A) -> Self;
     fn into_parts(self) -> (S, A, A);
+
+    #[inline(always)]
+    fn from_parts_with_restore_dim(stem_state: S, _restore_dim: usize, old_off: A, rd: A) -> Self {
+        Self::from_parts(stem_state, old_off, rd)
+    }
+
+    #[inline(always)]
+    fn into_parts_with_restore_dim(self) -> (S, Option<usize>, A, A) {
+        let (stem_state, old_off, rd) = self.into_parts();
+        (stem_state, None, old_off, rd)
+    }
 }
 
 /// Trait for query stack types to enable generic backtracking implementations

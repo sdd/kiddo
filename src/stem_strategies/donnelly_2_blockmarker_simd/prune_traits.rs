@@ -30,6 +30,41 @@ pub trait SimdPrune: AxisUnified<Coord = Self> + sealed::Sealed {
     fn simd_prune_block3(rd_values: &[Self; 8], max_dist: Self, sibling_mask: u8) -> u8;
 }
 
+/// Select the child with the smallest lower-bound distance among the live Block3 lanes.
+///
+/// `candidate_mask` marks the currently viable children. Returns `None` if no children remain.
+pub trait SimdSelectBestChildBlock3: AxisUnified<Coord = Self> + sealed::Sealed {
+    /// Returns the lowest-index live child whose lower-bound distance is minimal.
+    fn simd_select_best_child_block3(rd_values: &[Self; 8], candidate_mask: u8) -> Option<u8>;
+}
+
+#[inline(always)]
+fn scalar_select_best_child_block3<O>(rd_values: &[O; 8], candidate_mask: u8) -> Option<u8>
+where
+    O: AxisUnified<Coord = O>,
+{
+    if candidate_mask == 0 {
+        return None;
+    }
+
+    let mut remaining = candidate_mask;
+    let first = remaining.trailing_zeros() as usize;
+    let mut best_idx = first;
+    let mut best_rd = rd_values[first];
+    remaining &= remaining - 1;
+
+    while remaining != 0 {
+        let idx = remaining.trailing_zeros() as usize;
+        if O::cmp(rd_values[idx], best_rd) == std::cmp::Ordering::Less {
+            best_idx = idx;
+            best_rd = rd_values[idx];
+        }
+        remaining &= remaining - 1;
+    }
+
+    Some(best_idx as u8)
+}
+
 /// Macro to generate the autovec fallback implementation.
 /// This is the same for all types - a simple loop with comparisons.
 ///
@@ -119,6 +154,36 @@ impl SimdPrune for f64 {
     }
 }
 
+impl SimdSelectBestChildBlock3 for f64 {
+    #[inline(always)]
+    fn simd_select_best_child_block3(rd_values: &[f64; 8], candidate_mask: u8) -> Option<u8> {
+        #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+        {
+            unsafe {
+                use std::arch::x86_64::*;
+
+                if candidate_mask == 0 {
+                    return None;
+                }
+
+                let rd_vec = _mm512_loadu_pd(rd_values.as_ptr());
+                let masked =
+                    _mm512_mask_mov_pd(_mm512_set1_pd(f64::INFINITY), candidate_mask, rd_vec);
+                let min_val = _mm512_reduce_min_pd(masked);
+                let eq_mask = _mm512_cmp_pd_mask(masked, _mm512_set1_pd(min_val), _CMP_EQ_OQ)
+                    & candidate_mask;
+
+                return Some(eq_mask.trailing_zeros() as u8);
+            }
+        }
+
+        #[cfg(not(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f")))]
+        {
+            scalar_select_best_child_block3(rd_values, candidate_mask)
+        }
+    }
+}
+
 impl sealed::Sealed for f32 {}
 impl SimdPrune for f32 {
     #[inline(always)]
@@ -170,6 +235,13 @@ impl SimdPrune for f32 {
         {
             autovec_fallback!(8, u8, rd_values, max_dist, sibling_mask)
         }
+    }
+}
+
+impl SimdSelectBestChildBlock3 for f32 {
+    #[inline(always)]
+    fn simd_select_best_child_block3(rd_values: &[f32; 8], candidate_mask: u8) -> Option<u8> {
+        scalar_select_best_child_block3(rd_values, candidate_mask)
     }
 }
 
@@ -230,6 +302,16 @@ mod fixed_impls {
                     }
                 }
             }
+
+            impl SimdSelectBestChildBlock3 for fixed::FixedI32<$frac> {
+                #[inline(always)]
+                fn simd_select_best_child_block3(
+                    rd_values: &[fixed::FixedI32<$frac>; 8],
+                    candidate_mask: u8,
+                ) -> Option<u8> {
+                    scalar_select_best_child_block3(rd_values, candidate_mask)
+                }
+            }
         };
     }
 
@@ -279,6 +361,16 @@ mod fixed_impls {
                     {
                         autovec_fallback!(8, u8, rd_values, max_dist, sibling_mask)
                     }
+                }
+            }
+
+            impl SimdSelectBestChildBlock3 for fixed::FixedU32<$frac> {
+                #[inline(always)]
+                fn simd_select_best_child_block3(
+                    rd_values: &[fixed::FixedU32<$frac>; 8],
+                    candidate_mask: u8,
+                ) -> Option<u8> {
+                    scalar_select_best_child_block3(rd_values, candidate_mask)
                 }
             }
         };
@@ -332,6 +424,16 @@ mod fixed_impls {
                     }
                 }
             }
+
+            impl SimdSelectBestChildBlock3 for fixed::FixedI16<$frac> {
+                #[inline(always)]
+                fn simd_select_best_child_block3(
+                    rd_values: &[fixed::FixedI16<$frac>; 8],
+                    candidate_mask: u8,
+                ) -> Option<u8> {
+                    scalar_select_best_child_block3(rd_values, candidate_mask)
+                }
+            }
         };
     }
 
@@ -383,6 +485,16 @@ mod fixed_impls {
                     }
                 }
             }
+
+            impl SimdSelectBestChildBlock3 for fixed::FixedU16<$frac> {
+                #[inline(always)]
+                fn simd_select_best_child_block3(
+                    rd_values: &[fixed::FixedU16<$frac>; 8],
+                    candidate_mask: u8,
+                ) -> Option<u8> {
+                    scalar_select_best_child_block3(rd_values, candidate_mask)
+                }
+            }
         };
     }
 
@@ -429,6 +541,13 @@ mod f16_impl {
             {
                 autovec_fallback!(8, u8, rd_values, max_dist, sibling_mask)
             }
+        }
+    }
+
+    impl SimdSelectBestChildBlock3 for f16 {
+        #[inline(always)]
+        fn simd_select_best_child_block3(rd_values: &[f16; 8], candidate_mask: u8) -> Option<u8> {
+            scalar_select_best_child_block3(rd_values, candidate_mask)
         }
     }
 }

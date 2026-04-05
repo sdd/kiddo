@@ -3,7 +3,9 @@ use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::result_collection::ResultCollection;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
-use crate::stem_strategies::donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4};
+use crate::stem_strategies::donnelly_2_blockmarker_simd::{
+    BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
+};
 use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, LeafStrategy};
 use crate::{NearestNeighbour, StemStrategy};
 use std::collections::BinaryHeap;
@@ -32,6 +34,7 @@ where
             + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, D::Output>
             + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, D::Output>,
         D::Output: crate::stem_strategies::SimdPrune
+            + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
             + TlsLeafScratch
@@ -63,6 +66,7 @@ where
             + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, D::Output>
             + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, D::Output>,
         D::Output: crate::stem_strategies::SimdPrune
+            + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
             + TlsLeafScratch
