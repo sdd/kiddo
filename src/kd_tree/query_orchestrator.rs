@@ -745,7 +745,7 @@ where
                     // Process each surviving sibling
                     for sibling_idx in 0..8 {
                         if surviving_mask & (1 << sibling_idx) != 0 {
-                            let mut ss = siblings[sibling_idx].clone();
+                            let mut ss = siblings[sibling_idx];
                             let rd = rd_values[sibling_idx];
                             let new_off = new_off_values[sibling_idx];
                             // if !self.subtree_may_contain_leaf(

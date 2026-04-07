@@ -6,6 +6,7 @@ use generator::Generator;
 pub struct WithinUnsortedIter<'a, A, T>(Generator<'a, (), NearestNeighbour<A, T>>);
 
 impl<'a, A, T> WithinUnsortedIter<'a, A, T> {
+    #[allow(dead_code)]
     pub(crate) fn new(gen: Generator<'a, (), NearestNeighbour<A, T>>) -> Self {
         WithinUnsortedIter(gen)
     }
