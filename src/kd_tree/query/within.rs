@@ -49,7 +49,6 @@ mod tests {
     use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
     use crate::kd_tree::KdTree;
     use crate::traits::Axis;
-    use crate::traits::DistanceMetric;
     use crate::traits_unified_2::Manhattan;
     use crate::Eytzinger;
 
@@ -159,11 +158,14 @@ mod tests {
         content: &[[A; K]],
         query_point: &[A; K],
         radius: A,
-    ) -> Vec<(A, u32)> {
+    ) -> Vec<(A, u32)>
+    where
+        crate::dist::Manhattan<A>: crate::dist::DistanceMetricCore<A, Output = A>,
+    {
         let mut matching_items = vec![];
 
         for (idx, p) in content.iter().enumerate() {
-            let dist = crate::Manhattan::dist(query_point, p);
+            let dist = manhattan_dist(query_point, p);
             if dist <= radius {
                 matching_items.push((dist, idx as u32));
             }
@@ -172,6 +174,20 @@ mod tests {
         stabilize_sort(&mut matching_items);
 
         matching_items
+    }
+
+    fn manhattan_dist<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A
+    where
+        crate::dist::Manhattan<A>: crate::dist::DistanceMetricCore<A, Output = A>,
+    {
+        let aw = (*a).map(|coord| {
+            <crate::dist::Manhattan<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(coord)
+        });
+        let bw = (*b).map(|coord| {
+            <crate::dist::Manhattan<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(coord)
+        });
+
+        <crate::dist::Manhattan<A> as crate::dist::DistanceMetricCore<A>>::dist::<K>(&aw, &bw)
     }
 
     fn stabilize_sort<A: Axis>(matching_items: &mut [(A, u32)]) {

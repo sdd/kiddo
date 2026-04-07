@@ -165,45 +165,45 @@ lto = "thin"
 codegen-units = 16
 incremental = true
 
-[[bench]]
-name = "add_points"
-harness = false
-required-features = ["test_utils"]
+#[[bench]]
+#name = "add_points"
+#harness = false
+#required-features = ["test_utils"]
+#
+#[[bench]]
+#name = "nearest_one"
+#harness = false
+#required-features = ["test_utils"]
 
-[[bench]]
-name = "nearest_one"
-harness = false
-required-features = ["test_utils"]
-
-[[bench]]
-name = "nearest_one_immutable"
-harness = false
-required-features = ["test_utils"]
-
-[[bench]]
-name = "nearest_n"
-harness = false
-required-features = ["test_utils"]
-
-[[bench]]
-name = "within"
-harness = false
-required-features = ["test_utils"]
-
-[[bench]]
-name = "within_unsorted"
-harness = false
-required-features = ["test_utils"]
-
-[[bench]]
-name = "best_n"
-harness = false
-required-features = ["test_utils"]
-
-[[bench]]
-name = "approx_nearest_one_immutable"
-harness = false
-required-features = ["test_utils"]
+#[[bench]]
+#name = "nearest_one_immutable"
+#harness = false
+#required-features = ["test_utils"]
+#
+#[[bench]]
+#name = "nearest_n"
+#harness = false
+#required-features = ["test_utils"]
+#
+#[[bench]]
+#name = "within"
+#harness = false
+#required-features = ["test_utils"]
+#
+#[[bench]]
+#name = "within_unsorted"
+#harness = false
+#required-features = ["test_utils"]
+#
+#[[bench]]
+#name = "best_n"
+#harness = false
+#required-features = ["test_utils"]
+#
+#[[bench]]
+#name = "approx_nearest_one_immutable"
+#harness = false
+#required-features = ["test_utils"]
 
 [[bench]]
 name = "v6_leaf_strategies"
@@ -225,184 +225,184 @@ name = "get_leaf_idx_immutable_mt"
 harness = false
 required-features = ["test_utils"]
 
-[[example]]
-name = "avx2-check"
-path = "examples/avx2-check.rs"
-
-[[example]]
-name = "build-float-doctest-tree-rkyv_08"
-path = "examples/build-float-doctest-tree-rkyv_08.rs"
-required-features = ["rkyv_08"]
-
-[[example]]
-name = "build-immutable-doctest-tree-rkyv_08"
-path = "examples/build-immutable-doctest-tree-rkyv_08.rs"
-required-features = ["rkyv_08"]
-
-[[example]]
-name = "check-select-nth-unstable"
-path = "examples/check-select-nth-unstable.rs"
-
-[[example]]
-name = "cities"
-path = "examples/cities.rs"
-required-features = ["csv"]
-
-[[example]]
-name = "float-rkyv_08-serialize"
-path = "examples/float-rkyv_08-serialize.rs"
-required-features = ["rkyv_08"]
-
-[[example]]
-name = "float-rkyv_08-deserialize"
-path = "examples/float-rkyv_08-deserialize.rs"
-required-features = ["rkyv_08"]
-
-[[example]]
-name = "half"
-path = "examples/half.rs"
-required-features = ["f16"]
-
-[[example]]
-name = "immutable-large"
-path = "examples/immutable-large.rs"
-required-features = ["test_utils"]
-
-[[example]]
-name = "immutable-large-ann-donnelly"
-path = "examples/immutable-large-ann-donnelly.rs"
-required-features = ["test_utils"]
-
-[[example]]
-name = "immutable-large-ann-donnelly-deserialize-and-query"
-path = "examples/immutable-large-ann-donnelly-deserialize-and-query.rs"
-required-features = ["test_utils", "rkyv_08"]
-
-[[example]]
-name = "immutable-large-ann-donnelly-swpre-deserialize-and-query"
-path = "examples/immutable-large-ann-donnelly-swpre-deserialize-and-query.rs"
-required-features = ["test_utils", "rkyv_08"]
-
-[[example]]
-name = "immutable-large-ann-eytzinger-deserialize-and-query"
-path = "examples/immutable-large-ann-eytzinger-deserialize-and-query.rs"
-required-features = ["test_utils", "rkyv_08"]
-
-[[example]]
-name = "immutable-large-donnelly-simulate-traverse-f32"
-path = "examples/immutable-large-donnelly-simulate-traverse-f32.rs"
-required-features = ["test_utils", "rkyv_08", "simulator"]
-
-[[example]]
-name = "immutable-large-donnelly-simulate-traverse-f64"
-path = "examples/immutable-large-donnelly-simulate-traverse-f64.rs"
-required-features = ["test_utils", "rkyv_08", "simulator"]
-
-[[example]]
-name = "immutable-large-donnelly-swpre-simulate-traverse-f64"
-path = "examples/immutable-large-donnelly-swpre-simulate-traverse-f64.rs"
-required-features = ["test_utils", "rkyv_08", "simulator"]
-
-[[example]]
-name = "immutable-large-ann-donnelly-build-and-serialize"
-path = "examples/immutable-large-ann-donnelly-build-and-serialize.rs"
-required-features = ["test_utils", "rkyv_08"]
-
-[[example]]
-name = "immutable-large-donnelly-build-and-serialize-d4-f32"
-path = "examples/immutable-large-donnelly-build-and-serialize-d4-f32.rs"
-required-features = ["test_utils", "rkyv_08"]
-
-
-[[example]]
-name = "immutable-large-donnelly-simulate-traverse-f32-unrolled"
-path = "examples/immutable-large-donnelly-simulate-traverse-f32-unrolled.rs"
-required-features = ["test_utils", "simulator", "rkyv_08"]
-
-[[example]]
-name = "immutable-large-donnelly-deserialize-and-traverse-f32-rolled"
-path = "examples/immutable-large-donnelly-deserialize-and-traverse-f32-rolled.rs"
-required-features = ["test_utils", "rkyv_08"]
-
-[[example]]
-name = "immutable-large-donnelly-deserialize-and-traverse-f32-unrolled"
-path = "examples/immutable-large-donnelly-deserialize-and-traverse-f32-unrolled.rs"
-required-features = ["test_utils", "rkyv_08"]
-
-[[example]]
-name = "immutable-large-donnelly-deserialize-and-traverse-f32-unrolled-pf"
-path = "examples/immutable-large-donnelly-deserialize-and-traverse-f32-unrolled-pf.rs"
-required-features = ["test_utils", "rkyv_08"]
-
-[[example]]
-name = "immutable-large-eytz-build-and-serialize-f32"
-path = "examples/immutable-large-eytz-build-and-serialize-f32.rs"
-required-features = ["test_utils", "rkyv_08"]
-
-[[example]]
-name = "immutable-large-eytz-simulate-traverse-f32"
-path = "examples/immutable-large-eytz-simulate-traverse-f32.rs"
-required-features = ["test_utils", "simulator", "rkyv_08"]
-
-[[example]]
-name = "immutable-large-eytz-deserialize-and-traverse-f32"
-path = "examples/immutable-large-eytz-deserialize-and-traverse-f32.rs"
-required-features = ["test_utils", "rkyv_08"]
-
-[[example]]
-name = "immutable-large-eytz-deserialize-and-traverse-f32-pf"
-path = "examples/immutable-large-eytz-deserialize-and-traverse-f32-pf.rs"
-required-features = ["test_utils", "rkyv_08"]
-
-[[example]]
-name = "immutable-large-eytz-deserialize-and-traverse-f32-pf-far"
-path = "examples/immutable-large-eytz-deserialize-and-traverse-f32-pf-far.rs"
-required-features = ["test_utils", "rkyv_08"]
-
-[[example]]
-name = "immutable-large-eytz-simulate-traverse-f64"
-path = "examples/immutable-large-eytz-simulate-traverse-f64.rs"
-required-features = ["test_utils", "rkyv_08", "simulator"]
-
-[[example]]
-name = "immutable-large-ann-eytz-build-and-serialize"
-path = "examples/immutable-large-ann-eytz-build-and-serialize.rs"
-required-features = ["test_utils", "rkyv_08"]
-
-[[example]]
-name = "immutable-large-ann-eytzinger"
-path = "examples/immutable-large-ann-eytzinger.rs"
-required-features = ["test_utils"]
-
-[[example]]
-name = "immutable-rkyv_08-serialize"
-path = "examples/immutable-rkyv_08-serialize.rs"
-required-features = ["rkyv_08"]
-
-[[example]]
-name = "immutable-rkyv_08-deserialize"
-path = "examples/immutable-rkyv_08-deserialize.rs"
-required-features = ["rkyv_08"]
-
-[[example]]
-name = "pointcloud-las"
-path = "examples/pointcloud-las.rs"
-required-features = ["las", "rkyv_08"]
-
-[[example]]
-name = "pointcloud-csv"
-path = "examples/pointcloud-csv.rs"
-required-features = ["csv", "rkyv_08"]
-
-[[example]]
-name = "serde"
-path = "examples/serde.rs"
-required-features = ["csv", "serde"]
+#[[example]]
+#name = "avx2-check"
+#path = "examples/avx2-check.rs"
 #
-#[[bin]]
-#name = "fuzz-case-repro"
-#path = "src/bin/fuzz-case-repro.rs"
+#[[example]]
+#name = "build-float-doctest-tree-rkyv_08"
+#path = "examples/build-float-doctest-tree-rkyv_08.rs"
+#required-features = ["rkyv_08"]
+#
+#[[example]]
+#name = "build-immutable-doctest-tree-rkyv_08"
+#path = "examples/build-immutable-doctest-tree-rkyv_08.rs"
+#required-features = ["rkyv_08"]
+#
+#[[example]]
+#name = "check-select-nth-unstable"
+#path = "examples/check-select-nth-unstable.rs"
+#
+#[[example]]
+#name = "cities"
+#path = "examples/cities.rs"
+#required-features = ["csv"]
+#
+#[[example]]
+#name = "float-rkyv_08-serialize"
+#path = "examples/float-rkyv_08-serialize.rs"
+#required-features = ["rkyv_08"]
+#
+#[[example]]
+#name = "float-rkyv_08-deserialize"
+#path = "examples/float-rkyv_08-deserialize.rs"
+#required-features = ["rkyv_08"]
+#
+#[[example]]
+#name = "half"
+#path = "examples/half.rs"
+#required-features = ["f16"]
+#
+#[[example]]
+#name = "immutable-large"
+#path = "examples/immutable-large.rs"
 #required-features = ["test_utils"]
+#
+#[[example]]
+#name = "immutable-large-ann-donnelly"
+#path = "examples/immutable-large-ann-donnelly.rs"
+#required-features = ["test_utils"]
+#
+#[[example]]
+#name = "immutable-large-ann-donnelly-deserialize-and-query"
+#path = "examples/immutable-large-ann-donnelly-deserialize-and-query.rs"
+#required-features = ["test_utils", "rkyv_08"]
+#
+#[[example]]
+#name = "immutable-large-ann-donnelly-swpre-deserialize-and-query"
+#path = "examples/immutable-large-ann-donnelly-swpre-deserialize-and-query.rs"
+#required-features = ["test_utils", "rkyv_08"]
+#
+#[[example]]
+#name = "immutable-large-ann-eytzinger-deserialize-and-query"
+#path = "examples/immutable-large-ann-eytzinger-deserialize-and-query.rs"
+#required-features = ["test_utils", "rkyv_08"]
+#
+#[[example]]
+#name = "immutable-large-donnelly-simulate-traverse-f32"
+#path = "examples/immutable-large-donnelly-simulate-traverse-f32.rs"
+#required-features = ["test_utils", "rkyv_08", "simulator"]
+#
+#[[example]]
+#name = "immutable-large-donnelly-simulate-traverse-f64"
+#path = "examples/immutable-large-donnelly-simulate-traverse-f64.rs"
+#required-features = ["test_utils", "rkyv_08", "simulator"]
+#
+#[[example]]
+#name = "immutable-large-donnelly-swpre-simulate-traverse-f64"
+#path = "examples/immutable-large-donnelly-swpre-simulate-traverse-f64.rs"
+#required-features = ["test_utils", "rkyv_08", "simulator"]
+#
+#[[example]]
+#name = "immutable-large-ann-donnelly-build-and-serialize"
+#path = "examples/immutable-large-ann-donnelly-build-and-serialize.rs"
+#required-features = ["test_utils", "rkyv_08"]
+#
+#[[example]]
+#name = "immutable-large-donnelly-build-and-serialize-d4-f32"
+#path = "examples/immutable-large-donnelly-build-and-serialize-d4-f32.rs"
+#required-features = ["test_utils", "rkyv_08"]
+#
+#
+#[[example]]
+#name = "immutable-large-donnelly-simulate-traverse-f32-unrolled"
+#path = "examples/immutable-large-donnelly-simulate-traverse-f32-unrolled.rs"
+#required-features = ["test_utils", "simulator", "rkyv_08"]
+#
+#[[example]]
+#name = "immutable-large-donnelly-deserialize-and-traverse-f32-rolled"
+#path = "examples/immutable-large-donnelly-deserialize-and-traverse-f32-rolled.rs"
+#required-features = ["test_utils", "rkyv_08"]
+#
+#[[example]]
+#name = "immutable-large-donnelly-deserialize-and-traverse-f32-unrolled"
+#path = "examples/immutable-large-donnelly-deserialize-and-traverse-f32-unrolled.rs"
+#required-features = ["test_utils", "rkyv_08"]
+#
+#[[example]]
+#name = "immutable-large-donnelly-deserialize-and-traverse-f32-unrolled-pf"
+#path = "examples/immutable-large-donnelly-deserialize-and-traverse-f32-unrolled-pf.rs"
+#required-features = ["test_utils", "rkyv_08"]
+#
+#[[example]]
+#name = "immutable-large-eytz-build-and-serialize-f32"
+#path = "examples/immutable-large-eytz-build-and-serialize-f32.rs"
+#required-features = ["test_utils", "rkyv_08"]
+#
+#[[example]]
+#name = "immutable-large-eytz-simulate-traverse-f32"
+#path = "examples/immutable-large-eytz-simulate-traverse-f32.rs"
+#required-features = ["test_utils", "simulator", "rkyv_08"]
+#
+#[[example]]
+#name = "immutable-large-eytz-deserialize-and-traverse-f32"
+#path = "examples/immutable-large-eytz-deserialize-and-traverse-f32.rs"
+#required-features = ["test_utils", "rkyv_08"]
+#
+#[[example]]
+#name = "immutable-large-eytz-deserialize-and-traverse-f32-pf"
+#path = "examples/immutable-large-eytz-deserialize-and-traverse-f32-pf.rs"
+#required-features = ["test_utils", "rkyv_08"]
+#
+#[[example]]
+#name = "immutable-large-eytz-deserialize-and-traverse-f32-pf-far"
+#path = "examples/immutable-large-eytz-deserialize-and-traverse-f32-pf-far.rs"
+#required-features = ["test_utils", "rkyv_08"]
+#
+#[[example]]
+#name = "immutable-large-eytz-simulate-traverse-f64"
+#path = "examples/immutable-large-eytz-simulate-traverse-f64.rs"
+#required-features = ["test_utils", "rkyv_08", "simulator"]
+#
+#[[example]]
+#name = "immutable-large-ann-eytz-build-and-serialize"
+#path = "examples/immutable-large-ann-eytz-build-and-serialize.rs"
+#required-features = ["test_utils", "rkyv_08"]
+#
+#[[example]]
+#name = "immutable-large-ann-eytzinger"
+#path = "examples/immutable-large-ann-eytzinger.rs"
+#required-features = ["test_utils"]
+#
+#[[example]]
+#name = "immutable-rkyv_08-serialize"
+#path = "examples/immutable-rkyv_08-serialize.rs"
+#required-features = ["rkyv_08"]
+#
+#[[example]]
+#name = "immutable-rkyv_08-deserialize"
+#path = "examples/immutable-rkyv_08-deserialize.rs"
+#required-features = ["rkyv_08"]
+#
+#[[example]]
+#name = "pointcloud-las"
+#path = "examples/pointcloud-las.rs"
+#required-features = ["las", "rkyv_08"]
+#
+#[[example]]
+#name = "pointcloud-csv"
+#path = "examples/pointcloud-csv.rs"
+#required-features = ["csv", "rkyv_08"]
+#
+#[[example]]
+#name = "serde"
+#path = "examples/serde.rs"
+#required-features = ["csv", "serde"]
+
+[[bin]]
+name = "fuzz-case-repro"
+path = "src/bin/fuzz-case-repro.rs"
+required-features = ["test_utils"]
 
 [[bin]]
 name = "profile_v5_nearest_one_eytzinger"

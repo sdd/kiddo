@@ -76,6 +76,8 @@ where
     #[cfg(all(feature = "simd", target_arch = "aarch64"))]
     #[inline(always)]
     /// NEON override for Block3. Defaults to autovec unless metric overrides it.
+    /// # Safety
+    /// guarded by cfg as NEON only
     unsafe fn backtrack_block3_neon(
         query_wide: O,
         stems_ptr: NonNull<u8>,
@@ -142,7 +144,7 @@ where
         #[cfg(all(feature = "simd", target_arch = "aarch64"))]
         {
             // SAFETY: guarded by target cfg and delegated to metric hook.
-            return unsafe {
+            unsafe {
                 Self::backtrack_block3_neon(
                     query_wide,
                     stems_ptr,
@@ -151,7 +153,7 @@ where
                     rd,
                     best_dist,
                 )
-            };
+            }
         }
         #[cfg(not(any(
             all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
@@ -236,6 +238,9 @@ where
     #[cfg(all(feature = "simd", target_arch = "aarch64"))]
     #[inline(always)]
     /// NEON override for Block4. Defaults to autovec unless metric overrides it.
+    ///
+    /// # Safety
+    /// guarded by cfg as NEON only
     unsafe fn backtrack_block4_neon(
         query_wide: O,
         stems_ptr: NonNull<u8>,
@@ -302,7 +307,7 @@ where
         #[cfg(all(feature = "simd", target_arch = "aarch64"))]
         {
             // SAFETY: guarded by target cfg and delegated to metric hook.
-            return unsafe {
+            unsafe {
                 Self::backtrack_block4_neon(
                     query_wide,
                     stems_ptr,
@@ -311,7 +316,7 @@ where
                     rd,
                     best_dist,
                 )
-            };
+            }
         }
         #[cfg(not(any(
             all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),

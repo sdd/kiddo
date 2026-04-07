@@ -142,6 +142,7 @@ impl Index for u16 {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn is_stem_index<IDX: Index<T = IDX>>(x: IDX) -> bool {
     x < <IDX as Index>::leaf_offset()
 }

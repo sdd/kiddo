@@ -52,7 +52,6 @@ mod tests {
     use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
     use crate::kd_tree::KdTree;
     use crate::traits::Axis;
-    use crate::traits::DistanceMetric;
     use crate::traits_unified_2::SquaredEuclidean;
     use crate::Eytzinger;
 
@@ -168,11 +167,12 @@ mod tests {
     ) -> Vec<(A, R)>
     where
         usize: Cast<R>,
+        crate::dist::SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
     {
         let mut results: Vec<(A, R)> = vec![];
 
         for (idx, p) in content.iter().enumerate() {
-            let dist = crate::SquaredEuclidean::dist(query_point, p);
+            let dist = squared_euclidean_dist(query_point, p);
             if results.len() < qty {
                 results.push((dist, idx.az::<R>()));
                 results.sort_by(|(a_dist, _), (b_dist, _)| a_dist.partial_cmp(b_dist).unwrap());
@@ -183,6 +183,26 @@ mod tests {
         }
 
         results
+    }
+
+    fn squared_euclidean_dist<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A
+    where
+        crate::dist::SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
+    {
+        let aw = (*a).map(|coord| {
+            <crate::dist::SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(
+                coord,
+            )
+        });
+        let bw = (*b).map(|coord| {
+            <crate::dist::SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(
+                coord,
+            )
+        });
+
+        <crate::dist::SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::dist::<K>(
+            &aw, &bw,
+        )
     }
 
     fn random_point_f32<const K: usize>(rng: &mut StdRng) -> [f32; K] {

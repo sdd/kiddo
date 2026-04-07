@@ -92,7 +92,6 @@ mod tests {
 
     use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
     use crate::kd_tree::KdTree;
-    use crate::traits::DistanceMetric;
     use crate::traits_unified_2::SquaredEuclidean;
     use crate::{BestNeighbour, Eytzinger};
 
@@ -235,7 +234,7 @@ mod tests {
         let mut best_items = Vec::with_capacity(max_qty);
 
         for (item, p) in content.iter().enumerate() {
-            let distance: f64 = crate::SquaredEuclidean::dist(query, p);
+            let distance = squared_euclidean_dist(query, p);
             if distance <= radius {
                 if best_items.len() < max_qty {
                     best_items.push(BestNeighbour {
@@ -255,5 +254,22 @@ mod tests {
         best_items.reverse();
 
         best_items
+    }
+
+    fn squared_euclidean_dist<const K: usize>(a: &[f64; K], b: &[f64; K]) -> f64 {
+        let aw = (*a).map(|coord| {
+            <crate::dist::SquaredEuclidean<f64> as crate::dist::DistanceMetricCore<f64>>::widen_coord(
+                coord,
+            )
+        });
+        let bw = (*b).map(|coord| {
+            <crate::dist::SquaredEuclidean<f64> as crate::dist::DistanceMetricCore<f64>>::widen_coord(
+                coord,
+            )
+        });
+
+        <crate::dist::SquaredEuclidean<f64> as crate::dist::DistanceMetricCore<f64>>::dist::<K>(
+            &aw, &bw,
+        )
     }
 }
