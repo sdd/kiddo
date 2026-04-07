@@ -308,7 +308,7 @@ mod tests {
     use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
     use crate::stem_strategies::Donnelly;
-    use crate::traits::{Axis, DistanceMetric};
+    use crate::traits::Axis;
     use crate::{Eytzinger, NearestNeighbour};
 
     const REL_EPS_F32: f32 = 1.0e-6;
@@ -580,12 +580,15 @@ mod tests {
     fn linear_search<A: Axis, const K: usize>(
         content: &[[A; K]],
         query_point: &[A; K],
-    ) -> NearestNeighbour<A, usize> {
+    ) -> NearestNeighbour<A, usize>
+    where
+        crate::dist::SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
+    {
         let mut best_dist: A = A::infinity();
         let mut best_item: usize = usize::MAX;
 
         for (idx, p) in content.iter().enumerate() {
-            let dist = crate::SquaredEuclidean::dist(query_point, p);
+            let dist = squared_euclidean_dist(query_point, p);
             if dist < best_dist {
                 best_item = idx;
                 best_dist = dist;
@@ -596,6 +599,26 @@ mod tests {
             distance: best_dist,
             item: best_item,
         }
+    }
+
+    fn squared_euclidean_dist<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A
+    where
+        crate::dist::SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
+    {
+        let aw = (*a).map(|coord| {
+            <crate::dist::SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(
+                coord,
+            )
+        });
+        let bw = (*b).map(|coord| {
+            <crate::dist::SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(
+                coord,
+            )
+        });
+
+        <crate::dist::SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::dist::<K>(
+            &aw, &bw,
+        )
     }
 
     #[test]

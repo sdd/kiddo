@@ -1,14 +1,12 @@
+/*
 use std::array;
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
 use std::env;
 use std::num::NonZeroUsize;
 
-use kiddo::distance::float::{Manhattan, SquaredEuclidean};
-use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
 use kiddo::kd_tree::KdTree as V6KdTree;
-use kiddo::mutable::float::kdtree::KdTree;
 use kiddo::nearest_neighbour::NearestNeighbour;
 use kiddo::stem_strategies::{Donnelly, Eytzinger};
 use kiddo::traits::{Axis, DistanceMetric};
@@ -48,7 +46,7 @@ struct ReproParams {
     content_seed: u64,
     query_seed: u64,
 }
-
+*/
 fn main() {
     // let arg = env::args().nth(1).unwrap_or_else(|| {
     //     eprintln!(
@@ -193,42 +191,6 @@ fn run_repro(params: &ReproParams) -> Result<(), String> {
     }
 }
 
-fn run_mutable_f32(params: &ReproParams) -> Result<(), String> {
-    match (params.k, params.b) {
-        (2, 16) => run_mutable_case_f32::<2, 16>(params),
-        (2, 32) => run_mutable_case_f32::<2, 32>(params),
-        (2, 64) => run_mutable_case_f32::<2, 64>(params),
-        (3, 16) => run_mutable_case_f32::<3, 16>(params),
-        (3, 32) => run_mutable_case_f32::<3, 32>(params),
-        (3, 64) => run_mutable_case_f32::<3, 64>(params),
-        (4, 16) => run_mutable_case_f32::<4, 16>(params),
-        (4, 32) => run_mutable_case_f32::<4, 32>(params),
-        (4, 64) => run_mutable_case_f32::<4, 64>(params),
-        _ => Err(format!(
-            "unsupported K/B combination for mutable: K={} B={}",
-            params.k, params.b
-        )),
-    }
-}
-
-fn run_mutable_f64(params: &ReproParams) -> Result<(), String> {
-    match (params.k, params.b) {
-        (2, 16) => run_mutable_case_f64::<2, 16>(params),
-        (2, 32) => run_mutable_case_f64::<2, 32>(params),
-        (2, 64) => run_mutable_case_f64::<2, 64>(params),
-        (3, 16) => run_mutable_case_f64::<3, 16>(params),
-        (3, 32) => run_mutable_case_f64::<3, 32>(params),
-        (3, 64) => run_mutable_case_f64::<3, 64>(params),
-        (4, 16) => run_mutable_case_f64::<4, 16>(params),
-        (4, 32) => run_mutable_case_f64::<4, 32>(params),
-        (4, 64) => run_mutable_case_f64::<4, 64>(params),
-        _ => Err(format!(
-            "unsupported K/B combination for mutable: K={} B={}",
-            params.k, params.b
-        )),
-    }
-}
-
 fn run_immutable_f32(params: &ReproParams) -> Result<(), String> {
     match params.strategy.as_str() {
         "eytzinger" => run_immutable_strategy_f32::<EytzingerStrategyF32>(params),
@@ -348,43 +310,6 @@ struct EytzingerStrategyF64;
 struct DonnellyStrategyF64;
 struct DonnellySimdStrategyF64;
 
-impl StrategySelectorF32 for EytzingerStrategyF32 {
-    fn run<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
-        run_immutable_case_f32::<K, B, Eytzinger<K>>(params)
-    }
-}
-
-impl StrategySelectorF32 for DonnellyStrategyF32 {
-    fn run<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
-        run_immutable_case_f32::<K, B, Donnelly<4, 64, 4, K>>(params)
-    }
-}
-
-impl StrategySelectorF32 for DonnellySimdStrategyF32 {
-    fn run<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
-        let _ = params;
-        #[cfg(feature = "simd")]
-        {
-            run_immutable_case_f32::<K, B, DonnellyMarkerSimd<Block4, 64, 4, K>>(params)
-        }
-        #[cfg(not(feature = "simd"))]
-        {
-            Err("donnelly_simd requires --features simd".to_string())
-        }
-    }
-}
-
-impl StrategySelectorF64 for EytzingerStrategyF64 {
-    fn run<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
-        run_immutable_case_f64::<K, B, Eytzinger<K>>(params)
-    }
-}
-
-impl StrategySelectorF64 for DonnellyStrategyF64 {
-    fn run<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
-        run_immutable_case_f64::<K, B, Donnelly<3, 64, 8, K>>(params)
-    }
-}
 
 impl StrategySelectorF64 for DonnellySimdStrategyF64 {
     fn run<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
@@ -699,159 +624,7 @@ where
     }
 }
 
-fn run_mutable_case_f32<const K: usize, const B: usize>(
-    params: &ReproParams,
-) -> Result<(), String> {
-    let cfg = fuzz_config_from_env();
-    let points = generate_points_f32::<K>(params, cfg)?;
-    let point_count = points.len();
-    let (query, max_qty, radius_sq, radius_man) =
-        generate_query_with_params_f32::<K>(params, cfg, point_count);
 
-    let mut tree: KdTree<f32, usize, K, B, u32> = KdTree::with_capacity(point_count);
-    for (idx, point) in points.iter().enumerate() {
-        tree.add(point, idx);
-    }
-
-    run_checks::<f32, K, _, _, _>(
-        params,
-        &points,
-        &query,
-        max_qty,
-        radius_sq,
-        radius_man,
-        |metric| match metric {
-            Metric::SquaredEuclidean => tree.nearest_one::<SquaredEuclidean>(&query),
-            Metric::Manhattan => tree.nearest_one::<Manhattan>(&query),
-        },
-        |metric, max_qty| {
-            Ok(match metric {
-                Metric::SquaredEuclidean => tree.nearest_n::<SquaredEuclidean>(&query, max_qty),
-                Metric::Manhattan => tree.nearest_n::<Manhattan>(&query, max_qty),
-            })
-        },
-        |metric, radius| match metric {
-            Metric::SquaredEuclidean => tree.within_unsorted::<SquaredEuclidean>(&query, radius),
-            Metric::Manhattan => tree.within_unsorted::<Manhattan>(&query, radius),
-        },
-    )
-}
-
-fn run_mutable_case_f64<const K: usize, const B: usize>(
-    params: &ReproParams,
-) -> Result<(), String> {
-    let cfg = fuzz_config_from_env();
-    let points = generate_points_f64::<K>(params, cfg)?;
-    let point_count = points.len();
-    let (query, max_qty, radius_sq, radius_man) =
-        generate_query_with_params_f64::<K>(params, cfg, point_count);
-
-    let mut tree: KdTree<f64, usize, K, B, u32> = KdTree::with_capacity(point_count);
-    for (idx, point) in points.iter().enumerate() {
-        tree.add(point, idx);
-    }
-
-    run_checks::<f64, K, _, _, _>(
-        params,
-        &points,
-        &query,
-        max_qty,
-        radius_sq,
-        radius_man,
-        |metric| match metric {
-            Metric::SquaredEuclidean => tree.nearest_one::<SquaredEuclidean>(&query),
-            Metric::Manhattan => tree.nearest_one::<Manhattan>(&query),
-        },
-        |metric, max_qty| {
-            Ok(match metric {
-                Metric::SquaredEuclidean => tree.nearest_n::<SquaredEuclidean>(&query, max_qty),
-                Metric::Manhattan => tree.nearest_n::<Manhattan>(&query, max_qty),
-            })
-        },
-        |metric, radius| match metric {
-            Metric::SquaredEuclidean => tree.within_unsorted::<SquaredEuclidean>(&query, radius),
-            Metric::Manhattan => tree.within_unsorted::<Manhattan>(&query, radius),
-        },
-    )
-}
-
-fn run_immutable_case_f32<const K: usize, const B: usize, SO>(
-    params: &ReproParams,
-) -> Result<(), String>
-where
-    SO: StemStrategy,
-{
-    let cfg = fuzz_config_from_env();
-    let points = generate_points_f32::<K>(params, cfg)?;
-    let point_count = points.len();
-    let (query, max_qty, radius_sq, radius_man) =
-        generate_query_with_params_f32::<K>(params, cfg, point_count);
-
-    let tree: ImmutableKdTree<f32, usize, SO, K, B> = ImmutableKdTree::new_from_slice(&points);
-
-    run_checks::<f32, K, _, _, _>(
-        params,
-        &points,
-        &query,
-        max_qty,
-        radius_sq,
-        radius_man,
-        |metric| match metric {
-            Metric::SquaredEuclidean => tree.nearest_one::<SquaredEuclidean>(&query),
-            Metric::Manhattan => tree.nearest_one::<Manhattan>(&query),
-        },
-        |metric, max_qty| {
-            let max_qty = NonZeroUsize::new(max_qty).ok_or("max_qty was zero")?;
-            Ok(match metric {
-                Metric::SquaredEuclidean => tree.nearest_n::<SquaredEuclidean>(&query, max_qty),
-                Metric::Manhattan => tree.nearest_n::<Manhattan>(&query, max_qty),
-            })
-        },
-        |metric, radius| match metric {
-            Metric::SquaredEuclidean => tree.within_unsorted::<SquaredEuclidean>(&query, radius),
-            Metric::Manhattan => tree.within_unsorted::<Manhattan>(&query, radius),
-        },
-    )
-}
-
-fn run_immutable_case_f64<const K: usize, const B: usize, SO>(
-    params: &ReproParams,
-) -> Result<(), String>
-where
-    SO: StemStrategy,
-{
-    let cfg = fuzz_config_from_env();
-    let points = generate_points_f64::<K>(params, cfg)?;
-    let point_count = points.len();
-    let (query, max_qty, radius_sq, radius_man) =
-        generate_query_with_params_f64::<K>(params, cfg, point_count);
-
-    let tree: ImmutableKdTree<f64, usize, SO, K, B> = ImmutableKdTree::new_from_slice(&points);
-
-    run_checks::<f64, K, _, _, _>(
-        params,
-        &points,
-        &query,
-        max_qty,
-        radius_sq,
-        radius_man,
-        |metric| match metric {
-            Metric::SquaredEuclidean => tree.nearest_one::<SquaredEuclidean>(&query),
-            Metric::Manhattan => tree.nearest_one::<Manhattan>(&query),
-        },
-        |metric, max_qty| {
-            let max_qty = NonZeroUsize::new(max_qty).ok_or("max_qty was zero")?;
-            Ok(match metric {
-                Metric::SquaredEuclidean => tree.nearest_n::<SquaredEuclidean>(&query, max_qty),
-                Metric::Manhattan => tree.nearest_n::<Manhattan>(&query, max_qty),
-            })
-        },
-        |metric, radius| match metric {
-            Metric::SquaredEuclidean => tree.within_unsorted::<SquaredEuclidean>(&query, radius),
-            Metric::Manhattan => tree.within_unsorted::<Manhattan>(&query, radius),
-        },
-    )
-}
 
 fn run_v6_mutable_case_f32<const K: usize, const B: usize, SO>(
     params: &ReproParams,
@@ -1066,130 +839,6 @@ enum Metric {
     Manhattan,
 }
 
-fn run_checks<A, const K: usize, F1, F2, F3>(
-    params: &ReproParams,
-    points: &[[A; K]],
-    query: &[A; K],
-    max_qty: usize,
-    radius_sq: A,
-    radius_man: A,
-    nearest_one: F1,
-    nearest_n: F2,
-    within_unsorted: F3,
-) -> Result<(), String>
-where
-    A: Axis,
-    SquaredEuclidean: DistanceMetric<A, K>,
-    Manhattan: DistanceMetric<A, K>,
-    F1: Fn(Metric) -> NearestNeighbour<A, usize>,
-    F2: Fn(Metric, usize) -> Result<Vec<NearestNeighbour<A, usize>>, String>,
-    F3: Fn(Metric, A) -> Vec<NearestNeighbour<A, usize>>,
-{
-    let (mut sq_state, mut man_state) = brute_states(points, query, max_qty, radius_sq, radius_man);
-
-    let result_sq = nearest_one(Metric::SquaredEuclidean);
-    check_nearest_one("SquaredEuclidean", result_sq, &sq_state)?;
-
-    let result_man = nearest_one(Metric::Manhattan);
-    check_nearest_one("Manhattan", result_man, &man_state)?;
-
-    let mut expected_n_sq = sq_state.take_nearest_n_sorted();
-    sort_by_distance_then_index(&mut expected_n_sq);
-    let mut result_n_sq: Vec<(A, usize)> = nearest_n(Metric::SquaredEuclidean, max_qty)?
-        .into_iter()
-        .map(|n| (n.distance, n.item))
-        .collect();
-    sort_by_distance_then_index(&mut result_n_sq);
-    if let Err(reason) = compare_nearest_n_sorted(&expected_n_sq, &result_n_sq) {
-        return Err(format!(
-            "nearest_n SquaredEuclidean mismatch: {reason} expected={} got={}",
-            format_preview(&expected_n_sq, 8),
-            format_preview(&result_n_sq, 8)
-        ));
-    }
-
-    let mut expected_n_man = man_state.take_nearest_n_sorted();
-    sort_by_distance_then_index(&mut expected_n_man);
-    let mut result_n_man: Vec<(A, usize)> = nearest_n(Metric::Manhattan, max_qty)?
-        .into_iter()
-        .map(|n| (n.distance, n.item))
-        .collect();
-    sort_by_distance_then_index(&mut result_n_man);
-    if let Err(reason) = compare_nearest_n_sorted(&expected_n_man, &result_n_man) {
-        return Err(format!(
-            "nearest_n Manhattan mismatch: {reason} expected={} got={}",
-            format_preview(&expected_n_man, 8),
-            format_preview(&result_n_man, 8)
-        ));
-    }
-
-    let expected_within_sq = sq_state.take_within_sorted();
-    let mut result_within_sq: Vec<(A, usize)> =
-        within_unsorted(Metric::SquaredEuclidean, radius_sq)
-            .into_iter()
-            .map(|n| (n.distance, n.item))
-            .collect();
-    sort_by_distance_then_index(&mut result_within_sq);
-    if result_within_sq != expected_within_sq {
-        let mismatch = first_within_mismatch(&expected_within_sq, &result_within_sq)
-            .map(|(idx, exp, got)| {
-                let exp_dist = SquaredEuclidean::dist(query, &points[exp.1]);
-                let got_dist = SquaredEuclidean::dist(query, &points[got.1]);
-                format!(
-                    " first_mismatch_idx={idx} expected_item={exp:?} expected_dist_calc={exp_dist:?} got_item={got:?} got_dist_calc={got_dist:?} radius={radius_sq:?}",
-                )
-            })
-            .unwrap_or_default();
-        return Err(format!(
-            "within_unsorted SquaredEuclidean mismatch:{mismatch} expected={} got={}",
-            format_preview(&expected_within_sq, 8),
-            format_preview(&result_within_sq, 8)
-        ));
-    }
-
-    let expected_within_man = man_state.take_within_sorted();
-    let mut result_within_man: Vec<(A, usize)> = within_unsorted(Metric::Manhattan, radius_man)
-        .into_iter()
-        .map(|n| (n.distance, n.item))
-        .collect();
-    sort_by_distance_then_index(&mut result_within_man);
-    if result_within_man != expected_within_man {
-        let mismatch = first_within_mismatch(&expected_within_man, &result_within_man)
-            .map(|(idx, exp, got)| {
-                let exp_dist = Manhattan::dist(query, &points[exp.1]);
-                let got_dist = Manhattan::dist(query, &points[got.1]);
-                format!(
-                    " first_mismatch_idx={idx} expected_item={exp:?} expected_dist_calc={exp_dist:?} got_item={got:?} got_dist_calc={got_dist:?} radius={radius_man:?}",
-                )
-            })
-            .unwrap_or_default();
-        return Err(format!(
-            "within_unsorted Manhattan mismatch:{mismatch} expected={} got={}",
-            format_preview(&expected_within_man, 8),
-            format_preview(&result_within_man, 8)
-        ));
-    }
-
-    let leaf = params
-        .leaf
-        .as_deref()
-        .map(|value| format!(" leaf={value}"))
-        .unwrap_or_default();
-    println!(
-        "Repro succeeded for kind={} scalar={} strategy={}{} K={} B={} size={} content_seed={} query_seed={}",
-        params.kind,
-        params.scalar,
-        params.strategy,
-        leaf,
-        params.k,
-        params.b,
-        params.size,
-        params.content_seed,
-        params.query_seed
-    );
-
-    Ok(())
-}
 
 fn check_nearest_one<A: Axis + std::fmt::Debug>(
     metric: &str,
