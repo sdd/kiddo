@@ -1,6 +1,8 @@
 use crate::kd_tree::leaf_view::LeafArena;
 use crate::kd_tree::leaf_view::LeafView;
-use crate::traits_unified_2::{AxisUnified, Basics, BucketLimitType, Immutable, LeafStrategy};
+use crate::traits_unified_2::{
+    AxisUnified, Basics, BucketLimitType, Immutable, LeafProjection, LeafStrategy,
+};
 use crate::StemStrategy;
 use aligned_vec::{AVec, CACHELINE_ALIGN};
 
@@ -62,6 +64,7 @@ where
     type Mutability = Immutable;
 
     const BUCKET_LIMIT_TYPE: BucketLimitType = BucketLimitType::Soft;
+    const LEAF_PROJECTION: LeafProjection = LeafProjection::LeafArena;
 
     fn new_with_capacity(capacity: usize) -> Self {
         Self {
@@ -93,7 +96,7 @@ where
         unimplemented!("VecOfArenas currently exposes only arena-backed hot paths")
     }
 
-    fn leaf_arena(&self, leaf_idx: usize) -> Option<LeafArena<'_, AX, T, K>> {
+    fn leaf_arena(&self, leaf_idx: usize) -> LeafArena<'_, AX, T, K> {
         debug_assert!(leaf_idx < self.leaf_extents.len());
         let (offset, len) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
         #[cfg(debug_assertions)]
@@ -102,10 +105,7 @@ where
             debug_assert!(offset + byte_len <= self.leaf_bytes.len());
         }
 
-        Some(LeafArena::new(
-            unsafe { self.leaf_bytes.as_ptr().add(offset) },
-            len,
-        ))
+        LeafArena::new(unsafe { self.leaf_bytes.as_ptr().add(offset) }, len)
     }
 
     fn append_leaf(&mut self, leaf_points: &[&[AX]; K], leaf_items: &[T]) {
@@ -202,8 +202,7 @@ mod tests {
         let arena =
             <VecOfArenas<f64, u32, 3, 32> as LeafStrategy<f64, u32, Eytzinger<3>, 3, 32>>::leaf_arena(
                 &leaves, 0,
-            )
-            .expect("arena-backed leaf");
+            );
 
         let mut recovered_x = Vec::new();
         let mut recovered_y = Vec::new();
@@ -250,8 +249,7 @@ mod tests {
         let arena =
             <VecOfArenas<f64, u32, 3, 32> as LeafStrategy<f64, u32, Eytzinger<3>, 3, 32>>::leaf_arena(
                 &leaves, 0,
-            )
-            .expect("arena-backed leaf");
+            );
 
         let mut tile_lens = Vec::new();
         arena.for_each_tiled_chunk(|tile| tile_lens.push(tile.len()));

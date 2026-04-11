@@ -6,14 +6,13 @@ use std::io::{IsTerminal, Write};
 use std::num::NonZeroUsize;
 use std::sync::{Mutex, OnceLock};
 
-use kiddo::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
+use kiddo::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
 use kiddo::kd_tree::KdTree;
 use kiddo::nearest_neighbour::NearestNeighbour;
 use kiddo::stem_strategies::{Donnelly, Eytzinger};
-use kiddo::traits_unified_2::{
-    AxisUnified, DistanceMetricUnified, LeafStrategy, Manhattan, SquaredEuclidean,
-};
+use kiddo::traits_unified_2::{AxisUnified, LeafStrategy};
 use kiddo::StemStrategy;
+use kiddo::{dist::DistanceMetricCore, Manhattan, SquaredEuclidean};
 
 #[cfg(feature = "simd")]
 use kiddo::stem_strategies::{Block3, Block4, DonnellyMarkerSimd};
@@ -30,7 +29,9 @@ const DEFAULT_PERTURB_MAX: i32 = 5;
 const DEFAULT_MAX_NEAREST_N: usize = 32;
 const DEFAULT_SEED: u64 = 0x4b1d_f00d;
 const DEFAULT_QUERY_COUNT: usize = 100;
+#[cfg(feature = "simd")]
 const SIMD_FAST_CASES: usize = 1;
+#[cfg(feature = "simd")]
 const SIMD_FAST_QUERY_COUNT: usize = 10;
 const PROGRESS_EVERY: usize = 100;
 const PREVIEW_LEN: usize = 8;
@@ -433,8 +434,8 @@ fn brute_states_f32<const K: usize>(
     let mut man = MetricState::new(max_qty, radius_manhattan);
 
     for (idx, point) in points.iter().enumerate() {
-        let dist_sq = <SquaredEuclidean<f32> as DistanceMetricUnified<f32, K>>::dist(query, point);
-        let dist_man = <Manhattan<f32> as DistanceMetricUnified<f32, K>>::dist(query, point);
+        let dist_sq = <SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, point);
+        let dist_man = <Manhattan<f32> as DistanceMetricCore<f32>>::dist_raw(query, point);
         sq.update(dist_sq, idx);
         man.update(dist_man, idx);
     }
@@ -453,8 +454,8 @@ fn brute_states_f64<const K: usize>(
     let mut man = MetricState::new(max_qty, radius_manhattan);
 
     for (idx, point) in points.iter().enumerate() {
-        let dist_sq = <SquaredEuclidean<f64> as DistanceMetricUnified<f64, K>>::dist(query, point);
-        let dist_man = <Manhattan<f64> as DistanceMetricUnified<f64, K>>::dist(query, point);
+        let dist_sq = <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, point);
+        let dist_man = <Manhattan<f64> as DistanceMetricCore<f64>>::dist_raw(query, point);
         sq.update(dist_sq, idx);
         man.update(dist_man, idx);
     }
@@ -532,7 +533,7 @@ fn assert_approx_nearest_one_f32<D, const K: usize>(
     points: &[[f32; K]],
     result: (f32, usize),
 ) where
-    D: DistanceMetricUnified<f32, K, Output = f32>,
+    D: DistanceMetricCore<f32, Output = f32>,
 {
     if result.1 >= points.len() {
         log_mismatch(
@@ -554,7 +555,7 @@ fn assert_approx_nearest_one_f32<D, const K: usize>(
         );
     }
 
-    let expected_dist = D::dist(query, &points[result.1]);
+    let expected_dist = D::dist_raw(query, &points[result.1]);
     if result.0 != expected_dist {
         log_mismatch(
             meta,
@@ -591,7 +592,7 @@ fn assert_approx_nearest_one_f64<D, const K: usize>(
     points: &[[f64; K]],
     result: (f64, usize),
 ) where
-    D: DistanceMetricUnified<f64, K, Output = f64>,
+    D: DistanceMetricCore<f64, Output = f64>,
 {
     if result.1 >= points.len() {
         log_mismatch(
@@ -613,7 +614,7 @@ fn assert_approx_nearest_one_f64<D, const K: usize>(
         );
     }
 
-    let expected_dist = D::dist(query, &points[result.1]);
+    let expected_dist = D::dist_raw(query, &points[result.1]);
     if result.0 != expected_dist {
         log_mismatch(
             meta,
@@ -1542,13 +1543,14 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
     }
 }
 
-fn run_immutable_case_f32<const K: usize, const B: usize, SO>(
+fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
     cfg: FuzzConfig,
     label: &str,
     meta: ReproMeta,
 ) where
     SO: StemStrategy + 'static,
     <SO as StemStrategy>::Stack<f32>: 'static,
+    LS: LeafStrategy<f32, usize, SO, K, B>,
 {
     let mut progress = ProgressReporter::new(label, cfg.cases, cfg.query_count);
     for case_idx in 0..cfg.cases {
@@ -1561,8 +1563,7 @@ fn run_immutable_case_f32<const K: usize, const B: usize, SO>(
 
         progress.case_start(case_idx, point_count, content_seed);
 
-        let tree: KdTree<f32, usize, SO, FlatVec<f32, usize, K, B>, K, B> =
-            KdTree::new_from_slice(&points);
+        let tree: KdTree<f32, usize, SO, LS, K, B> = KdTree::new_from_slice(&points);
 
         let max_nearest_n = cfg.max_nearest_n.max(1).min(point_count);
 
@@ -1916,13 +1917,36 @@ fn run_immutable_case_f32<const K: usize, const B: usize, SO>(
     }
 }
 
-fn run_immutable_case_f64<const K: usize, const B: usize, SO>(
+fn run_immutable_case_f32<const K: usize, const B: usize, SO>(
+    cfg: FuzzConfig,
+    label: &str,
+    meta: ReproMeta,
+) where
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f32>: 'static,
+{
+    run_immutable_case_f32_with_leaf::<K, B, SO, FlatVec<f32, usize, K, B>>(cfg, label, meta);
+}
+
+fn run_immutable_case_f32_arenas<const K: usize, const B: usize, SO>(
+    cfg: FuzzConfig,
+    label: &str,
+    meta: ReproMeta,
+) where
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f32>: 'static,
+{
+    run_immutable_case_f32_with_leaf::<K, B, SO, VecOfArenas<f32, usize, K, B>>(cfg, label, meta);
+}
+
+fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
     cfg: FuzzConfig,
     label: &str,
     meta: ReproMeta,
 ) where
     SO: StemStrategy + 'static,
     <SO as StemStrategy>::Stack<f64>: 'static,
+    LS: LeafStrategy<f64, usize, SO, K, B>,
 {
     let mut progress = ProgressReporter::new(label, cfg.cases, cfg.query_count);
     for case_idx in 0..cfg.cases {
@@ -1935,8 +1959,7 @@ fn run_immutable_case_f64<const K: usize, const B: usize, SO>(
 
         progress.case_start(case_idx, point_count, content_seed);
 
-        let tree: KdTree<f64, usize, SO, FlatVec<f64, usize, K, B>, K, B> =
-            KdTree::new_from_slice(&points);
+        let tree: KdTree<f64, usize, SO, LS, K, B> = KdTree::new_from_slice(&points);
 
         let max_nearest_n = cfg.max_nearest_n.max(1).min(point_count);
 
@@ -2290,6 +2313,28 @@ fn run_immutable_case_f64<const K: usize, const B: usize, SO>(
     }
 }
 
+fn run_immutable_case_f64<const K: usize, const B: usize, SO>(
+    cfg: FuzzConfig,
+    label: &str,
+    meta: ReproMeta,
+) where
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f64>: 'static,
+{
+    run_immutable_case_f64_with_leaf::<K, B, SO, FlatVec<f64, usize, K, B>>(cfg, label, meta);
+}
+
+fn run_immutable_case_f64_arenas<const K: usize, const B: usize, SO>(
+    cfg: FuzzConfig,
+    label: &str,
+    meta: ReproMeta,
+) where
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f64>: 'static,
+{
+    run_immutable_case_f64_with_leaf::<K, B, SO, VecOfArenas<f64, usize, K, B>>(cfg, label, meta);
+}
+
 #[allow(type_alias_bounds)]
 type DonnellyF32<const K: usize> = Donnelly<4, 64, 4, K>;
 #[allow(type_alias_bounds)]
@@ -2329,6 +2374,34 @@ macro_rules! run_simd_matrix_f64 {
         $runner::<4, 32, $strategy<4>>($cfg, concat!($prefix, " ", $block, " K=4 B=32"), $meta);
         $runner::<4, 64, $strategy<4>>($cfg, concat!($prefix, " ", $block, " K=4 B=64"), $meta);
         $runner::<4, 128, $strategy<4>>($cfg, concat!($prefix, " ", $block, " K=4 B=128"), $meta);
+    };
+}
+
+macro_rules! run_immutable_matrix_f32 {
+    ($runner:ident, $cfg:expr, $meta:expr, $prefix:literal, $strategy:ident) => {
+        $runner::<2, 16, $strategy<2>>($cfg, concat!($prefix, " K=2 B=16"), $meta);
+        $runner::<2, 32, $strategy<2>>($cfg, concat!($prefix, " K=2 B=32"), $meta);
+        $runner::<2, 64, $strategy<2>>($cfg, concat!($prefix, " K=2 B=64"), $meta);
+        $runner::<3, 16, $strategy<3>>($cfg, concat!($prefix, " K=3 B=16"), $meta);
+        $runner::<3, 32, $strategy<3>>($cfg, concat!($prefix, " K=3 B=32"), $meta);
+        $runner::<3, 64, $strategy<3>>($cfg, concat!($prefix, " K=3 B=64"), $meta);
+        $runner::<4, 16, $strategy<4>>($cfg, concat!($prefix, " K=4 B=16"), $meta);
+        $runner::<4, 32, $strategy<4>>($cfg, concat!($prefix, " K=4 B=32"), $meta);
+        $runner::<4, 64, $strategy<4>>($cfg, concat!($prefix, " K=4 B=64"), $meta);
+    };
+}
+
+macro_rules! run_immutable_matrix_f64 {
+    ($runner:ident, $cfg:expr, $meta:expr, $prefix:literal, $strategy:ident) => {
+        $runner::<2, 16, $strategy<2>>($cfg, concat!($prefix, " K=2 B=16"), $meta);
+        $runner::<2, 32, $strategy<2>>($cfg, concat!($prefix, " K=2 B=32"), $meta);
+        $runner::<2, 64, $strategy<2>>($cfg, concat!($prefix, " K=2 B=64"), $meta);
+        $runner::<3, 16, $strategy<3>>($cfg, concat!($prefix, " K=3 B=16"), $meta);
+        $runner::<3, 32, $strategy<3>>($cfg, concat!($prefix, " K=3 B=32"), $meta);
+        $runner::<3, 64, $strategy<3>>($cfg, concat!($prefix, " K=3 B=64"), $meta);
+        $runner::<4, 16, $strategy<4>>($cfg, concat!($prefix, " K=4 B=16"), $meta);
+        $runner::<4, 32, $strategy<4>>($cfg, concat!($prefix, " K=4 B=32"), $meta);
+        $runner::<4, 64, $strategy<4>>($cfg, concat!($prefix, " K=4 B=64"), $meta);
     };
 }
 
@@ -2575,101 +2648,49 @@ fn fuzz_v6_immutable_f32() {
     };
 
     if run_non_simd_paths {
-        run_immutable_case_f32::<2, 16, Eytzinger<2>>(
+        run_immutable_matrix_f32!(
+            run_immutable_case_f32,
             cfg,
-            "v6 immutable f32 Eytzinger K=2 B=16",
             meta,
-        );
-        run_immutable_case_f32::<2, 32, Eytzinger<2>>(
-            cfg,
-            "v6 immutable f32 Eytzinger K=2 B=32",
-            meta,
-        );
-        run_immutable_case_f32::<2, 64, Eytzinger<2>>(
-            cfg,
-            "v6 immutable f32 Eytzinger K=2 B=64",
-            meta,
-        );
-        run_immutable_case_f32::<3, 16, Eytzinger<3>>(
-            cfg,
-            "v6 immutable f32 Eytzinger K=3 B=16",
-            meta,
-        );
-        run_immutable_case_f32::<3, 32, Eytzinger<3>>(
-            cfg,
-            "v6 immutable f32 Eytzinger K=3 B=32",
-            meta,
-        );
-        run_immutable_case_f32::<3, 64, Eytzinger<3>>(
-            cfg,
-            "v6 immutable f32 Eytzinger K=3 B=64",
-            meta,
-        );
-        run_immutable_case_f32::<4, 16, Eytzinger<4>>(
-            cfg,
-            "v6 immutable f32 Eytzinger K=4 B=16",
-            meta,
-        );
-        run_immutable_case_f32::<4, 32, Eytzinger<4>>(
-            cfg,
-            "v6 immutable f32 Eytzinger K=4 B=32",
-            meta,
-        );
-        run_immutable_case_f32::<4, 64, Eytzinger<4>>(
-            cfg,
-            "v6 immutable f32 Eytzinger K=4 B=64",
-            meta,
+            "v6 immutable f32 Eytzinger",
+            Eytzinger
         );
 
-        let meta = ReproMeta {
+        let donnelly_meta = ReproMeta {
             strategy: "donnelly",
             ..meta
         };
+        run_immutable_matrix_f32!(
+            run_immutable_case_f32,
+            cfg,
+            donnelly_meta,
+            "v6 immutable f32 Donnelly",
+            DonnellyF32
+        );
 
-        run_immutable_case_f32::<2, 16, DonnellyF32<2>>(
+        let arena_meta = ReproMeta {
+            leaf: "vec_of_arenas",
+            strategy: "eytzinger",
+            ..meta
+        };
+        run_immutable_matrix_f32!(
+            run_immutable_case_f32_arenas,
             cfg,
-            "v6 immutable f32 Donnelly K=2 B=16",
-            meta,
+            arena_meta,
+            "v6 immutable f32 Eytzinger VecOfArenas",
+            Eytzinger
         );
-        run_immutable_case_f32::<2, 32, DonnellyF32<2>>(
+
+        let arena_donnelly_meta = ReproMeta {
+            strategy: "donnelly",
+            ..arena_meta
+        };
+        run_immutable_matrix_f32!(
+            run_immutable_case_f32_arenas,
             cfg,
-            "v6 immutable f32 Donnelly K=2 B=32",
-            meta,
-        );
-        run_immutable_case_f32::<2, 64, DonnellyF32<2>>(
-            cfg,
-            "v6 immutable f32 Donnelly K=2 B=64",
-            meta,
-        );
-        run_immutable_case_f32::<3, 16, DonnellyF32<3>>(
-            cfg,
-            "v6 immutable f32 Donnelly K=3 B=16",
-            meta,
-        );
-        run_immutable_case_f32::<3, 32, DonnellyF32<3>>(
-            cfg,
-            "v6 immutable f32 Donnelly K=3 B=32",
-            meta,
-        );
-        run_immutable_case_f32::<3, 64, DonnellyF32<3>>(
-            cfg,
-            "v6 immutable f32 Donnelly K=3 B=64",
-            meta,
-        );
-        run_immutable_case_f32::<4, 16, DonnellyF32<4>>(
-            cfg,
-            "v6 immutable f32 Donnelly K=4 B=16",
-            meta,
-        );
-        run_immutable_case_f32::<4, 32, DonnellyF32<4>>(
-            cfg,
-            "v6 immutable f32 Donnelly K=4 B=32",
-            meta,
-        );
-        run_immutable_case_f32::<4, 64, DonnellyF32<4>>(
-            cfg,
-            "v6 immutable f32 Donnelly K=4 B=64",
-            meta,
+            arena_donnelly_meta,
+            "v6 immutable f32 Donnelly VecOfArenas",
+            DonnellyF32
         );
     }
 
@@ -2685,6 +2706,20 @@ fn fuzz_v6_immutable_f32() {
                 simd_cfg,
                 block4_meta,
                 "v6 immutable f32 DonnellySimd",
+                DonnellySimdBlock4F32,
+                "Block4"
+            );
+
+            let block4_arena_meta = ReproMeta {
+                leaf: "vec_of_arenas",
+                strategy: "donnelly_simd_block4",
+                ..meta
+            };
+            run_simd_matrix_f32!(
+                run_immutable_case_f32_arenas,
+                simd_cfg,
+                block4_arena_meta,
+                "v6 immutable f32 DonnellySimd VecOfArenas",
                 DonnellySimdBlock4F32,
                 "Block4"
             );
@@ -2711,101 +2746,49 @@ fn fuzz_v6_immutable_f64() {
     };
 
     if run_non_simd_paths {
-        run_immutable_case_f64::<2, 16, Eytzinger<2>>(
+        run_immutable_matrix_f64!(
+            run_immutable_case_f64,
             cfg,
-            "v6 immutable f64 Eytzinger K=2 B=16",
             meta,
-        );
-        run_immutable_case_f64::<2, 32, Eytzinger<2>>(
-            cfg,
-            "v6 immutable f64 Eytzinger K=2 B=32",
-            meta,
-        );
-        run_immutable_case_f64::<2, 64, Eytzinger<2>>(
-            cfg,
-            "v6 immutable f64 Eytzinger K=2 B=64",
-            meta,
-        );
-        run_immutable_case_f64::<3, 16, Eytzinger<3>>(
-            cfg,
-            "v6 immutable f64 Eytzinger K=3 B=16",
-            meta,
-        );
-        run_immutable_case_f64::<3, 32, Eytzinger<3>>(
-            cfg,
-            "v6 immutable f64 Eytzinger K=3 B=32",
-            meta,
-        );
-        run_immutable_case_f64::<3, 64, Eytzinger<3>>(
-            cfg,
-            "v6 immutable f64 Eytzinger K=3 B=64",
-            meta,
-        );
-        run_immutable_case_f64::<4, 16, Eytzinger<4>>(
-            cfg,
-            "v6 immutable f64 Eytzinger K=4 B=16",
-            meta,
-        );
-        run_immutable_case_f64::<4, 32, Eytzinger<4>>(
-            cfg,
-            "v6 immutable f64 Eytzinger K=4 B=32",
-            meta,
-        );
-        run_immutable_case_f64::<4, 64, Eytzinger<4>>(
-            cfg,
-            "v6 immutable f64 Eytzinger K=4 B=64",
-            meta,
+            "v6 immutable f64 Eytzinger",
+            Eytzinger
         );
 
-        let meta = ReproMeta {
+        let donnelly_meta = ReproMeta {
             strategy: "donnelly",
             ..meta
         };
+        run_immutable_matrix_f64!(
+            run_immutable_case_f64,
+            cfg,
+            donnelly_meta,
+            "v6 immutable f64 Donnelly",
+            DonnellyF64
+        );
 
-        run_immutable_case_f64::<2, 16, DonnellyF64<2>>(
+        let arena_meta = ReproMeta {
+            leaf: "vec_of_arenas",
+            strategy: "eytzinger",
+            ..meta
+        };
+        run_immutable_matrix_f64!(
+            run_immutable_case_f64_arenas,
             cfg,
-            "v6 immutable f64 Donnelly K=2 B=16",
-            meta,
+            arena_meta,
+            "v6 immutable f64 Eytzinger VecOfArenas",
+            Eytzinger
         );
-        run_immutable_case_f64::<2, 32, DonnellyF64<2>>(
+
+        let arena_donnelly_meta = ReproMeta {
+            strategy: "donnelly",
+            ..arena_meta
+        };
+        run_immutable_matrix_f64!(
+            run_immutable_case_f64_arenas,
             cfg,
-            "v6 immutable f64 Donnelly K=2 B=32",
-            meta,
-        );
-        run_immutable_case_f64::<2, 64, DonnellyF64<2>>(
-            cfg,
-            "v6 immutable f64 Donnelly K=2 B=64",
-            meta,
-        );
-        run_immutable_case_f64::<3, 16, DonnellyF64<3>>(
-            cfg,
-            "v6 immutable f64 Donnelly K=3 B=16",
-            meta,
-        );
-        run_immutable_case_f64::<3, 32, DonnellyF64<3>>(
-            cfg,
-            "v6 immutable f64 Donnelly K=3 B=32",
-            meta,
-        );
-        run_immutable_case_f64::<3, 64, DonnellyF64<3>>(
-            cfg,
-            "v6 immutable f64 Donnelly K=3 B=64",
-            meta,
-        );
-        run_immutable_case_f64::<4, 16, DonnellyF64<4>>(
-            cfg,
-            "v6 immutable f64 Donnelly K=4 B=16",
-            meta,
-        );
-        run_immutable_case_f64::<4, 32, DonnellyF64<4>>(
-            cfg,
-            "v6 immutable f64 Donnelly K=4 B=32",
-            meta,
-        );
-        run_immutable_case_f64::<4, 64, DonnellyF64<4>>(
-            cfg,
-            "v6 immutable f64 Donnelly K=4 B=64",
-            meta,
+            arena_donnelly_meta,
+            "v6 immutable f64 Donnelly VecOfArenas",
+            DonnellyF64
         );
     }
 
@@ -2821,6 +2804,20 @@ fn fuzz_v6_immutable_f64() {
                 simd_cfg,
                 block3_meta,
                 "v6 immutable f64 DonnellySimd",
+                DonnellySimdBlock3F64,
+                "Block3"
+            );
+
+            let block3_arena_meta = ReproMeta {
+                leaf: "vec_of_arenas",
+                strategy: "donnelly_simd_block3",
+                ..meta
+            };
+            run_simd_matrix_f64!(
+                run_immutable_case_f64_arenas,
+                simd_cfg,
+                block3_arena_meta,
+                "v6 immutable f64 DonnellySimd VecOfArenas",
                 DonnellySimdBlock3F64,
                 "Block3"
             );
@@ -2968,11 +2965,11 @@ fn adversarial_mutation_point_f32(size: usize, query_idx: usize) -> [f32; 2] {
 
 fn brute_ranked_entries_f32<D>(entries: &[EntryF32], query: &[f32; 2]) -> Vec<(f32, usize)>
 where
-    D: DistanceMetricUnified<f32, 2, Output = f32>,
+    D: DistanceMetricCore<f32, Output = f32>,
 {
     let mut ranked: Vec<(f32, usize)> = entries
         .iter()
-        .map(|(point, item)| (D::dist(query, point), *item))
+        .map(|(point, item)| (D::dist_raw(query, point), *item))
         .collect();
     sort_by_distance_then_index(&mut ranked);
     ranked
@@ -2981,11 +2978,11 @@ where
 #[cfg(feature = "simd")]
 fn brute_ranked_entries_f64<D>(entries: &[EntryF64], query: &[f64; 2]) -> Vec<(f64, usize)>
 where
-    D: DistanceMetricUnified<f64, 2, Output = f64>,
+    D: DistanceMetricCore<f64, Output = f64>,
 {
     let mut ranked: Vec<(f64, usize)> = entries
         .iter()
-        .map(|(point, item)| (D::dist(query, point), *item))
+        .map(|(point, item)| (D::dist_raw(query, point), *item))
         .collect();
     sort_by_distance_then_index(&mut ranked);
     ranked
@@ -3200,7 +3197,7 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
         let approx_sq = tree.approx_nearest_one::<SquaredEuclidean<f32>>(query);
         let approx_sq_point = find_point_by_item_f32(entries, approx_sq.1);
         let approx_sq_dist =
-            <SquaredEuclidean<f32> as DistanceMetricUnified<f32, 2>>::dist(query, &approx_sq_point);
+            <SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_sq_point);
         assert_eq!(
             approx_sq.0, approx_sq_dist,
             "{context} metric=SquaredEuclidean op=approx_nearest_one distance mismatch expected={} got={} item={}",
@@ -3229,7 +3226,7 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
         let approx_man = tree.approx_nearest_one::<Manhattan<f32>>(query);
         let approx_man_point = find_point_by_item_f32(entries, approx_man.1);
         let approx_man_dist =
-            <Manhattan<f32> as DistanceMetricUnified<f32, 2>>::dist(query, &approx_man_point);
+            <Manhattan<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_man_point);
         assert_eq!(
             approx_man.0, approx_man_dist,
             "{context} metric=Manhattan op=approx_nearest_one distance mismatch expected={} got={} item={}",
@@ -3431,7 +3428,7 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
         let approx_sq = tree.approx_nearest_one::<SquaredEuclidean<f64>>(query);
         let approx_sq_point = find_point_by_item_f64(entries, approx_sq.1);
         let approx_sq_dist =
-            <SquaredEuclidean<f64> as DistanceMetricUnified<f64, 2>>::dist(query, &approx_sq_point);
+            <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_sq_point);
         assert_eq!(
             approx_sq.0, approx_sq_dist,
             "{context} metric=SquaredEuclidean op=approx_nearest_one distance mismatch expected={} got={} item={}",
@@ -3460,7 +3457,7 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
         let approx_man = tree.approx_nearest_one::<Manhattan<f64>>(query);
         let approx_man_point = find_point_by_item_f64(entries, approx_man.1);
         let approx_man_dist =
-            <Manhattan<f64> as DistanceMetricUnified<f64, 2>>::dist(query, &approx_man_point);
+            <Manhattan<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_man_point);
         assert_eq!(
             approx_man.0, approx_man_dist,
             "{context} metric=Manhattan op=approx_nearest_one distance mismatch expected={} got={} item={}",
@@ -3469,10 +3466,11 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
     }
 }
 
-fn run_adversarial_immutable_f32<SO>(label: &str)
+fn run_adversarial_immutable_f32_with_leaf<SO, LS>(label: &str)
 where
     SO: StemStrategy + 'static,
     <SO as StemStrategy>::Stack<f32>: 'static,
+    LS: LeafStrategy<f32, usize, SO, 2, ADVERSARIAL_B>,
 {
     let queries = adversarial_queries_f32();
 
@@ -3492,14 +3490,8 @@ where
                 .map(|(item, point)| (point, item))
                 .collect();
 
-            let tree: KdTree<
-                f32,
-                usize,
-                SO,
-                FlatVec<f32, usize, 2, ADVERSARIAL_B>,
-                2,
-                ADVERSARIAL_B,
-            > = KdTree::new_from_slice(&points);
+            let tree: KdTree<f32, usize, SO, LS, 2, ADVERSARIAL_B> =
+                KdTree::new_from_slice(&points);
 
             for (query_idx, query) in queries.iter().enumerate() {
                 let context = format!(
@@ -3512,6 +3504,22 @@ where
             }
         }
     }
+}
+
+fn run_adversarial_immutable_f32<SO>(label: &str)
+where
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f32>: 'static,
+{
+    run_adversarial_immutable_f32_with_leaf::<SO, FlatVec<f32, usize, 2, ADVERSARIAL_B>>(label);
+}
+
+fn run_adversarial_immutable_f32_arenas<SO>(label: &str)
+where
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f32>: 'static,
+{
+    run_adversarial_immutable_f32_with_leaf::<SO, VecOfArenas<f32, usize, 2, ADVERSARIAL_B>>(label);
 }
 
 fn run_adversarial_mutable_f32<SO>(label: &str)
@@ -3590,10 +3598,11 @@ where
 }
 
 #[cfg(feature = "simd")]
-fn run_adversarial_immutable_f64<SO>(label: &str)
+fn run_adversarial_immutable_f64_with_leaf<SO, LS>(label: &str)
 where
     SO: StemStrategy + 'static,
     <SO as StemStrategy>::Stack<f64>: 'static,
+    LS: LeafStrategy<f64, usize, SO, 2, ADVERSARIAL_B>,
 {
     let queries = adversarial_queries_f64();
 
@@ -3613,14 +3622,8 @@ where
                 .map(|(item, point)| (point, item))
                 .collect();
 
-            let tree: KdTree<
-                f64,
-                usize,
-                SO,
-                FlatVec<f64, usize, 2, ADVERSARIAL_B>,
-                2,
-                ADVERSARIAL_B,
-            > = KdTree::new_from_slice(&points);
+            let tree: KdTree<f64, usize, SO, LS, 2, ADVERSARIAL_B> =
+                KdTree::new_from_slice(&points);
 
             for (query_idx, query) in queries.iter().enumerate() {
                 let context = format!(
@@ -3635,6 +3638,24 @@ where
     }
 }
 
+#[cfg(feature = "simd")]
+fn run_adversarial_immutable_f64<SO>(label: &str)
+where
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f64>: 'static,
+{
+    run_adversarial_immutable_f64_with_leaf::<SO, FlatVec<f64, usize, 2, ADVERSARIAL_B>>(label);
+}
+
+#[cfg(feature = "simd")]
+fn run_adversarial_immutable_f64_arenas<SO>(label: &str)
+where
+    SO: StemStrategy + 'static,
+    <SO as StemStrategy>::Stack<f64>: 'static,
+{
+    run_adversarial_immutable_f64_with_leaf::<SO, VecOfArenas<f64, usize, 2, ADVERSARIAL_B>>(label);
+}
+
 #[test]
 fn fuzz_v6_adversarial_fast_non_simd() {
     if !should_run_non_simd_paths() {
@@ -3642,8 +3663,14 @@ fn fuzz_v6_adversarial_fast_non_simd() {
     }
 
     run_adversarial_immutable_f32::<Eytzinger<2>>("v6 adversarial non-simd f32 Eytzinger");
+    run_adversarial_immutable_f32_arenas::<Eytzinger<2>>(
+        "v6 adversarial non-simd f32 Eytzinger VecOfArenas",
+    );
     run_adversarial_mutable_f32::<Eytzinger<2>>("v6 adversarial non-simd f32 Eytzinger");
     run_adversarial_immutable_f32::<DonnellyF32<2>>("v6 adversarial non-simd f32 Donnelly");
+    run_adversarial_immutable_f32_arenas::<DonnellyF32<2>>(
+        "v6 adversarial non-simd f32 Donnelly VecOfArenas",
+    );
     run_adversarial_mutable_f32::<DonnellyF32<2>>("v6 adversarial non-simd f32 Donnelly");
 }
 
@@ -3655,7 +3682,13 @@ fn fuzz_v6_adversarial_fast_simd() {
     }
 
     run_adversarial_immutable_f32::<DonnellySimdBlock4F32<2>>("v6 adversarial simd f32 Block4");
+    run_adversarial_immutable_f32_arenas::<DonnellySimdBlock4F32<2>>(
+        "v6 adversarial simd f32 Block4 VecOfArenas",
+    );
     run_adversarial_immutable_f64::<DonnellySimdBlock3F64<2>>("v6 adversarial simd f64 Block3");
+    run_adversarial_immutable_f64_arenas::<DonnellySimdBlock3F64<2>>(
+        "v6 adversarial simd f64 Block3 VecOfArenas",
+    );
 }
 
 fn assert_approx_invariants_f32<SO, LS, const B: usize>(
@@ -3683,7 +3716,7 @@ fn assert_approx_invariants_f32<SO, LS, const B: usize>(
     let approx_sq = tree.approx_nearest_one::<SquaredEuclidean<f32>>(query);
     let approx_sq_point = find_point_by_item_f32(entries, approx_sq.1);
     let approx_sq_dist =
-        <SquaredEuclidean<f32> as DistanceMetricUnified<f32, 2>>::dist(query, &approx_sq_point);
+        <SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_sq_point);
     assert_eq!(
         approx_sq.0, approx_sq_dist,
         "{context} metric=SquaredEuclidean op=approx_nearest_one distance mismatch expected={} got={} item={}",
@@ -3726,7 +3759,7 @@ fn assert_approx_invariants_f32<SO, LS, const B: usize>(
     let approx_man = tree.approx_nearest_one::<Manhattan<f32>>(query);
     let approx_man_point = find_point_by_item_f32(entries, approx_man.1);
     let approx_man_dist =
-        <Manhattan<f32> as DistanceMetricUnified<f32, 2>>::dist(query, &approx_man_point);
+        <Manhattan<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_man_point);
     assert_eq!(
         approx_man.0, approx_man_dist,
         "{context} metric=Manhattan op=approx_nearest_one distance mismatch expected={} got={} item={}",
@@ -3785,7 +3818,7 @@ fn assert_approx_invariants_f64<SO, LS, const B: usize>(
     let approx_sq = tree.approx_nearest_one::<SquaredEuclidean<f64>>(query);
     let approx_sq_point = find_point_by_item_f64(entries, approx_sq.1);
     let approx_sq_dist =
-        <SquaredEuclidean<f64> as DistanceMetricUnified<f64, 2>>::dist(query, &approx_sq_point);
+        <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_sq_point);
     assert_eq!(
         approx_sq.0, approx_sq_dist,
         "{context} metric=SquaredEuclidean op=approx_nearest_one distance mismatch expected={} got={} item={}",
@@ -3828,7 +3861,7 @@ fn assert_approx_invariants_f64<SO, LS, const B: usize>(
     let approx_man = tree.approx_nearest_one::<Manhattan<f64>>(query);
     let approx_man_point = find_point_by_item_f64(entries, approx_man.1);
     let approx_man_dist =
-        <Manhattan<f64> as DistanceMetricUnified<f64, 2>>::dist(query, &approx_man_point);
+        <Manhattan<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_man_point);
     assert_eq!(
         approx_man.0, approx_man_dist,
         "{context} metric=Manhattan op=approx_nearest_one distance mismatch expected={} got={} item={}",

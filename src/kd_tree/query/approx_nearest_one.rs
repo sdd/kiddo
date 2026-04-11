@@ -1,7 +1,8 @@
+use crate::dist::KdTreeDistanceMetric;
 use crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
-use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, LeafStrategy};
+use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
 use crate::StemStrategy;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
@@ -19,20 +20,25 @@ where
         best_dist: &mut D::Output,
         best_item: &mut T,
     ) where
-        D: DistanceMetricUnified<A, K, Output = A>,
+        D: KdTreeDistanceMetric<A, K, Output = A>,
     {
-        if let Some(arena) = self.leaves.leaf_arena(leaf_idx) {
-            crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide_arena::<
-                A,
-                T,
-                D,
-                K,
-            >(&arena, query_wide, best_dist, best_item);
-            return;
+        match LS::LEAF_PROJECTION {
+            LeafProjection::LeafArena => {
+                let arena = self.leaves.leaf_arena(leaf_idx);
+                crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide_arena::<
+                    A,
+                    T,
+                    D,
+                    K,
+                >(&arena, query_wide, best_dist, best_item);
+            }
+            LeafProjection::LeafView => {
+                let leaf = self.leaves.leaf_view(leaf_idx);
+                nearest_one_with_query_wide::<A, T, D, K, B>(
+                    &leaf, query_wide, best_dist, best_item,
+                );
+            }
         }
-
-        let leaf = self.leaves.leaf_view(leaf_idx);
-        nearest_one_with_query_wide::<A, T, D, K, B>(&leaf, query_wide, best_dist, best_item);
     }
 
     /// Finds an approximate nearest point to the query point.
@@ -42,7 +48,7 @@ where
     #[inline(always)]
     pub fn approx_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
-        D: DistanceMetricUnified<A, K, Output = A>,
+        D: KdTreeDistanceMetric<A, K, Output = A>,
     {
         let req_ctx = ApproxNearestOneReqCtx::<A, D::Output, K> {
             query,
@@ -138,7 +144,7 @@ mod tests {
     use crate::kd_tree::KdTree;
     use crate::stem_strategies::{Donnelly, DonnellyMarkerPf};
 
-    use crate::traits_unified_2::SquaredEuclidean;
+    use crate::dist::SquaredEuclidean;
     use crate::Eytzinger;
 
     const RNG_SEED: u64 = 42;

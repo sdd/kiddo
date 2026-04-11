@@ -1,3 +1,4 @@
+use crate::dist::KdTreeDistanceMetric;
 use crate::kd_tree::query_stack::{ScalarStackContext, StackTrait};
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
@@ -5,9 +6,7 @@ use crate::stem_strategies::{
     donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4},
     DistanceMetricSimdBlock3, DistanceMetricSimdBlock4, SimdPrune, SimdSelectBestChildBlock3,
 };
-use crate::traits_unified_2::{
-    AxisUnified, Basics, DistanceMetricUnified, LeafStrategy, Mutability,
-};
+use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
 use crate::StemStrategy;
 use std::any::{Any, TypeId};
 use std::cell::UnsafeCell;
@@ -108,7 +107,11 @@ where
 {
     #[inline]
     pub(crate) fn get_leaf_idx(&self, query: &[A; K]) -> usize {
-        LS::Mutability::get_leaf_idx(self, query)
+        if self.stem_leaf_resolution.uses_arithmetic() {
+            self.get_leaf_idx_unmapped(query)
+        } else {
+            self.get_leaf_idx_mapped(query)
+        }
     }
 
     /// Non-backtracking query
@@ -117,7 +120,7 @@ where
     where
         QC: QueryContext<A, O, K>,
     {
-        let leaf_idx = LS::Mutability::get_leaf_idx(self, query_ctx.query());
+        let leaf_idx = self.get_leaf_idx(query_ctx.query());
 
         tracing::trace!(%leaf_idx, "processing leaf");
         process_leaf(leaf_idx);
@@ -213,7 +216,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: DistanceMetricUnified<A, K, Output = O>
+        D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS> + Default + 'static,
@@ -238,7 +241,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: DistanceMetricUnified<A, K, Output = O>
+        D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS>,
@@ -263,7 +266,7 @@ where
     ) where
         QC: QueryContext<A, O, K>,
         O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: DistanceMetricUnified<A, K, Output = O>
+        D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS>,
@@ -339,7 +342,7 @@ where
     ) where
         QC: QueryContext<A, O, K>,
         O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: DistanceMetricUnified<A, K, Output = O>
+        D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS> + Default + 'static,
@@ -359,7 +362,7 @@ where
     ) where
         QC: QueryContext<A, O, K>,
         O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: DistanceMetricUnified<A, K, Output = O>
+        D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS>,
@@ -384,7 +387,7 @@ where
     ) where
         QC: QueryContext<A, O, K>,
         O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: DistanceMetricUnified<A, K, Output = O>
+        D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS>,
@@ -488,7 +491,7 @@ where
     ) -> Option<usize>
     where
         O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: DistanceMetricUnified<A, K, Output = O>
+        D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS>,
@@ -498,9 +501,7 @@ where
             // Check if current stem points directly to a leaf
             // For Immutable trees, this should optimise away since resolve_terminal_stem_idx
             // will always return None
-            if let Some(leaf_idx) =
-                LS::Mutability::resolve_terminal_stem_idx(self, stem_strat.stem_idx())
-            {
+            if let Some(leaf_idx) = self.resolve_terminal_stem(stem_strat.stem_idx()) {
                 return Some(leaf_idx);
             }
 
@@ -558,7 +559,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: DistanceMetricUnified<A, K, Output = O>
+        D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS: StemStrategy<
@@ -593,8 +594,16 @@ where
                     rd,
                 } => {
                     // Single entry - standard scalar processing
-                    let mut dim = dim_val;
-                    tracing::trace!(%dim, %old_off, %rd, ?off, "Popped single context");
+                    let restore_dim = dim_val;
+                    let mut dim = ss.dim();
+                    tracing::trace!(
+                        %restore_dim,
+                        resumed_dim = %dim,
+                        %old_off,
+                        %rd,
+                        ?off,
+                        "Popped single context"
+                    );
 
                     let max_dist = query_ctx.max_dist();
                     let rd_vs_max = O::cmp(rd, max_dist);
@@ -608,11 +617,11 @@ where
                     }
                     tracing::trace!(%rd, %max_dist, "SIMD Prune check: VISIT");
 
-                    tracing::trace!("Restoring interval state for dim {}", dim);
+                    tracing::trace!("Restoring interval state for dim {}", restore_dim);
                     unsafe {
-                        *off.get_unchecked_mut(dim) = old_off;
-                        *lower.get_unchecked_mut(dim) = lower_bound;
-                        *upper.get_unchecked_mut(dim) = upper_bound;
+                        *off.get_unchecked_mut(restore_dim) = old_off;
+                        *lower.get_unchecked_mut(restore_dim) = lower_bound;
+                        *upper.get_unchecked_mut(restore_dim) = upper_bound;
                     }
 
                     let best_dist = query_ctx.max_dist();
@@ -900,7 +909,7 @@ where
     ) -> Option<usize>
     where
         O: AxisUnified<Coord = O> + SimdSelectBestChildBlock3 + BacktrackBlock3 + BacktrackBlock4,
-        D: DistanceMetricUnified<A, K, Output = O>
+        D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS: StemStrategy<
@@ -915,7 +924,7 @@ where
         loop {
             let stem_idx = stem_strat.stem_idx();
             // Check if current stem points directly to a leaf
-            if let Some(leaf_idx) = LS::Mutability::resolve_terminal_stem_idx(self, stem_idx) {
+            if let Some(leaf_idx) = self.resolve_terminal_stem(stem_idx) {
                 return Some(leaf_idx);
             }
             let stem_oob = stem_idx >= self.stems.len();
@@ -1010,18 +1019,9 @@ where
                         }
                     } else {
                         // +Inf pivots can still encode structural branches in left-aligned trees.
-                        // Traversing right should not add geometric distance in this case.
-                        let far_ctx = stem_strat.branch_relative(false);
-                        if O::cmp(rd, best_dist) != std::cmp::Ordering::Greater {
-                            stack.push(SimdQueryStackContext::Single {
-                                stem_strat: far_ctx,
-                                dim: dim_val,
-                                lower_bound: unsafe { *lower.get_unchecked(dim_val) },
-                                upper_bound: unsafe { *upper.get_unchecked(dim_val) },
-                                old_off,
-                                rd,
-                            });
-                        }
+                        // Scalar traversal treats these as structural padding and just descends
+                        // left without enqueuing a synthetic sibling branch.
+                        stem_strat.traverse(false);
                     }
 
                     *dim = stem_strat.dim();

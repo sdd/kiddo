@@ -97,9 +97,6 @@ pub mod best_neighbour;
 // #[doc(hidden)]
 // mod custom_serde;
 
-// #[doc(hidden)]
-// pub mod leaf_slice;
-
 mod mirror_select_nth_unstable_by;
 
 #[doc(hidden)]
@@ -108,8 +105,6 @@ pub mod nearest_neighbour;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 pub mod traits;
-
-// mod iter;
 
 /// Stem Orderings
 pub mod stem_strategies;
@@ -130,6 +125,7 @@ mod rkyv_utils;
 // pub mod traits_unified;
 pub mod traits_unified_2;
 
+pub use crate::dist::{DotProduct, Manhattan, SquaredEuclidean};
 pub use best_neighbour::BestNeighbour;
 pub use nearest_neighbour::NearestNeighbour;
 

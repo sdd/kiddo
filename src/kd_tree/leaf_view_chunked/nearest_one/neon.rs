@@ -1,5 +1,6 @@
+use crate::dist::DistanceMetricUnified;
 use crate::kd_tree::leaf_view::LeafView;
-use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified};
+use crate::traits_unified_2::{AxisUnified, Basics};
 use super::LeafViewChunked;
 
 
@@ -8,7 +9,7 @@ use super::LeafViewChunked;
 impl<'a, T, D, const K: usize> LeafViewChunked<'a, f32, T, K>
 where
     T: Basics,
-    D: DistanceMetricUnified<f32, K>,
+    D: DistanceMetricUnified<f32>,
 {
     pub fn nearest_one_neon(
         leaf: &LeafView<'_, f32, T, K>,

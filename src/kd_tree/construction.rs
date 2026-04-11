@@ -299,12 +299,16 @@ where
         );
 
         let initial_max_stem_level = stems_depth as i32 - 1;
-        let stem_leaf_resolution =
-            if LS::Mutability::is_mutable() || actual_max_stem_level > initial_max_stem_level {
-                Self::mapped_stem_leaf_resolution_from_terminals(&terminal_stem_indices)
-            } else {
-                LS::Mutability::initial_stem_leaf_resolution::<SS>(stems_depth, leaf_node_count)
-            };
+        let stem_leaf_resolution = if LS::Mutability::is_mutable()
+            || actual_max_stem_level > initial_max_stem_level
+            // Block-aligned stem layouts can add synthetic root levels; those do not preserve a
+            // direct arithmetic leaf-index mapping, so immutable builds need an explicit terminal map.
+            || padding_level_count != 0
+        {
+            Self::mapped_stem_leaf_resolution_from_terminals(&terminal_stem_indices)
+        } else {
+            LS::Mutability::initial_stem_leaf_resolution::<SS>(stems_depth, leaf_node_count)
+        };
 
         let max_leaf_len = Self::initial_max_leaf_len();
         // TODO: if we keep max_leaf_len, populate this from the actual constructed leaf sizes
@@ -724,13 +728,13 @@ where
 
             sort_index.sort_unstable_by(|&ia, &ib| A::cmp(source[ia][dim], source[ib][dim]));
 
-            while pivot <= sort_index.len()
+            while pivot + 1 < sort_index.len()
                 && source[sort_index[pivot]][dim] == source[sort_index[pivot + 1]][dim]
             {
                 pivot += 1;
             }
 
-            if pivot >= sort_index.len() {
+            if pivot + 1 >= sort_index.len() {
                 // if we end up here at the end of the slice, then the source slice is unsplittable
                 // in this dimension due to all entries having the same value on the given dimension
                 tracing::debug!(

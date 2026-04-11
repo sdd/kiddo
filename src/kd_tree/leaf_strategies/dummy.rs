@@ -1,5 +1,7 @@
 use crate::kd_tree::leaf_view::LeafView;
-use crate::traits_unified_2::{AxisUnified, Basics, BucketLimitType, Immutable, LeafStrategy};
+use crate::traits_unified_2::{
+    AxisUnified, Basics, BucketLimitType, Immutable, LeafProjection, LeafStrategy,
+};
 use crate::StemStrategy;
 
 /// A dummy leaf strategy used for testing.
@@ -19,6 +21,7 @@ where
     type Mutability = Immutable;
 
     const BUCKET_LIMIT_TYPE: BucketLimitType = BucketLimitType::Hard;
+    const LEAF_PROJECTION: LeafProjection = LeafProjection::LeafView;
 
     fn new_with_capacity(_capacity: usize) -> Self {
         Self::default()

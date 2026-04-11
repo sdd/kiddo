@@ -166,7 +166,7 @@ fn fill_block3_backtrack_values<A, O, D, const K2: usize>(
 where
     A: AxisUnified<Coord = A>,
     O: AxisUnified<Coord = O>,
-    D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
+    D: crate::dist::DistanceMetricCore<A, Output = O>,
 {
     // Block3 exact backtracking intentionally uses the same off[dim]-only lower-bound model
     // as DonnellySimdDescent. Clipping by parent interval bounds was correct but destroyed
@@ -231,7 +231,7 @@ fn fill_block4_backtrack_values_and_bounds<A, O, D, const K2: usize>(
 where
     A: AxisUnified<Coord = A>,
     O: AxisUnified<Coord = O>,
-    D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
+    D: crate::dist::DistanceMetricCore<A, Output = O>,
 {
     let old_dist1 = D::dist1(old_off, O::zero());
     let mut mask = 0u16;
@@ -490,7 +490,7 @@ where
         Self: Sized,
         A: AxisUnified<Coord = A>,
         O: AxisUnified<Coord = O> + SimdSelectBestChildBlock3 + BacktrackBlock3 + BacktrackBlock4,
-        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
+        D: crate::dist::DistanceMetricCore<A, Output = O>
             + crate::stem_strategies::donnelly_2_blockmarker_simd::backtrack_traits::DistanceMetricSimdBlock3<
                 A,
                 K2,
@@ -561,18 +561,8 @@ where
                 }
             } else {
                 // +Inf can represent structural padding in left-aligned trees.
-                // Traversing right should not add geometric distance.
-                let far_ctx = self.branch_relative(false);
-                if O::cmp(rd, best_dist) != std::cmp::Ordering::Greater {
-                    stack.push(SimdQueryStackContext::Single {
-                        stem_strat: far_ctx,
-                        dim: dim_val,
-                        lower_bound,
-                        upper_bound,
-                        old_off: old_off_val,
-                        rd,
-                    });
-                }
+                // Scalar traversal just descends left through the padding.
+                self.traverse(false);
             }
 
             *dim = self.dim();
@@ -633,7 +623,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
+        D: crate::dist::KdTreeDistanceMetric<A, K2, Output = O>
             + crate::stem_strategies::DistanceMetricSimdBlock3<A, K2, O>
             + crate::stem_strategies::DistanceMetricSimdBlock4<A, K2, O>,
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
@@ -798,7 +788,7 @@ where
         Self: Sized,
         A: AxisUnified<Coord = A>,
         O: AxisUnified<Coord = O> + BacktrackBlock4,
-        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
+        D: crate::dist::DistanceMetricCore<A, Output = O>
             + crate::stem_strategies::donnelly_2_blockmarker_simd::backtrack_traits::DistanceMetricSimdBlock4<
                 A,
                 K2,
@@ -1003,7 +993,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
+        D: crate::dist::KdTreeDistanceMetric<A, K2, Output = O>
             + crate::stem_strategies::DistanceMetricSimdBlock3<A, K2, O>
             + crate::stem_strategies::DistanceMetricSimdBlock4<A, K2, O>,
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
@@ -1345,7 +1335,7 @@ mod tests {
     #[test]
     #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
     fn test_simd_backtrack_vs_scalar() {
-        use crate::traits_unified_2::SquaredEuclidean;
+        use crate::SquaredEuclidean;
 
         // Create test pivots: [pivot0, pivot1, ..., pivot6, +∞]
         let pivots = [0.2, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f64::INFINITY];
@@ -1625,7 +1615,7 @@ mod tests {
             #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
             {
                 let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
-                let simd_mask = f64::backtrack_block3::<f64, SquaredEuclidean<f64>, 3>(
+                let simd_mask = f64::backtrack_block3::<f64, crate::SquaredEuclidean<f64>, 3>(
                     query, stems_ptr, 0, old_off, rd, best_dist,
                 );
 
@@ -1662,7 +1652,7 @@ mod tests {
             #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
             {
                 let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
-                let simd_mask = f32::backtrack_block3::<f32, SquaredEuclidean<f32>, 3>(
+                let simd_mask = f32::backtrack_block3::<f32, crate::SquaredEuclidean<f32>, 3>(
                     query, stems_ptr, 0, old_off, rd, best_dist,
                 );
 

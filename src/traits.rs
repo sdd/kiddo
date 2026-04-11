@@ -147,38 +147,6 @@ pub(crate) fn is_stem_index<IDX: Index<T = IDX>>(x: IDX) -> bool {
     x < <IDX as Index>::leaf_offset()
 }
 
-/// Trait that needs to be implemented by any potential distance
-/// metric to be used within queries
-pub trait DistanceMetric<A, const K: usize> {
-    /// returns the distance between two K-d points, as measured
-    /// by a particular distance metric
-    fn dist(a: &[A; K], b: &[A; K]) -> A;
-
-    /// returns the distance between two points along a single axis,
-    /// as measured by a particular distance metric.
-    ///
-    /// (needs to be implemented as it is used by the NN query implementations
-    /// to extend the minimum acceptable distance for a node when recursing
-    /// back up the tree)
-    fn dist1(a: A, b: A) -> A;
-}
-
-/// Trait that needs to be implemented by any potential distance
-/// metric to be used within queries on fixed-point trees
-pub trait DistanceMetricFixed<A, const K: usize, R = A> {
-    /// returns the distance between two K-d points, as measured
-    /// by a particular distance metric
-    fn dist(a: &[A; K], b: &[A; K]) -> R;
-
-    /// returns the distance between two points along a single axis,
-    /// as measured by a particular distance metric.
-    ///
-    /// (needs to be implemented as it is used by the NN query implementations
-    /// to extend the minimum acceptable distance for a node when recursing
-    /// back up the tree)
-    fn dist1(a: A, b: A) -> R;
-}
-
 /// Trait that needs to be implemented by any potential stem ordering
 /// algorithm used by a KdTree.
 pub trait StemStrategy: Clone + Sync + Send {
@@ -391,7 +359,7 @@ pub trait StemStrategy: Clone + Sync + Send {
         Self: Sized,
         A: AxisUnified<Coord = A>,
         O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: crate::traits_unified_2::DistanceMetricUnified<A, K, Output = O>
+        D: crate::dist::DistanceMetricCore<A, Output = O>
             + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, O>
             + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, O>,
         Self::Stack<O>: StackTrait<O, Self>,
@@ -474,7 +442,7 @@ pub trait StemStrategy: Clone + Sync + Send {
             + crate::stem_strategies::SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: crate::traits_unified_2::DistanceMetricUnified<A, K, Output = O>
+        D: crate::dist::DistanceMetricCore<A, Output = O>
             + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, O>
             + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, O>,
         Self::Stack<O>: StackTrait<O, Self>,
@@ -516,7 +484,7 @@ pub trait StemStrategy: Clone + Sync + Send {
             + crate::stem_strategies::SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
+        D: crate::dist::KdTreeDistanceMetric<A, K2, Output = O>
             + crate::stem_strategies::DistanceMetricSimdBlock3<A, K2, O>
             + crate::stem_strategies::DistanceMetricSimdBlock4<A, K2, O>,
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
@@ -542,7 +510,7 @@ pub trait StemStrategy: Clone + Sync + Send {
         A: AxisUnified<Coord = A>,
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
         O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
+        D: crate::dist::KdTreeDistanceMetric<A, K2, Output = O>
             + crate::stem_strategies::DistanceMetricSimdBlock3<A, K2, O>
             + crate::stem_strategies::DistanceMetricSimdBlock4<A, K2, O>,
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,

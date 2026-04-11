@@ -1,5 +1,1 @@
-use crate::dist::distance_metric_neon::NeonLeafOps;
-
-pub struct DotProductNeonLeafOps;
-
-impl NeonLeafOps for DotProductNeonLeafOps {}
+// Dot product does not use the multi-result NEON leaf-op path.

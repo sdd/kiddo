@@ -1,5 +1,5 @@
 /// AVX2 distance metric trait
-#[cfg(all(feature = "simd", target_feature = "avx2"))]
+#[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
 pub mod distance_metric_avx2;
 
 /// AVX512 distance metric trait
@@ -10,7 +10,7 @@ pub mod distance_metric_avx512;
 pub mod distance_metric_core;
 
 /// NEON distance metric trait
-#[cfg(all(feature = "simd", target_feature = "neon"))]
+#[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
 pub mod distance_metric_neon;
 
 /// Dot Product distance metric
@@ -22,15 +22,30 @@ pub mod manhattan;
 /// Squared Euclidean distance metric
 pub mod squared_euclidean;
 
-mod traits_unified_2_adapters;
-
 pub use distance_metric_core::DistanceMetricCore;
-use std::cmp::Ordering;
+#[cfg(any(
+    all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
+    all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"),
+    all(feature = "simd", target_arch = "aarch64", target_feature = "neon")
+))]
+use std::any::TypeId;
 
 use crate::stem_strategies::donnelly_2_blockmarker_simd::{
     DistanceMetricSimdBlock3, DistanceMetricSimdBlock4,
 };
 use crate::traits_unified_2::AxisUnified;
+#[cfg(any(
+    all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
+    all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"),
+    all(feature = "simd", target_arch = "aarch64", target_feature = "neon")
+))]
+use crate::{
+    kd_tree::{
+        leaf_view::{LeafArena, LeafView},
+        result_collection::ResultCollection,
+    },
+    BestNeighbour, NearestNeighbour,
+};
 
 pub use dot_product::DotProduct;
 pub use manhattan::Manhattan;
@@ -41,12 +56,288 @@ pub use squared_euclidean::SquaredEuclidean;
 /// Default behavior is "not specialized". Concrete metrics can override hook
 /// methods in arch-specific code without changing public query bounds.
 pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
-    /// Whether a specialized AVX512 path is provided by this metric impl.
-    const HAS_AVX512_SPECIALIZATION: bool = false;
-
     /// Type that provides implementations of the AVX512 leaf ops
     #[cfg(all(feature = "simd", target_feature = "avx512f"))]
-    type Avx512F64Ops: distance_metric_avx512::Avx512F64LeafOps;
+    type Avx512F64Ops: distance_metric_avx512::Avx512F64LeafOps + 'static;
+
+    /// Type that provides implementations of the AVX512 f32 leaf ops.
+    #[cfg(all(feature = "simd", target_feature = "avx512f"))]
+    type Avx512F32Ops: distance_metric_avx512::Avx512F32LeafOps + 'static;
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    /// Try an AVX512-specialized `nearest_one` leaf kernel.
+    unsafe fn try_nearest_one_leaf_avx512<T, const K: usize, const B: usize>(
+        leaf: &LeafView<'_, A, T, K, B>,
+        query_wide: &[Self::Output; K],
+        best_dist: &mut Self::Output,
+        best_item: &mut T,
+    ) -> bool
+    where
+        A: AxisUnified<Coord = A> + 'static,
+        T: crate::traits_unified_2::Basics,
+        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+    {
+        if TypeId::of::<A>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Avx512F64Ops>()
+                != TypeId::of::<distance_metric_avx512::UnsupportedAvx512F64LeafOps>()
+        {
+            let leaf =
+                &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f64, T, K, B>);
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
+            let best_dist = &mut *(best_dist as *mut Self::Output as *mut f64);
+
+            crate::kd_tree::leaf_view_chunked::nearest_one::avx512::nearest_one_avx512_unchecked::<
+                f64,
+                Self::Avx512F64Ops,
+                T,
+                K,
+                B,
+            >(leaf, query_wide, best_dist, best_item);
+
+            return true;
+        }
+
+        false
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    /// Try an AVX512-specialized `nearest_one` arena kernel.
+    unsafe fn try_nearest_one_arena_avx512<T, const K: usize>(
+        arena: &LeafArena<'_, A, T, K>,
+        query_wide: &[Self::Output; K],
+        best_dist: &mut Self::Output,
+        best_item: &mut T,
+    ) -> bool
+    where
+        A: AxisUnified<Coord = A> + 'static,
+        T: crate::traits_unified_2::Basics,
+        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+    {
+        if TypeId::of::<A>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Avx512F64Ops>()
+                != TypeId::of::<distance_metric_avx512::UnsupportedAvx512F64LeafOps>()
+        {
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
+            let best_dist = &mut *(best_dist as *mut Self::Output as *mut f64);
+            let query_ptr = query_wide.as_ptr();
+            let mut tile_base = arena.as_ptr();
+            let mut remaining = arena.len();
+
+            while remaining != 0 {
+                let tile_len = crate::kd_tree::leaf_view::leaf_arena_tile_len(remaining);
+                crate::kd_tree::leaf_view_chunked::nearest_one::avx512::nearest_one_avx512_arena_unchecked::<
+                    f64,
+                    Self::Avx512F64Ops,
+                    T,
+                    K,
+                >(tile_base, tile_len, query_ptr, best_dist, best_item);
+                let tile_bytes =
+                    K * tile_len * std::mem::size_of::<f64>() + tile_len * std::mem::size_of::<T>();
+                tile_base = tile_base.add(tile_bytes);
+                remaining -= tile_len;
+            }
+
+            return true;
+        }
+
+        false
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    /// Try an AVX512-specialized `nearest_n_within` leaf kernel.
+    unsafe fn try_nearest_n_within_leaf_avx512<T, R, const K: usize, const B: usize>(
+        leaf: &LeafView<'_, A, T, K, B>,
+        query_wide: &[Self::Output; K],
+        max_dist: Self::Output,
+        results: &mut R,
+    ) -> bool
+    where
+        A: AxisUnified<Coord = A> + 'static,
+        T: crate::traits_unified_2::Basics + Ord,
+        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
+    {
+        if TypeId::of::<A>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Avx512F64Ops>()
+                != TypeId::of::<distance_metric_avx512::UnsupportedAvx512F64LeafOps>()
+        {
+            let leaf =
+                &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f64, T, K, B>);
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f64);
+            let mut emit = |candidate_dist: f64, item: T| {
+                results.add(NearestNeighbour {
+                    distance: std::mem::transmute_copy::<f64, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+
+            crate::kd_tree::leaf_view_chunked::nearest_n_within::avx512::nearest_n_within_avx512_unchecked::<
+                Self::Avx512F64Ops,
+                T,
+                _,
+                K,
+                B,
+            >(leaf, query_wide, max_dist, &mut emit);
+
+            return true;
+        }
+
+        false
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    /// Try an AVX512-specialized `nearest_n_within` arena kernel.
+    unsafe fn try_nearest_n_within_arena_avx512<T, R, const K: usize>(
+        arena: &LeafArena<'_, A, T, K>,
+        query_wide: &[Self::Output; K],
+        max_dist: Self::Output,
+        results: &mut R,
+    ) -> bool
+    where
+        A: AxisUnified<Coord = A> + 'static,
+        T: crate::traits_unified_2::Basics,
+        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
+    {
+        if TypeId::of::<A>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Avx512F64Ops>()
+                != TypeId::of::<distance_metric_avx512::UnsupportedAvx512F64LeafOps>()
+        {
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f64);
+            let mut emit = |candidate_dist: f64, item: T| {
+                results.add(NearestNeighbour {
+                    distance: std::mem::transmute_copy::<f64, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+            let mut tile_base = arena.as_ptr();
+            let mut remaining = arena.len();
+
+            while remaining != 0 {
+                let tile_len = crate::kd_tree::leaf_view::leaf_arena_tile_len(remaining);
+                crate::kd_tree::leaf_view_chunked::nearest_n_within::avx512::nearest_n_within_avx512_arena_unchecked::<
+                    Self::Avx512F64Ops,
+                    T,
+                    _,
+                    K,
+                >(tile_base, tile_len, query_wide, max_dist, &mut emit);
+                let tile_bytes =
+                    K * tile_len * std::mem::size_of::<f64>() + tile_len * std::mem::size_of::<T>();
+                tile_base = tile_base.add(tile_bytes);
+                remaining -= tile_len;
+            }
+
+            return true;
+        }
+
+        false
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    /// Try an AVX512-specialized `best_n_within` leaf kernel.
+    unsafe fn try_best_n_within_leaf_avx512<T, R, const K: usize, const B: usize>(
+        leaf: &LeafView<'_, A, T, K, B>,
+        query_wide: &[Self::Output; K],
+        max_dist: Self::Output,
+        results: &mut R,
+    ) -> bool
+    where
+        A: AxisUnified<Coord = A> + 'static,
+        T: crate::traits_unified_2::Basics + Ord,
+        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        R: ResultCollection<Self::Output, BestNeighbour<Self::Output, T>>,
+    {
+        if TypeId::of::<A>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Avx512F64Ops>()
+                != TypeId::of::<distance_metric_avx512::UnsupportedAvx512F64LeafOps>()
+        {
+            let leaf =
+                &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f64, T, K, B>);
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f64);
+            let mut emit = |candidate_dist: f64, item: T| {
+                results.add(BestNeighbour {
+                    distance: std::mem::transmute_copy::<f64, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+
+            crate::kd_tree::leaf_view_chunked::best_n_within::avx512::best_n_within_avx512_unchecked::<
+                Self::Avx512F64Ops,
+                T,
+                _,
+                K,
+                B,
+            >(leaf, query_wide, max_dist, &mut emit);
+
+            return true;
+        }
+
+        false
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    /// Try an AVX512-specialized `best_n_within` arena kernel.
+    unsafe fn try_best_n_within_arena_avx512<T, R, const K: usize>(
+        arena: &LeafArena<'_, A, T, K>,
+        query_wide: &[Self::Output; K],
+        max_dist: Self::Output,
+        results: &mut R,
+    ) -> bool
+    where
+        A: AxisUnified<Coord = A> + 'static,
+        T: crate::traits_unified_2::Basics + Ord,
+        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        R: ResultCollection<Self::Output, BestNeighbour<Self::Output, T>>,
+    {
+        if TypeId::of::<A>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Avx512F64Ops>()
+                != TypeId::of::<distance_metric_avx512::UnsupportedAvx512F64LeafOps>()
+        {
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f64);
+            let mut emit = |candidate_dist: f64, item: T| {
+                results.add(BestNeighbour {
+                    distance: std::mem::transmute_copy::<f64, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+            let mut tile_base = arena.as_ptr();
+            let mut remaining = arena.len();
+
+            while remaining != 0 {
+                let tile_len = crate::kd_tree::leaf_view::leaf_arena_tile_len(remaining);
+                crate::kd_tree::leaf_view_chunked::best_n_within::avx512::best_n_within_avx512_arena_unchecked::<
+                    Self::Avx512F64Ops,
+                    T,
+                    _,
+                    K,
+                >(tile_base, tile_len, query_wide, max_dist, &mut emit);
+                let tile_bytes =
+                    K * tile_len * std::mem::size_of::<f64>() + tile_len * std::mem::size_of::<T>();
+                tile_base = tile_base.add(tile_bytes);
+                remaining -= tile_len;
+            }
+
+            return true;
+        }
+
+        false
+    }
 }
 
 /// AVX2 extension hooks.
@@ -54,9 +345,325 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
     /// Whether a specialized AVX2 path is provided by this metric impl.
     const HAS_AVX2_SPECIALIZATION: bool = false;
 
-    /// Type that provides implementations of the AVX2 leaf ops
-    #[cfg(all(feature = "simd", target_feature = "avx2"))]
-    type Avx2LeafOps: distance_metric_avx2::Avx2LeafOps;
+    /// Type that provides implementations of the AVX2 f64 leaf ops.
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    type Avx2F64Ops: distance_metric_avx2::Avx2F64LeafOps + 'static;
+
+    /// Type that provides implementations of the AVX2 f32 leaf ops.
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    type Avx2F32Ops: distance_metric_avx2::Avx2F32LeafOps + 'static;
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    /// Try an AVX2-specialized `nearest_n_within` leaf kernel.
+    unsafe fn try_nearest_n_within_leaf_avx2<T, R, const K: usize, const B: usize>(
+        leaf: &LeafView<'_, A, T, K, B>,
+        query_wide: &[Self::Output; K],
+        max_dist: Self::Output,
+        results: &mut R,
+    ) -> bool
+    where
+        A: AxisUnified<Coord = A> + 'static,
+        T: crate::traits_unified_2::Basics + Ord,
+        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
+    {
+        if TypeId::of::<A>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Avx2F64Ops>()
+                != TypeId::of::<distance_metric_avx2::UnsupportedAvx2F64LeafOps>()
+        {
+            let leaf =
+                &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f64, T, K, B>);
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f64);
+            let mut emit = |candidate_dist: f64, item: T| {
+                results.add(NearestNeighbour {
+                    distance: std::mem::transmute_copy::<f64, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+
+            crate::kd_tree::leaf_view_chunked::nearest_n_within::avx2::nearest_n_within_avx2_unchecked_f64::<
+                Self::Avx2F64Ops,
+                T,
+                _,
+                K,
+                B,
+            >(leaf, query_wide, max_dist, &mut emit);
+
+            return true;
+        }
+
+        if TypeId::of::<A>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Avx2F32Ops>()
+                != TypeId::of::<distance_metric_avx2::UnsupportedAvx2F32LeafOps>()
+        {
+            let leaf =
+                &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f32, T, K, B>);
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f32);
+            let mut emit = |candidate_dist: f32, item: T| {
+                results.add(NearestNeighbour {
+                    distance: std::mem::transmute_copy::<f32, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+
+            crate::kd_tree::leaf_view_chunked::nearest_n_within::avx2::nearest_n_within_avx2_unchecked_f32::<
+                Self::Avx2F32Ops,
+                T,
+                _,
+                K,
+                B,
+            >(leaf, query_wide, max_dist, &mut emit);
+
+            return true;
+        }
+
+        false
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    /// Try an AVX2-specialized `nearest_n_within` arena kernel.
+    unsafe fn try_nearest_n_within_arena_avx2<T, R, const K: usize>(
+        arena: &LeafArena<'_, A, T, K>,
+        query_wide: &[Self::Output; K],
+        max_dist: Self::Output,
+        results: &mut R,
+    ) -> bool
+    where
+        A: AxisUnified<Coord = A> + 'static,
+        T: crate::traits_unified_2::Basics,
+        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
+    {
+        if TypeId::of::<A>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Avx2F64Ops>()
+                != TypeId::of::<distance_metric_avx2::UnsupportedAvx2F64LeafOps>()
+        {
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f64);
+            let mut emit = |candidate_dist: f64, item: T| {
+                results.add(NearestNeighbour {
+                    distance: std::mem::transmute_copy::<f64, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+            let mut tile_base = arena.as_ptr();
+            let mut remaining = arena.len();
+
+            while remaining != 0 {
+                let tile_len = crate::kd_tree::leaf_view::leaf_arena_tile_len(remaining);
+                crate::kd_tree::leaf_view_chunked::nearest_n_within::avx2::nearest_n_within_avx2_arena_unchecked_f64::<
+                    Self::Avx2F64Ops,
+                    T,
+                    _,
+                    K,
+                >(tile_base, tile_len, query_wide, max_dist, &mut emit);
+                let tile_bytes =
+                    K * tile_len * std::mem::size_of::<f64>() + tile_len * std::mem::size_of::<T>();
+                tile_base = tile_base.add(tile_bytes);
+                remaining -= tile_len;
+            }
+
+            return true;
+        }
+
+        if TypeId::of::<A>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Avx2F32Ops>()
+                != TypeId::of::<distance_metric_avx2::UnsupportedAvx2F32LeafOps>()
+        {
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f32);
+            let mut emit = |candidate_dist: f32, item: T| {
+                results.add(NearestNeighbour {
+                    distance: std::mem::transmute_copy::<f32, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+            let mut tile_base = arena.as_ptr();
+            let mut remaining = arena.len();
+
+            while remaining != 0 {
+                let tile_len = crate::kd_tree::leaf_view::leaf_arena_tile_len(remaining);
+                crate::kd_tree::leaf_view_chunked::nearest_n_within::avx2::nearest_n_within_avx2_arena_unchecked_f32::<
+                    Self::Avx2F32Ops,
+                    T,
+                    _,
+                    K,
+                >(tile_base, tile_len, query_wide, max_dist, &mut emit);
+                let tile_bytes =
+                    K * tile_len * std::mem::size_of::<f32>() + tile_len * std::mem::size_of::<T>();
+                tile_base = tile_base.add(tile_bytes);
+                remaining -= tile_len;
+            }
+
+            return true;
+        }
+
+        false
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    /// Try an AVX2-specialized `best_n_within` leaf kernel.
+    unsafe fn try_best_n_within_leaf_avx2<T, R, const K: usize, const B: usize>(
+        leaf: &LeafView<'_, A, T, K, B>,
+        query_wide: &[Self::Output; K],
+        max_dist: Self::Output,
+        results: &mut R,
+    ) -> bool
+    where
+        A: AxisUnified<Coord = A> + 'static,
+        T: crate::traits_unified_2::Basics + Ord,
+        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        R: ResultCollection<Self::Output, BestNeighbour<Self::Output, T>>,
+    {
+        if TypeId::of::<A>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Avx2F64Ops>()
+                != TypeId::of::<distance_metric_avx2::UnsupportedAvx2F64LeafOps>()
+        {
+            let leaf =
+                &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f64, T, K, B>);
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f64);
+            let mut emit = |candidate_dist: f64, item: T| {
+                results.add(BestNeighbour {
+                    distance: std::mem::transmute_copy::<f64, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+
+            crate::kd_tree::leaf_view_chunked::best_n_within::avx2::best_n_within_avx2_unchecked_f64::<
+                Self::Avx2F64Ops,
+                T,
+                _,
+                K,
+                B,
+            >(leaf, query_wide, max_dist, &mut emit);
+
+            return true;
+        }
+
+        if TypeId::of::<A>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Avx2F32Ops>()
+                != TypeId::of::<distance_metric_avx2::UnsupportedAvx2F32LeafOps>()
+        {
+            let leaf =
+                &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f32, T, K, B>);
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f32);
+            let mut emit = |candidate_dist: f32, item: T| {
+                results.add(BestNeighbour {
+                    distance: std::mem::transmute_copy::<f32, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+
+            crate::kd_tree::leaf_view_chunked::best_n_within::avx2::best_n_within_avx2_unchecked_f32::<
+                Self::Avx2F32Ops,
+                T,
+                _,
+                K,
+                B,
+            >(leaf, query_wide, max_dist, &mut emit);
+
+            return true;
+        }
+
+        false
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    /// Try an AVX2-specialized `best_n_within` arena kernel.
+    unsafe fn try_best_n_within_arena_avx2<T, R, const K: usize>(
+        arena: &LeafArena<'_, A, T, K>,
+        query_wide: &[Self::Output; K],
+        max_dist: Self::Output,
+        results: &mut R,
+    ) -> bool
+    where
+        A: AxisUnified<Coord = A> + 'static,
+        T: crate::traits_unified_2::Basics + Ord,
+        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        R: ResultCollection<Self::Output, BestNeighbour<Self::Output, T>>,
+    {
+        if TypeId::of::<A>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Avx2F64Ops>()
+                != TypeId::of::<distance_metric_avx2::UnsupportedAvx2F64LeafOps>()
+        {
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f64);
+            let mut emit = |candidate_dist: f64, item: T| {
+                results.add(BestNeighbour {
+                    distance: std::mem::transmute_copy::<f64, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+            let mut tile_base = arena.as_ptr();
+            let mut remaining = arena.len();
+
+            while remaining != 0 {
+                let tile_len = crate::kd_tree::leaf_view::leaf_arena_tile_len(remaining);
+                crate::kd_tree::leaf_view_chunked::best_n_within::avx2::best_n_within_avx2_arena_unchecked_f64::<
+                    Self::Avx2F64Ops,
+                    T,
+                    _,
+                    K,
+                >(tile_base, tile_len, query_wide, max_dist, &mut emit);
+                let tile_bytes =
+                    K * tile_len * std::mem::size_of::<f64>() + tile_len * std::mem::size_of::<T>();
+                tile_base = tile_base.add(tile_bytes);
+                remaining -= tile_len;
+            }
+
+            return true;
+        }
+
+        if TypeId::of::<A>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Avx2F32Ops>()
+                != TypeId::of::<distance_metric_avx2::UnsupportedAvx2F32LeafOps>()
+        {
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f32);
+            let mut emit = |candidate_dist: f32, item: T| {
+                results.add(BestNeighbour {
+                    distance: std::mem::transmute_copy::<f32, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+            let mut tile_base = arena.as_ptr();
+            let mut remaining = arena.len();
+
+            while remaining != 0 {
+                let tile_len = crate::kd_tree::leaf_view::leaf_arena_tile_len(remaining);
+                crate::kd_tree::leaf_view_chunked::best_n_within::avx2::best_n_within_avx2_arena_unchecked_f32::<
+                    Self::Avx2F32Ops,
+                    T,
+                    _,
+                    K,
+                >(tile_base, tile_len, query_wide, max_dist, &mut emit);
+                let tile_bytes =
+                    K * tile_len * std::mem::size_of::<f32>() + tile_len * std::mem::size_of::<T>();
+                tile_base = tile_base.add(tile_bytes);
+                remaining -= tile_len;
+            }
+
+            return true;
+        }
+
+        false
+    }
 }
 
 /// NEON extension hooks.
@@ -64,9 +671,325 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     /// Whether a specialized NEON path is provided by this metric impl.
     const HAS_NEON_SPECIALIZATION: bool = false;
 
-    /// Type that provides implementations of the NEON leaf ops
-    #[cfg(all(feature = "simd", target_feature = "neon"))]
-    type NeonLeafOps: distance_metric_neon::NeonLeafOps;
+    /// Type that provides implementations of the NEON f64 leaf ops.
+    #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
+    type NeonF64Ops: distance_metric_neon::NeonF64LeafOps + 'static;
+
+    /// Type that provides implementations of the NEON f32 leaf ops.
+    #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
+    type NeonF32Ops: distance_metric_neon::NeonF32LeafOps + 'static;
+
+    #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
+    #[inline(always)]
+    /// Try a NEON-specialized `nearest_n_within` leaf kernel.
+    unsafe fn try_nearest_n_within_leaf_neon<T, R, const K: usize, const B: usize>(
+        leaf: &LeafView<'_, A, T, K, B>,
+        query_wide: &[Self::Output; K],
+        max_dist: Self::Output,
+        results: &mut R,
+    ) -> bool
+    where
+        A: AxisUnified<Coord = A> + 'static,
+        T: crate::traits_unified_2::Basics + Ord,
+        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
+    {
+        if TypeId::of::<A>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::NeonF64Ops>()
+                != TypeId::of::<distance_metric_neon::UnsupportedNeonF64LeafOps>()
+        {
+            let leaf =
+                &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f64, T, K, B>);
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f64);
+            let mut emit = |candidate_dist: f64, item: T| {
+                results.add(NearestNeighbour {
+                    distance: std::mem::transmute_copy::<f64, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+
+            crate::kd_tree::leaf_view_chunked::nearest_n_within::neon::nearest_n_within_neon_unchecked_f64::<
+                Self::NeonF64Ops,
+                T,
+                _,
+                K,
+                B,
+            >(leaf, query_wide, max_dist, &mut emit);
+
+            return true;
+        }
+
+        if TypeId::of::<A>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::NeonF32Ops>()
+                != TypeId::of::<distance_metric_neon::UnsupportedNeonF32LeafOps>()
+        {
+            let leaf =
+                &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f32, T, K, B>);
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f32);
+            let mut emit = |candidate_dist: f32, item: T| {
+                results.add(NearestNeighbour {
+                    distance: std::mem::transmute_copy::<f32, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+
+            crate::kd_tree::leaf_view_chunked::nearest_n_within::neon::nearest_n_within_neon_unchecked_f32::<
+                Self::NeonF32Ops,
+                T,
+                _,
+                K,
+                B,
+            >(leaf, query_wide, max_dist, &mut emit);
+
+            return true;
+        }
+
+        false
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
+    #[inline(always)]
+    /// Try a NEON-specialized `nearest_n_within` arena kernel.
+    unsafe fn try_nearest_n_within_arena_neon<T, R, const K: usize>(
+        arena: &LeafArena<'_, A, T, K>,
+        query_wide: &[Self::Output; K],
+        max_dist: Self::Output,
+        results: &mut R,
+    ) -> bool
+    where
+        A: AxisUnified<Coord = A> + 'static,
+        T: crate::traits_unified_2::Basics,
+        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
+    {
+        if TypeId::of::<A>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::NeonF64Ops>()
+                != TypeId::of::<distance_metric_neon::UnsupportedNeonF64LeafOps>()
+        {
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f64);
+            let mut emit = |candidate_dist: f64, item: T| {
+                results.add(NearestNeighbour {
+                    distance: std::mem::transmute_copy::<f64, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+            let mut tile_base = arena.as_ptr();
+            let mut remaining = arena.len();
+
+            while remaining != 0 {
+                let tile_len = crate::kd_tree::leaf_view::leaf_arena_tile_len(remaining);
+                crate::kd_tree::leaf_view_chunked::nearest_n_within::neon::nearest_n_within_neon_arena_unchecked_f64::<
+                    Self::NeonF64Ops,
+                    T,
+                    _,
+                    K,
+                >(tile_base, tile_len, query_wide, max_dist, &mut emit);
+                let tile_bytes =
+                    K * tile_len * std::mem::size_of::<f64>() + tile_len * std::mem::size_of::<T>();
+                tile_base = tile_base.add(tile_bytes);
+                remaining -= tile_len;
+            }
+
+            return true;
+        }
+
+        if TypeId::of::<A>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::NeonF32Ops>()
+                != TypeId::of::<distance_metric_neon::UnsupportedNeonF32LeafOps>()
+        {
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f32);
+            let mut emit = |candidate_dist: f32, item: T| {
+                results.add(NearestNeighbour {
+                    distance: std::mem::transmute_copy::<f32, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+            let mut tile_base = arena.as_ptr();
+            let mut remaining = arena.len();
+
+            while remaining != 0 {
+                let tile_len = crate::kd_tree::leaf_view::leaf_arena_tile_len(remaining);
+                crate::kd_tree::leaf_view_chunked::nearest_n_within::neon::nearest_n_within_neon_arena_unchecked_f32::<
+                    Self::NeonF32Ops,
+                    T,
+                    _,
+                    K,
+                >(tile_base, tile_len, query_wide, max_dist, &mut emit);
+                let tile_bytes =
+                    K * tile_len * std::mem::size_of::<f32>() + tile_len * std::mem::size_of::<T>();
+                tile_base = tile_base.add(tile_bytes);
+                remaining -= tile_len;
+            }
+
+            return true;
+        }
+
+        false
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
+    #[inline(always)]
+    /// Try a NEON-specialized `best_n_within` leaf kernel.
+    unsafe fn try_best_n_within_leaf_neon<T, R, const K: usize, const B: usize>(
+        leaf: &LeafView<'_, A, T, K, B>,
+        query_wide: &[Self::Output; K],
+        max_dist: Self::Output,
+        results: &mut R,
+    ) -> bool
+    where
+        A: AxisUnified<Coord = A> + 'static,
+        T: crate::traits_unified_2::Basics + Ord,
+        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        R: ResultCollection<Self::Output, BestNeighbour<Self::Output, T>>,
+    {
+        if TypeId::of::<A>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::NeonF64Ops>()
+                != TypeId::of::<distance_metric_neon::UnsupportedNeonF64LeafOps>()
+        {
+            let leaf =
+                &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f64, T, K, B>);
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f64);
+            let mut emit = |candidate_dist: f64, item: T| {
+                results.add(BestNeighbour {
+                    distance: std::mem::transmute_copy::<f64, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+
+            crate::kd_tree::leaf_view_chunked::best_n_within::neon::best_n_within_neon_unchecked_f64::<
+                Self::NeonF64Ops,
+                T,
+                _,
+                K,
+                B,
+            >(leaf, query_wide, max_dist, &mut emit);
+
+            return true;
+        }
+
+        if TypeId::of::<A>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::NeonF32Ops>()
+                != TypeId::of::<distance_metric_neon::UnsupportedNeonF32LeafOps>()
+        {
+            let leaf =
+                &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f32, T, K, B>);
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f32);
+            let mut emit = |candidate_dist: f32, item: T| {
+                results.add(BestNeighbour {
+                    distance: std::mem::transmute_copy::<f32, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+
+            crate::kd_tree::leaf_view_chunked::best_n_within::neon::best_n_within_neon_unchecked_f32::<
+                Self::NeonF32Ops,
+                T,
+                _,
+                K,
+                B,
+            >(leaf, query_wide, max_dist, &mut emit);
+
+            return true;
+        }
+
+        false
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
+    #[inline(always)]
+    /// Try a NEON-specialized `best_n_within` arena kernel.
+    unsafe fn try_best_n_within_arena_neon<T, R, const K: usize>(
+        arena: &LeafArena<'_, A, T, K>,
+        query_wide: &[Self::Output; K],
+        max_dist: Self::Output,
+        results: &mut R,
+    ) -> bool
+    where
+        A: AxisUnified<Coord = A> + 'static,
+        T: crate::traits_unified_2::Basics + Ord,
+        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        R: ResultCollection<Self::Output, BestNeighbour<Self::Output, T>>,
+    {
+        if TypeId::of::<A>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
+            && TypeId::of::<Self::NeonF64Ops>()
+                != TypeId::of::<distance_metric_neon::UnsupportedNeonF64LeafOps>()
+        {
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f64);
+            let mut emit = |candidate_dist: f64, item: T| {
+                results.add(BestNeighbour {
+                    distance: std::mem::transmute_copy::<f64, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+            let mut tile_base = arena.as_ptr();
+            let mut remaining = arena.len();
+
+            while remaining != 0 {
+                let tile_len = crate::kd_tree::leaf_view::leaf_arena_tile_len(remaining);
+                crate::kd_tree::leaf_view_chunked::best_n_within::neon::best_n_within_neon_arena_unchecked_f64::<
+                    Self::NeonF64Ops,
+                    T,
+                    _,
+                    K,
+                >(tile_base, tile_len, query_wide, max_dist, &mut emit);
+                let tile_bytes =
+                    K * tile_len * std::mem::size_of::<f64>() + tile_len * std::mem::size_of::<T>();
+                tile_base = tile_base.add(tile_bytes);
+                remaining -= tile_len;
+            }
+
+            return true;
+        }
+
+        if TypeId::of::<A>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::NeonF32Ops>()
+                != TypeId::of::<distance_metric_neon::UnsupportedNeonF32LeafOps>()
+        {
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f32);
+            let mut emit = |candidate_dist: f32, item: T| {
+                results.add(BestNeighbour {
+                    distance: std::mem::transmute_copy::<f32, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+            let mut tile_base = arena.as_ptr();
+            let mut remaining = arena.len();
+
+            while remaining != 0 {
+                let tile_len = crate::kd_tree::leaf_view::leaf_arena_tile_len(remaining);
+                crate::kd_tree::leaf_view_chunked::best_n_within::neon::best_n_within_neon_arena_unchecked_f32::<
+                    Self::NeonF32Ops,
+                    T,
+                    _,
+                    K,
+                >(tile_base, tile_len, query_wide, max_dist, &mut emit);
+                let tile_bytes =
+                    K * tile_len * std::mem::size_of::<f32>() + tile_len * std::mem::size_of::<T>();
+                tile_base = tile_base.add(tile_bytes);
+                remaining -= tile_len;
+            }
+
+            return true;
+        }
+
+        false
+    }
 }
 
 /// Unified distance metric trait (V3 umbrella).
@@ -91,54 +1014,19 @@ impl<T, A: Copy> DistanceMetricUnified<A> for T where
 /// This bridges the new `crate::dist` traits to legacy internal query plumbing
 /// while keeping query modules free of direct legacy trait references.
 pub trait KdTreeDistanceMetric<A: Copy, const K: usize>:
-    crate::traits_unified_2::DistanceMetricUnified<A, K, Output = Self::DistOutput>
-    + DistanceMetricSimdBlock3<A, K, Self::DistOutput>
-    + DistanceMetricSimdBlock4<A, K, Self::DistOutput>
+    DistanceMetricUnified<A>
+    + DistanceMetricSimdBlock3<A, K, <Self as DistanceMetricCore<A>>::Output>
+    + DistanceMetricSimdBlock4<A, K, <Self as DistanceMetricCore<A>>::Output>
 {
-    /// Distance accumulator / output type used by query paths.
-    type DistOutput: AxisUnified<Coord = Self::DistOutput>;
-
-    /// Widen a single coordinate from axis type `A`.
-    fn widen_coord(a: A) -> Self::DistOutput;
-
-    /// One-axis distance contribution.
-    fn dist1(a: Self::DistOutput, b: Self::DistOutput) -> Self::DistOutput;
-
-    /// Ordering-compatible comparison helper.
-    fn cmp(a: Self::DistOutput, b: Self::DistOutput) -> Ordering;
 }
 
 impl<T, A: Copy, const K: usize> KdTreeDistanceMetric<A, K> for T
 where
-    T: crate::traits_unified_2::DistanceMetricUnified<A, K>
-        + DistanceMetricSimdBlock3<
-            A,
-            K,
-            <T as crate::traits_unified_2::DistanceMetricUnified<A, K>>::Output,
-        > + DistanceMetricSimdBlock4<
-            A,
-            K,
-            <T as crate::traits_unified_2::DistanceMetricUnified<A, K>>::Output,
-        >,
-    <T as crate::traits_unified_2::DistanceMetricUnified<A, K>>::Output:
-        AxisUnified<Coord = <T as crate::traits_unified_2::DistanceMetricUnified<A, K>>::Output>,
+    T: DistanceMetricUnified<A>
+        + DistanceMetricSimdBlock3<A, K, <T as DistanceMetricCore<A>>::Output>
+        + DistanceMetricSimdBlock4<A, K, <T as DistanceMetricCore<A>>::Output>,
+    <T as DistanceMetricCore<A>>::Output: AxisUnified<Coord = <T as DistanceMetricCore<A>>::Output>,
 {
-    type DistOutput = <T as crate::traits_unified_2::DistanceMetricUnified<A, K>>::Output;
-
-    #[inline(always)]
-    fn widen_coord(a: A) -> Self::DistOutput {
-        <T as crate::traits_unified_2::DistanceMetricUnified<A, K>>::widen_coord(a)
-    }
-
-    #[inline(always)]
-    fn dist1(a: Self::DistOutput, b: Self::DistOutput) -> Self::DistOutput {
-        <T as crate::traits_unified_2::DistanceMetricUnified<A, K>>::dist1(a, b)
-    }
-
-    #[inline(always)]
-    fn cmp(a: Self::DistOutput, b: Self::DistOutput) -> Ordering {
-        <T as crate::traits_unified_2::DistanceMetricUnified<A, K>>::cmp(a, b)
-    }
 }
 
 #[cfg(test)]

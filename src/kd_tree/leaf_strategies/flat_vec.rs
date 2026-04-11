@@ -1,5 +1,7 @@
 use crate::kd_tree::leaf_view::LeafView;
-use crate::traits_unified_2::{AxisUnified, Basics, BucketLimitType, Immutable, LeafStrategy};
+use crate::traits_unified_2::{
+    AxisUnified, Basics, BucketLimitType, Immutable, LeafProjection, LeafStrategy,
+};
 use crate::StemStrategy;
 
 /// A leaf storage strategy using flat vectors for coordinates.
@@ -23,6 +25,7 @@ where
     type Mutability = Immutable;
 
     const BUCKET_LIMIT_TYPE: BucketLimitType = BucketLimitType::Soft;
+    const LEAF_PROJECTION: LeafProjection = LeafProjection::LeafView;
 
     fn new_with_capacity(capacity: usize) -> Self {
         Self {
@@ -90,8 +93,9 @@ mod test {
     use rand::Rng;
     use std::num::NonZeroUsize;
 
+    use crate::dist::SquaredEuclidean;
     use crate::kd_tree::leaf_strategies::flat_vec::FlatVec;
-    use crate::traits_unified_2::{LeafStrategy, SquaredEuclidean};
+    use crate::traits_unified_2::LeafStrategy;
     use crate::{kd_tree, Eytzinger};
 
     #[test]

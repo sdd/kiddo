@@ -1,7 +1,6 @@
 //! Definitions and implementations for some traits that are used by KdTree, LeafStrategies, StemStrategies and DistanceMEtrics
 
 use crate::kd_tree::leaf_view::{LeafArena, LeafView};
-use crate::kd_tree::KdTree;
 use crate::StemStrategy;
 use fixed::traits::LossyFrom;
 use fixed::types::extra::{U0, U16, U8};
@@ -32,26 +31,6 @@ pub(crate) trait Mutability: sealed::Sealed + 'static {
         stems_depth: usize,
         leaf_count: usize,
     ) -> crate::kd_tree::StemLeafResolution;
-
-    fn get_leaf_idx<A, T, SS, LS, const K: usize, const B: usize>(
-        tree: &KdTree<A, T, SS, LS, K, B>,
-        query: &[A; K],
-    ) -> usize
-    where
-        A: AxisUnified<Coord = A>,
-        T: Basics + Copy + Default + PartialOrd + PartialEq,
-        SS: StemStrategy,
-        LS: LeafStrategy<A, T, SS, K, B>;
-
-    fn resolve_terminal_stem_idx<A, T, SS, LS, const K: usize, const B: usize>(
-        tree: &KdTree<A, T, SS, LS, K, B>,
-        stem_idx: usize,
-    ) -> Option<usize>
-    where
-        A: AxisUnified<Coord = A>,
-        T: Basics + Copy + Default + PartialOrd + PartialEq,
-        SS: StemStrategy,
-        LS: LeafStrategy<A, T, SS, K, B>;
 }
 
 fn build_mapped_stem_leaf_resolution<SS: StemStrategy>(
@@ -122,32 +101,6 @@ impl Mutability for Immutable {
             leaf_count,
         }
     }
-
-    fn get_leaf_idx<A, T, SS, LS, const K: usize, const B: usize>(
-        tree: &KdTree<A, T, SS, LS, K, B>,
-        query: &[A; K],
-    ) -> usize
-    where
-        A: AxisUnified<Coord = A>,
-        T: Basics + Copy + Default + PartialOrd + PartialEq,
-        SS: StemStrategy,
-        LS: LeafStrategy<A, T, SS, K, B>,
-    {
-        tree.get_leaf_idx_unmapped(query)
-    }
-
-    fn resolve_terminal_stem_idx<A, T, SS, LS, const K: usize, const B: usize>(
-        _tree: &KdTree<A, T, SS, LS, K, B>,
-        _stem_idx: usize,
-    ) -> Option<usize>
-    where
-        A: AxisUnified<Coord = A>,
-        T: Basics + Copy + Default + PartialOrd + PartialEq,
-        SS: StemStrategy,
-        LS: LeafStrategy<A, T, SS, K, B>,
-    {
-        None
-    }
 }
 
 /// Marker type for mutable leaf strategies.
@@ -169,40 +122,6 @@ impl Mutability for Mutable {
         // Start in Mapped state with min_stem_leaf_idx = 0 for simplicity.
         // TODO: Optimize later with Pristine state and dynamic min_stem_leaf_idx
         build_mapped_stem_leaf_resolution::<SS>(stems_depth, leaf_count)
-    }
-
-    fn get_leaf_idx<A, T, SS, LS, const K: usize, const B: usize>(
-        tree: &KdTree<A, T, SS, LS, K, B>,
-        query: &[A; K],
-    ) -> usize
-    where
-        A: AxisUnified<Coord = A>,
-        T: Basics + Copy + Default + PartialOrd + PartialEq,
-        SS: StemStrategy,
-        LS: LeafStrategy<A, T, SS, K, B>,
-    {
-        if tree.stem_leaf_resolution.uses_arithmetic() {
-            tree.get_leaf_idx_unmapped(query)
-        } else {
-            tree.get_leaf_idx_mapped(query)
-        }
-    }
-
-    fn resolve_terminal_stem_idx<A, T, SS, LS, const K: usize, const B: usize>(
-        tree: &KdTree<A, T, SS, LS, K, B>,
-        stem_idx: usize,
-    ) -> Option<usize>
-    where
-        A: AxisUnified<Coord = A>,
-        T: Basics + Copy + Default + PartialOrd + PartialEq,
-        SS: StemStrategy,
-        LS: LeafStrategy<A, T, SS, K, B>,
-    {
-        if tree.stem_leaf_resolution.uses_arithmetic() {
-            None
-        } else {
-            tree.resolve_terminal_stem(stem_idx)
-        }
     }
 }
 
@@ -259,6 +178,15 @@ pub enum BucketLimitType {
     Soft,
 }
 
+/// The leaf access projection supported by a leaf strategy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LeafProjection {
+    /// Strategy exposes leaf data through [`LeafView`].
+    LeafView,
+    /// Strategy exposes leaf data through [`LeafArena`].
+    LeafArena,
+}
+
 /// Strategy for how leaf storage is laid out and constructed.
 /// - AX: Axis marker implementing AxisUnified (selects float or fixed semantics).
 /// - T: item/content type stored alongside points.
@@ -280,6 +208,9 @@ where
 
     /// Whether bucket size is a hard or soft limit
     const BUCKET_LIMIT_TYPE: BucketLimitType;
+
+    /// The leaf projection exposed by this strategy.
+    const LEAF_PROJECTION: LeafProjection;
 
     // ---- Construction ----
 
@@ -303,10 +234,13 @@ where
     /// Returns a view into the specified leaf's data.
     fn leaf_view(&self, leaf_idx: usize) -> LeafView<'_, AX, T, K, B>;
 
-    /// Returns arena-backed access for the specified leaf when the strategy supports it.
+    /// Returns arena-backed access for the specified leaf.
+    ///
+    /// Callers should only use this when [`Self::LEAF_PROJECTION`] is
+    /// [`LeafProjection::LeafArena`].
     #[inline(always)]
-    fn leaf_arena(&self, _leaf_idx: usize) -> Option<LeafArena<'_, AX, T, K>> {
-        None
+    fn leaf_arena(&self, _leaf_idx: usize) -> LeafArena<'_, AX, T, K> {
+        unimplemented!("leaf_arena is unsupported for this leaf strategy")
     }
 
     /// Appends a new leaf to the storage.

@@ -109,7 +109,7 @@ impl<const CL: u32, const VB: u32, const K: usize> DonnellySimdDescent<CL, VB, K
     where
         A: AxisUnified<Coord = A>,
         O: AxisUnified<Coord = O>,
-        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>,
+        D: crate::dist::DistanceMetricCore<A, Output = O>,
     {
         let (lower_offset, upper_offset) = child_interval_bounds_block3(child_idx);
 
@@ -289,7 +289,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
         Self: Sized,
         A: AxisUnified<Coord = A>,
         O: AxisUnified<Coord = O> + crate::stem_strategies::donnelly_2_blockmarker_simd::BacktrackBlock3,
-        D: crate::traits_unified_2::DistanceMetricUnified<A, K2, Output = O>
+        D: crate::dist::DistanceMetricCore<A, Output = O>
             + crate::stem_strategies::donnelly_2_blockmarker_simd::backtrack_traits::DistanceMetricSimdBlock3<
                 A,
                 K2,

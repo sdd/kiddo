@@ -6,8 +6,8 @@
 
 use std::ptr::NonNull;
 
+use crate::dist::{DistanceMetricCore, DotProduct, Manhattan, SquaredEuclidean};
 use crate::traits_unified_2::AxisUnified;
-use crate::traits_unified_2::{DistanceMetricUnified, DotProduct, Manhattan, SquaredEuclidean};
 
 mod sealed {
     pub trait Sealed {}
@@ -374,7 +374,7 @@ pub trait BacktrackBlock3: AxisUnified<Coord = Self> + sealed::Sealed {
     ) -> u8
     where
         A: Copy,
-        D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>;
+        D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>;
 }
 
 /// Trait for computing SIMD backtrack masks for Block4 (16 children).
@@ -402,7 +402,7 @@ pub trait BacktrackBlock4: AxisUnified<Coord = Self> + sealed::Sealed {
     ) -> u16
     where
         A: Copy,
-        D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>;
+        D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>;
 }
 
 // ====================================================================================
@@ -424,7 +424,7 @@ fn autovec_backtrack_block3<A, I, D, const K: usize>(
 where
     A: AxisUnified<Coord = A> + std::ops::Add<Output = A> + std::ops::Sub<Output = A>,
     I: Copy,
-    D: DistanceMetricUnified<I, K, Output = A>,
+    D: DistanceMetricCore<I, Output = A>,
 {
     use super::{child_interval_bounds_block3, interval_distance_1d};
 
@@ -482,7 +482,7 @@ fn autovec_backtrack_block4<A, I, D, const K: usize>(
 where
     A: AxisUnified<Coord = A> + std::ops::Add<Output = A> + std::ops::Sub<Output = A>,
     I: Copy,
-    D: DistanceMetricUnified<I, K, Output = A>,
+    D: DistanceMetricCore<I, Output = A>,
 {
     use super::{child_interval_bounds_block4, interval_distance_1d};
 
@@ -534,7 +534,7 @@ where
 impl<A, const K: usize> DistanceMetricSimdBlock3<A, K, f64> for SquaredEuclidean<f64>
 where
     A: Copy,
-    SquaredEuclidean<f64>: DistanceMetricUnified<A, K, Output = f64>,
+    SquaredEuclidean<f64>: DistanceMetricCore<A, Output = f64>,
 {
     #[inline(always)]
     fn backtrack_block3_autovec(
@@ -624,7 +624,7 @@ where
 impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f64> for SquaredEuclidean<f64>
 where
     A: Copy,
-    SquaredEuclidean<f64>: DistanceMetricUnified<A, K, Output = f64>,
+    SquaredEuclidean<f64>: DistanceMetricCore<A, Output = f64>,
 {
     #[inline(always)]
     fn backtrack_block4_autovec(
@@ -714,7 +714,7 @@ where
 impl<A, const K: usize> DistanceMetricSimdBlock3<A, K, f32> for SquaredEuclidean<f32>
 where
     A: Copy,
-    SquaredEuclidean<f32>: DistanceMetricUnified<A, K, Output = f32>,
+    SquaredEuclidean<f32>: DistanceMetricCore<A, Output = f32>,
 {
     #[inline(always)]
     fn backtrack_block3_autovec(
@@ -804,7 +804,7 @@ where
 impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f32> for SquaredEuclidean<f32>
 where
     A: Copy,
-    SquaredEuclidean<f32>: DistanceMetricUnified<A, K, Output = f32>,
+    SquaredEuclidean<f32>: DistanceMetricCore<A, Output = f32>,
 {
     #[inline(always)]
     fn backtrack_block4_autovec(
@@ -894,7 +894,7 @@ where
 impl<A, const K: usize> DistanceMetricSimdBlock3<A, K, f64> for Manhattan<f64>
 where
     A: Copy,
-    Manhattan<f64>: DistanceMetricUnified<A, K, Output = f64>,
+    Manhattan<f64>: DistanceMetricCore<A, Output = f64>,
 {
     #[inline(always)]
     fn backtrack_block3_autovec(
@@ -984,7 +984,7 @@ where
 impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f64> for Manhattan<f64>
 where
     A: Copy,
-    Manhattan<f64>: DistanceMetricUnified<A, K, Output = f64>,
+    Manhattan<f64>: DistanceMetricCore<A, Output = f64>,
 {
     #[inline(always)]
     fn backtrack_block4_autovec(
@@ -1074,7 +1074,7 @@ where
 impl<A, const K: usize> DistanceMetricSimdBlock3<A, K, f32> for Manhattan<f32>
 where
     A: Copy,
-    Manhattan<f32>: DistanceMetricUnified<A, K, Output = f32>,
+    Manhattan<f32>: DistanceMetricCore<A, Output = f32>,
 {
     #[inline(always)]
     fn backtrack_block3_autovec(
@@ -1164,7 +1164,7 @@ where
 impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f32> for Manhattan<f32>
 where
     A: Copy,
-    Manhattan<f32>: DistanceMetricUnified<A, K, Output = f32>,
+    Manhattan<f32>: DistanceMetricCore<A, Output = f32>,
 {
     #[inline(always)]
     fn backtrack_block4_autovec(
@@ -1255,7 +1255,7 @@ where
 impl<A, const K: usize> DistanceMetricSimdBlock3<A, K, f64> for DotProduct<f64>
 where
     A: Copy,
-    DotProduct<f64>: DistanceMetricUnified<A, K, Output = f64>,
+    DotProduct<f64>: DistanceMetricCore<A, Output = f64>,
 {
     #[inline(always)]
     fn backtrack_block3_autovec(
@@ -1273,7 +1273,7 @@ where
 impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f64> for DotProduct<f64>
 where
     A: Copy,
-    DotProduct<f64>: DistanceMetricUnified<A, K, Output = f64>,
+    DotProduct<f64>: DistanceMetricCore<A, Output = f64>,
 {
     #[inline(always)]
     fn backtrack_block4_autovec(
@@ -1291,7 +1291,7 @@ where
 impl<A, const K: usize> DistanceMetricSimdBlock3<A, K, f32> for DotProduct<f32>
 where
     A: Copy,
-    DotProduct<f32>: DistanceMetricUnified<A, K, Output = f32>,
+    DotProduct<f32>: DistanceMetricCore<A, Output = f32>,
 {
     #[inline(always)]
     fn backtrack_block3_autovec(
@@ -1309,7 +1309,7 @@ where
 impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f32> for DotProduct<f32>
 where
     A: Copy,
-    DotProduct<f32>: DistanceMetricUnified<A, K, Output = f32>,
+    DotProduct<f32>: DistanceMetricCore<A, Output = f32>,
 {
     #[inline(always)]
     fn backtrack_block4_autovec(
@@ -1342,7 +1342,7 @@ impl BacktrackBlock3 for f64 {
     ) -> u8
     where
         A: Copy,
-        D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>,
+        D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>,
     {
         D::backtrack_block3(
             query_wide,
@@ -1367,7 +1367,7 @@ impl BacktrackBlock4 for f64 {
     ) -> u16
     where
         A: Copy,
-        D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>,
+        D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>,
     {
         D::backtrack_block4(
             query_wide,
@@ -1398,7 +1398,7 @@ impl BacktrackBlock3 for f32 {
     ) -> u8
     where
         A: Copy,
-        D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>,
+        D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>,
     {
         D::backtrack_block3(
             query_wide,
@@ -1423,7 +1423,7 @@ impl BacktrackBlock4 for f32 {
     ) -> u16
     where
         A: Copy,
-        D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>,
+        D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>,
     {
         D::backtrack_block4(
             query_wide,
@@ -1448,7 +1448,7 @@ impl BacktrackBlock4 for f32 {
 #[inline(always)]
 unsafe fn simd_backtrack_block3_f64_avx2_squared_euclidean<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f64>,
+    D: DistanceMetricCore<A, Output = f64>,
     const K: usize,
 >(
     query_wide: f64,
@@ -1516,7 +1516,7 @@ unsafe fn simd_backtrack_block3_f64_avx2_squared_euclidean<
 #[inline(always)]
 unsafe fn simd_backtrack_block3_f32_avx2_squared_euclidean<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f32>,
+    D: DistanceMetricCore<A, Output = f32>,
     const K: usize,
 >(
     query_wide: f32,
@@ -1577,7 +1577,7 @@ unsafe fn simd_backtrack_block3_f32_avx2_squared_euclidean<
 #[inline(always)]
 unsafe fn simd_backtrack_block4_f64_avx2_squared_euclidean<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f64>,
+    D: DistanceMetricCore<A, Output = f64>,
     const K: usize,
 >(
     query_wide: f64,
@@ -1646,7 +1646,7 @@ unsafe fn simd_backtrack_block4_f64_avx2_squared_euclidean<
 #[inline(always)]
 unsafe fn simd_backtrack_block4_f32_avx2_squared_euclidean<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f32>,
+    D: DistanceMetricCore<A, Output = f32>,
     const K: usize,
 >(
     query_wide: f32,
@@ -1716,7 +1716,7 @@ unsafe fn simd_backtrack_block4_f32_avx2_squared_euclidean<
 #[inline(always)]
 unsafe fn simd_backtrack_block3_f64_avx2_manhattan<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f64>,
+    D: DistanceMetricCore<A, Output = f64>,
     const K: usize,
 >(
     query_wide: f64,
@@ -1782,7 +1782,7 @@ unsafe fn simd_backtrack_block3_f64_avx2_manhattan<
 #[inline(always)]
 unsafe fn simd_backtrack_block3_f32_avx2_manhattan<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f32>,
+    D: DistanceMetricCore<A, Output = f32>,
     const K: usize,
 >(
     query_wide: f32,
@@ -1839,7 +1839,7 @@ unsafe fn simd_backtrack_block3_f32_avx2_manhattan<
 #[inline(always)]
 unsafe fn simd_backtrack_block4_f64_avx2_manhattan<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f64>,
+    D: DistanceMetricCore<A, Output = f64>,
     const K: usize,
 >(
     query_wide: f64,
@@ -1902,7 +1902,7 @@ unsafe fn simd_backtrack_block4_f64_avx2_manhattan<
 #[inline(always)]
 unsafe fn simd_backtrack_block4_f32_avx2_manhattan<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f32>,
+    D: DistanceMetricCore<A, Output = f32>,
     const K: usize,
 >(
     query_wide: f32,
@@ -1968,7 +1968,7 @@ unsafe fn simd_backtrack_block4_f32_avx2_manhattan<
 #[inline(always)]
 unsafe fn simd_backtrack_block3_f64_avx512_squared_euclidean<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f64>,
+    D: DistanceMetricCore<A, Output = f64>,
     const K: usize,
 >(
     query_wide: f64,
@@ -2031,7 +2031,7 @@ unsafe fn simd_backtrack_block3_f64_avx512_squared_euclidean<
 #[inline(always)]
 unsafe fn simd_backtrack_block3_f32_avx512_squared_euclidean<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f32>,
+    D: DistanceMetricCore<A, Output = f32>,
     const K: usize,
 >(
     query_wide: f32,
@@ -2095,7 +2095,7 @@ unsafe fn simd_backtrack_block3_f32_avx512_squared_euclidean<
 #[inline(always)]
 unsafe fn simd_backtrack_block4_f64_avx512_squared_euclidean<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f64>,
+    D: DistanceMetricCore<A, Output = f64>,
     const K: usize,
 >(
     query_wide: f64,
@@ -2165,7 +2165,7 @@ unsafe fn simd_backtrack_block4_f64_avx512_squared_euclidean<
 #[inline(always)]
 unsafe fn simd_backtrack_block4_f32_avx512_squared_euclidean<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f32>,
+    D: DistanceMetricCore<A, Output = f32>,
     const K: usize,
 >(
     query_wide: f32,
@@ -2228,7 +2228,7 @@ unsafe fn simd_backtrack_block4_f32_avx512_squared_euclidean<
 #[inline(always)]
 unsafe fn simd_backtrack_block3_f64_avx512_manhattan<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f64>,
+    D: DistanceMetricCore<A, Output = f64>,
     const K: usize,
 >(
     query_wide: f64,
@@ -2281,7 +2281,7 @@ unsafe fn simd_backtrack_block3_f64_avx512_manhattan<
 #[inline(always)]
 unsafe fn simd_backtrack_block3_f32_avx512_manhattan<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f32>,
+    D: DistanceMetricCore<A, Output = f32>,
     const K: usize,
 >(
     query_wide: f32,
@@ -2334,7 +2334,7 @@ unsafe fn simd_backtrack_block3_f32_avx512_manhattan<
 #[inline(always)]
 unsafe fn simd_backtrack_block4_f64_avx512_manhattan<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f64>,
+    D: DistanceMetricCore<A, Output = f64>,
     const K: usize,
 >(
     query_wide: f64,
@@ -2396,7 +2396,7 @@ unsafe fn simd_backtrack_block4_f64_avx512_manhattan<
 #[inline(always)]
 unsafe fn simd_backtrack_block4_f32_avx512_manhattan<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f32>,
+    D: DistanceMetricCore<A, Output = f32>,
     const K: usize,
 >(
     query_wide: f32,
@@ -2454,7 +2454,7 @@ unsafe fn simd_backtrack_block4_f32_avx512_manhattan<
 #[allow(dead_code)]
 unsafe fn simd_backtrack_block3_f64_neon_squared_euclidean<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f64>,
+    D: DistanceMetricCore<A, Output = f64>,
     const K: usize,
 >(
     query_wide: f64,
@@ -2530,7 +2530,7 @@ unsafe fn simd_backtrack_block3_f64_neon_squared_euclidean<
 #[allow(dead_code)]
 unsafe fn simd_backtrack_block3_f32_neon_squared_euclidean<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f32>,
+    D: DistanceMetricCore<A, Output = f32>,
     const K: usize,
 >(
     query_wide: f32,
@@ -2604,7 +2604,7 @@ unsafe fn simd_backtrack_block3_f32_neon_squared_euclidean<
 #[allow(dead_code)]
 unsafe fn simd_backtrack_block4_f64_neon_squared_euclidean<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f64>,
+    D: DistanceMetricCore<A, Output = f64>,
     const K: usize,
 >(
     query_wide: f64,
@@ -2684,7 +2684,7 @@ unsafe fn simd_backtrack_block4_f64_neon_squared_euclidean<
 #[allow(dead_code)]
 unsafe fn simd_backtrack_block4_f32_neon_squared_euclidean<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f32>,
+    D: DistanceMetricCore<A, Output = f32>,
     const K: usize,
 >(
     query_wide: f32,
@@ -2760,7 +2760,7 @@ unsafe fn simd_backtrack_block4_f32_neon_squared_euclidean<
 #[allow(dead_code)]
 unsafe fn simd_backtrack_block3_f64_neon_manhattan<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f64>,
+    D: DistanceMetricCore<A, Output = f64>,
     const K: usize,
 >(
     query_wide: f64,
@@ -2835,7 +2835,7 @@ unsafe fn simd_backtrack_block3_f64_neon_manhattan<
 #[allow(dead_code)]
 unsafe fn simd_backtrack_block3_f32_neon_manhattan<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f32>,
+    D: DistanceMetricCore<A, Output = f32>,
     const K: usize,
 >(
     query_wide: f32,
@@ -2908,7 +2908,7 @@ unsafe fn simd_backtrack_block3_f32_neon_manhattan<
 #[allow(dead_code)]
 unsafe fn simd_backtrack_block4_f64_neon_manhattan<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f64>,
+    D: DistanceMetricCore<A, Output = f64>,
     const K: usize,
 >(
     query_wide: f64,
@@ -2987,7 +2987,7 @@ unsafe fn simd_backtrack_block4_f64_neon_manhattan<
 #[allow(dead_code)]
 unsafe fn simd_backtrack_block4_f32_neon_manhattan<
     A: Copy,
-    D: DistanceMetricUnified<A, K, Output = f32>,
+    D: DistanceMetricCore<A, Output = f32>,
     const K: usize,
 >(
     query_wide: f32,
@@ -3086,8 +3086,7 @@ mod fixed_impls {
                 ) -> u8
                 where
                     A: Copy,
-                    D: DistanceMetricUnified<A, K, Output = Self>
-                        + DistanceMetricSimdBlock3<A, K, Self>,
+                    D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>,
                 {
                     // TODO: Integer SIMD for fixed-point
                     autovec_backtrack_block3::<Self, A, D, K>(
@@ -3113,8 +3112,7 @@ mod fixed_impls {
                 ) -> u16
                 where
                     A: Copy,
-                    D: DistanceMetricUnified<A, K, Output = Self>
-                        + DistanceMetricSimdBlock4<A, K, Self>,
+                    D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>,
                 {
                     // TODO: Integer SIMD for fixed-point
                     autovec_backtrack_block4::<Self, A, D, K>(
@@ -3158,7 +3156,7 @@ mod f16_impl {
         ) -> u8
         where
             A: Copy,
-            D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>,
+            D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>,
         {
             // TODO: f16 SIMD (possibly widen to f32)
             autovec_backtrack_block3::<Self, A, D, K>(
@@ -3184,7 +3182,7 @@ mod f16_impl {
         ) -> u16
         where
             A: Copy,
-            D: DistanceMetricUnified<A, K, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>,
+            D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>,
         {
             // TODO: f16 SIMD (possibly widen to f32)
             autovec_backtrack_block4::<Self, A, D, K>(
@@ -3202,10 +3200,10 @@ mod f16_impl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dist::{DistanceMetricCore, SquaredEuclidean};
     use crate::stem_strategies::donnelly_2_blockmarker_simd::{
         child_interval_bounds_block3, child_interval_bounds_block4, interval_distance_1d,
     };
-    use crate::traits_unified_2::{DistanceMetricUnified, SquaredEuclidean};
 
     #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
     struct Lcg {
@@ -3387,7 +3385,7 @@ mod tests {
 
             let interval_dist = interval_distance_1d(query, lower, upper);
             let new_off =
-                <SquaredEuclidean<f64> as DistanceMetricUnified<f64, 3>>::dist1(interval_dist, 0.0);
+                <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist1(interval_dist, 0.0);
             let rd_far = rd - old_off + new_off;
 
             if rd_far <= best_dist {
@@ -3422,7 +3420,7 @@ mod tests {
 
             let interval_dist = interval_distance_1d(query, lower, upper);
             let new_off =
-                <SquaredEuclidean<f32> as DistanceMetricUnified<f32, 3>>::dist1(interval_dist, 0.0);
+                <SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist1(interval_dist, 0.0);
             let rd_far = rd - old_off + new_off;
 
             if rd_far <= best_dist {
@@ -3457,7 +3455,7 @@ mod tests {
 
             let interval_dist = interval_distance_1d(query, lower, upper);
             let new_off =
-                <SquaredEuclidean<f64> as DistanceMetricUnified<f64, 3>>::dist1(interval_dist, 0.0);
+                <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist1(interval_dist, 0.0);
             let rd_far = rd - old_off + new_off;
 
             if rd_far <= best_dist {
@@ -3492,7 +3490,7 @@ mod tests {
 
             let interval_dist = interval_distance_1d(query, lower, upper);
             let new_off =
-                <SquaredEuclidean<f32> as DistanceMetricUnified<f32, 3>>::dist1(interval_dist, 0.0);
+                <SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist1(interval_dist, 0.0);
             let rd_far = rd - old_off + new_off;
 
             if rd_far <= best_dist {

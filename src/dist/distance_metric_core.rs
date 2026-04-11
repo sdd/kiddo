@@ -35,6 +35,12 @@ pub trait DistanceMetricCore<A: Copy> {
     /// Single-axis contribution in widened coordinates.
     fn dist1(a: Self::Output, b: Self::Output) -> Self::Output;
 
+    /// Single-axis contribution on raw coordinates.
+    #[inline(always)]
+    fn dist1_raw(a: A, b: A) -> Self::Output {
+        Self::dist1(Self::widen_coord(a), Self::widen_coord(b))
+    }
+
     /// Full point distance in widened coordinates.
     #[inline(always)]
     fn dist<const K: usize>(a: &[Self::Output; K], b: &[Self::Output; K]) -> Self::Output {
@@ -42,6 +48,18 @@ pub trait DistanceMetricCore<A: Copy> {
 
         for dim in 1..K {
             acc += Self::dist1(a[dim], b[dim]);
+        }
+
+        acc
+    }
+
+    /// Full point distance on raw coordinates.
+    #[inline(always)]
+    fn dist_raw<const K: usize>(a: &[A; K], b: &[A; K]) -> Self::Output {
+        let mut acc = Self::dist1_raw(a[0], b[0]);
+
+        for dim in 1..K {
+            acc += Self::dist1_raw(a[dim], b[dim]);
         }
 
         acc
