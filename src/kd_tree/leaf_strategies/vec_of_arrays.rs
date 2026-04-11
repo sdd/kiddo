@@ -1,7 +1,8 @@
 use crate::kd_tree::leaf_view::LeafView;
 use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
 use crate::traits_unified_2::{
-    AxisUnified, Basics, BucketLimitType, LeafStrategy, Mutable, MutableLeafStrategy,
+    AxisUnified, Basics, BucketLimitType, LeafProjection, LeafStrategy, Mutable,
+    MutableLeafStrategy,
 };
 use crate::StemStrategy;
 
@@ -35,6 +36,7 @@ where
     type Mutability = Mutable;
 
     const BUCKET_LIMIT_TYPE: BucketLimitType = BucketLimitType::Hard;
+    const LEAF_PROJECTION: LeafProjection = LeafProjection::LeafView;
 
     fn new_with_capacity(capacity: usize) -> Self {
         Self {
@@ -208,6 +210,7 @@ where
         leaf.content_items[idx] = item;
 
         leaf.size += 1;
+        self.size += 1;
     }
 
     fn is_leaf_full(&self, leaf_idx: usize) -> bool {
@@ -414,8 +417,9 @@ mod test {
     use fixed::{types::extra::U8, FixedU16};
     use rand::Rng;
 
+    use crate::dist::SquaredEuclidean;
     use crate::kd_tree::leaf_strategies::vec_of_arrays::VecOfArrays;
-    use crate::traits_unified_2::{LeafStrategy, SquaredEuclidean};
+    use crate::traits_unified_2::LeafStrategy;
     use crate::{kd_tree, Eytzinger};
 
     #[test]

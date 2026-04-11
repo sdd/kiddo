@@ -7,7 +7,7 @@ use crate::kd_tree::KdTree;
 use crate::stem_strategies::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
+use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
 use crate::StemStrategy;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
@@ -21,41 +21,46 @@ where
     fn process_leaf_nearest_one<D>(
         &self,
         leaf_idx: usize,
-        query_wide: &[D::DistOutput; K],
-        best_dist: &mut D::DistOutput,
+        query_wide: &[D::Output; K],
+        best_dist: &mut D::Output,
         best_item: &mut T,
     ) where
         D: KdTreeDistanceMetric<A, K>,
-        D::DistOutput: AxisUnified<Coord = D::DistOutput> + 'static,
+        D::Output: AxisUnified<Coord = D::Output> + 'static,
     {
-        if let Some(arena) = self.leaves.leaf_arena(leaf_idx) {
-            crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide_arena::<
-                A,
-                T,
-                D,
-                K,
-            >(&arena, query_wide, best_dist, best_item);
-            return;
+        match LS::LEAF_PROJECTION {
+            LeafProjection::LeafArena => {
+                let arena = self.leaves.leaf_arena(leaf_idx);
+                crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide_arena::<
+                    A,
+                    T,
+                    D,
+                    K,
+                >(&arena, query_wide, best_dist, best_item);
+            }
+            LeafProjection::LeafView => {
+                let leaf = self.leaves.leaf_view(leaf_idx);
+                nearest_one_with_query_wide::<A, T, D, K, B>(
+                    &leaf, query_wide, best_dist, best_item,
+                );
+            }
         }
-
-        let leaf = self.leaves.leaf_view(leaf_idx);
-        nearest_one_with_query_wide::<A, T, D, K, B>(&leaf, query_wide, best_dist, best_item);
     }
 
     /// Finds the nearest point to the query point.
     ///
     /// Returns a tuple of (distance, item) for the nearest neighbor.
     #[inline(always)]
-    pub fn nearest_one<D>(&self, query: &[A; K]) -> (D::DistOutput, T)
+    pub fn nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::DistOutput: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategies::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
             + TlsLeafScratch
             + 'static,
-        SS::Stack<D::DistOutput>: StackTrait<D::DistOutput, SS> + Default + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + Default + 'static,
         SS: 'static,
     {
         if self.stem_leaf_resolution.uses_arithmetic() {
@@ -66,20 +71,20 @@ where
     }
 
     #[inline(always)]
-    fn nearest_one_mapped<D>(&self, query: &[A; K]) -> (D::DistOutput, T)
+    fn nearest_one_mapped<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::DistOutput: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategies::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
             + TlsLeafScratch
             + 'static,
-        SS::Stack<D::DistOutput>: StackTrait<D::DistOutput, SS> + Default + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + Default + 'static,
     {
         let mut req_ctx = NearestOneReqCtx {
             query,
-            best_dist: D::DistOutput::max_value(),
+            best_dist: D::Output::max_value(),
             best_item: T::default(),
         };
 
@@ -96,16 +101,16 @@ where
     }
 
     #[inline(always)]
-    fn nearest_one_arithmetic<D>(&self, query: &[A; K]) -> (D::DistOutput, T)
+    fn nearest_one_arithmetic<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::DistOutput: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategies::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
             + TlsLeafScratch
             + 'static,
-        SS::Stack<D::DistOutput>: StackTrait<D::DistOutput, SS> + Default + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + Default + 'static,
         SS: 'static,
     {
         if SS::BLOCK_SIZE != 1 {
@@ -114,7 +119,7 @@ where
 
         let mut req_ctx = NearestOneReqCtx {
             query,
-            best_dist: D::DistOutput::max_value(),
+            best_dist: D::Output::max_value(),
             best_item: T::default(),
         };
 
@@ -134,21 +139,21 @@ where
     fn nearest_one_arithmetic_with_stack<D>(
         &self,
         query: &[A; K],
-        stack: &mut SS::Stack<D::DistOutput>,
-    ) -> (D::DistOutput, T)
+        stack: &mut SS::Stack<D::Output>,
+    ) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::DistOutput: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategies::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
             + TlsLeafScratch
             + 'static,
-        SS::Stack<D::DistOutput>: StackTrait<D::DistOutput, SS>,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
         let mut req_ctx = NearestOneReqCtx {
             query,
-            best_dist: D::DistOutput::max_value(),
+            best_dist: D::Output::max_value(),
             best_item: T::default(),
         };
 
@@ -173,17 +178,17 @@ where
     pub(crate) fn nearest_one_with_stack<D>(
         &self,
         query: &[A; K],
-        stack: &mut SS::Stack<D::DistOutput>,
-    ) -> (D::DistOutput, T)
+        stack: &mut SS::Stack<D::Output>,
+    ) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::DistOutput: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategies::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
             + TlsLeafScratch
             + 'static,
-        SS::Stack<D::DistOutput>: StackTrait<D::DistOutput, SS>,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
         if self.stem_leaf_resolution.uses_arithmetic() {
             return self.nearest_one_arithmetic_with_stack::<D>(query, stack);
@@ -196,21 +201,21 @@ where
     fn nearest_one_mapped_with_stack<D>(
         &self,
         query: &[A; K],
-        stack: &mut SS::Stack<D::DistOutput>,
-    ) -> (D::DistOutput, T)
+        stack: &mut SS::Stack<D::Output>,
+    ) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::DistOutput: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategies::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
             + TlsLeafScratch
             + 'static,
-        SS::Stack<D::DistOutput>: StackTrait<D::DistOutput, SS>,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
         let mut req_ctx = NearestOneReqCtx {
             query,
-            best_dist: D::DistOutput::max_value(),
+            best_dist: D::Output::max_value(),
             best_item: T::default(),
         };
 

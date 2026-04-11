@@ -2,14 +2,18 @@ use codspeed_criterion_compat::{
     black_box, criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, BenchmarkId,
     Criterion, Throughput,
 };
+use kiddo::dist::SquaredEuclidean;
 use kiddo::kd_tree::leaf_strategies::VecOfArenas;
 use kiddo::kd_tree::KdTree;
 use kiddo::stem_strategies::donnelly_2_pf::DonnellyPf;
 use kiddo::stem_strategies::eytzinger_pf_far::EytzingerPfFar;
-use kiddo::stem_strategies::{
-    Block3, Donnelly, DonnellyMarkerSimd, DonnellySimdDescent, Eytzinger, EytzingerPf,
-};
-use kiddo::traits_unified_2::SquaredEuclidean;
+#[cfg(all(
+    feature = "simd",
+    target_arch = "x86_64",
+    any(target_feature = "avx2", target_feature = "avx512f")
+))]
+use kiddo::stem_strategies::{Block3, DonnellyMarkerSimd};
+use kiddo::stem_strategies::{Donnelly, DonnellySimdDescent, Eytzinger, EytzingerPf};
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;

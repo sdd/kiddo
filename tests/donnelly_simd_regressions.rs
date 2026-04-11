@@ -1,18 +1,38 @@
+#[cfg(feature = "simd")]
 use assert_float_eq::assert_float_relative_eq;
+#[cfg(feature = "simd")]
+use kiddo::dist::DistanceMetricCore;
+#[cfg(feature = "simd")]
 use kiddo::kd_tree::leaf_strategies::FlatVec;
+#[cfg(feature = "simd")]
 use kiddo::kd_tree::KdTree;
+#[cfg(feature = "simd")]
 use kiddo::stem_strategies::{Block3, Block4, Donnelly, DonnellyMarkerSimd};
-use kiddo::traits::DistanceMetric;
-use kiddo::traits_unified_2::SquaredEuclidean;
+#[cfg(feature = "simd")]
+use kiddo::BestNeighbour;
+#[cfg(feature = "simd")]
+use kiddo::SquaredEuclidean;
+#[cfg(feature = "simd")]
 use rand::rngs::StdRng;
+#[cfg(feature = "simd")]
 use rand::{Rng, SeedableRng};
+#[cfg(feature = "simd")]
+use std::cmp::Ordering;
+#[cfg(feature = "simd")]
+use std::num::NonZeroUsize;
 
+#[cfg(feature = "simd")]
 const CONTENT_SEED: u64 = 1_260_253_197;
+#[cfg(feature = "simd")]
 const QUERY_SEED: u64 = 13_787_848_794_416_797_126;
+#[cfg(feature = "simd")]
 const POINT_COUNT: usize = 1_022;
+#[cfg(feature = "simd")]
 const REL_EPS_F32: f32 = 1.0e-6;
+#[cfg(feature = "simd")]
 const REL_EPS_F64: f64 = 1.0e-12;
 
+#[cfg(feature = "simd")]
 fn build_points_f32_k2() -> Vec<[f32; 2]> {
     let mut rng = StdRng::seed_from_u64(CONTENT_SEED);
     (0..POINT_COUNT)
@@ -20,16 +40,19 @@ fn build_points_f32_k2() -> Vec<[f32; 2]> {
         .collect()
 }
 
+#[cfg(feature = "simd")]
 fn build_query_f32_k2() -> [f32; 2] {
     let mut rng = StdRng::seed_from_u64(QUERY_SEED);
     [rng.random_range(-1.0..1.0), rng.random_range(-1.0..1.0)]
 }
 
+#[cfg(feature = "simd")]
 fn linear_search(points: &[[f32; 2]], query: &[f32; 2]) -> (f32, usize) {
     let mut best_dist = f32::MAX;
     let mut best_idx = 0usize;
     for (idx, point) in points.iter().enumerate() {
-        let dist = kiddo::SquaredEuclidean::dist(query, point);
+        let dist =
+            <kiddo::SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, point);
         if dist < best_dist {
             best_dist = dist;
             best_idx = idx;
@@ -38,17 +61,106 @@ fn linear_search(points: &[[f32; 2]], query: &[f32; 2]) -> (f32, usize) {
     (best_dist, best_idx)
 }
 
+#[cfg(feature = "simd")]
 fn linear_search_f64(points: &[[f64; 2]], query: &[f64; 2]) -> (f64, usize) {
     let mut best_dist = f64::MAX;
     let mut best_idx = 0usize;
     for (idx, point) in points.iter().enumerate() {
-        let dist = kiddo::SquaredEuclidean::dist(query, point);
+        let dist =
+            <kiddo::SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, point);
         if dist < best_dist {
             best_dist = dist;
             best_idx = idx;
         }
     }
     (best_dist, best_idx)
+}
+
+#[cfg(feature = "simd")]
+fn linear_best_n_within_f32(
+    points: &[[f32; 2]],
+    query: &[f32; 2],
+    max_dist: f32,
+    max_qty: usize,
+) -> Vec<BestNeighbour<f32, usize>> {
+    let mut best_items = Vec::with_capacity(max_qty);
+
+    for (item, point) in points.iter().enumerate() {
+        let distance =
+            <kiddo::SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, point);
+        if distance <= max_dist {
+            if best_items.len() < max_qty {
+                best_items.push(BestNeighbour { distance, item });
+            } else if item < best_items.last().unwrap().item {
+                best_items.pop();
+                best_items.push(BestNeighbour { distance, item });
+            }
+            best_items.sort_unstable();
+        }
+    }
+
+    best_items
+}
+
+#[cfg(feature = "simd")]
+fn linear_best_n_within_f64(
+    points: &[[f64; 2]],
+    query: &[f64; 2],
+    max_dist: f64,
+    max_qty: usize,
+) -> Vec<BestNeighbour<f64, usize>> {
+    let mut best_items = Vec::with_capacity(max_qty);
+
+    for (item, point) in points.iter().enumerate() {
+        let distance =
+            <kiddo::SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, point);
+        if distance <= max_dist {
+            if best_items.len() < max_qty {
+                best_items.push(BestNeighbour { distance, item });
+            } else if item < best_items.last().unwrap().item {
+                best_items.pop();
+                best_items.push(BestNeighbour { distance, item });
+            }
+            best_items.sort_unstable();
+        }
+    }
+
+    best_items
+}
+
+#[cfg(feature = "simd")]
+fn adversarial_grid_points_f32(size: usize) -> Vec<[f32; 2]> {
+    (0..size)
+        .map(|i| {
+            let x = ((i % 7) as f32 - 3.0) / 4.0;
+            let y = (((i / 7) % 7) as f32 - 3.0) / 4.0;
+            [x, y]
+        })
+        .collect()
+}
+
+#[cfg(feature = "simd")]
+fn stabilize_neighbours_f32(items: &mut [(f32, usize)]) {
+    items.sort_by(|a, b| {
+        a.0.partial_cmp(&b.0)
+            .unwrap_or(Ordering::Equal)
+            .then_with(|| a.1.cmp(&b.1))
+    });
+}
+
+#[cfg(feature = "simd")]
+fn linear_within_f32(points: &[[f32; 2]], query: &[f32; 2], max_dist: f32) -> Vec<(f32, usize)> {
+    let mut result: Vec<(f32, usize)> = points
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, point)| {
+            let distance =
+                <kiddo::SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, point);
+            (distance <= max_dist).then_some((distance, idx))
+        })
+        .collect();
+    stabilize_neighbours_f32(&mut result);
+    result
 }
 
 #[test]
@@ -105,6 +217,47 @@ fn regression_donnelly_simd_block4_f32_approx_self_lookup_hits_zero_distance() {
 
 #[test]
 #[cfg(feature = "simd")]
+fn regression_donnelly_simd_block4_f32_best_n_within_matches_scalar_and_linear() {
+    let points = build_points_f32_k2();
+    let query = build_query_f32_k2();
+    let max_dist = 2.0f32;
+    let max_qty = NonZeroUsize::new(16).unwrap();
+    let expected = linear_best_n_within_f32(&points, &query, max_dist, max_qty.get());
+
+    let tree_scalar: KdTree<f32, usize, Donnelly<4, 64, 4, 2>, FlatVec<f32, usize, 2, 16>, 2, 16> =
+        KdTree::new_from_slice(&points);
+    let tree_simd: KdTree<
+        f32,
+        usize,
+        DonnellyMarkerSimd<Block4, 64, 4, 2>,
+        FlatVec<f32, usize, 2, 16>,
+        2,
+        16,
+    > = KdTree::new_from_slice(&points);
+
+    let scalar_result = tree_scalar
+        .best_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty)
+        .into_sorted_vec();
+    let simd_result = tree_simd
+        .best_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty)
+        .into_sorted_vec();
+
+    assert_eq!(scalar_result.len(), expected.len());
+    assert_eq!(simd_result.len(), expected.len());
+
+    for (actual, expected) in scalar_result.iter().zip(expected.iter()) {
+        assert_float_relative_eq!(actual.distance, expected.distance, REL_EPS_F32);
+        assert_eq!(actual.item, expected.item);
+    }
+
+    for (actual, expected) in simd_result.iter().zip(expected.iter()) {
+        assert_float_relative_eq!(actual.distance, expected.distance, REL_EPS_F32);
+        assert_eq!(actual.item, expected.item);
+    }
+}
+
+#[test]
+#[cfg(feature = "simd")]
 fn control_donnelly_simd_block3_f64_nearest_one_matches_scalar_and_linear() {
     let mut rng = StdRng::seed_from_u64(CONTENT_SEED);
     let points: Vec<[f64; 2]> = (0..POINT_COUNT)
@@ -134,4 +287,160 @@ fn control_donnelly_simd_block3_f64_nearest_one_matches_scalar_and_linear() {
     assert_eq!(scalar_result.1, expected.1);
     assert_float_relative_eq!(simd_result.0, expected.0, REL_EPS_F64);
     assert_eq!(simd_result.1, expected.1);
+}
+
+#[test]
+#[cfg(feature = "simd")]
+fn control_donnelly_simd_block3_f64_best_n_within_matches_scalar_and_linear() {
+    let mut rng = StdRng::seed_from_u64(CONTENT_SEED);
+    let points: Vec<[f64; 2]> = (0..POINT_COUNT)
+        .map(|_| [rng.random_range(-1.0..1.0), rng.random_range(-1.0..1.0)])
+        .collect();
+
+    let mut rng = StdRng::seed_from_u64(QUERY_SEED);
+    let query = [rng.random_range(-1.0..1.0), rng.random_range(-1.0..1.0)];
+    let max_dist = 2.0f64;
+    let max_qty = NonZeroUsize::new(16).unwrap();
+    let expected = linear_best_n_within_f64(&points, &query, max_dist, max_qty.get());
+
+    let tree_scalar: KdTree<f64, usize, Donnelly<3, 64, 8, 2>, FlatVec<f64, usize, 2, 16>, 2, 16> =
+        KdTree::new_from_slice(&points);
+    let tree_simd: KdTree<
+        f64,
+        usize,
+        DonnellyMarkerSimd<Block3, 64, 8, 2>,
+        FlatVec<f64, usize, 2, 16>,
+        2,
+        16,
+    > = KdTree::new_from_slice(&points);
+
+    let scalar_result = tree_scalar
+        .best_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty)
+        .into_sorted_vec();
+    let simd_result = tree_simd
+        .best_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty)
+        .into_sorted_vec();
+
+    assert_eq!(scalar_result.len(), expected.len());
+    assert_eq!(simd_result.len(), expected.len());
+
+    for (actual, expected) in scalar_result.iter().zip(expected.iter()) {
+        assert_float_relative_eq!(actual.distance, expected.distance, REL_EPS_F64);
+        assert_eq!(actual.item, expected.item);
+    }
+
+    for (actual, expected) in simd_result.iter().zip(expected.iter()) {
+        assert_float_relative_eq!(actual.distance, expected.distance, REL_EPS_F64);
+        assert_eq!(actual.item, expected.item);
+    }
+}
+
+#[test]
+#[cfg(feature = "simd")]
+fn regression_donnelly_simd_block4_f32_small_grid_within_variants_match_linear() {
+    let points = adversarial_grid_points_f32(17);
+    let query = [0.125f32, -0.75];
+    let max_dist = 0.6f32;
+    let expected = linear_within_f32(&points, &query, max_dist);
+    let max_qty = NonZeroUsize::new(usize::MAX).unwrap();
+
+    let tree_scalar: KdTree<f32, usize, Donnelly<4, 64, 4, 2>, FlatVec<f32, usize, 2, 16>, 2, 16> =
+        KdTree::new_from_slice(&points);
+    let tree_simd: KdTree<
+        f32,
+        usize,
+        DonnellyMarkerSimd<Block4, 64, 4, 2>,
+        FlatVec<f32, usize, 2, 16>,
+        2,
+        16,
+    > = KdTree::new_from_slice(&points);
+
+    let mut scalar_within_unsorted: Vec<(f32, usize)> = tree_scalar
+        .within_unsorted::<SquaredEuclidean<f32>>(&query, max_dist)
+        .into_iter()
+        .map(|n| (n.distance, n.item))
+        .collect();
+    stabilize_neighbours_f32(&mut scalar_within_unsorted);
+
+    let mut simd_within_unsorted: Vec<(f32, usize)> = tree_simd
+        .within_unsorted::<SquaredEuclidean<f32>>(&query, max_dist)
+        .into_iter()
+        .map(|n| (n.distance, n.item))
+        .collect();
+    stabilize_neighbours_f32(&mut simd_within_unsorted);
+
+    let mut scalar_within_sorted: Vec<(f32, usize)> = tree_scalar
+        .within::<SquaredEuclidean<f32>>(&query, max_dist)
+        .into_iter()
+        .map(|n| (n.distance, n.item))
+        .collect();
+    stabilize_neighbours_f32(&mut scalar_within_sorted);
+
+    let mut simd_within_sorted: Vec<(f32, usize)> = tree_simd
+        .within::<SquaredEuclidean<f32>>(&query, max_dist)
+        .into_iter()
+        .map(|n| (n.distance, n.item))
+        .collect();
+    stabilize_neighbours_f32(&mut simd_within_sorted);
+
+    let mut scalar_nearest_n_unsorted: Vec<(f32, usize)> = tree_scalar
+        .nearest_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty, false)
+        .into_iter()
+        .map(|n| (n.distance, n.item))
+        .collect();
+    stabilize_neighbours_f32(&mut scalar_nearest_n_unsorted);
+
+    let mut simd_nearest_n_unsorted: Vec<(f32, usize)> = tree_simd
+        .nearest_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty, false)
+        .into_iter()
+        .map(|n| (n.distance, n.item))
+        .collect();
+    stabilize_neighbours_f32(&mut simd_nearest_n_unsorted);
+
+    let mut scalar_nearest_n_sorted: Vec<(f32, usize)> = tree_scalar
+        .nearest_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty, true)
+        .into_iter()
+        .map(|n| (n.distance, n.item))
+        .collect();
+    stabilize_neighbours_f32(&mut scalar_nearest_n_sorted);
+
+    let mut simd_nearest_n_sorted: Vec<(f32, usize)> = tree_simd
+        .nearest_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty, true)
+        .into_iter()
+        .map(|n| (n.distance, n.item))
+        .collect();
+    stabilize_neighbours_f32(&mut simd_nearest_n_sorted);
+
+    assert_eq!(scalar_within_unsorted, expected);
+    assert_eq!(scalar_within_sorted, expected);
+    assert_eq!(scalar_nearest_n_unsorted, expected);
+    assert_eq!(scalar_nearest_n_sorted, expected);
+
+    let mut mismatches = Vec::new();
+    if simd_within_unsorted != expected {
+        mismatches.push(format!(
+            "within_unsorted got={simd_within_unsorted:?} expected={expected:?}"
+        ));
+    }
+    if simd_within_sorted != expected {
+        mismatches.push(format!(
+            "within got={simd_within_sorted:?} expected={expected:?}"
+        ));
+    }
+    if simd_nearest_n_unsorted != expected {
+        mismatches.push(format!(
+            "nearest_n_within unsorted got={simd_nearest_n_unsorted:?} expected={expected:?}"
+        ));
+    }
+    if simd_nearest_n_sorted != expected {
+        mismatches.push(format!(
+            "nearest_n_within sorted got={simd_nearest_n_sorted:?} expected={expected:?}"
+        ));
+    }
+
+    assert!(
+        mismatches.is_empty(),
+        "SIMD mismatches:\n{}",
+        mismatches.join("\n")
+    );
 }

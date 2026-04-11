@@ -1,10 +1,11 @@
+use crate::dist::KdTreeDistanceMetric;
 use crate::kd_tree::leaf_view::TlsLeafScratch;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::KdTree;
 use crate::stem_strategies::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
-use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, LeafStrategy};
+use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
 use crate::{NearestNeighbour, StemStrategy};
 use std::num::NonZeroUsize;
 
@@ -25,9 +26,7 @@ where
         max_dist: D::Output,
     ) -> Vec<NearestNeighbour<D::Output, T>>
     where
-        D: DistanceMetricUnified<A, K>
-            + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, D::Output>
-            + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, D::Output>,
+        D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategies::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -47,13 +46,53 @@ mod tests {
     use rand::SeedableRng;
     use std::cmp::Ordering;
 
-    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
+    use crate::dist::SquaredEuclidean;
+    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
     use crate::traits::Axis;
-    use crate::traits_unified_2::SquaredEuclidean;
     use crate::Eytzinger;
 
     const RNG_SEED: u64 = 42;
+    const TILE_BOUNDARY_CASES: [usize; 7] = [1, 2, 4, 8, 32, 33, 47];
+
+    #[test]
+    fn within_unsorted_vec_of_arenas_matches_flat_vec_across_tile_boundaries() {
+        let query = [0.29f32, 0.41, 0.53];
+        let radius = 0.2;
+
+        for &len in &TILE_BOUNDARY_CASES {
+            let points: Vec<[f32; 3]> = (0..len)
+                .map(|idx| {
+                    [
+                        ((idx * 7) % 97) as f32 / 97.0,
+                        ((idx * 17 + 1) % 97) as f32 / 97.0,
+                        ((idx * 29 + 2) % 97) as f32 / 97.0,
+                    ]
+                })
+                .collect();
+
+            let flat_tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+                KdTree::new_from_slice(&points);
+            let arena_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
+                KdTree::new_from_slice(&points);
+
+            let mut flat: Vec<(f32, u32)> = flat_tree
+                .within_unsorted::<SquaredEuclidean<f32>>(&query, radius)
+                .into_iter()
+                .map(|n| (n.distance, n.item))
+                .collect();
+            let mut arena: Vec<(f32, u32)> = arena_tree
+                .within_unsorted::<SquaredEuclidean<f32>>(&query, radius)
+                .into_iter()
+                .map(|n| (n.distance, n.item))
+                .collect();
+
+            stabilize_sort(&mut flat);
+            stabilize_sort(&mut arena);
+
+            assert_eq!(arena, flat, "len={len}");
+        }
+    }
 
     #[test]
     fn v6_query_within_unsorted_large_f32_flat_vec() {
