@@ -7,12 +7,11 @@ pub mod leaf_strategies;
 pub mod leaf_view;
 // #[cfg(feature = "leaf_view_chunked")]
 pub(crate) mod leaf_view_chunked;
-pub(crate) mod leaf_view_chunked_v2;
 mod query;
 mod query_orchestrator;
 pub(crate) mod query_stack;
 pub(crate) mod query_stack_simd;
-mod result_collection;
+pub(crate) mod result_collection;
 pub(crate) mod traits;
 
 use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};

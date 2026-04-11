@@ -1,21 +1,16 @@
-/// Kiddo example: Pointcloud LAS file
+/// Kiddo example: Pointcloud CSV file
 ///
-/// Populates a Kiddo KdTree from a pointcloud LAS file
-/// An example LAZ (compressed LAS) file can be found here:
-/// https://cesium.com/public/learn/House.laz
+/// Populates a v6 `KdTree` from a pointcloud CSV file and performs a query.
 use elapsed::ElapsedDuration;
 use std::error::Error;
-use std::fs::File;
-use std::io::Write;
 use std::time::Instant;
 
 use csv::Reader;
-use kiddo::immutable::float::kdtree::ImmutableKdTree;
-use kiddo::{Eytzinger, SquaredEuclidean};
-use rkyv_08::{rancor::Error as RkyvError, to_bytes};
+use kiddo::dist::SquaredEuclidean;
+use kiddo::kd_tree::leaf_strategies::FlatVec;
+use kiddo::kd_tree::KdTree;
+use kiddo::Eytzinger;
 use serde::Deserialize;
-use tracing::Level;
-use tracing_subscriber::fmt;
 
 #[derive(Debug, Deserialize)]
 struct Point {
@@ -24,18 +19,11 @@ struct Point {
     z: f64,
 }
 
-type Tree = ImmutableKdTree<f64, u32, Eytzinger<3>, 3, 64>;
+type Tree = KdTree<f64, u32, Eytzinger<3>, FlatVec<f64, u32, 3, 64>, 3, 64>;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    #[cfg(feature = "tracing")]
-    let subscriber = fmt().with_max_level(Level::WARN).without_time().finish();
-    #[cfg(feature = "tracing")]
-    tracing::subscriber::set_global_default(subscriber)?;
-
-    // create a tree populated with random points
     let start = Instant::now();
-
-    let mut reader = Reader::from_path("./points.csv")?;
+    let mut reader = Reader::from_path("./examples/points.csv")?;
 
     let points: Vec<[f64; 3]> = reader
         .deserialize()
@@ -47,7 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Points loaded from CSV file. Count: {}", points.len());
 
-    let kdtree: Tree = (&*points).into();
+    let kdtree: Tree = KdTree::new_from_slice(&points);
 
     println!(
         "Populated k-d tree with {} items. Took {}",
@@ -55,30 +43,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         ElapsedDuration::new(start.elapsed())
     );
 
-    // Test query on the newly created tree
     let query = [0.123f64, 0.456f64, 0.789f64];
-    let nearest_neighbour = kdtree.nearest_one::<SquaredEuclidean>(&query);
-    println!("Nearest item to query: {:?}", nearest_neighbour.item);
-
-    let start = Instant::now();
-
-    // create a file for us to serialize into
-    let mut file = File::create("./examples/house.rkyv")?;
-
-    serialize_to_rkyv(&mut file, kdtree)?;
-
-    println!(
-        "total elapsed: {}\n\n",
-        ElapsedDuration::new(start.elapsed())
-    );
-
-    Ok(())
-}
-
-fn serialize_to_rkyv(file: &mut File, tree: Tree) -> Result<(), Box<dyn Error>> {
-    let buf = to_bytes::<RkyvError>(&tree)?;
-
-    file.write_all(&buf)?;
+    let (distance, item) = kdtree.nearest_one::<SquaredEuclidean<f64>>(&query);
+    println!("Nearest item to query: index={item}, distance={distance:?}");
 
     Ok(())
 }

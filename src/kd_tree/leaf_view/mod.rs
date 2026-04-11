@@ -1,9 +1,9 @@
+use crate::dist::DistanceMetricUnified;
 use crate::kd_tree::result_collection::ResultCollection;
-use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified};
+use crate::traits_unified_2::{AxisUnified, Basics};
 use crate::{BestNeighbour, NearestNeighbour};
 use std::any::TypeId;
 use std::cell::UnsafeCell;
-use std::collections::BinaryHeap;
 use std::mem::MaybeUninit;
 
 use fixed::{
@@ -181,7 +181,7 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
         best_dist: &mut D::Output,
         best_item: &mut T,
     ) where
-        D: DistanceMetricUnified<AX, K>,
+        D: DistanceMetricUnified<AX>,
         D::Output: TlsLeafScratch,
         AX: 'static,
     {
@@ -200,7 +200,7 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
         best_dist: &mut D::Output,
         best_item: &mut T,
     ) where
-        D: DistanceMetricUnified<AX, K>,
+        D: DistanceMetricUnified<AX>,
         D::Output: TlsLeafScratch,
         AX: 'static,
     {
@@ -278,52 +278,14 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
         });
     }
 
-    #[allow(dead_code)]
-    #[inline]
-    pub(crate) fn nearest_n_within<D, R>(
-        &self,
-        query: &[AX; K],
-        dist: <D as DistanceMetricUnified<AX, K>>::Output,
-        results: &mut R,
-    ) where
-        D: DistanceMetricUnified<AX, K>,
-        D::Output: TlsLeafScratch,
-        R: ResultCollection<D::Output, T>,
-        AX: 'static,
-    {
-        let mut query_wide: [D::Output; K] = [D::Output::zero(); K];
-        for dim in 0..K {
-            query_wide[dim] = D::widen_coord(query[dim]);
-        }
-
-        self.nearest_n_within_with_query_wide::<D, R>(&query_wide, dist, results);
-    }
-
-    #[inline]
-    pub(crate) fn nearest_n_within_with_query_wide<D, R>(
-        &self,
-        query_wide: &[D::Output; K],
-        dist: <D as DistanceMetricUnified<AX, K>>::Output,
-        results: &mut R,
-    ) where
-        D: DistanceMetricUnified<AX, K>,
-        D::Output: TlsLeafScratch,
-        R: ResultCollection<D::Output, T>,
-        AX: 'static,
-    {
-        self.with_dists_for_slice_wide::<D, _>(query_wide, |dists| {
-            Self::update_nearest_dists(dists, self.items, dist, results);
-        });
-    }
-
     #[cfg_attr(not(feature = "no_inline"), inline)]
-    fn with_dists_for_slice_wide<D, R>(
+    pub(crate) fn with_dists_for_slice_wide<D, R>(
         &self,
         query_wide: &[D::Output; K],
         f: impl FnOnce(&[D::Output]) -> R,
     ) -> R
     where
-        D: DistanceMetricUnified<AX, K>,
+        D: DistanceMetricUnified<AX>,
         D::Output: TlsLeafScratch,
         AX: 'static,
     {
@@ -380,7 +342,7 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
     pub(crate) fn update_nearest_dists<O, R>(dists: &[O], items: &[T], dist: O, results: &mut R)
     where
         O: AxisUnified<Coord = O>,
-        R: ResultCollection<O, T>,
+        R: ResultCollection<O, NearestNeighbour<O, T>>,
     {
         dists.iter().zip(items).for_each(|(&d, &i)| {
             if d <= dist {
@@ -411,13 +373,21 @@ where
         self.len == 0
     }
 
-    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[cfg(any(
+        all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
+        all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"),
+        all(feature = "simd", target_arch = "aarch64", target_feature = "neon")
+    ))]
     #[inline(always)]
     pub(crate) fn len(&self) -> usize {
         self.len
     }
 
-    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[cfg(any(
+        all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
+        all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"),
+        all(feature = "simd", target_arch = "aarch64", target_feature = "neon")
+    ))]
     #[inline(always)]
     pub(crate) fn as_ptr(&self) -> *const u8 {
         self.bytes
@@ -499,63 +469,15 @@ pub(crate) fn try_identity_widen_axis<AX: 'static, O: 'static>(axis: &[AX]) -> O
 impl<'a, AX: AxisUnified<Coord = AX>, T: Basics + Ord, const K: usize, const B: usize>
     LeafView<'a, AX, T, K, B>
 {
-    #[allow(dead_code)]
-    #[inline]
-    pub(crate) fn best_n_within<D>(
-        &self,
-        query: &[AX; K],
-        dist: <D as DistanceMetricUnified<AX, K>>::Output,
-        results: &mut BinaryHeap<BestNeighbour<<D as DistanceMetricUnified<AX, K>>::Output, T>>,
-    ) where
-        D: DistanceMetricUnified<AX, K>,
-        D::Output: TlsLeafScratch,
-        AX: 'static,
-    {
-        let mut query_wide: [D::Output; K] = [D::Output::zero(); K];
-        for dim in 0..K {
-            query_wide[dim] = D::widen_coord(query[dim]);
-        }
-
-        self.best_n_within_with_query_wide::<D>(&query_wide, dist, results);
-    }
-
-    #[inline]
-    pub(crate) fn best_n_within_with_query_wide<D>(
-        &self,
-        query_wide: &[D::Output; K],
-        dist: <D as DistanceMetricUnified<AX, K>>::Output,
-        results: &mut BinaryHeap<BestNeighbour<<D as DistanceMetricUnified<AX, K>>::Output, T>>,
-    ) where
-        D: DistanceMetricUnified<AX, K>,
-        D::Output: TlsLeafScratch,
-        AX: 'static,
-    {
-        self.with_dists_for_slice_wide::<D, _>(query_wide, |dists| {
-            Self::update_best_dists(dists, self.items, dist, results.capacity(), results);
-        });
-    }
-
     #[cfg_attr(not(feature = "no_inline"), inline)]
-    pub(crate) fn update_best_dists<O>(
-        dists: &[O],
-        items: &[T],
-        dist: O,
-        max_qty: usize,
-        results: &mut BinaryHeap<BestNeighbour<O, T>>,
-    ) where
+    pub(crate) fn update_best_dists<O, R>(dists: &[O], items: &[T], dist: O, results: &mut R)
+    where
         O: AxisUnified<Coord = O>,
+        R: ResultCollection<O, BestNeighbour<O, T>>,
     {
         dists.iter().zip(items).for_each(|(&d, &item)| {
             if d <= dist {
-                if results.len() < max_qty {
-                    results.push(BestNeighbour { distance: d, item });
-                } else {
-                    let mut top = results.peek_mut().unwrap();
-                    if item < top.item {
-                        top.item = item;
-                        top.distance = d;
-                    }
-                }
+                results.add(BestNeighbour { distance: d, item });
             }
         })
     }

@@ -1,7 +1,7 @@
 use kiddo::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
 use kiddo::kd_tree::KdTree;
-use kiddo::traits_unified_2::SquaredEuclidean;
 use kiddo::Eytzinger;
+use kiddo::SquaredEuclidean;
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;

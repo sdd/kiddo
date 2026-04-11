@@ -2,9 +2,9 @@ use codspeed_criterion_compat::{
     black_box, criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, BenchmarkId,
     Criterion, Throughput,
 };
+use kiddo::dist::SquaredEuclidean;
 use kiddo::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
 use kiddo::kd_tree::KdTree;
-use kiddo::traits_unified_2::SquaredEuclidean;
 use kiddo::Eytzinger;
 use rand::Rng;
 use rand::SeedableRng;

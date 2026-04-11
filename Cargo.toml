@@ -215,16 +215,6 @@ name = "v6_stem_strategies"
 harness = false
 required-features = ["test_utils"]
 
-[[bench]]
-name = "get_leaf_idx_immutable"
-harness = false
-required-features = ["test_utils"]
-
-[[bench]]
-name = "get_leaf_idx_immutable_mt"
-harness = false
-required-features = ["test_utils"]
-
 #[[example]]
 #name = "avx2-check"
 #path = "examples/avx2-check.rs"

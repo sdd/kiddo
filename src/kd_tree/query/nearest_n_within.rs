@@ -1,15 +1,22 @@
+use crate::dist::KdTreeDistanceMetric;
 use crate::kd_tree::leaf_view::TlsLeafScratch;
+use crate::kd_tree::leaf_view_chunked::nearest_n_within::{
+    nearest_n_within_with_query_wide, nearest_n_within_with_query_wide_arena,
+};
 use crate::kd_tree::query_stack::StackTrait;
-use crate::kd_tree::result_collection::ResultCollection;
+use crate::kd_tree::result_collection::{
+    BinaryHeapResultCollection, ResultCollection, SortedVecResultCollection,
+};
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::stem_strategies::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
-use crate::traits_unified_2::{AxisUnified, Basics, DistanceMetricUnified, LeafStrategy};
+use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
 use crate::{NearestNeighbour, StemStrategy};
-use std::collections::BinaryHeap;
 use std::num::NonZeroUsize;
+
+const MAX_VEC_RESULT_SIZE: usize = 20;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
@@ -18,6 +25,34 @@ where
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
+    #[inline(always)]
+    fn process_leaf_nearest_n_within<D, R>(
+        &self,
+        leaf_idx: usize,
+        query_wide: &[D::Output; K],
+        max_dist: D::Output,
+        results: &mut R,
+    ) where
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
+        R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
+    {
+        match LS::LEAF_PROJECTION {
+            LeafProjection::LeafArena => {
+                let arena = self.leaves.leaf_arena(leaf_idx);
+                nearest_n_within_with_query_wide_arena::<A, T, D, R, K>(
+                    &arena, query_wide, max_dist, results,
+                );
+            }
+            LeafProjection::LeafView => {
+                let leaf = self.leaves.leaf_view(leaf_idx);
+                nearest_n_within_with_query_wide::<A, T, D, R, K, B>(
+                    &leaf, query_wide, max_dist, results,
+                );
+            }
+        }
+    }
+
     /// Finds up to N nearest points within a given distance.
     ///
     /// Returns up to `max_qty` points that are within `max_dist` of the query point.
@@ -30,9 +65,7 @@ where
         sorted: bool,
     ) -> Vec<NearestNeighbour<D::Output, T>>
     where
-        D: DistanceMetricUnified<A, K>
-            + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, D::Output>
-            + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, D::Output>,
+        D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategies::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -45,12 +78,18 @@ where
 
         if max_qty == usize::MAX {
             self.nearest_n_within_inner::<D, Vec<NearestNeighbour<D::Output, T>>>(
-                query, max_dist, 0, sorted,
-            )
-        } else {
-            self.nearest_n_within_inner::<D, BinaryHeap<NearestNeighbour<D::Output, T>>>(
                 query, max_dist, max_qty, sorted,
             )
+        } else if sorted && max_qty <= MAX_VEC_RESULT_SIZE {
+            self.nearest_n_within_inner::<
+                D,
+                SortedVecResultCollection<NearestNeighbour<D::Output, T>>,
+            >(query, max_dist, max_qty, sorted)
+        } else {
+            self.nearest_n_within_inner::<
+                D,
+                BinaryHeapResultCollection<NearestNeighbour<D::Output, T>>,
+            >(query, max_dist, max_qty, sorted)
         }
     }
 
@@ -62,30 +101,26 @@ where
         sorted: bool,
     ) -> Vec<NearestNeighbour<D::Output, T>>
     where
-        D: DistanceMetricUnified<A, K>
-            + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, D::Output>
-            + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, D::Output>,
+        D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategies::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
             + TlsLeafScratch
             + 'static,
-        R: ResultCollection<D::Output, T>,
+        R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
         let mut req_ctx = NearestNWithinReqCtx {
             query,
             max_dist,
-            max_qty,
-            sorted,
-            results: R::new_with_capacity(max_qty),
+            results: R::with_max_qty(max_qty),
             _phantom: std::marker::PhantomData,
         };
 
         self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
-            let leaf = self.leaves.leaf_view(leaf_idx);
-            leaf.nearest_n_within_with_query_wide::<D, R>(
+            self.process_leaf_nearest_n_within::<D, R>(
+                leaf_idx,
                 query_wide,
                 max_dist,
                 &mut req_ctx.results,
@@ -107,8 +142,6 @@ where
 {
     query: &'a [A; K],
     max_dist: O,
-    max_qty: usize,
-    sorted: bool,
     results: R,
     _phantom: std::marker::PhantomData<T>,
 }
@@ -116,14 +149,14 @@ where
 impl<A, T, O, R, const K: usize> QueryContext<A, O, K> for NearestNWithinReqCtx<'_, A, T, O, R, K>
 where
     O: AxisUnified<Coord = O>,
-    R: ResultCollection<O, T>,
+    R: ResultCollection<O, NearestNeighbour<O, T>>,
 {
     fn query(&self) -> &[A; K] {
         self.query
     }
 
     fn max_dist(&self) -> O {
-        let results_cap = self.results.max_dist();
+        let results_cap = self.results.threshold_distance().unwrap_or(O::max_value());
         if results_cap < self.max_dist {
             results_cap
         } else {
@@ -142,11 +175,10 @@ mod tests {
     use rand::SeedableRng;
     use test_log::test;
 
-    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
-    use crate::kd_tree::result_collection::ResultCollection;
+    use crate::dist::SquaredEuclidean;
+    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
     use crate::traits::Axis;
-    use crate::traits_unified_2::SquaredEuclidean;
     use crate::Eytzinger;
 
     const RNG_SEED: u64 = 42;
@@ -181,6 +213,98 @@ mod tests {
     }
 
     #[test]
+    fn nearest_n_within_vec_of_arenas_matches_flat_vec_f32() {
+        let points: Vec<[f32; 3]> = (0..40)
+            .map(|idx| {
+                [
+                    idx as f32 / 40.0,
+                    ((idx * 7) % 40) as f32 / 40.0,
+                    ((idx * 13) % 40) as f32 / 40.0,
+                ]
+            })
+            .collect();
+        let query = [0.42f32, 0.53, 0.61];
+        let max_qty = NonZeroUsize::new(5).unwrap();
+        let max_dist = 0.2;
+
+        let flat_tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+        let arena_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+
+        let flat_result =
+            flat_tree.nearest_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty, true);
+        let arena_result =
+            arena_tree.nearest_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty, true);
+
+        assert_eq!(arena_result, flat_result);
+    }
+
+    #[test]
+    fn nearest_n_within_unbounded_vec_of_arenas_matches_flat_vec_f32() {
+        let points: Vec<[f32; 3]> = (0..40)
+            .map(|idx| {
+                [
+                    ((idx * 3) % 40) as f32 / 40.0,
+                    ((idx * 11) % 40) as f32 / 40.0,
+                    ((idx * 17) % 40) as f32 / 40.0,
+                ]
+            })
+            .collect();
+        let query = [0.35f32, 0.45, 0.55];
+        let max_dist = 0.5;
+
+        let flat_tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+        let arena_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+
+        let flat_result = flat_tree.nearest_n_within::<SquaredEuclidean<f32>>(
+            &query,
+            max_dist,
+            NonZeroUsize::MAX,
+            true,
+        );
+        let arena_result = arena_tree.nearest_n_within::<SquaredEuclidean<f32>>(
+            &query,
+            max_dist,
+            NonZeroUsize::MAX,
+            true,
+        );
+
+        assert_eq!(arena_result, flat_result);
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[test]
+    fn nearest_n_within_vec_of_arenas_matches_flat_vec_f64_simd() {
+        let points: Vec<[f64; 3]> = (0..40)
+            .map(|idx| {
+                [
+                    idx as f64 / 40.0,
+                    ((idx * 7) % 40) as f64 / 40.0,
+                    ((idx * 13) % 40) as f64 / 40.0,
+                ]
+            })
+            .collect();
+        let query = [0.42f64, 0.53, 0.61];
+        let max_qty = NonZeroUsize::new(5).unwrap();
+        let max_dist = 0.2;
+
+        let flat_tree: KdTree<f64, u32, Eytzinger<3>, FlatVec<f64, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+        let arena_tree: KdTree<f64, u32, Eytzinger<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+
+        let flat_result =
+            flat_tree.nearest_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty, true);
+        let arena_result =
+            arena_tree.nearest_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty, true);
+
+        assert_eq!(arena_result, flat_result);
+    }
+
+    #[test]
     fn v6_n_items_within_f32_eytzinger_large_scale() {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(RNG_SEED);
 
@@ -209,7 +333,6 @@ mod tests {
 
             let mut result: Vec<_> = tree
                 .nearest_n_within::<SquaredEuclidean<f32>>(query_point, RADIUS, max_qty, true)
-                .into_sorted_vec()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -250,7 +373,6 @@ mod tests {
 
             let mut result: Vec<_> = tree
                 .nearest_n_within::<SquaredEuclidean<f32>>(query_point, RADIUS, max_qty, true)
-                .into_sorted_vec()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -296,7 +418,6 @@ mod tests {
 
             let mut result: Vec<_> = tree
                 .nearest_n_within::<SquaredEuclidean<f32>>(query_point, RADIUS, max_qty, true)
-                .into_sorted_vec()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();

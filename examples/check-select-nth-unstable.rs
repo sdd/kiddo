@@ -1,6 +1,7 @@
 /// Check select_nth_unstable
 ///
-/// This is not really a Kiddo example. The `ImmutableTree` uses `select_nth_unstable` during
+/// This is not really a Kiddo example. The v6 immutable `KdTree` construction path uses
+/// `select_nth_unstable` during
 /// tree construction and I needed to validate some of the behaviour of that function.
 /// Specifically, whether or not **all** items with the same value as the selected item end up adjacent
 /// to it in the array or not. It is not clear from the documentation that this is definitely the case.
