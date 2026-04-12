@@ -1,17 +1,19 @@
-/*
+use std::any::TypeId;
 use std::array;
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::env;
 use std::num::NonZeroUsize;
 
+use kiddo::dist::DistanceMetricCore;
 use kiddo::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
 use kiddo::kd_tree::KdTree as V6KdTree;
 use kiddo::nearest_neighbour::NearestNeighbour;
 use kiddo::stem_strategies::{Donnelly, Eytzinger};
-use kiddo::traits::{Axis, DistanceMetric};
-use kiddo::traits_unified_2::{Manhattan as V6Manhattan, SquaredEuclidean as V6SquaredEuclidean};
+use kiddo::traits::Axis;
 use kiddo::StemStrategy;
+use kiddo::{Manhattan as V6Manhattan, SquaredEuclidean as V6SquaredEuclidean};
 
 #[cfg(feature = "simd")]
 use kiddo::stem_strategies::{Block3, Block4, DonnellyMarkerSimd};
@@ -46,31 +48,41 @@ struct ReproParams {
     content_seed: u64,
     query_seed: u64,
 }
-*/
-fn main() {
-    // let arg = env::args().nth(1).unwrap_or_else(|| {
-    //     eprintln!(
-    //         "Usage: cargo run --bin fuzz-case-repro -- <repro-id>\n\
-    //          Example: failure-kind_immutable-ty_f32-strategy_donnelly-b_32-k_4-size_12345-content_seed_1-query_seed_2\n\
-    //          Example (v6): failure-kind_v6_mutable-leaf_vec_of_arrays-ty_f32-strategy_eytzinger-b_32-k_4-size_12345-content_seed_1-query_seed_2"
-    //     );
-    //     std::process::exit(2);
-    // });
-    //
-    // let params = match parse_repro_id(&arg) {
-    //     Ok(params) => params,
-    //     Err(err) => {
-    //         eprintln!("Invalid repro id: {err}");
-    //         std::process::exit(2);
-    //     }
-    // };
-    //
-    // if let Err(err) = run_repro(&params) {
-    //     eprintln!("Repro failed: {err}");
-    //     std::process::exit(1);
-    //}
+
+struct ReproRunContext<'a, A, const K: usize> {
+    params: &'a ReproParams,
+    points: &'a [[A; K]],
+    query: &'a [A; K],
+    max_qty: usize,
+    radius_sq: A,
+    radius_man: A,
 }
-/*
+
+fn main() {
+    let arg = env::args().nth(1).unwrap_or_else(|| {
+        eprintln!(
+            "Usage: cargo run --features fuzz --bin fuzz-case-repro -- <repro-id>\n\
+             Add `simd` to --features for SIMD repro ids, or use `just fuzz-case-repro ...`.\n\
+             Example: failure-kind_immutable-ty_f32-strategy_donnelly-b_32-k_4-size_12345-content_seed_1-query_seed_2\n\
+             Example (v6): failure-kind_v6_mutable-leaf_vec_of_arrays-ty_f32-strategy_eytzinger-b_32-k_4-size_12345-content_seed_1-query_seed_2"
+        );
+        std::process::exit(2);
+    });
+
+    let params = match parse_repro_id(&arg) {
+        Ok(params) => params,
+        Err(err) => {
+            eprintln!("Invalid repro id: {err}");
+            std::process::exit(2);
+        }
+    };
+
+    if let Err(err) = run_repro(&params) {
+        eprintln!("Repro failed: {err}");
+        std::process::exit(1);
+    }
+}
+
 fn parse_repro_id(input: &str) -> Result<ReproParams, String> {
     let trimmed = input.trim();
     let trimmed = trimmed.strip_prefix("repro=").unwrap_or(trimmed);
@@ -176,41 +188,17 @@ fn parse_u64(value: &str, label: &str) -> Result<u64, String> {
 
 fn run_repro(params: &ReproParams) -> Result<(), String> {
     match (params.kind.as_str(), params.scalar.as_str()) {
-        ("mutable", "f32") => run_mutable_f32(params),
-        ("mutable", "f64") => run_mutable_f64(params),
-        ("immutable", "f32") => run_immutable_f32(params),
-        ("immutable", "f64") => run_immutable_f64(params),
         ("v6_mutable", "f32") => run_v6_mutable_f32(params),
         ("v6_mutable", "f64") => run_v6_mutable_f64(params),
         ("v6_immutable", "f32") => run_v6_immutable_f32(params),
         ("v6_immutable", "f64") => run_v6_immutable_f64(params),
+        ("mutable", _) | ("immutable", _) => Err(
+            "legacy pre-v6 repro ids are no longer supported; use the current fuzz targets"
+                .to_string(),
+        ),
         _ => Err(format!(
             "unsupported kind/scalar: {} {}",
             params.kind, params.scalar
-        )),
-    }
-}
-
-fn run_immutable_f32(params: &ReproParams) -> Result<(), String> {
-    match params.strategy.as_str() {
-        "eytzinger" => run_immutable_strategy_f32::<EytzingerStrategyF32>(params),
-        "donnelly" => run_immutable_strategy_f32::<DonnellyStrategyF32>(params),
-        "donnelly_simd" => run_immutable_strategy_f32::<DonnellySimdStrategyF32>(params),
-        _ => Err(format!(
-            "unsupported immutable strategy '{}'",
-            params.strategy
-        )),
-    }
-}
-
-fn run_immutable_f64(params: &ReproParams) -> Result<(), String> {
-    match params.strategy.as_str() {
-        "eytzinger" => run_immutable_strategy_f64::<EytzingerStrategyF64>(params),
-        "donnelly" => run_immutable_strategy_f64::<DonnellyStrategyF64>(params),
-        "donnelly_simd" => run_immutable_strategy_f64::<DonnellySimdStrategyF64>(params),
-        _ => Err(format!(
-            "unsupported immutable strategy '{}'",
-            params.strategy
         )),
     }
 }
@@ -292,36 +280,6 @@ fn run_v6_immutable_f64(params: &ReproParams) -> Result<(), String> {
             "unsupported v6 immutable strategy '{}'",
             params.strategy
         )),
-    }
-}
-
-trait StrategySelectorF32 {
-    fn run<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String>;
-}
-
-trait StrategySelectorF64 {
-    fn run<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String>;
-}
-
-struct EytzingerStrategyF32;
-struct DonnellyStrategyF32;
-struct DonnellySimdStrategyF32;
-struct EytzingerStrategyF64;
-struct DonnellyStrategyF64;
-struct DonnellySimdStrategyF64;
-
-
-impl StrategySelectorF64 for DonnellySimdStrategyF64 {
-    fn run<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
-        let _ = params;
-        #[cfg(feature = "simd")]
-        {
-            run_immutable_case_f64::<K, B, DonnellyMarkerSimd<Block3, 64, 8, K>>(params)
-        }
-        #[cfg(not(feature = "simd"))]
-        {
-            Err("donnelly_simd requires --features simd".to_string())
-        }
     }
 }
 
@@ -498,48 +456,6 @@ impl V6StrategySelectorF64 for V6DonnellySimdBlock3StrategyF64 {
     }
 }
 
-fn run_immutable_strategy_f32<S>(params: &ReproParams) -> Result<(), String>
-where
-    S: StrategySelectorF32,
-{
-    match (params.k, params.b) {
-        (2, 16) => S::run::<2, 16>(params),
-        (2, 32) => S::run::<2, 32>(params),
-        (2, 64) => S::run::<2, 64>(params),
-        (3, 16) => S::run::<3, 16>(params),
-        (3, 32) => S::run::<3, 32>(params),
-        (3, 64) => S::run::<3, 64>(params),
-        (4, 16) => S::run::<4, 16>(params),
-        (4, 32) => S::run::<4, 32>(params),
-        (4, 64) => S::run::<4, 64>(params),
-        _ => Err(format!(
-            "unsupported K/B combination for immutable: K={} B={}",
-            params.k, params.b
-        )),
-    }
-}
-
-fn run_immutable_strategy_f64<S>(params: &ReproParams) -> Result<(), String>
-where
-    S: StrategySelectorF64,
-{
-    match (params.k, params.b) {
-        (2, 16) => S::run::<2, 16>(params),
-        (2, 32) => S::run::<2, 32>(params),
-        (2, 64) => S::run::<2, 64>(params),
-        (3, 16) => S::run::<3, 16>(params),
-        (3, 32) => S::run::<3, 32>(params),
-        (3, 64) => S::run::<3, 64>(params),
-        (4, 16) => S::run::<4, 16>(params),
-        (4, 32) => S::run::<4, 32>(params),
-        (4, 64) => S::run::<4, 64>(params),
-        _ => Err(format!(
-            "unsupported K/B combination for immutable: K={} B={}",
-            params.k, params.b
-        )),
-    }
-}
-
 fn run_v6_mutable_strategy_f32<S>(params: &ReproParams) -> Result<(), String>
 where
     S: V6StrategySelectorF32,
@@ -624,8 +540,6 @@ where
     }
 }
 
-
-
 fn run_v6_mutable_case_f32<const K: usize, const B: usize, SO>(
     params: &ReproParams,
 ) -> Result<(), String>
@@ -645,12 +559,14 @@ where
     }
 
     run_checks::<f32, K, _, _, _>(
-        params,
-        &points,
-        &query,
-        max_qty,
-        radius_sq,
-        radius_man,
+        ReproRunContext {
+            params,
+            points: &points,
+            query: &query,
+            max_qty,
+            radius_sq,
+            radius_man,
+        },
         |metric| match metric {
             Metric::SquaredEuclidean => {
                 let (distance, item) = tree.nearest_one::<V6SquaredEuclidean<f32>>(&query);
@@ -699,12 +615,14 @@ where
     }
 
     run_checks::<f64, K, _, _, _>(
-        params,
-        &points,
-        &query,
-        max_qty,
-        radius_sq,
-        radius_man,
+        ReproRunContext {
+            params,
+            points: &points,
+            query: &query,
+            max_qty,
+            radius_sq,
+            radius_man,
+        },
         |metric| match metric {
             Metric::SquaredEuclidean => {
                 let (distance, item) = tree.nearest_one::<V6SquaredEuclidean<f64>>(&query);
@@ -749,12 +667,14 @@ where
         V6KdTree::new_from_slice(&points);
 
     run_checks::<f32, K, _, _, _>(
-        params,
-        &points,
-        &query,
-        max_qty,
-        radius_sq,
-        radius_man,
+        ReproRunContext {
+            params,
+            points: &points,
+            query: &query,
+            max_qty,
+            radius_sq,
+            radius_man,
+        },
         |metric| match metric {
             Metric::SquaredEuclidean => {
                 let (distance, item) = tree.nearest_one::<V6SquaredEuclidean<f32>>(&query);
@@ -799,12 +719,14 @@ where
         V6KdTree::new_from_slice(&points);
 
     run_checks::<f64, K, _, _, _>(
-        params,
-        &points,
-        &query,
-        max_qty,
-        radius_sq,
-        radius_man,
+        ReproRunContext {
+            params,
+            points: &points,
+            query: &query,
+            max_qty,
+            radius_sq,
+            radius_man,
+        },
         |metric| match metric {
             Metric::SquaredEuclidean => {
                 let (distance, item) = tree.nearest_one::<V6SquaredEuclidean<f64>>(&query);
@@ -833,19 +755,121 @@ where
     )
 }
 
+fn run_checks<A, const K: usize, FNearestOne, FNearestN, FWithin>(
+    ctx: ReproRunContext<'_, A, K>,
+    nearest_one: FNearestOne,
+    nearest_n: FNearestN,
+    within: FWithin,
+) -> Result<(), String>
+where
+    A: Axis + std::fmt::Debug + std::fmt::Display + 'static,
+    V6SquaredEuclidean<A>: DistanceMetricCore<A, Output = A>,
+    V6Manhattan<A>: DistanceMetricCore<A, Output = A>,
+    FNearestOne: Fn(Metric) -> NearestNeighbour<A, usize>,
+    FNearestN: Fn(Metric, usize) -> Result<Vec<NearestNeighbour<A, usize>>, String>,
+    FWithin: Fn(Metric, A) -> Vec<NearestNeighbour<A, usize>>,
+{
+    let (mut sq, mut man) = brute_states(
+        ctx.points,
+        ctx.query,
+        ctx.max_qty,
+        ctx.radius_sq,
+        ctx.radius_man,
+    );
+
+    check_nearest_one(
+        "SquaredEuclidean",
+        nearest_one(Metric::SquaredEuclidean),
+        &sq,
+    )?;
+    check_nearest_one("Manhattan", nearest_one(Metric::Manhattan), &man)?;
+
+    let expected_sq_n = sq.take_nearest_n_sorted();
+    let got_sq_n: Vec<(A, usize)> = nearest_n(Metric::SquaredEuclidean, ctx.max_qty)?
+        .into_iter()
+        .map(|n| (n.distance, n.item))
+        .collect();
+    compare_nearest_n_sorted(&expected_sq_n, &got_sq_n).map_err(|err| {
+        format!(
+            "nearest_n SquaredEuclidean mismatch: {err} expected={} got={}",
+            format_preview(&expected_sq_n, 8),
+            format_preview(&got_sq_n, 8)
+        )
+    })?;
+
+    let expected_man_n = man.take_nearest_n_sorted();
+    let got_man_n: Vec<(A, usize)> = nearest_n(Metric::Manhattan, ctx.max_qty)?
+        .into_iter()
+        .map(|n| (n.distance, n.item))
+        .collect();
+    compare_nearest_n_sorted(&expected_man_n, &got_man_n).map_err(|err| {
+        format!(
+            "nearest_n Manhattan mismatch: {err} expected={} got={}",
+            format_preview(&expected_man_n, 8),
+            format_preview(&got_man_n, 8)
+        )
+    })?;
+
+    let mut expected_sq_within = sq.take_within_sorted();
+    let mut got_sq_within: Vec<(A, usize)> = within(Metric::SquaredEuclidean, ctx.radius_sq)
+        .into_iter()
+        .map(|n| (n.distance, n.item))
+        .collect();
+    compare_within_results(&mut expected_sq_within, &mut got_sq_within, ctx.radius_sq).map_err(
+        |err| {
+            format!(
+                "within_unsorted SquaredEuclidean mismatch: {err} expected={} got={}",
+                format_preview(&expected_sq_within, 8),
+                format_preview(&got_sq_within, 8)
+            )
+        },
+    )?;
+
+    let mut expected_man_within = man.take_within_sorted();
+    let mut got_man_within: Vec<(A, usize)> = within(Metric::Manhattan, ctx.radius_man)
+        .into_iter()
+        .map(|n| (n.distance, n.item))
+        .collect();
+    compare_within_results(
+        &mut expected_man_within,
+        &mut got_man_within,
+        ctx.radius_man,
+    )
+    .map_err(|err| {
+        format!(
+            "within_unsorted Manhattan mismatch: {err} expected={} got={}",
+            format_preview(&expected_man_within, 8),
+            format_preview(&got_man_within, 8)
+        )
+    })?;
+
+    println!(
+        "repro passed: kind={} scalar={} strategy={} leaf={} K={} B={} size={} query_seed={}",
+        ctx.params.kind,
+        ctx.params.scalar,
+        ctx.params.strategy,
+        ctx.params.leaf.as_deref().unwrap_or("n/a"),
+        ctx.params.k,
+        ctx.params.b,
+        ctx.params.size,
+        ctx.params.query_seed
+    );
+
+    Ok(())
+}
+
 #[derive(Clone, Copy)]
 enum Metric {
     SquaredEuclidean,
     Manhattan,
 }
 
-
-fn check_nearest_one<A: Axis + std::fmt::Debug>(
+fn check_nearest_one<A: Axis + std::fmt::Debug + 'static>(
     metric: &str,
     result: NearestNeighbour<A, usize>,
     expected: &MetricState<A>,
 ) -> Result<(), String> {
-    if result.distance != expected.best_dist {
+    if !distances_match_for_repro(result.distance, expected.best_dist) {
         return Err(format!(
             "nearest_one {metric} mismatch: expected_dist={:?} got_dist={:?}",
             expected.best_dist, result.distance
@@ -995,7 +1019,7 @@ fn random_point_count(cfg: FuzzConfig, rng: &mut StdRng) -> usize {
     }
 }
 
-fn sort_by_distance_then_index<A: Axis>(items: &mut Vec<(A, usize)>) {
+fn sort_by_distance_then_index<A: Axis>(items: &mut [(A, usize)]) {
     items.sort_by(|a, b| {
         a.0.partial_cmp(&b.0)
             .expect("NaN distance in sort")
@@ -1003,7 +1027,39 @@ fn sort_by_distance_then_index<A: Axis>(items: &mut Vec<(A, usize)>) {
     });
 }
 
-fn compare_nearest_n_sorted<A: Axis + std::fmt::Debug>(
+fn sort_by_item_idx<A>(items: &mut [(A, usize)]) {
+    items.sort_unstable_by_key(|(_, item)| *item);
+}
+
+fn distances_match_for_repro<A: Copy + PartialEq + 'static>(expected: A, got: A) -> bool {
+    if expected == got {
+        return true;
+    }
+
+    if TypeId::of::<A>() == TypeId::of::<f32>() {
+        let expected = unsafe { *(&expected as *const A as *const f32) };
+        let got = unsafe { *(&got as *const A as *const f32) };
+        return expected.is_finite()
+            && got.is_finite()
+            && expected.to_bits().abs_diff(got.to_bits()) <= 4;
+    }
+
+    if TypeId::of::<A>() == TypeId::of::<f64>() {
+        let expected = unsafe { *(&expected as *const A as *const f64) };
+        let got = unsafe { *(&got as *const A as *const f64) };
+        return expected.is_finite()
+            && got.is_finite()
+            && expected.to_bits().abs_diff(got.to_bits()) <= 4;
+    }
+
+    false
+}
+
+fn distance_lt_for_repro<A: Copy + PartialOrd + PartialEq + 'static>(lhs: A, rhs: A) -> bool {
+    lhs < rhs && !distances_match_for_repro(lhs, rhs)
+}
+
+fn compare_nearest_n_sorted<A: Axis + std::fmt::Debug + 'static>(
     expected: &[(A, usize)],
     got: &[(A, usize)],
 ) -> Result<(), String> {
@@ -1020,7 +1076,7 @@ fn compare_nearest_n_sorted<A: Axis + std::fmt::Debug>(
 
     let tail_dist = expected.last().unwrap().0;
     let got_tail = got.last().unwrap().0;
-    if got_tail != tail_dist {
+    if !distances_match_for_repro(got_tail, tail_dist) {
         return Err(format!(
             "tail distance mismatch expected={tail_dist:?} got={got_tail:?}"
         ));
@@ -1028,26 +1084,26 @@ fn compare_nearest_n_sorted<A: Axis + std::fmt::Debug>(
 
     let mut i = 0usize;
     let mut j = 0usize;
-    while i < expected.len() && expected[i].0 < tail_dist {
+    while i < expected.len() && distance_lt_for_repro(expected[i].0, tail_dist) {
         let dist = expected[i].0;
         let mut exp_items = Vec::new();
-        while i < expected.len() && expected[i].0 == dist {
+        while i < expected.len() && distances_match_for_repro(expected[i].0, dist) {
             exp_items.push(expected[i].1);
             i += 1;
         }
 
-        if j < got.len() && got[j].0 < dist {
+        if j < got.len() && distance_lt_for_repro(got[j].0, dist) {
             return Err(format!(
                 "unexpected distance in results {got_dist:?} < expected {dist:?}",
                 got_dist = got[j].0
             ));
         }
-        if j >= got.len() || got[j].0 != dist {
+        if j >= got.len() || !distances_match_for_repro(got[j].0, dist) {
             return Err(format!("missing distance in results {dist:?}"));
         }
 
         let mut got_items = Vec::new();
-        while j < got.len() && got[j].0 == dist {
+        while j < got.len() && distances_match_for_repro(got[j].0, dist) {
             got_items.push(got[j].1);
             j += 1;
         }
@@ -1061,7 +1117,7 @@ fn compare_nearest_n_sorted<A: Axis + std::fmt::Debug>(
         }
     }
 
-    if j < got.len() && got[j].0 < tail_dist {
+    if j < got.len() && distance_lt_for_repro(got[j].0, tail_dist) {
         return Err(format!(
             "unexpected distance in results {got_dist:?} < tail {tail_dist:?}",
             got_dist = got[j].0
@@ -1071,17 +1127,105 @@ fn compare_nearest_n_sorted<A: Axis + std::fmt::Debug>(
     Ok(())
 }
 
-fn first_within_mismatch<A: Axis + std::fmt::Debug>(
-    expected: &[(A, usize)],
-    got: &[(A, usize)],
-) -> Option<(usize, (A, usize), (A, usize))> {
-    let len = expected.len().min(got.len());
-    for idx in 0..len {
-        if expected[idx] != got[idx] {
-            return Some((idx, expected[idx], got[idx]));
+fn format_item_delta<A>(expected: &[(A, usize)], got: &[(A, usize)]) -> String {
+    const SAMPLE: usize = 8;
+
+    let got_items: HashSet<usize> = got.iter().map(|entry| entry.1).collect();
+    let expected_items: HashSet<usize> = expected.iter().map(|entry| entry.1).collect();
+
+    let mut missing: Vec<usize> = expected_items.difference(&got_items).copied().collect();
+    let mut extra: Vec<usize> = got_items.difference(&expected_items).copied().collect();
+    missing.sort_unstable();
+    extra.sort_unstable();
+
+    format!(
+        "missing_item_count={} missing_item_sample={:?} extra_item_count={} extra_item_sample={:?}",
+        missing.len(),
+        &missing[..missing.len().min(SAMPLE)],
+        extra.len(),
+        &extra[..extra.len().min(SAMPLE)]
+    )
+}
+
+fn within_boundary_matches_for_repro<A: Copy + PartialEq + 'static>(dist: A, radius: A) -> bool {
+    distances_match_for_repro(dist, radius)
+}
+
+fn compare_within_results<A: Axis + std::fmt::Display + std::fmt::Debug + 'static>(
+    expected: &mut [(A, usize)],
+    got: &mut [(A, usize)],
+    radius: A,
+) -> Result<(), String> {
+    sort_by_item_idx(expected);
+    sort_by_item_idx(got);
+
+    let mut i = 0usize;
+    let mut j = 0usize;
+    while i < expected.len() || j < got.len() {
+        match (expected.get(i), got.get(j)) {
+            (Some((expected_dist, expected_item)), Some((got_dist, got_item))) => {
+                match expected_item.cmp(got_item) {
+                    std::cmp::Ordering::Equal => {
+                        if !distances_match_for_repro(*expected_dist, *got_dist) {
+                            return Err(format!(
+                                "distance mismatch at item={} expected={} got={}",
+                                expected_item, expected_dist, got_dist
+                            ));
+                        }
+                        i += 1;
+                        j += 1;
+                    }
+                    std::cmp::Ordering::Less => {
+                        if !within_boundary_matches_for_repro(*expected_dist, radius) {
+                            return Err(format!(
+                                "len mismatch expected={} got={} {}",
+                                expected.len(),
+                                got.len(),
+                                format_item_delta(expected, got)
+                            ));
+                        }
+                        i += 1;
+                    }
+                    std::cmp::Ordering::Greater => {
+                        if !within_boundary_matches_for_repro(*got_dist, radius) {
+                            return Err(format!(
+                                "len mismatch expected={} got={} {}",
+                                expected.len(),
+                                got.len(),
+                                format_item_delta(expected, got)
+                            ));
+                        }
+                        j += 1;
+                    }
+                }
+            }
+            (Some((expected_dist, _)), None) => {
+                if !within_boundary_matches_for_repro(*expected_dist, radius) {
+                    return Err(format!(
+                        "len mismatch expected={} got={} {}",
+                        expected.len(),
+                        got.len(),
+                        format_item_delta(expected, got)
+                    ));
+                }
+                i += 1;
+            }
+            (None, Some((got_dist, _))) => {
+                if !within_boundary_matches_for_repro(*got_dist, radius) {
+                    return Err(format!(
+                        "len mismatch expected={} got={} {}",
+                        expected.len(),
+                        got.len(),
+                        format_item_delta(expected, got)
+                    ));
+                }
+                j += 1;
+            }
+            (None, None) => break,
         }
     }
-    None
+
+    Ok(())
 }
 
 fn format_preview<A: std::fmt::Debug>(items: &[(A, usize)], limit: usize) -> String {
@@ -1170,19 +1314,18 @@ fn brute_states<A: Axis, const K: usize>(
     radius_manhattan: A,
 ) -> (MetricState<A>, MetricState<A>)
 where
-    SquaredEuclidean: DistanceMetric<A, K>,
-    Manhattan: DistanceMetric<A, K>,
+    V6SquaredEuclidean<A>: DistanceMetricCore<A, Output = A>,
+    V6Manhattan<A>: DistanceMetricCore<A, Output = A>,
 {
     let mut sq = MetricState::new(max_qty, radius_sq);
     let mut man = MetricState::new(max_qty, radius_manhattan);
 
     for (idx, point) in points.iter().enumerate() {
-        let dist_sq = SquaredEuclidean::dist(query, point);
-        let dist_man = Manhattan::dist(query, point);
+        let dist_sq = <V6SquaredEuclidean<A> as DistanceMetricCore<A>>::dist_raw(query, point);
+        let dist_man = <V6Manhattan<A> as DistanceMetricCore<A>>::dist_raw(query, point);
         sq.update(dist_sq, idx);
         man.update(dist_man, idx);
     }
 
     (sq, man)
 }
-*/

@@ -10,6 +10,8 @@ repository = "https://github.com/sdd/kiddo"
 documentation = "https://docs.rs/kiddo"
 license = "MIT OR Apache-2.0"
 autobenches = false
+autotests = false
+autoexamples = false
 resolver = "2"
 
 [package.metadata.docs.rs]
@@ -24,6 +26,7 @@ leaf_nta_prefetch = []
 modified_van_emde_boas = []
 f16 = ["dep:half"]
 fixed = ["dep:fixed"]
+fuzz = ["test_utils"]
 logging_off = [
     "dep:log",
     "tracing/max_level_off",
@@ -417,7 +420,7 @@ required-features = ["test_utils"]
 [[bin]]
 name = "fuzz-case-repro"
 path = "src/bin/fuzz-case-repro.rs"
-required-features = ["test_utils"]
+required-features = ["fuzz"]
 
 [[bin]]
 name = "profile_v5_nearest_one_eytzinger"
@@ -433,6 +436,24 @@ required-features = ["profile_v5"]
 name = "profile_v6_leaf_strategies"
 path = "src/bin/profile_v6_leaf_strategies.rs"
 required-features = ["profile_v5"]
+
+[[test]]
+name = "donnelly_simd_regressions"
+path = "tests/donnelly_simd_regressions.rs"
+
+[[test]]
+name = "kd_tree_fuzz"
+path = "tests/kd_tree_fuzz.rs"
+required-features = ["fuzz"]
+
+[[test]]
+name = "kd_tree_fuzz_v6"
+path = "tests/kd_tree_fuzz_v6.rs"
+required-features = ["fuzz"]
+
+[[test]]
+name = "string_data_test"
+path = "tests/string_data_test.rs"
 
 [build-dependencies]
 yep-cache-line-size = "0.9"

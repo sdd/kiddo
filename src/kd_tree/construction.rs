@@ -6,13 +6,12 @@ use crate::StemStrategy;
 use aligned_vec::{avec, AVec, ConstAlign, CACHELINE_ALIGN};
 use az::{Az, Cast};
 use nonmax::NonMaxUsize;
-use std::fmt::Display;
 use std::ptr::NonNull;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: AxisUnified<Coord = A>,
-    T: Basics + Copy + Default + PartialOrd + PartialEq + Display,
+    T: Basics + Copy + Default + PartialOrd + PartialEq,
     SS: StemStrategy,
     LS: MutableLeafStrategy<A, T, SS, K, B>,
 {

@@ -1,3 +1,5 @@
+#![allow(clippy::missing_safety_doc)]
+
 /// AVX2 distance metric trait
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
 pub mod distance_metric_avx2;
@@ -99,6 +101,26 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
             return true;
         }
 
+        if TypeId::of::<A>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Avx512F32Ops>()
+                != TypeId::of::<distance_metric_avx512::UnsupportedAvx512F32LeafOps>()
+        {
+            let leaf =
+                &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f32, T, K, B>);
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
+            let best_dist = &mut *(best_dist as *mut Self::Output as *mut f32);
+
+            crate::kd_tree::leaf_view_chunked::nearest_one::avx512::nearest_one_avx512_unchecked_f32::<
+                Self::Avx512F32Ops,
+                T,
+                K,
+                B,
+            >(leaf, query_wide, best_dist, best_item);
+
+            return true;
+        }
+
         false
     }
 
@@ -144,6 +166,33 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
             return true;
         }
 
+        if TypeId::of::<A>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Avx512F32Ops>()
+                != TypeId::of::<distance_metric_avx512::UnsupportedAvx512F32LeafOps>()
+        {
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
+            let best_dist = &mut *(best_dist as *mut Self::Output as *mut f32);
+            let query_ptr = query_wide.as_ptr();
+            let mut tile_base = arena.as_ptr();
+            let mut remaining = arena.len();
+
+            while remaining != 0 {
+                let tile_len = crate::kd_tree::leaf_view::leaf_arena_tile_len(remaining);
+                crate::kd_tree::leaf_view_chunked::nearest_one::avx512::nearest_one_avx512_arena_unchecked_f32::<
+                    Self::Avx512F32Ops,
+                    T,
+                    K,
+                >(tile_base, tile_len, query_ptr, best_dist, best_item);
+                let tile_bytes =
+                    K * tile_len * std::mem::size_of::<f32>() + tile_len * std::mem::size_of::<T>();
+                tile_base = tile_base.add(tile_bytes);
+                remaining -= tile_len;
+            }
+
+            return true;
+        }
+
         false
     }
 
@@ -180,6 +229,33 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
 
             crate::kd_tree::leaf_view_chunked::nearest_n_within::avx512::nearest_n_within_avx512_unchecked::<
                 Self::Avx512F64Ops,
+                T,
+                _,
+                K,
+                B,
+            >(leaf, query_wide, max_dist, &mut emit);
+
+            return true;
+        }
+
+        if TypeId::of::<A>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Avx512F32Ops>()
+                != TypeId::of::<distance_metric_avx512::UnsupportedAvx512F32LeafOps>()
+        {
+            let leaf =
+                &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f32, T, K, B>);
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f32);
+            let mut emit = |candidate_dist: f32, item: T| {
+                results.add(NearestNeighbour {
+                    distance: std::mem::transmute_copy::<f32, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+
+            crate::kd_tree::leaf_view_chunked::nearest_n_within::avx512::nearest_n_within_avx512_unchecked_f32::<
+                Self::Avx512F32Ops,
                 T,
                 _,
                 K,
@@ -240,6 +316,39 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
             return true;
         }
 
+        if TypeId::of::<A>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Avx512F32Ops>()
+                != TypeId::of::<distance_metric_avx512::UnsupportedAvx512F32LeafOps>()
+        {
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f32);
+            let mut emit = |candidate_dist: f32, item: T| {
+                results.add(NearestNeighbour {
+                    distance: std::mem::transmute_copy::<f32, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+            let mut tile_base = arena.as_ptr();
+            let mut remaining = arena.len();
+
+            while remaining != 0 {
+                let tile_len = crate::kd_tree::leaf_view::leaf_arena_tile_len(remaining);
+                crate::kd_tree::leaf_view_chunked::nearest_n_within::avx512::nearest_n_within_avx512_arena_unchecked_f32::<
+                    Self::Avx512F32Ops,
+                    T,
+                    _,
+                    K,
+                >(tile_base, tile_len, query_wide, max_dist, &mut emit);
+                let tile_bytes =
+                    K * tile_len * std::mem::size_of::<f32>() + tile_len * std::mem::size_of::<T>();
+                tile_base = tile_base.add(tile_bytes);
+                remaining -= tile_len;
+            }
+
+            return true;
+        }
+
         false
     }
 
@@ -276,6 +385,33 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
 
             crate::kd_tree::leaf_view_chunked::best_n_within::avx512::best_n_within_avx512_unchecked::<
                 Self::Avx512F64Ops,
+                T,
+                _,
+                K,
+                B,
+            >(leaf, query_wide, max_dist, &mut emit);
+
+            return true;
+        }
+
+        if TypeId::of::<A>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Avx512F32Ops>()
+                != TypeId::of::<distance_metric_avx512::UnsupportedAvx512F32LeafOps>()
+        {
+            let leaf =
+                &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f32, T, K, B>);
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f32);
+            let mut emit = |candidate_dist: f32, item: T| {
+                results.add(BestNeighbour {
+                    distance: std::mem::transmute_copy::<f32, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+
+            crate::kd_tree::leaf_view_chunked::best_n_within::avx512::best_n_within_avx512_unchecked_f32::<
+                Self::Avx512F32Ops,
                 T,
                 _,
                 K,
@@ -329,6 +465,39 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
                 >(tile_base, tile_len, query_wide, max_dist, &mut emit);
                 let tile_bytes =
                     K * tile_len * std::mem::size_of::<f64>() + tile_len * std::mem::size_of::<T>();
+                tile_base = tile_base.add(tile_bytes);
+                remaining -= tile_len;
+            }
+
+            return true;
+        }
+
+        if TypeId::of::<A>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Output>() == TypeId::of::<f32>()
+            && TypeId::of::<Self::Avx512F32Ops>()
+                != TypeId::of::<distance_metric_avx512::UnsupportedAvx512F32LeafOps>()
+        {
+            let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
+            let max_dist = *(&max_dist as *const Self::Output as *const f32);
+            let mut emit = |candidate_dist: f32, item: T| {
+                results.add(BestNeighbour {
+                    distance: std::mem::transmute_copy::<f32, Self::Output>(&candidate_dist),
+                    item,
+                });
+            };
+            let mut tile_base = arena.as_ptr();
+            let mut remaining = arena.len();
+
+            while remaining != 0 {
+                let tile_len = crate::kd_tree::leaf_view::leaf_arena_tile_len(remaining);
+                crate::kd_tree::leaf_view_chunked::best_n_within::avx512::best_n_within_avx512_arena_unchecked_f32::<
+                    Self::Avx512F32Ops,
+                    T,
+                    _,
+                    K,
+                >(tile_base, tile_len, query_wide, max_dist, &mut emit);
+                let tile_bytes =
+                    K * tile_len * std::mem::size_of::<f32>() + tile_len * std::mem::size_of::<T>();
                 tile_base = tile_base.add(tile_bytes);
                 remaining -= tile_len;
             }

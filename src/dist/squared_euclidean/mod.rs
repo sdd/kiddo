@@ -48,7 +48,7 @@ where
     type Avx512F64Ops = avx512::SquaredEuclideanAvx512F64LeafOps;
 
     #[cfg(all(feature = "simd", target_feature = "avx512f"))]
-    type Avx512F32Ops = crate::dist::distance_metric_avx512::UnsupportedAvx512F32LeafOps;
+    type Avx512F32Ops = avx512::SquaredEuclideanAvx512F32LeafOps;
 }
 
 impl<A, R> DistanceMetricAvx2<A> for SquaredEuclidean<R>

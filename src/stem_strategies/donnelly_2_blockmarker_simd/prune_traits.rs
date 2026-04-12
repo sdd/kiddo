@@ -173,7 +173,7 @@ impl SimdSelectBestChildBlock3 for f64 {
                 let eq_mask = _mm512_cmp_pd_mask(masked, _mm512_set1_pd(min_val), _CMP_EQ_OQ)
                     & candidate_mask;
 
-                return Some(eq_mask.trailing_zeros() as u8);
+                Some(eq_mask.trailing_zeros() as u8)
             }
         }
 

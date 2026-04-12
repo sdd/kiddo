@@ -1,3 +1,5 @@
+#![allow(clippy::missing_safety_doc)]
+
 use core::arch::x86_64::{__m128, __m128d, __m256, __m256d, __m512, __m512d};
 
 /// AVX512 f64 leaf-kernel operations contract.
