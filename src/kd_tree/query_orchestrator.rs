@@ -580,6 +580,7 @@ where
         let mut off = [O::zero(); K];
         let mut lower = [O::min_value(); K];
         let mut upper = [O::max_value(); K];
+
         stack.push(SimdQueryStackContext::new_single(stem_strat));
 
         // Backtracking loop
@@ -645,6 +646,8 @@ where
                     base,
                     rd_values,
                     new_off_values,
+                    lower_bounds,
+                    upper_bounds,
                     pending_mask,
                     dim: dim_val,
                     old_off,
@@ -679,6 +682,8 @@ where
                             base,
                             rd_values,
                             new_off_values,
+                            lower_bounds,
+                            upper_bounds,
                             selection.remaining_mask,
                             dim_val,
                             old_off,
@@ -692,6 +697,10 @@ where
 
                     unsafe {
                         *off.get_unchecked_mut(dim_val) = selection.child_off;
+                        *lower.get_unchecked_mut(dim_val) =
+                            lower_bounds[selection.child_idx as usize];
+                        *upper.get_unchecked_mut(dim_val) =
+                            upper_bounds[selection.child_idx as usize];
                     }
 
                     let best_dist = query_ctx.max_dist();
@@ -928,21 +937,6 @@ where
                 return Some(leaf_idx);
             }
             let stem_oob = stem_idx >= self.stems.len();
-            if stem_oob
-                && matches!(
-                    self.stem_leaf_resolution,
-                    crate::kd_tree::StemLeafResolution::Mapped { .. }
-                )
-            {
-                tracing::warn!(
-                    stem_idx,
-                    stems_len = self.stems.len(),
-                    level = stem_strat.level(),
-                    leaf_idx_prefix = stem_strat.leaf_idx(),
-                    "SIMD traversal reached non-terminal out-of-bounds stem index; skipping subtree"
-                );
-                return None;
-            }
 
             let should_continue = if use_scalar_step {
                 use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
@@ -1001,6 +995,13 @@ where
                             far_upper = old_upper;
                         }
 
+                        let near_off =
+                            crate::stem_strategies::donnelly_2_blockmarker_simd::interval_distance_1d(
+                                query_elem_wide,
+                                near_lower,
+                                near_upper,
+                            );
+
                         if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
                             stack.push(SimdQueryStackContext::Single {
                                 stem_strat: far_ctx,
@@ -1015,7 +1016,7 @@ where
                         unsafe {
                             *lower.get_unchecked_mut(dim_val) = near_lower;
                             *upper.get_unchecked_mut(dim_val) = near_upper;
-                            *off.get_unchecked_mut(dim_val) = O::zero();
+                            *off.get_unchecked_mut(dim_val) = near_off;
                         }
                     } else {
                         // +Inf pivots can still encode structural branches in left-aligned trees.

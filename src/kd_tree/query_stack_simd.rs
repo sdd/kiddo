@@ -8,6 +8,7 @@ const INLINE_SIMD_QUERY_STACK_CAPACITY: usize = 50;
 #[derive(Debug)]
 pub struct SimdQueryStack<A, SS: StemStrategy> {
     stack: [MaybeUninit<SS::StackContext<A>>; INLINE_SIMD_QUERY_STACK_CAPACITY],
+    spill: Vec<SS::StackContext<A>>,
     len: usize,
 }
 
@@ -31,6 +32,8 @@ pub enum SimdQueryStackContext<A, SS> {
         base: SS,
         rd_values: [A; 8],
         new_off_values: [A; 8],
+        lower_bounds: [A; 8],
+        upper_bounds: [A; 8],
         pending_mask: u8,
         dim: usize,
         old_off: A,
@@ -67,8 +70,11 @@ pub enum SimdQueryStackContext<A, SS> {
 impl<A, SS: StemStrategy> StackTrait<A, SS> for SimdQueryStack<A, SS> {
     #[inline]
     fn push(&mut self, item: SS::StackContext<A>) {
-        debug_assert!(self.len < INLINE_SIMD_QUERY_STACK_CAPACITY);
-        unsafe { self.stack.get_unchecked_mut(self.len) }.write(item);
+        if self.len < INLINE_SIMD_QUERY_STACK_CAPACITY {
+            unsafe { self.stack.get_unchecked_mut(self.len) }.write(item);
+        } else {
+            self.spill.push(item);
+        }
         self.len += 1;
     }
 
@@ -78,12 +84,21 @@ impl<A, SS: StemStrategy> StackTrait<A, SS> for SimdQueryStack<A, SS> {
             None
         } else {
             self.len -= 1;
-            Some(unsafe { self.stack.get_unchecked(self.len).assume_init_read() })
+            if self.len >= INLINE_SIMD_QUERY_STACK_CAPACITY {
+                Some(self.spill.pop().expect("simd query stack spill underflow"))
+            } else {
+                Some(unsafe { self.stack.get_unchecked(self.len).assume_init_read() })
+            }
         }
     }
 
     #[inline]
     fn clear(&mut self) {
+        if self.len > INLINE_SIMD_QUERY_STACK_CAPACITY {
+            self.spill.clear();
+            self.len = INLINE_SIMD_QUERY_STACK_CAPACITY;
+        }
+
         while self.len > 0 {
             self.len -= 1;
             unsafe { self.stack.get_unchecked_mut(self.len).assume_init_drop() };
@@ -93,9 +108,10 @@ impl<A, SS: StemStrategy> StackTrait<A, SS> for SimdQueryStack<A, SS> {
 
 impl<A, SS: StemStrategy> SimdQueryStack<A, SS> {
     #[inline]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             stack: [const { MaybeUninit::uninit() }; INLINE_SIMD_QUERY_STACK_CAPACITY],
+            spill: Vec::new(),
             len: 0,
         }
     }
@@ -187,6 +203,8 @@ impl<A: AxisUnified<Coord = A>, SS: StemStrategy> SimdQueryStackContext<A, SS> {
         base: SS,
         rd_values: [A; 8],
         new_off_values: [A; 8],
+        lower_bounds: [A; 8],
+        upper_bounds: [A; 8],
         pending_mask: u8,
         dim: usize,
         old_off: A,
@@ -197,6 +215,8 @@ impl<A: AxisUnified<Coord = A>, SS: StemStrategy> SimdQueryStackContext<A, SS> {
             base,
             rd_values,
             new_off_values,
+            lower_bounds,
+            upper_bounds,
             pending_mask,
             dim,
             old_off,

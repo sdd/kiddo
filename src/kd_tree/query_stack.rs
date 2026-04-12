@@ -30,6 +30,7 @@ pub trait StackTrait<A, SS: StemStrategy> {
 #[derive(Debug)]
 pub struct QueryStack<A, SS: StemStrategy> {
     stack: [MaybeUninit<SS::StackContext<A>>; INLINE_QUERY_STACK_CAPACITY],
+    spill: Vec<SS::StackContext<A>>,
     len: usize,
 }
 
@@ -50,8 +51,11 @@ pub struct QueryStackContext<A, S> {
 impl<A, SS: StemStrategy> StackTrait<A, SS> for QueryStack<A, SS> {
     #[inline]
     fn push(&mut self, item: SS::StackContext<A>) {
-        debug_assert!(self.len < INLINE_QUERY_STACK_CAPACITY);
-        unsafe { self.stack.get_unchecked_mut(self.len) }.write(item);
+        if self.len < INLINE_QUERY_STACK_CAPACITY {
+            unsafe { self.stack.get_unchecked_mut(self.len) }.write(item);
+        } else {
+            self.spill.push(item);
+        }
         self.len += 1;
     }
 
@@ -61,12 +65,21 @@ impl<A, SS: StemStrategy> StackTrait<A, SS> for QueryStack<A, SS> {
             None
         } else {
             self.len -= 1;
-            Some(unsafe { self.stack.get_unchecked(self.len).assume_init_read() })
+            if self.len >= INLINE_QUERY_STACK_CAPACITY {
+                Some(self.spill.pop().expect("query stack spill underflow"))
+            } else {
+                Some(unsafe { self.stack.get_unchecked(self.len).assume_init_read() })
+            }
         }
     }
 
     #[inline]
     fn clear(&mut self) {
+        if self.len > INLINE_QUERY_STACK_CAPACITY {
+            self.spill.clear();
+            self.len = INLINE_QUERY_STACK_CAPACITY;
+        }
+
         while self.len > 0 {
             self.len -= 1;
             unsafe { self.stack.get_unchecked_mut(self.len).assume_init_drop() };
@@ -76,9 +89,10 @@ impl<A, SS: StemStrategy> StackTrait<A, SS> for QueryStack<A, SS> {
 
 impl<A, SS: StemStrategy> QueryStack<A, SS> {
     #[inline]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             stack: [const { MaybeUninit::uninit() }; INLINE_QUERY_STACK_CAPACITY],
+            spill: Vec::new(),
             len: 0,
         }
     }

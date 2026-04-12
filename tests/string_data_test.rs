@@ -1,5 +1,11 @@
-use kiddo::mutable::float::kdtree::KdTree;
-use kiddo::SquaredEuclidean;
+use std::fmt::{self, Display};
+use std::num::NonZero;
+
+use kiddo::kd_tree::leaf_strategies::VecOfArrays;
+use kiddo::kd_tree::KdTree;
+use kiddo::{Eytzinger, SquaredEuclidean};
+
+type TestTree<T> = KdTree<f64, T, Eytzinger<2>, VecOfArrays<f64, T, 2, 32>, 2, 32>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Default, Eq, Ord, PartialOrd)]
 struct MyFixedString {
@@ -20,10 +26,16 @@ impl MyFixedString {
     }
 }
 
+impl Display for MyFixedString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 #[test]
 fn test_kdtree_with_numeric_id() {
     // Create a new KdTree with 2D points (K=2) and u32 as the data type
-    let mut tree: KdTree<f64, u32, 2, 32, u32> = KdTree::new();
+    let mut tree: TestTree<u32> = KdTree::default();
 
     // Add some points with associated numeric IDs
     tree.add(&[0.0, 0.0], 1001);
@@ -33,21 +45,22 @@ fn test_kdtree_with_numeric_id() {
 
     // Test nearest neighbor query
     let query_point = [0.5, 0.25];
-    let nearest = tree.nearest_one::<SquaredEuclidean>(&query_point);
+    let nearest = tree.nearest_one::<SquaredEuclidean<f64>>(&query_point);
 
     // The closest point should be [0.0, 0.0] with ID 1001
-    assert_eq!(nearest.item, 1001);
-    assert!((nearest.distance - (0.5f64 * 0.5 + 0.25 * 0.25)).abs() < f64::EPSILON);
+    assert_eq!(nearest.1, 1001);
+    assert!((nearest.0 - (0.5f64 * 0.5 + 0.25 * 0.25)).abs() < f64::EPSILON);
 
     // Test k-nearest neighbors
-    let k_nearest = tree.nearest_n::<SquaredEuclidean>(&query_point, 2);
+    let k_nearest =
+        tree.nearest_n::<SquaredEuclidean<f64>>(&query_point, NonZero::new(2).unwrap(), true);
     assert_eq!(k_nearest.len(), 2);
     assert_eq!(k_nearest[0].item, 1001);
     assert_eq!(k_nearest[1].item, 1002);
 
     // Test within radius
     let radius = 2.0;
-    let within_results = tree.within::<SquaredEuclidean>(&query_point, radius);
+    let within_results = tree.within::<SquaredEuclidean<f64>>(&query_point, radius);
     assert_eq!(within_results.len(), 2); // Should find two points within radius
     assert!(within_results.iter().any(|r| r.item == 1001));
     assert!(within_results.iter().any(|r| r.item == 1002));
@@ -57,7 +70,7 @@ fn test_kdtree_with_numeric_id() {
 /// Test case with an esoteric T type
 fn test_kdtree_with_fixed_string() {
     // Create a new KdTree with 2D points (K=2) and MyFixedString as the data type
-    let mut tree: KdTree<f64, MyFixedString, 2, 32, u32> = KdTree::new();
+    let mut tree: TestTree<MyFixedString> = KdTree::default();
 
     // Add some points with associated MyFixedString data
     tree.add(&[0.0, 0.0], MyFixedString::from_str("Origin"));
@@ -67,35 +80,29 @@ fn test_kdtree_with_fixed_string() {
 
     // Test nearest neighbor query
     let query_point = [0.5, 0.25];
-    let nearest = tree.nearest_one::<SquaredEuclidean>(&query_point);
+    let nearest = tree.nearest_one::<SquaredEuclidean<f64>>(&query_point);
 
     // The closest point should be [0.0, 0.0] with data "Origin"
-    assert_eq!(nearest.item.as_str(), "Origin");
-    assert!((nearest.distance - (0.5f64 * 0.5 + 0.25 * 0.25)).abs() < f64::EPSILON);
-
-    let (nearest, nearest_point) = tree.nearest_one_point::<SquaredEuclidean>(&query_point);
-
-    // The closest point should be [0.0, 0.0] with data "Origin"
-    assert_eq!(nearest.item.as_str(), "Origin");
-    assert_eq!(nearest_point, [0.0, 0.0]);
-    assert!((nearest.distance - (0.5f64 * 0.5 + 0.25 * 0.25)).abs() < f64::EPSILON);
+    assert_eq!(nearest.1.as_str(), "Origin");
+    assert!((nearest.0 - (0.5f64 * 0.5 + 0.25 * 0.25)).abs() < f64::EPSILON);
 
     // Test k-nearest neighbors
-    let k_nearest = tree.nearest_n::<SquaredEuclidean>(&query_point, 2);
+    let k_nearest =
+        tree.nearest_n::<SquaredEuclidean<f64>>(&query_point, NonZero::new(2).unwrap(), true);
     assert_eq!(k_nearest.len(), 2);
     assert_eq!(k_nearest[0].item.as_str(), "Origin");
     assert_eq!(k_nearest[1].item.as_str(), "Point A");
 
     // Test within radius
     let radius = 2.0;
-    let within_results = tree.within::<SquaredEuclidean>(&query_point, radius);
+    let within_results = tree.within::<SquaredEuclidean<f64>>(&query_point, radius);
     assert_eq!(within_results.len(), 2); // Should find "Origin" and "Point A"
 }
 
 #[test]
 fn test_kdtree_with_empty_type_as_content() {
     // Create a new KdTree with 2D points (K=2) and () as the data type
-    let mut tree: KdTree<f64, (), 2, 32, u32> = KdTree::new();
+    let mut tree: TestTree<()> = KdTree::default();
 
     // Add some points with associated numeric IDs
     tree.add(&[0.0, 0.0], ());
@@ -105,18 +112,19 @@ fn test_kdtree_with_empty_type_as_content() {
 
     // Test nearest neighbor query
     let query_point = [0.5, 0.25];
-    let nearest = tree.nearest_one_point::<SquaredEuclidean>(&query_point);
+    let nearest = tree.nearest_one::<SquaredEuclidean<f64>>(&query_point);
 
     // The closest point should be [0.0, 0.0]
-    assert!((nearest.0.distance - (0.5f64 * 0.5 + 0.25 * 0.25)).abs() < f64::EPSILON);
-    assert_eq!(nearest.1, [0.0, 0.0]);
+    assert!((nearest.0 - (0.5f64 * 0.5 + 0.25 * 0.25)).abs() < f64::EPSILON);
+    assert_eq!(nearest.1, ());
 
     // Test k-nearest neighbors
-    let k_nearest = tree.nearest_n::<SquaredEuclidean>(&query_point, 2);
+    let k_nearest =
+        tree.nearest_n::<SquaredEuclidean<f64>>(&query_point, NonZero::new(2).unwrap(), true);
     assert_eq!(k_nearest.len(), 2);
 
     // Test within radius
     let radius = 2.0;
-    let within_results = tree.within::<SquaredEuclidean>(&query_point, radius);
+    let within_results = tree.within::<SquaredEuclidean<f64>>(&query_point, radius);
     assert_eq!(within_results.len(), 2); // Should find two points within radius
 }

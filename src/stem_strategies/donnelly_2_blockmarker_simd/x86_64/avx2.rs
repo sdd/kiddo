@@ -1,3 +1,5 @@
+#![allow(clippy::missing_safety_doc)]
+
 //! AVX2 SIMD implementations for Block3 and Block4 comparisons
 
 use std::ptr::NonNull;

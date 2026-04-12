@@ -1,3 +1,5 @@
+#![allow(clippy::missing_safety_doc)]
+
 //! Type-specific SIMD backtrack mask generation traits for Donnelly block traversal.
 //!
 //! Replaces size_of-based dispatch with explicit trait implementations per type.
@@ -109,7 +111,7 @@ where
         #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
         {
             // SAFETY: guarded by target cfg and delegated to metric hook.
-            return unsafe {
+            unsafe {
                 Self::backtrack_block3_avx512(
                     query_wide,
                     stems_ptr,
@@ -118,7 +120,7 @@ where
                     rd,
                     best_dist,
                 )
-            };
+            }
         }
 
         #[cfg(all(
@@ -129,7 +131,7 @@ where
         ))]
         {
             // SAFETY: guarded by target cfg and delegated to metric hook.
-            return unsafe {
+            unsafe {
                 Self::backtrack_block3_avx2(
                     query_wide,
                     stems_ptr,
@@ -138,7 +140,7 @@ where
                     rd,
                     best_dist,
                 )
-            };
+            }
         }
 
         #[cfg(all(feature = "simd", target_arch = "aarch64"))]
@@ -272,7 +274,7 @@ where
         #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
         {
             // SAFETY: guarded by target cfg and delegated to metric hook.
-            return unsafe {
+            unsafe {
                 Self::backtrack_block4_avx512(
                     query_wide,
                     stems_ptr,
@@ -281,7 +283,7 @@ where
                     rd,
                     best_dist,
                 )
-            };
+            }
         }
 
         #[cfg(all(
@@ -292,7 +294,7 @@ where
         ))]
         {
             // SAFETY: guarded by target cfg and delegated to metric hook.
-            return unsafe {
+            unsafe {
                 Self::backtrack_block4_avx2(
                     query_wide,
                     stems_ptr,
@@ -301,7 +303,7 @@ where
                     rd,
                     best_dist,
                 )
-            };
+            }
         }
 
         #[cfg(all(feature = "simd", target_arch = "aarch64"))]
@@ -590,7 +592,7 @@ where
         rd: f64,
         best_dist: f64,
     ) -> u8 {
-        simd_backtrack_block3_f64_avx512_squared_euclidean::<A, Self, K>(
+        simd_backtrack_block3_f64_avx512_squared_euclidean::<K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -680,7 +682,7 @@ where
         rd: f64,
         best_dist: f64,
     ) -> u16 {
-        simd_backtrack_block4_f64_avx512_squared_euclidean::<A, Self, K>(
+        simd_backtrack_block4_f64_avx512_squared_euclidean::<K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -770,7 +772,7 @@ where
         rd: f32,
         best_dist: f32,
     ) -> u8 {
-        simd_backtrack_block3_f32_avx512_squared_euclidean::<A, Self, K>(
+        simd_backtrack_block3_f32_avx512_squared_euclidean::<K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -860,7 +862,7 @@ where
         rd: f32,
         best_dist: f32,
     ) -> u16 {
-        simd_backtrack_block4_f32_avx512_squared_euclidean::<A, Self, K>(
+        simd_backtrack_block4_f32_avx512_squared_euclidean::<K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -1966,11 +1968,7 @@ unsafe fn simd_backtrack_block4_f32_avx2_manhattan<
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 #[inline(always)]
-unsafe fn simd_backtrack_block3_f64_avx512_squared_euclidean<
-    A: Copy,
-    D: DistanceMetricCore<A, Output = f64>,
-    const K: usize,
->(
+unsafe fn simd_backtrack_block3_f64_avx512_squared_euclidean<const K: usize>(
     query_wide: f64,
     stems_ptr: NonNull<u8>,
     block_base_idx: usize,
@@ -2029,11 +2027,7 @@ unsafe fn simd_backtrack_block3_f64_avx512_squared_euclidean<
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 #[inline(always)]
-unsafe fn simd_backtrack_block3_f32_avx512_squared_euclidean<
-    A: Copy,
-    D: DistanceMetricCore<A, Output = f32>,
-    const K: usize,
->(
+unsafe fn simd_backtrack_block3_f32_avx512_squared_euclidean<const K: usize>(
     query_wide: f32,
     stems_ptr: NonNull<u8>,
     block_base_idx: usize,
@@ -2093,11 +2087,7 @@ unsafe fn simd_backtrack_block3_f32_avx512_squared_euclidean<
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 #[inline(always)]
-unsafe fn simd_backtrack_block4_f64_avx512_squared_euclidean<
-    A: Copy,
-    D: DistanceMetricCore<A, Output = f64>,
-    const K: usize,
->(
+unsafe fn simd_backtrack_block4_f64_avx512_squared_euclidean<const K: usize>(
     query_wide: f64,
     stems_ptr: NonNull<u8>,
     block_base_idx: usize,
@@ -2163,11 +2153,7 @@ unsafe fn simd_backtrack_block4_f64_avx512_squared_euclidean<
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 #[inline(always)]
-unsafe fn simd_backtrack_block4_f32_avx512_squared_euclidean<
-    A: Copy,
-    D: DistanceMetricCore<A, Output = f32>,
-    const K: usize,
->(
+unsafe fn simd_backtrack_block4_f32_avx512_squared_euclidean<const K: usize>(
     query_wide: f32,
     stems_ptr: NonNull<u8>,
     block_base_idx: usize,
