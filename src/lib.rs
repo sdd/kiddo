@@ -45,9 +45,12 @@
 //!
 //! ## Usage
 //! ```rust
-//! use kiddo::KdTree;
+//! use std::num::NonZero;
+//!
+//! use kiddo::kd_tree::leaf_strategies::VecOfArrays;
 //! use kiddo::SquaredEuclidean;
 //! use kiddo::NearestNeighbour;
+//! use kiddo::{Eytzinger, KdTree};
 //!
 //! let entries = vec![
 //!     [0f64, 0f64],
@@ -56,8 +59,8 @@
 //!     [3f64, 3f64]
 //! ];
 //!
-//! // use the kiddo::KdTree type to get up and running quickly with default settings
-//! let mut kdtree: KdTree<_, 2> = (&entries).into();
+//! type Tree = KdTree<f64, usize, Eytzinger<2>, VecOfArrays<f64, usize, 2, 32>, 2, 32>;
+//! let kdtree: Tree = KdTree::new_from_slice(&entries);
 //!
 //! // How many items are in tree?
 //! assert_eq!(kdtree.size(), 4);
@@ -65,13 +68,17 @@
 //! // find the nearest item to [0f64, 0f64].
 //! // returns a tuple of (dist, index)
 //! assert_eq!(
-//!     kdtree.nearest_one::<SquaredEuclidean>(&[0f64, 0f64]),
-//!     NearestNeighbour { distance: 0f64, item: 0 }
+//!     kdtree.nearest_one::<SquaredEuclidean<f64>>(&[0f64, 0f64]),
+//!     (0f64, 0)
 //! );
 //!
 //! // find the nearest 3 items to [0f64, 0f64], and collect into a `Vec`
 //! assert_eq!(
-//!     kdtree.nearest_n::<SquaredEuclidean>(&[0f64, 0f64], 3),
+//!     kdtree.nearest_n::<SquaredEuclidean<f64>>(
+//!         &[0f64, 0f64],
+//!         NonZero::new(3usize).unwrap(),
+//!         true
+//!     ),
 //!     vec![NearestNeighbour { distance: 0f64, item: 0 }, NearestNeighbour { distance: 2f64, item: 1 }, NearestNeighbour { distance: 8f64, item: 2 }]
 //! );
 //! ```
@@ -126,6 +133,7 @@ mod rkyv_utils;
 pub mod traits_unified_2;
 
 pub use crate::dist::{DotProduct, Manhattan, SquaredEuclidean};
+pub use crate::kd_tree::KdTree;
 pub use best_neighbour::BestNeighbour;
 pub use nearest_neighbour::NearestNeighbour;
 

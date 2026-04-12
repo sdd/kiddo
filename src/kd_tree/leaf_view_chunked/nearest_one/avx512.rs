@@ -3,7 +3,9 @@
 
 use std::arch::x86_64::*;
 
-use crate::dist::distance_metric_avx512::Avx512F64LeafOps;
+use array_init::array_init;
+
+use crate::dist::distance_metric_avx512::{Avx512F32LeafOps, Avx512F64LeafOps};
 use crate::kd_tree::leaf_view::LeafView;
 use crate::traits_unified_2::{AxisUnified, Basics};
 
@@ -839,6 +841,289 @@ pub(crate) unsafe fn nearest_one_avx512_unchecked<AX, L, T, const K: usize, cons
     let point_ptrs = std::array::from_fn(|dim| points[dim].as_ptr());
 
     nearest_one_avx512_raw_unchecked::<AX, L, T, K>(
+        point_ptrs,
+        leaf.items().as_ptr(),
+        leaf.items().len(),
+        query_wide,
+        best_dist,
+        best_item,
+    );
+}
+
+const CHUNK_SIZE_F32: usize = 64;
+const LINE_SIZE_F32: usize = 16;
+const AVX2_LINE_SIZE_F32: usize = 8;
+const SSE_LINE_SIZE_F32: usize = 4;
+
+#[inline(always)]
+unsafe fn scan_best_values_f32<T: Basics>(
+    dist_values: &[f32],
+    items: *const T,
+    base: usize,
+    best_dist: &mut f32,
+    best_item: &mut T,
+) {
+    for (lane, &dist) in dist_values.iter().enumerate() {
+        if dist < *best_dist {
+            *best_dist = dist;
+            *best_item = std::ptr::read_unaligned(items.add(base + lane));
+        }
+    }
+}
+
+#[inline(always)]
+unsafe fn update_best_chunk_avx512_raw_f32<T: Basics>(
+    d0: __m512,
+    d1: __m512,
+    d2: __m512,
+    d3: __m512,
+    items: *const T,
+    base: usize,
+    best_dist: &mut f32,
+    best_item: &mut T,
+) {
+    let mut values0 = [0.0f32; LINE_SIZE_F32];
+    let mut values1 = [0.0f32; LINE_SIZE_F32];
+    let mut values2 = [0.0f32; LINE_SIZE_F32];
+    let mut values3 = [0.0f32; LINE_SIZE_F32];
+    _mm512_storeu_ps(values0.as_mut_ptr(), d0);
+    _mm512_storeu_ps(values1.as_mut_ptr(), d1);
+    _mm512_storeu_ps(values2.as_mut_ptr(), d2);
+    _mm512_storeu_ps(values3.as_mut_ptr(), d3);
+    scan_best_values_f32(&values0, items, base, best_dist, best_item);
+    scan_best_values_f32(&values1, items, base + LINE_SIZE_F32, best_dist, best_item);
+    scan_best_values_f32(
+        &values2,
+        items,
+        base + 2 * LINE_SIZE_F32,
+        best_dist,
+        best_item,
+    );
+    scan_best_values_f32(
+        &values3,
+        items,
+        base + 3 * LINE_SIZE_F32,
+        best_dist,
+        best_item,
+    );
+}
+
+#[inline(always)]
+unsafe fn update_best_line_avx512_raw_f32<T: Basics>(
+    d0: __m512,
+    items: *const T,
+    base: usize,
+    best_dist: &mut f32,
+    best_item: &mut T,
+) {
+    let mut values = [0.0f32; LINE_SIZE_F32];
+    _mm512_storeu_ps(values.as_mut_ptr(), d0);
+    scan_best_values_f32(&values, items, base, best_dist, best_item);
+}
+
+#[inline(always)]
+unsafe fn update_best_line_avx2_raw_f32<T: Basics>(
+    d0: __m256,
+    items: *const T,
+    base: usize,
+    best_dist: &mut f32,
+    best_item: &mut T,
+) {
+    let mut values = [0.0f32; AVX2_LINE_SIZE_F32];
+    _mm256_storeu_ps(values.as_mut_ptr(), d0);
+    scan_best_values_f32(&values, items, base, best_dist, best_item);
+}
+
+#[inline(always)]
+unsafe fn update_best_line_avx128_raw_f32<T: Basics>(
+    d0: __m128,
+    items: *const T,
+    base: usize,
+    best_dist: &mut f32,
+    best_item: &mut T,
+) {
+    let mut values = [0.0f32; SSE_LINE_SIZE_F32];
+    _mm_storeu_ps(values.as_mut_ptr(), d0);
+    scan_best_values_f32(&values, items, base, best_dist, best_item);
+}
+
+#[inline(always)]
+unsafe fn line_dists_avx512_f32<L, const K: usize>(
+    points: &[*const f32; K],
+    query: &[__m512; K],
+    base: usize,
+) -> __m512
+where
+    L: Avx512F32LeafOps,
+{
+    let a0 = _mm512_loadu_ps(points[0].add(base));
+    let d0 = _mm512_sub_ps(a0, query[0]);
+    let mut acc = L::dist_k0_f32x16(d0);
+
+    for dim in 1..K {
+        let a = _mm512_loadu_ps(points[dim].add(base));
+        let d = _mm512_sub_ps(a, query[dim]);
+        acc = L::dist_kn_f32x16(acc, d);
+    }
+
+    acc
+}
+
+#[inline(always)]
+unsafe fn line_dists_avx2_f32<L, const K: usize>(
+    points: &[*const f32; K],
+    query: &[__m256; K],
+    base: usize,
+) -> __m256
+where
+    L: Avx512F32LeafOps,
+{
+    let a0 = _mm256_loadu_ps(points[0].add(base));
+    let d0 = _mm256_sub_ps(a0, query[0]);
+    let mut acc = L::dist_k0_f32x8(d0);
+
+    for dim in 1..K {
+        let a = _mm256_loadu_ps(points[dim].add(base));
+        let d = _mm256_sub_ps(a, query[dim]);
+        acc = L::dist_kn_f32x8(acc, d);
+    }
+
+    acc
+}
+
+#[inline(always)]
+unsafe fn line_dists_avx128_f32<L, const K: usize>(
+    points: &[*const f32; K],
+    query: &[__m128; K],
+    base: usize,
+) -> __m128
+where
+    L: Avx512F32LeafOps,
+{
+    let a0 = _mm_loadu_ps(points[0].add(base));
+    let d0 = _mm_sub_ps(a0, query[0]);
+    let mut acc = L::dist_k0_f32x4(d0);
+
+    for dim in 1..K {
+        let a = _mm_loadu_ps(points[dim].add(base));
+        let d = _mm_sub_ps(a, query[dim]);
+        acc = L::dist_kn_f32x4(acc, d);
+    }
+
+    acc
+}
+
+#[inline(always)]
+unsafe fn dist_scalar_f32<L, const K: usize>(
+    points: &[*const f32; K],
+    query: &[f32; K],
+    idx: usize,
+) -> f32
+where
+    L: Avx512F32LeafOps,
+{
+    let mut dist = L::dist_k0_f32x1(*points[0].add(idx) - query[0]);
+    for dim in 1..K {
+        dist = L::dist_kn_f32x1(dist, *points[dim].add(idx) - query[dim]);
+    }
+    dist
+}
+
+#[target_feature(enable = "avx512f,avx512vl,fma")]
+unsafe fn nearest_one_avx512_raw_unchecked_f32<L, T, const K: usize>(
+    points: [*const f32; K],
+    items: *const T,
+    len: usize,
+    query_wide: &[f32; K],
+    best_dist: &mut f32,
+    best_item: &mut T,
+) where
+    L: Avx512F32LeafOps,
+    T: Basics,
+{
+    if len == 0 {
+        return;
+    }
+
+    let query_512 = array_init(|dim| _mm512_set1_ps(query_wide[dim]));
+    let query_256 = array_init(|dim| _mm256_set1_ps(query_wide[dim]));
+    let query_128 = array_init(|dim| _mm_set1_ps(query_wide[dim]));
+    let mut base = 0usize;
+
+    let full_chunks_len = len & !(CHUNK_SIZE_F32 - 1);
+    while base != full_chunks_len {
+        let d0 = line_dists_avx512_f32::<L, K>(&points, &query_512, base);
+        let d1 = line_dists_avx512_f32::<L, K>(&points, &query_512, base + LINE_SIZE_F32);
+        let d2 = line_dists_avx512_f32::<L, K>(&points, &query_512, base + 2 * LINE_SIZE_F32);
+        let d3 = line_dists_avx512_f32::<L, K>(&points, &query_512, base + 3 * LINE_SIZE_F32);
+        update_best_chunk_avx512_raw_f32(d0, d1, d2, d3, items, base, best_dist, best_item);
+        base += CHUNK_SIZE_F32;
+    }
+
+    let full_lines_len = full_chunks_len + ((len - full_chunks_len) & !(LINE_SIZE_F32 - 1));
+    while base != full_lines_len {
+        let d0 = line_dists_avx512_f32::<L, K>(&points, &query_512, base);
+        update_best_line_avx512_raw_f32(d0, items, base, best_dist, best_item);
+        base += LINE_SIZE_F32;
+    }
+
+    if base + AVX2_LINE_SIZE_F32 <= len {
+        let d0 = line_dists_avx2_f32::<L, K>(&points, &query_256, base);
+        update_best_line_avx2_raw_f32(d0, items, base, best_dist, best_item);
+        base += AVX2_LINE_SIZE_F32;
+    }
+
+    if base + SSE_LINE_SIZE_F32 <= len {
+        let d0 = line_dists_avx128_f32::<L, K>(&points, &query_128, base);
+        update_best_line_avx128_raw_f32(d0, items, base, best_dist, best_item);
+        base += SSE_LINE_SIZE_F32;
+    }
+
+    while base < len {
+        let dist = dist_scalar_f32::<L, K>(&points, query_wide, base);
+        if dist < *best_dist {
+            *best_dist = dist;
+            *best_item = std::ptr::read_unaligned(items.add(base));
+        }
+        base += 1;
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn nearest_one_avx512_arena_unchecked_f32<L, T, const K: usize>(
+    tile_base: *const u8,
+    len: usize,
+    query: *const f32,
+    best_dist: &mut f32,
+    best_item: &mut T,
+) where
+    L: Avx512F32LeafOps,
+    T: Basics,
+{
+    let point_base = tile_base as *const f32;
+    let point_ptrs = std::array::from_fn(|dim| point_base.add(dim * len));
+    let query = &*(query as *const [f32; K]);
+    let items = tile_base.add(K * len * std::mem::size_of::<f32>()) as *const T;
+
+    nearest_one_avx512_raw_unchecked_f32::<L, T, K>(
+        point_ptrs, items, len, query, best_dist, best_item,
+    );
+}
+
+#[inline(always)]
+pub(crate) unsafe fn nearest_one_avx512_unchecked_f32<L, T, const K: usize, const B: usize>(
+    leaf: &LeafView<'_, f32, T, K, B>,
+    query_wide: &[f32; K],
+    best_dist: &mut f32,
+    best_item: &mut T,
+) where
+    L: Avx512F32LeafOps,
+    T: Basics,
+{
+    let points = leaf.points();
+    let point_ptrs = std::array::from_fn(|dim| points[dim].as_ptr());
+
+    nearest_one_avx512_raw_unchecked_f32::<L, T, K>(
         point_ptrs,
         leaf.items().as_ptr(),
         leaf.items().len(),

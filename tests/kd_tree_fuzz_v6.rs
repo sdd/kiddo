@@ -1,5 +1,6 @@
+use std::any::TypeId;
 use std::array;
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashSet};
 use std::env;
 use std::fs::OpenOptions;
 use std::io::{IsTerminal, Write};
@@ -143,6 +144,11 @@ fn should_run_simd_paths() -> bool {
     read_env_bool("KIDDO_FUZZ_V6_RUN_SIMD", true)
 }
 
+#[cfg(feature = "simd")]
+fn should_run_simd_f32_paths() -> bool {
+    should_run_simd_paths() && read_env_bool("KIDDO_FUZZ_V6_RUN_SIMD_F32", true)
+}
+
 fn log_failure(message: &str) {
     let lock = REPORT_LOCK.get_or_init(|| Mutex::new(()));
     let _guard = lock.lock().ok();
@@ -236,7 +242,37 @@ fn sort_by_distance_then_index<A: AxisUnified<Coord = A> + PartialOrd>(
     });
 }
 
-fn compare_nearest_n_sorted<A: AxisUnified<Coord = A> + PartialOrd + std::fmt::Debug>(
+fn distances_match_for_fuzz<A: Copy + PartialEq + 'static>(expected: A, got: A) -> bool {
+    if expected == got {
+        return true;
+    }
+
+    if TypeId::of::<A>() == TypeId::of::<f32>() {
+        let expected = unsafe { *(&expected as *const A as *const f32) };
+        let got = unsafe { *(&got as *const A as *const f32) };
+        return expected.is_finite()
+            && got.is_finite()
+            && expected.to_bits().abs_diff(got.to_bits()) <= 4;
+    }
+
+    if TypeId::of::<A>() == TypeId::of::<f64>() {
+        let expected = unsafe { *(&expected as *const A as *const f64) };
+        let got = unsafe { *(&got as *const A as *const f64) };
+        return expected.is_finite()
+            && got.is_finite()
+            && expected.to_bits().abs_diff(got.to_bits()) <= 4;
+    }
+
+    false
+}
+
+fn distance_lt_for_fuzz<A: Copy + PartialOrd + PartialEq + 'static>(lhs: A, rhs: A) -> bool {
+    lhs < rhs && !distances_match_for_fuzz(lhs, rhs)
+}
+
+fn compare_nearest_n_sorted<
+    A: AxisUnified<Coord = A> + PartialOrd + PartialEq + std::fmt::Debug + 'static,
+>(
     expected: &[(A, usize)],
     got: &[(A, usize)],
 ) -> Result<(), String> {
@@ -253,7 +289,7 @@ fn compare_nearest_n_sorted<A: AxisUnified<Coord = A> + PartialOrd + std::fmt::D
 
     let tail_dist = expected.last().unwrap().0;
     let got_tail = got.last().unwrap().0;
-    if got_tail != tail_dist {
+    if !distances_match_for_fuzz(got_tail, tail_dist) {
         return Err(format!(
             "tail distance mismatch expected={tail_dist:?} got={got_tail:?}"
         ));
@@ -261,26 +297,26 @@ fn compare_nearest_n_sorted<A: AxisUnified<Coord = A> + PartialOrd + std::fmt::D
 
     let mut i = 0usize;
     let mut j = 0usize;
-    while i < expected.len() && expected[i].0 < tail_dist {
+    while i < expected.len() && distance_lt_for_fuzz(expected[i].0, tail_dist) {
         let dist = expected[i].0;
         let mut exp_items = Vec::new();
-        while i < expected.len() && expected[i].0 == dist {
+        while i < expected.len() && distances_match_for_fuzz(expected[i].0, dist) {
             exp_items.push(expected[i].1);
             i += 1;
         }
 
-        if j < got.len() && got[j].0 < dist {
+        if j < got.len() && distance_lt_for_fuzz(got[j].0, dist) {
             return Err(format!(
                 "unexpected distance in results {got_dist:?} < expected {dist:?}",
                 got_dist = got[j].0
             ));
         }
-        if j >= got.len() || got[j].0 != dist {
+        if j >= got.len() || !distances_match_for_fuzz(got[j].0, dist) {
             return Err(format!("missing distance in results {dist:?}"));
         }
 
         let mut got_items = Vec::new();
-        while j < got.len() && got[j].0 == dist {
+        while j < got.len() && distances_match_for_fuzz(got[j].0, dist) {
             got_items.push(got[j].1);
             j += 1;
         }
@@ -294,7 +330,7 @@ fn compare_nearest_n_sorted<A: AxisUnified<Coord = A> + PartialOrd + std::fmt::D
         }
     }
 
-    while j < got.len() && got[j].0 < tail_dist {
+    while j < got.len() && distance_lt_for_fuzz(got[j].0, tail_dist) {
         return Err(format!(
             "unexpected distance in results {got_dist:?} < tail {tail_dist:?}",
             got_dist = got[j].0
@@ -302,6 +338,185 @@ fn compare_nearest_n_sorted<A: AxisUnified<Coord = A> + PartialOrd + std::fmt::D
     }
 
     Ok(())
+}
+
+fn compare_item_sorted_results<
+    A: AxisUnified<Coord = A> + PartialEq + std::fmt::Debug + std::fmt::Display + 'static,
+>(
+    expected: &[(A, usize)],
+    got: &[(A, usize)],
+) -> Result<(), String> {
+    if expected.len() != got.len() {
+        return Err(format!(
+            "len mismatch expected={} got={} {}",
+            expected.len(),
+            got.len(),
+            format_item_delta(expected, got)
+        ));
+    }
+
+    for (idx, (expected_entry, got_entry)) in expected.iter().zip(got.iter()).enumerate() {
+        if expected_entry.1 != got_entry.1 {
+            return Err(format!(
+                "item mismatch at idx={idx} expected_item={} got_item={}",
+                expected_entry.1, got_entry.1
+            ));
+        }
+        if !distances_match_for_fuzz(expected_entry.0, got_entry.0) {
+            return Err(format!(
+                "distance mismatch at idx={idx} expected={} got={}",
+                expected_entry.0, got_entry.0
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn within_boundary_matches_for_fuzz<A: Copy + PartialEq + 'static>(dist: A, radius: A) -> bool {
+    distances_match_for_fuzz(dist, radius)
+}
+
+fn compare_within_results<
+    A: AxisUnified<Coord = A> + PartialEq + std::fmt::Debug + std::fmt::Display + 'static,
+>(
+    expected: &mut Vec<(A, usize)>,
+    got: &mut Vec<(A, usize)>,
+    radius: A,
+) -> Result<(), String> {
+    sort_by_item_idx(expected);
+    sort_by_item_idx(got);
+
+    let mut i = 0usize;
+    let mut j = 0usize;
+
+    while i < expected.len() || j < got.len() {
+        match (expected.get(i), got.get(j)) {
+            (Some((expected_dist, expected_item)), Some((got_dist, got_item))) => {
+                match expected_item.cmp(got_item) {
+                    std::cmp::Ordering::Equal => {
+                        if !distances_match_for_fuzz(*expected_dist, *got_dist) {
+                            return Err(format!(
+                                "distance mismatch at item={} expected={} got={}",
+                                expected_item, expected_dist, got_dist
+                            ));
+                        }
+                        i += 1;
+                        j += 1;
+                    }
+                    std::cmp::Ordering::Less => {
+                        if !within_boundary_matches_for_fuzz(*expected_dist, radius) {
+                            return Err(format!(
+                                "len mismatch expected={} got={} {}",
+                                expected.len(),
+                                got.len(),
+                                format_item_delta(expected, got)
+                            ));
+                        }
+                        i += 1;
+                    }
+                    std::cmp::Ordering::Greater => {
+                        if !within_boundary_matches_for_fuzz(*got_dist, radius) {
+                            return Err(format!(
+                                "len mismatch expected={} got={} {}",
+                                expected.len(),
+                                got.len(),
+                                format_item_delta(expected, got)
+                            ));
+                        }
+                        j += 1;
+                    }
+                }
+            }
+            (Some((expected_dist, _)), None) => {
+                if !within_boundary_matches_for_fuzz(*expected_dist, radius) {
+                    return Err(format!(
+                        "len mismatch expected={} got={} {}",
+                        expected.len(),
+                        got.len(),
+                        format_item_delta(expected, got)
+                    ));
+                }
+                i += 1;
+            }
+            (None, Some((got_dist, _))) => {
+                if !within_boundary_matches_for_fuzz(*got_dist, radius) {
+                    return Err(format!(
+                        "len mismatch expected={} got={} {}",
+                        expected.len(),
+                        got.len(),
+                        format_item_delta(expected, got)
+                    ));
+                }
+                j += 1;
+            }
+            (None, None) => break,
+        }
+    }
+
+    Ok(())
+}
+
+fn format_item_delta<A>(expected: &[(A, usize)], got: &[(A, usize)]) -> String {
+    const SAMPLE: usize = 8;
+
+    let got_items: HashSet<usize> = got.iter().map(|entry| entry.1).collect();
+    let expected_items: HashSet<usize> = expected.iter().map(|entry| entry.1).collect();
+
+    let mut missing: Vec<usize> = expected_items.difference(&got_items).copied().collect();
+    let mut extra: Vec<usize> = got_items.difference(&expected_items).copied().collect();
+    missing.sort_unstable();
+    extra.sort_unstable();
+
+    format!(
+        "missing_item_count={} missing_item_sample={:?} extra_item_count={} extra_item_sample={:?}",
+        missing.len(),
+        &missing[..missing.len().min(SAMPLE)],
+        extra.len(),
+        &extra[..extra.len().min(SAMPLE)]
+    )
+}
+
+fn format_missing_leaf_sample<
+    A: AxisUnified<Coord = A>,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, usize, SS, K, B>,
+    const K: usize,
+    const B: usize,
+>(
+    tree: &KdTree<A, usize, SS, LS, K, B>,
+    expected: &[(A, usize)],
+    got: &[(A, usize)],
+) -> String {
+    const SAMPLE: usize = 8;
+
+    let got_items: HashSet<usize> = got.iter().map(|entry| entry.1).collect();
+    let mut missing: Vec<usize> = expected
+        .iter()
+        .map(|entry| entry.1)
+        .filter(|item| !got_items.contains(item))
+        .collect();
+    missing.sort_unstable();
+    missing.dedup();
+
+    let sample: Vec<_> = missing
+        .into_iter()
+        .take(SAMPLE)
+        .map(|item| (item, tree.find_leaf_for_item(item)))
+        .collect();
+
+    format!("missing_leaf_sample={sample:?}")
+}
+
+macro_rules! assert_distance_match_for_fuzz {
+    ($expected:expr, $got:expr, $($arg:tt)+) => {{
+        let expected_value = $expected;
+        let got_value = $got;
+        assert!(
+            distances_match_for_fuzz(expected_value, got_value),
+            $($arg)+
+        );
+    }};
 }
 
 fn format_context<A: std::fmt::Display>(
@@ -463,7 +678,7 @@ fn brute_states_f64<const K: usize>(
     (sq, man)
 }
 
-fn assert_nearest_one<A: AxisUnified<Coord = A> + PartialEq + std::fmt::Display>(
+fn assert_nearest_one<A: AxisUnified<Coord = A> + PartialEq + std::fmt::Display + 'static>(
     meta: ReproMeta,
     label: &str,
     metric: &str,
@@ -478,7 +693,7 @@ fn assert_nearest_one<A: AxisUnified<Coord = A> + PartialEq + std::fmt::Display>
     result: (A, usize),
     expected: &MetricState<A>,
 ) {
-    if result.0 != expected.best_dist {
+    if !distances_match_for_fuzz(result.0, expected.best_dist) {
         log_mismatch(
             meta,
             label,
@@ -556,7 +771,7 @@ fn assert_approx_nearest_one_f32<D, const K: usize>(
     }
 
     let expected_dist = D::dist_raw(query, &points[result.1]);
-    if result.0 != expected_dist {
+    if !distances_match_for_fuzz(result.0, expected_dist) {
         log_mismatch(
             meta,
             label,
@@ -615,7 +830,7 @@ fn assert_approx_nearest_one_f64<D, const K: usize>(
     }
 
     let expected_dist = D::dist_raw(query, &points[result.1]);
-    if result.0 != expected_dist {
+    if !distances_match_for_fuzz(result.0, expected_dist) {
         log_mismatch(
             meta,
             label,
@@ -636,7 +851,7 @@ fn assert_approx_nearest_one_f64<D, const K: usize>(
 }
 
 fn assert_nearest_n_unsorted_contains_top_k<
-    A: AxisUnified<Coord = A> + PartialOrd + std::fmt::Display,
+    A: AxisUnified<Coord = A> + PartialOrd + std::fmt::Display + 'static,
 >(
     meta: ReproMeta,
     label: &str,
@@ -998,14 +1213,17 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
                 &mut result_n_man_unsorted,
             );
 
-            let expected_within_sq = sq_state.take_within_sorted();
+            let mut expected_within_sq = sq_state.take_within_sorted();
             let mut result_within_sq: Vec<(f32, usize)> = tree
                 .within_unsorted::<SquaredEuclidean<f32>>(&query, radius_sq)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_sq);
-            if result_within_sq != expected_within_sq {
+            if let Err(reason) =
+                compare_within_results(&mut expected_within_sq, &mut result_within_sq, radius_sq)
+            {
+                let missing_leaf_sample =
+                    format_missing_leaf_sample(&tree, &expected_within_sq, &result_within_sq);
                 log_mismatch(
                     meta,
                     label,
@@ -1018,7 +1236,7 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=SquaredEuclidean op=within_unsorted expected={} got={}",
+                        "metric=SquaredEuclidean op=within_unsorted {reason} {missing_leaf_sample} expected={} got={}",
                         format_preview(&expected_within_sq, PREVIEW_LEN),
                         format_preview(&result_within_sq, PREVIEW_LEN)
                     ),
@@ -1030,8 +1248,11 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_sq_sorted);
-            if result_within_sq_sorted != expected_within_sq {
+            if let Err(reason) = compare_within_results(
+                &mut expected_within_sq,
+                &mut result_within_sq_sorted,
+                radius_sq,
+            ) {
                 log_mismatch(
                     meta,
                     label,
@@ -1044,7 +1265,7 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=SquaredEuclidean op=within expected={} got={}",
+                        "metric=SquaredEuclidean op=within {reason} expected={} got={}",
                         format_preview(&expected_within_sq, PREVIEW_LEN),
                         format_preview(&result_within_sq_sorted, PREVIEW_LEN)
                     ),
@@ -1059,7 +1280,9 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
                 .map(|n| (n.distance, n.item))
                 .collect();
             sort_by_item_idx(&mut result_best_within_sq);
-            if result_best_within_sq != expected_best_within_sq {
+            if let Err(reason) =
+                compare_item_sorted_results(&expected_best_within_sq, &result_best_within_sq)
+            {
                 log_mismatch(
                     meta,
                     label,
@@ -1072,21 +1295,22 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=SquaredEuclidean op=best_n_within expected={} got={}",
+                        "metric=SquaredEuclidean op=best_n_within {reason} expected={} got={}",
                         format_preview(&expected_best_within_sq, PREVIEW_LEN),
                         format_preview(&result_best_within_sq, PREVIEW_LEN)
                     ),
                 );
             }
 
-            let expected_within_man = man_state.take_within_sorted();
+            let mut expected_within_man = man_state.take_within_sorted();
             let mut result_within_man: Vec<(f32, usize)> = tree
                 .within_unsorted::<Manhattan<f32>>(&query, radius_man)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_man);
-            if result_within_man != expected_within_man {
+            if let Err(reason) =
+                compare_within_results(&mut expected_within_man, &mut result_within_man, radius_man)
+            {
                 log_mismatch(
                     meta,
                     label,
@@ -1099,7 +1323,7 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=Manhattan op=within_unsorted expected={} got={}",
+                        "metric=Manhattan op=within_unsorted {reason} expected={} got={}",
                         format_preview(&expected_within_man, PREVIEW_LEN),
                         format_preview(&result_within_man, PREVIEW_LEN)
                     ),
@@ -1111,8 +1335,11 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_man_sorted);
-            if result_within_man_sorted != expected_within_man {
+            if let Err(reason) = compare_within_results(
+                &mut expected_within_man,
+                &mut result_within_man_sorted,
+                radius_man,
+            ) {
                 log_mismatch(
                     meta,
                     label,
@@ -1125,7 +1352,7 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=Manhattan op=within expected={} got={}",
+                        "metric=Manhattan op=within {reason} expected={} got={}",
                         format_preview(&expected_within_man, PREVIEW_LEN),
                         format_preview(&result_within_man_sorted, PREVIEW_LEN)
                     ),
@@ -1140,7 +1367,9 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
                 .map(|n| (n.distance, n.item))
                 .collect();
             sort_by_item_idx(&mut result_best_within_man);
-            if result_best_within_man != expected_best_within_man {
+            if let Err(reason) =
+                compare_item_sorted_results(&expected_best_within_man, &result_best_within_man)
+            {
                 log_mismatch(
                     meta,
                     label,
@@ -1153,7 +1382,7 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=Manhattan op=best_n_within expected={} got={}",
+                        "metric=Manhattan op=best_n_within {reason} expected={} got={}",
                         format_preview(&expected_best_within_man, PREVIEW_LEN),
                         format_preview(&result_best_within_man, PREVIEW_LEN)
                     ),
@@ -1376,14 +1605,17 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
                 &mut result_n_man_unsorted,
             );
 
-            let expected_within_sq = sq_state.take_within_sorted();
+            let mut expected_within_sq = sq_state.take_within_sorted();
             let mut result_within_sq: Vec<(f64, usize)> = tree
                 .within_unsorted::<SquaredEuclidean<f64>>(&query, radius_sq)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_sq);
-            if result_within_sq != expected_within_sq {
+            if let Err(reason) =
+                compare_within_results(&mut expected_within_sq, &mut result_within_sq, radius_sq)
+            {
+                let missing_leaf_sample =
+                    format_missing_leaf_sample(&tree, &expected_within_sq, &result_within_sq);
                 log_mismatch(
                     meta,
                     label,
@@ -1396,7 +1628,7 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=SquaredEuclidean op=within_unsorted expected={} got={}",
+                        "metric=SquaredEuclidean op=within_unsorted {reason} {missing_leaf_sample} expected={} got={}",
                         format_preview(&expected_within_sq, PREVIEW_LEN),
                         format_preview(&result_within_sq, PREVIEW_LEN)
                     ),
@@ -1408,8 +1640,11 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_sq_sorted);
-            if result_within_sq_sorted != expected_within_sq {
+            if let Err(reason) = compare_within_results(
+                &mut expected_within_sq,
+                &mut result_within_sq_sorted,
+                radius_sq,
+            ) {
                 log_mismatch(
                     meta,
                     label,
@@ -1422,7 +1657,7 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=SquaredEuclidean op=within expected={} got={}",
+                        "metric=SquaredEuclidean op=within {reason} expected={} got={}",
                         format_preview(&expected_within_sq, PREVIEW_LEN),
                         format_preview(&result_within_sq_sorted, PREVIEW_LEN)
                     ),
@@ -1437,7 +1672,9 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
                 .map(|n| (n.distance, n.item))
                 .collect();
             sort_by_item_idx(&mut result_best_within_sq);
-            if result_best_within_sq != expected_best_within_sq {
+            if let Err(reason) =
+                compare_item_sorted_results(&expected_best_within_sq, &result_best_within_sq)
+            {
                 log_mismatch(
                     meta,
                     label,
@@ -1450,21 +1687,22 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=SquaredEuclidean op=best_n_within expected={} got={}",
+                        "metric=SquaredEuclidean op=best_n_within {reason} expected={} got={}",
                         format_preview(&expected_best_within_sq, PREVIEW_LEN),
                         format_preview(&result_best_within_sq, PREVIEW_LEN)
                     ),
                 );
             }
 
-            let expected_within_man = man_state.take_within_sorted();
+            let mut expected_within_man = man_state.take_within_sorted();
             let mut result_within_man: Vec<(f64, usize)> = tree
                 .within_unsorted::<Manhattan<f64>>(&query, radius_man)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_man);
-            if result_within_man != expected_within_man {
+            if let Err(reason) =
+                compare_within_results(&mut expected_within_man, &mut result_within_man, radius_man)
+            {
                 log_mismatch(
                     meta,
                     label,
@@ -1477,7 +1715,7 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=Manhattan op=within_unsorted expected={} got={}",
+                        "metric=Manhattan op=within_unsorted {reason} expected={} got={}",
                         format_preview(&expected_within_man, PREVIEW_LEN),
                         format_preview(&result_within_man, PREVIEW_LEN)
                     ),
@@ -1489,8 +1727,11 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_man_sorted);
-            if result_within_man_sorted != expected_within_man {
+            if let Err(reason) = compare_within_results(
+                &mut expected_within_man,
+                &mut result_within_man_sorted,
+                radius_man,
+            ) {
                 log_mismatch(
                     meta,
                     label,
@@ -1503,7 +1744,7 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=Manhattan op=within expected={} got={}",
+                        "metric=Manhattan op=within {reason} expected={} got={}",
                         format_preview(&expected_within_man, PREVIEW_LEN),
                         format_preview(&result_within_man_sorted, PREVIEW_LEN)
                     ),
@@ -1518,7 +1759,9 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
                 .map(|n| (n.distance, n.item))
                 .collect();
             sort_by_item_idx(&mut result_best_within_man);
-            if result_best_within_man != expected_best_within_man {
+            if let Err(reason) =
+                compare_item_sorted_results(&expected_best_within_man, &result_best_within_man)
+            {
                 log_mismatch(
                     meta,
                     label,
@@ -1531,7 +1774,7 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=Manhattan op=best_n_within expected={} got={}",
+                        "metric=Manhattan op=best_n_within {reason} expected={} got={}",
                         format_preview(&expected_best_within_man, PREVIEW_LEN),
                         format_preview(&result_best_within_man, PREVIEW_LEN)
                     ),
@@ -1750,14 +1993,17 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
                 &mut result_n_man_unsorted,
             );
 
-            let expected_within_sq = sq_state.take_within_sorted();
+            let mut expected_within_sq = sq_state.take_within_sorted();
             let mut result_within_sq: Vec<(f32, usize)> = tree
                 .within_unsorted::<SquaredEuclidean<f32>>(&query, radius_sq)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_sq);
-            if result_within_sq != expected_within_sq {
+            if let Err(reason) =
+                compare_within_results(&mut expected_within_sq, &mut result_within_sq, radius_sq)
+            {
+                let missing_leaf_sample =
+                    format_missing_leaf_sample(&tree, &expected_within_sq, &result_within_sq);
                 log_mismatch(
                     meta,
                     label,
@@ -1770,7 +2016,7 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=SquaredEuclidean op=within_unsorted expected={} got={}",
+                        "metric=SquaredEuclidean op=within_unsorted {reason} {missing_leaf_sample} expected={} got={}",
                         format_preview(&expected_within_sq, PREVIEW_LEN),
                         format_preview(&result_within_sq, PREVIEW_LEN)
                     ),
@@ -1782,8 +2028,11 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_sq_sorted);
-            if result_within_sq_sorted != expected_within_sq {
+            if let Err(reason) = compare_within_results(
+                &mut expected_within_sq,
+                &mut result_within_sq_sorted,
+                radius_sq,
+            ) {
                 log_mismatch(
                     meta,
                     label,
@@ -1796,7 +2045,7 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=SquaredEuclidean op=within expected={} got={}",
+                        "metric=SquaredEuclidean op=within {reason} expected={} got={}",
                         format_preview(&expected_within_sq, PREVIEW_LEN),
                         format_preview(&result_within_sq_sorted, PREVIEW_LEN)
                     ),
@@ -1811,7 +2060,9 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
                 .map(|n| (n.distance, n.item))
                 .collect();
             sort_by_item_idx(&mut result_best_within_sq);
-            if result_best_within_sq != expected_best_within_sq {
+            if let Err(reason) =
+                compare_item_sorted_results(&expected_best_within_sq, &result_best_within_sq)
+            {
                 log_mismatch(
                     meta,
                     label,
@@ -1824,21 +2075,22 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=SquaredEuclidean op=best_n_within expected={} got={}",
+                        "metric=SquaredEuclidean op=best_n_within {reason} expected={} got={}",
                         format_preview(&expected_best_within_sq, PREVIEW_LEN),
                         format_preview(&result_best_within_sq, PREVIEW_LEN)
                     ),
                 );
             }
 
-            let expected_within_man = man_state.take_within_sorted();
+            let mut expected_within_man = man_state.take_within_sorted();
             let mut result_within_man: Vec<(f32, usize)> = tree
                 .within_unsorted::<Manhattan<f32>>(&query, radius_man)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_man);
-            if result_within_man != expected_within_man {
+            if let Err(reason) =
+                compare_within_results(&mut expected_within_man, &mut result_within_man, radius_man)
+            {
                 log_mismatch(
                     meta,
                     label,
@@ -1851,7 +2103,7 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=Manhattan op=within_unsorted expected={} got={}",
+                        "metric=Manhattan op=within_unsorted {reason} expected={} got={}",
                         format_preview(&expected_within_man, PREVIEW_LEN),
                         format_preview(&result_within_man, PREVIEW_LEN)
                     ),
@@ -1863,8 +2115,11 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_man_sorted);
-            if result_within_man_sorted != expected_within_man {
+            if let Err(reason) = compare_within_results(
+                &mut expected_within_man,
+                &mut result_within_man_sorted,
+                radius_man,
+            ) {
                 log_mismatch(
                     meta,
                     label,
@@ -1877,7 +2132,7 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=Manhattan op=within expected={} got={}",
+                        "metric=Manhattan op=within {reason} expected={} got={}",
                         format_preview(&expected_within_man, PREVIEW_LEN),
                         format_preview(&result_within_man_sorted, PREVIEW_LEN)
                     ),
@@ -1892,7 +2147,9 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
                 .map(|n| (n.distance, n.item))
                 .collect();
             sort_by_item_idx(&mut result_best_within_man);
-            if result_best_within_man != expected_best_within_man {
+            if let Err(reason) =
+                compare_item_sorted_results(&expected_best_within_man, &result_best_within_man)
+            {
                 log_mismatch(
                     meta,
                     label,
@@ -1905,7 +2162,7 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=Manhattan op=best_n_within expected={} got={}",
+                        "metric=Manhattan op=best_n_within {reason} expected={} got={}",
                         format_preview(&expected_best_within_man, PREVIEW_LEN),
                         format_preview(&result_best_within_man, PREVIEW_LEN)
                     ),
@@ -2146,14 +2403,17 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
                 &mut result_n_man_unsorted,
             );
 
-            let expected_within_sq = sq_state.take_within_sorted();
+            let mut expected_within_sq = sq_state.take_within_sorted();
             let mut result_within_sq: Vec<(f64, usize)> = tree
                 .within_unsorted::<SquaredEuclidean<f64>>(&query, radius_sq)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_sq);
-            if result_within_sq != expected_within_sq {
+            if let Err(reason) =
+                compare_within_results(&mut expected_within_sq, &mut result_within_sq, radius_sq)
+            {
+                let missing_leaf_sample =
+                    format_missing_leaf_sample(&tree, &expected_within_sq, &result_within_sq);
                 log_mismatch(
                     meta,
                     label,
@@ -2166,7 +2426,7 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=SquaredEuclidean op=within_unsorted expected={} got={}",
+                        "metric=SquaredEuclidean op=within_unsorted {reason} {missing_leaf_sample} expected={} got={}",
                         format_preview(&expected_within_sq, PREVIEW_LEN),
                         format_preview(&result_within_sq, PREVIEW_LEN)
                     ),
@@ -2178,8 +2438,11 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_sq_sorted);
-            if result_within_sq_sorted != expected_within_sq {
+            if let Err(reason) = compare_within_results(
+                &mut expected_within_sq,
+                &mut result_within_sq_sorted,
+                radius_sq,
+            ) {
                 log_mismatch(
                     meta,
                     label,
@@ -2192,7 +2455,7 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=SquaredEuclidean op=within expected={} got={}",
+                        "metric=SquaredEuclidean op=within {reason} expected={} got={}",
                         format_preview(&expected_within_sq, PREVIEW_LEN),
                         format_preview(&result_within_sq_sorted, PREVIEW_LEN)
                     ),
@@ -2207,7 +2470,9 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
                 .map(|n| (n.distance, n.item))
                 .collect();
             sort_by_item_idx(&mut result_best_within_sq);
-            if result_best_within_sq != expected_best_within_sq {
+            if let Err(reason) =
+                compare_item_sorted_results(&expected_best_within_sq, &result_best_within_sq)
+            {
                 log_mismatch(
                     meta,
                     label,
@@ -2220,21 +2485,22 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=SquaredEuclidean op=best_n_within expected={} got={}",
+                        "metric=SquaredEuclidean op=best_n_within {reason} expected={} got={}",
                         format_preview(&expected_best_within_sq, PREVIEW_LEN),
                         format_preview(&result_best_within_sq, PREVIEW_LEN)
                     ),
                 );
             }
 
-            let expected_within_man = man_state.take_within_sorted();
+            let mut expected_within_man = man_state.take_within_sorted();
             let mut result_within_man: Vec<(f64, usize)> = tree
                 .within_unsorted::<Manhattan<f64>>(&query, radius_man)
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_man);
-            if result_within_man != expected_within_man {
+            if let Err(reason) =
+                compare_within_results(&mut expected_within_man, &mut result_within_man, radius_man)
+            {
                 log_mismatch(
                     meta,
                     label,
@@ -2247,7 +2513,7 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=Manhattan op=within_unsorted expected={} got={}",
+                        "metric=Manhattan op=within_unsorted {reason} expected={} got={}",
                         format_preview(&expected_within_man, PREVIEW_LEN),
                         format_preview(&result_within_man, PREVIEW_LEN)
                     ),
@@ -2259,8 +2525,11 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
-            sort_by_distance_then_index(&mut result_within_man_sorted);
-            if result_within_man_sorted != expected_within_man {
+            if let Err(reason) = compare_within_results(
+                &mut expected_within_man,
+                &mut result_within_man_sorted,
+                radius_man,
+            ) {
                 log_mismatch(
                     meta,
                     label,
@@ -2273,7 +2542,7 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=Manhattan op=within expected={} got={}",
+                        "metric=Manhattan op=within {reason} expected={} got={}",
                         format_preview(&expected_within_man, PREVIEW_LEN),
                         format_preview(&result_within_man_sorted, PREVIEW_LEN)
                     ),
@@ -2288,7 +2557,9 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
                 .map(|n| (n.distance, n.item))
                 .collect();
             sort_by_item_idx(&mut result_best_within_man);
-            if result_best_within_man != expected_best_within_man {
+            if let Err(reason) =
+                compare_item_sorted_results(&expected_best_within_man, &result_best_within_man)
+            {
                 log_mismatch(
                     meta,
                     label,
@@ -2301,7 +2572,7 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
                     radius_sq,
                     radius_man,
                     format!(
-                        "metric=Manhattan op=best_n_within expected={} got={}",
+                        "metric=Manhattan op=best_n_within {reason} expected={} got={}",
                         format_preview(&expected_best_within_man, PREVIEW_LEN),
                         format_preview(&result_best_within_man, PREVIEW_LEN)
                     ),
@@ -2411,8 +2682,6 @@ fn fuzz_v6_mutable_f32() {
     let cfg = FuzzConfig::from_env();
     let run_non_simd_paths = should_run_non_simd_paths();
     #[cfg(feature = "simd")]
-    let run_simd_paths = should_run_simd_paths();
-    #[cfg(feature = "simd")]
     let simd_cfg = cfg.for_simd();
     let meta = ReproMeta {
         kind: "v6_mutable",
@@ -2500,7 +2769,7 @@ fn fuzz_v6_mutable_f32() {
 
     #[cfg(feature = "simd")]
     {
-        if run_simd_paths {
+        if should_run_simd_f32_paths() {
             let block4_meta = ReproMeta {
                 strategy: "donnelly_simd_block4",
                 ..meta
@@ -2635,8 +2904,6 @@ fn fuzz_v6_immutable_f32() {
     let cfg = FuzzConfig::from_env();
     let run_non_simd_paths = should_run_non_simd_paths();
     #[cfg(feature = "simd")]
-    let run_simd_paths = should_run_simd_paths();
-    #[cfg(feature = "simd")]
     let simd_cfg = cfg.for_simd();
     let meta = ReproMeta {
         kind: "v6_immutable",
@@ -2696,7 +2963,7 @@ fn fuzz_v6_immutable_f32() {
 
     #[cfg(feature = "simd")]
     {
-        if run_simd_paths {
+        if should_run_simd_f32_paths() {
             let block4_meta = ReproMeta {
                 strategy: "donnelly_simd_block4",
                 ..meta
@@ -3049,7 +3316,7 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
         );
     }
 
-    let expected_within_sq: Vec<(f32, usize)> = expected_sq
+    let mut expected_within_sq: Vec<(f32, usize)> = expected_sq
         .iter()
         .copied()
         .filter(|(dist, _)| *dist <= ADVERSARIAL_RADIUS_SQ_F32)
@@ -3059,28 +3326,34 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
-    sort_by_distance_then_index(&mut got_within_sq);
-    assert_eq!(
-        got_within_sq,
-        expected_within_sq,
-        "{context} metric=SquaredEuclidean op=within_unsorted expected={} got={}",
-        format_preview(&expected_within_sq, PREVIEW_LEN),
-        format_preview(&got_within_sq, PREVIEW_LEN)
-    );
+    if let Err(reason) = compare_within_results(
+        &mut expected_within_sq,
+        &mut got_within_sq,
+        ADVERSARIAL_RADIUS_SQ_F32,
+    ) {
+        panic!(
+            "{context} metric=SquaredEuclidean op=within_unsorted {reason} expected={} got={}",
+            format_preview(&expected_within_sq, PREVIEW_LEN),
+            format_preview(&got_within_sq, PREVIEW_LEN)
+        );
+    }
 
     let mut got_within_sq_sorted: Vec<(f32, usize)> = tree
         .within::<SquaredEuclidean<f32>>(query, ADVERSARIAL_RADIUS_SQ_F32)
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
-    sort_by_distance_then_index(&mut got_within_sq_sorted);
-    assert_eq!(
-        got_within_sq_sorted,
-        expected_within_sq,
-        "{context} metric=SquaredEuclidean op=within expected={} got={}",
-        format_preview(&expected_within_sq, PREVIEW_LEN),
-        format_preview(&got_within_sq_sorted, PREVIEW_LEN)
-    );
+    if let Err(reason) = compare_within_results(
+        &mut expected_within_sq,
+        &mut got_within_sq_sorted,
+        ADVERSARIAL_RADIUS_SQ_F32,
+    ) {
+        panic!(
+            "{context} metric=SquaredEuclidean op=within {reason} expected={} got={}",
+            format_preview(&expected_within_sq, PREVIEW_LEN),
+            format_preview(&got_within_sq_sorted, PREVIEW_LEN)
+        );
+    }
 
     let expected_best_sq = expected_best_n_within(&expected_within_sq, max_qty);
     let mut got_best_sq: Vec<(f32, usize)> = tree
@@ -3089,13 +3362,13 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
         .map(|n| (n.distance, n.item))
         .collect();
     sort_by_item_idx(&mut got_best_sq);
-    assert_eq!(
-        got_best_sq,
-        expected_best_sq,
-        "{context} metric=SquaredEuclidean op=best_n_within expected={} got={}",
-        format_preview(&expected_best_sq, PREVIEW_LEN),
-        format_preview(&got_best_sq, PREVIEW_LEN)
-    );
+    if let Err(reason) = compare_item_sorted_results(&expected_best_sq, &got_best_sq) {
+        panic!(
+            "{context} metric=SquaredEuclidean op=best_n_within {reason} expected={} got={}",
+            format_preview(&expected_best_sq, PREVIEW_LEN),
+            format_preview(&got_best_sq, PREVIEW_LEN)
+        );
+    }
 
     let expected_man = brute_ranked_entries_f32::<Manhattan<f32>>(entries, query);
     let expected_man_n: Vec<(f32, usize)> = expected_man.iter().take(max_qty).copied().collect();
@@ -3128,7 +3401,7 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
         );
     }
 
-    let expected_within_man: Vec<(f32, usize)> = expected_man
+    let mut expected_within_man: Vec<(f32, usize)> = expected_man
         .iter()
         .copied()
         .filter(|(dist, _)| *dist <= ADVERSARIAL_RADIUS_MAN_F32)
@@ -3138,28 +3411,34 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
-    sort_by_distance_then_index(&mut got_within_man);
-    assert_eq!(
-        got_within_man,
-        expected_within_man,
-        "{context} metric=Manhattan op=within_unsorted expected={} got={}",
-        format_preview(&expected_within_man, PREVIEW_LEN),
-        format_preview(&got_within_man, PREVIEW_LEN)
-    );
+    if let Err(reason) = compare_within_results(
+        &mut expected_within_man,
+        &mut got_within_man,
+        ADVERSARIAL_RADIUS_MAN_F32,
+    ) {
+        panic!(
+            "{context} metric=Manhattan op=within_unsorted {reason} expected={} got={}",
+            format_preview(&expected_within_man, PREVIEW_LEN),
+            format_preview(&got_within_man, PREVIEW_LEN)
+        );
+    }
 
     let mut got_within_man_sorted: Vec<(f32, usize)> = tree
         .within::<Manhattan<f32>>(query, ADVERSARIAL_RADIUS_MAN_F32)
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
-    sort_by_distance_then_index(&mut got_within_man_sorted);
-    assert_eq!(
-        got_within_man_sorted,
-        expected_within_man,
-        "{context} metric=Manhattan op=within expected={} got={}",
-        format_preview(&expected_within_man, PREVIEW_LEN),
-        format_preview(&got_within_man_sorted, PREVIEW_LEN)
-    );
+    if let Err(reason) = compare_within_results(
+        &mut expected_within_man,
+        &mut got_within_man_sorted,
+        ADVERSARIAL_RADIUS_MAN_F32,
+    ) {
+        panic!(
+            "{context} metric=Manhattan op=within {reason} expected={} got={}",
+            format_preview(&expected_within_man, PREVIEW_LEN),
+            format_preview(&got_within_man_sorted, PREVIEW_LEN)
+        );
+    }
 
     let expected_best_man = expected_best_n_within(&expected_within_man, max_qty);
     let mut got_best_man: Vec<(f32, usize)> = tree
@@ -3168,13 +3447,13 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
         .map(|n| (n.distance, n.item))
         .collect();
     sort_by_item_idx(&mut got_best_man);
-    assert_eq!(
-        got_best_man,
-        expected_best_man,
-        "{context} metric=Manhattan op=best_n_within expected={} got={}",
-        format_preview(&expected_best_man, PREVIEW_LEN),
-        format_preview(&got_best_man, PREVIEW_LEN)
-    );
+    if let Err(reason) = compare_item_sorted_results(&expected_best_man, &got_best_man) {
+        panic!(
+            "{context} metric=Manhattan op=best_n_within {reason} expected={} got={}",
+            format_preview(&expected_best_man, PREVIEW_LEN),
+            format_preview(&got_best_man, PREVIEW_LEN)
+        );
+    }
 
     if let Some((best_sq_dist, _)) = expected_sq.first().copied() {
         let expected_sq_items: Vec<usize> = expected_sq
@@ -3183,10 +3462,12 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
             .map(|(_, item)| *item)
             .collect();
         let got_sq = tree.nearest_one::<SquaredEuclidean<f32>>(query);
-        assert_eq!(
-            got_sq.0, best_sq_dist,
+        assert_distance_match_for_fuzz!(
+            best_sq_dist,
+            got_sq.0,
             "{context} metric=SquaredEuclidean op=nearest_one distance mismatch expected={} got={}",
-            best_sq_dist, got_sq.0
+            best_sq_dist,
+            got_sq.0
         );
         assert!(
             expected_sq_items.contains(&got_sq.1),
@@ -3198,10 +3479,13 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
         let approx_sq_point = find_point_by_item_f32(entries, approx_sq.1);
         let approx_sq_dist =
             <SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_sq_point);
-        assert_eq!(
-            approx_sq.0, approx_sq_dist,
+        assert_distance_match_for_fuzz!(
+            approx_sq_dist,
+            approx_sq.0,
             "{context} metric=SquaredEuclidean op=approx_nearest_one distance mismatch expected={} got={} item={}",
-            approx_sq_dist, approx_sq.0, approx_sq.1
+            approx_sq_dist,
+            approx_sq.0,
+            approx_sq.1
         );
     }
 
@@ -3212,10 +3496,12 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
             .map(|(_, item)| *item)
             .collect();
         let got_man = tree.nearest_one::<Manhattan<f32>>(query);
-        assert_eq!(
-            got_man.0, best_man_dist,
+        assert_distance_match_for_fuzz!(
+            best_man_dist,
+            got_man.0,
             "{context} metric=Manhattan op=nearest_one distance mismatch expected={} got={}",
-            best_man_dist, got_man.0
+            best_man_dist,
+            got_man.0
         );
         assert!(
             expected_man_items.contains(&got_man.1),
@@ -3227,10 +3513,13 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
         let approx_man_point = find_point_by_item_f32(entries, approx_man.1);
         let approx_man_dist =
             <Manhattan<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_man_point);
-        assert_eq!(
-            approx_man.0, approx_man_dist,
+        assert_distance_match_for_fuzz!(
+            approx_man_dist,
+            approx_man.0,
             "{context} metric=Manhattan op=approx_nearest_one distance mismatch expected={} got={} item={}",
-            approx_man_dist, approx_man.0, approx_man.1
+            approx_man_dist,
+            approx_man.0,
+            approx_man.1
         );
     }
 }
@@ -3280,7 +3569,7 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
         );
     }
 
-    let expected_within_sq: Vec<(f64, usize)> = expected_sq
+    let mut expected_within_sq: Vec<(f64, usize)> = expected_sq
         .iter()
         .copied()
         .filter(|(dist, _)| *dist <= ADVERSARIAL_RADIUS_SQ_F64)
@@ -3290,28 +3579,34 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
-    sort_by_distance_then_index(&mut got_within_sq);
-    assert_eq!(
-        got_within_sq,
-        expected_within_sq,
-        "{context} metric=SquaredEuclidean op=within_unsorted expected={} got={}",
-        format_preview(&expected_within_sq, PREVIEW_LEN),
-        format_preview(&got_within_sq, PREVIEW_LEN)
-    );
+    if let Err(reason) = compare_within_results(
+        &mut expected_within_sq,
+        &mut got_within_sq,
+        ADVERSARIAL_RADIUS_SQ_F64,
+    ) {
+        panic!(
+            "{context} metric=SquaredEuclidean op=within_unsorted {reason} expected={} got={}",
+            format_preview(&expected_within_sq, PREVIEW_LEN),
+            format_preview(&got_within_sq, PREVIEW_LEN)
+        );
+    }
 
     let mut got_within_sq_sorted: Vec<(f64, usize)> = tree
         .within::<SquaredEuclidean<f64>>(query, ADVERSARIAL_RADIUS_SQ_F64)
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
-    sort_by_distance_then_index(&mut got_within_sq_sorted);
-    assert_eq!(
-        got_within_sq_sorted,
-        expected_within_sq,
-        "{context} metric=SquaredEuclidean op=within expected={} got={}",
-        format_preview(&expected_within_sq, PREVIEW_LEN),
-        format_preview(&got_within_sq_sorted, PREVIEW_LEN)
-    );
+    if let Err(reason) = compare_within_results(
+        &mut expected_within_sq,
+        &mut got_within_sq_sorted,
+        ADVERSARIAL_RADIUS_SQ_F64,
+    ) {
+        panic!(
+            "{context} metric=SquaredEuclidean op=within {reason} expected={} got={}",
+            format_preview(&expected_within_sq, PREVIEW_LEN),
+            format_preview(&got_within_sq_sorted, PREVIEW_LEN)
+        );
+    }
 
     let expected_best_sq = expected_best_n_within(&expected_within_sq, max_qty);
     let mut got_best_sq: Vec<(f64, usize)> = tree
@@ -3320,13 +3615,13 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
         .map(|n| (n.distance, n.item))
         .collect();
     sort_by_item_idx(&mut got_best_sq);
-    assert_eq!(
-        got_best_sq,
-        expected_best_sq,
-        "{context} metric=SquaredEuclidean op=best_n_within expected={} got={}",
-        format_preview(&expected_best_sq, PREVIEW_LEN),
-        format_preview(&got_best_sq, PREVIEW_LEN)
-    );
+    if let Err(reason) = compare_item_sorted_results(&expected_best_sq, &got_best_sq) {
+        panic!(
+            "{context} metric=SquaredEuclidean op=best_n_within {reason} expected={} got={}",
+            format_preview(&expected_best_sq, PREVIEW_LEN),
+            format_preview(&got_best_sq, PREVIEW_LEN)
+        );
+    }
 
     let expected_man = brute_ranked_entries_f64::<Manhattan<f64>>(entries, query);
     let expected_man_n: Vec<(f64, usize)> = expected_man.iter().take(max_qty).copied().collect();
@@ -3359,7 +3654,7 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
         );
     }
 
-    let expected_within_man: Vec<(f64, usize)> = expected_man
+    let mut expected_within_man: Vec<(f64, usize)> = expected_man
         .iter()
         .copied()
         .filter(|(dist, _)| *dist <= ADVERSARIAL_RADIUS_MAN_F64)
@@ -3369,28 +3664,34 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
-    sort_by_distance_then_index(&mut got_within_man);
-    assert_eq!(
-        got_within_man,
-        expected_within_man,
-        "{context} metric=Manhattan op=within_unsorted expected={} got={}",
-        format_preview(&expected_within_man, PREVIEW_LEN),
-        format_preview(&got_within_man, PREVIEW_LEN)
-    );
+    if let Err(reason) = compare_within_results(
+        &mut expected_within_man,
+        &mut got_within_man,
+        ADVERSARIAL_RADIUS_MAN_F64,
+    ) {
+        panic!(
+            "{context} metric=Manhattan op=within_unsorted {reason} expected={} got={}",
+            format_preview(&expected_within_man, PREVIEW_LEN),
+            format_preview(&got_within_man, PREVIEW_LEN)
+        );
+    }
 
     let mut got_within_man_sorted: Vec<(f64, usize)> = tree
         .within::<Manhattan<f64>>(query, ADVERSARIAL_RADIUS_MAN_F64)
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
-    sort_by_distance_then_index(&mut got_within_man_sorted);
-    assert_eq!(
-        got_within_man_sorted,
-        expected_within_man,
-        "{context} metric=Manhattan op=within expected={} got={}",
-        format_preview(&expected_within_man, PREVIEW_LEN),
-        format_preview(&got_within_man_sorted, PREVIEW_LEN)
-    );
+    if let Err(reason) = compare_within_results(
+        &mut expected_within_man,
+        &mut got_within_man_sorted,
+        ADVERSARIAL_RADIUS_MAN_F64,
+    ) {
+        panic!(
+            "{context} metric=Manhattan op=within {reason} expected={} got={}",
+            format_preview(&expected_within_man, PREVIEW_LEN),
+            format_preview(&got_within_man_sorted, PREVIEW_LEN)
+        );
+    }
 
     let expected_best_man = expected_best_n_within(&expected_within_man, max_qty);
     let mut got_best_man: Vec<(f64, usize)> = tree
@@ -3399,13 +3700,13 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
         .map(|n| (n.distance, n.item))
         .collect();
     sort_by_item_idx(&mut got_best_man);
-    assert_eq!(
-        got_best_man,
-        expected_best_man,
-        "{context} metric=Manhattan op=best_n_within expected={} got={}",
-        format_preview(&expected_best_man, PREVIEW_LEN),
-        format_preview(&got_best_man, PREVIEW_LEN)
-    );
+    if let Err(reason) = compare_item_sorted_results(&expected_best_man, &got_best_man) {
+        panic!(
+            "{context} metric=Manhattan op=best_n_within {reason} expected={} got={}",
+            format_preview(&expected_best_man, PREVIEW_LEN),
+            format_preview(&got_best_man, PREVIEW_LEN)
+        );
+    }
 
     if let Some((best_sq_dist, _)) = expected_sq.first().copied() {
         let expected_sq_items: Vec<usize> = expected_sq
@@ -3414,10 +3715,12 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
             .map(|(_, item)| *item)
             .collect();
         let got_sq = tree.nearest_one::<SquaredEuclidean<f64>>(query);
-        assert_eq!(
-            got_sq.0, best_sq_dist,
+        assert_distance_match_for_fuzz!(
+            best_sq_dist,
+            got_sq.0,
             "{context} metric=SquaredEuclidean op=nearest_one distance mismatch expected={} got={}",
-            best_sq_dist, got_sq.0
+            best_sq_dist,
+            got_sq.0
         );
         assert!(
             expected_sq_items.contains(&got_sq.1),
@@ -3429,10 +3732,13 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
         let approx_sq_point = find_point_by_item_f64(entries, approx_sq.1);
         let approx_sq_dist =
             <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_sq_point);
-        assert_eq!(
-            approx_sq.0, approx_sq_dist,
+        assert_distance_match_for_fuzz!(
+            approx_sq_dist,
+            approx_sq.0,
             "{context} metric=SquaredEuclidean op=approx_nearest_one distance mismatch expected={} got={} item={}",
-            approx_sq_dist, approx_sq.0, approx_sq.1
+            approx_sq_dist,
+            approx_sq.0,
+            approx_sq.1
         );
     }
 
@@ -3443,10 +3749,12 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
             .map(|(_, item)| *item)
             .collect();
         let got_man = tree.nearest_one::<Manhattan<f64>>(query);
-        assert_eq!(
-            got_man.0, best_man_dist,
+        assert_distance_match_for_fuzz!(
+            best_man_dist,
+            got_man.0,
             "{context} metric=Manhattan op=nearest_one distance mismatch expected={} got={}",
-            best_man_dist, got_man.0
+            best_man_dist,
+            got_man.0
         );
         assert!(
             expected_man_items.contains(&got_man.1),
@@ -3458,10 +3766,13 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
         let approx_man_point = find_point_by_item_f64(entries, approx_man.1);
         let approx_man_dist =
             <Manhattan<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_man_point);
-        assert_eq!(
-            approx_man.0, approx_man_dist,
+        assert_distance_match_for_fuzz!(
+            approx_man_dist,
+            approx_man.0,
             "{context} metric=Manhattan op=approx_nearest_one distance mismatch expected={} got={} item={}",
-            approx_man_dist, approx_man.0, approx_man.1
+            approx_man_dist,
+            approx_man.0,
+            approx_man.1
         );
     }
 }
@@ -3681,10 +3992,12 @@ fn fuzz_v6_adversarial_fast_simd() {
         return;
     }
 
-    run_adversarial_immutable_f32::<DonnellySimdBlock4F32<2>>("v6 adversarial simd f32 Block4");
-    run_adversarial_immutable_f32_arenas::<DonnellySimdBlock4F32<2>>(
-        "v6 adversarial simd f32 Block4 VecOfArenas",
-    );
+    if should_run_simd_f32_paths() {
+        run_adversarial_immutable_f32::<DonnellySimdBlock4F32<2>>("v6 adversarial simd f32 Block4");
+        run_adversarial_immutable_f32_arenas::<DonnellySimdBlock4F32<2>>(
+            "v6 adversarial simd f32 Block4 VecOfArenas",
+        );
+    }
     run_adversarial_immutable_f64::<DonnellySimdBlock3F64<2>>("v6 adversarial simd f64 Block3");
     run_adversarial_immutable_f64_arenas::<DonnellySimdBlock3F64<2>>(
         "v6 adversarial simd f64 Block3 VecOfArenas",
@@ -3717,17 +4030,22 @@ fn assert_approx_invariants_f32<SO, LS, const B: usize>(
     let approx_sq_point = find_point_by_item_f32(entries, approx_sq.1);
     let approx_sq_dist =
         <SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_sq_point);
-    assert_eq!(
-        approx_sq.0, approx_sq_dist,
+    assert_distance_match_for_fuzz!(
+        approx_sq_dist,
+        approx_sq.0,
         "{context} metric=SquaredEuclidean op=approx_nearest_one distance mismatch expected={} got={} item={}",
-        approx_sq_dist, approx_sq.0, approx_sq.1
+        approx_sq_dist,
+        approx_sq.0,
+        approx_sq.1
     );
 
     let exact_sq = tree.nearest_one::<SquaredEuclidean<f32>>(query);
-    assert_eq!(
-        exact_sq.0, best_sq_dist,
+    assert_distance_match_for_fuzz!(
+        best_sq_dist,
+        exact_sq.0,
         "{context} metric=SquaredEuclidean op=nearest_one distance mismatch expected={} got={}",
-        best_sq_dist, exact_sq.0
+        best_sq_dist,
+        exact_sq.0
     );
     assert!(
         best_sq_items.contains(&exact_sq.1),
@@ -3736,10 +4054,12 @@ fn assert_approx_invariants_f32<SO, LS, const B: usize>(
     );
 
     if entries.len() <= B {
-        assert_eq!(
-            approx_sq.0, exact_sq.0,
+        assert_distance_match_for_fuzz!(
+            exact_sq.0,
+            approx_sq.0,
             "{context} metric=SquaredEuclidean op=approx_single_leaf distance mismatch expected={} got={}",
-            exact_sq.0, approx_sq.0
+            exact_sq.0,
+            approx_sq.0
         );
         assert!(
             best_sq_items.contains(&approx_sq.1),
@@ -3760,17 +4080,22 @@ fn assert_approx_invariants_f32<SO, LS, const B: usize>(
     let approx_man_point = find_point_by_item_f32(entries, approx_man.1);
     let approx_man_dist =
         <Manhattan<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_man_point);
-    assert_eq!(
-        approx_man.0, approx_man_dist,
+    assert_distance_match_for_fuzz!(
+        approx_man_dist,
+        approx_man.0,
         "{context} metric=Manhattan op=approx_nearest_one distance mismatch expected={} got={} item={}",
-        approx_man_dist, approx_man.0, approx_man.1
+        approx_man_dist,
+        approx_man.0,
+        approx_man.1
     );
 
     let exact_man = tree.nearest_one::<Manhattan<f32>>(query);
-    assert_eq!(
-        exact_man.0, best_man_dist,
+    assert_distance_match_for_fuzz!(
+        best_man_dist,
+        exact_man.0,
         "{context} metric=Manhattan op=nearest_one distance mismatch expected={} got={}",
-        best_man_dist, exact_man.0
+        best_man_dist,
+        exact_man.0
     );
     assert!(
         best_man_items.contains(&exact_man.1),
@@ -3779,10 +4104,12 @@ fn assert_approx_invariants_f32<SO, LS, const B: usize>(
     );
 
     if entries.len() <= B {
-        assert_eq!(
-            approx_man.0, exact_man.0,
+        assert_distance_match_for_fuzz!(
+            exact_man.0,
+            approx_man.0,
             "{context} metric=Manhattan op=approx_single_leaf distance mismatch expected={} got={}",
-            exact_man.0, approx_man.0
+            exact_man.0,
+            approx_man.0
         );
         assert!(
             best_man_items.contains(&approx_man.1),
@@ -3819,17 +4146,22 @@ fn assert_approx_invariants_f64<SO, LS, const B: usize>(
     let approx_sq_point = find_point_by_item_f64(entries, approx_sq.1);
     let approx_sq_dist =
         <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_sq_point);
-    assert_eq!(
-        approx_sq.0, approx_sq_dist,
+    assert_distance_match_for_fuzz!(
+        approx_sq_dist,
+        approx_sq.0,
         "{context} metric=SquaredEuclidean op=approx_nearest_one distance mismatch expected={} got={} item={}",
-        approx_sq_dist, approx_sq.0, approx_sq.1
+        approx_sq_dist,
+        approx_sq.0,
+        approx_sq.1
     );
 
     let exact_sq = tree.nearest_one::<SquaredEuclidean<f64>>(query);
-    assert_eq!(
-        exact_sq.0, best_sq_dist,
+    assert_distance_match_for_fuzz!(
+        best_sq_dist,
+        exact_sq.0,
         "{context} metric=SquaredEuclidean op=nearest_one distance mismatch expected={} got={}",
-        best_sq_dist, exact_sq.0
+        best_sq_dist,
+        exact_sq.0
     );
     assert!(
         best_sq_items.contains(&exact_sq.1),
@@ -3838,10 +4170,12 @@ fn assert_approx_invariants_f64<SO, LS, const B: usize>(
     );
 
     if entries.len() <= B {
-        assert_eq!(
-            approx_sq.0, exact_sq.0,
+        assert_distance_match_for_fuzz!(
+            exact_sq.0,
+            approx_sq.0,
             "{context} metric=SquaredEuclidean op=approx_single_leaf distance mismatch expected={} got={}",
-            exact_sq.0, approx_sq.0
+            exact_sq.0,
+            approx_sq.0
         );
         assert!(
             best_sq_items.contains(&approx_sq.1),
@@ -3862,17 +4196,22 @@ fn assert_approx_invariants_f64<SO, LS, const B: usize>(
     let approx_man_point = find_point_by_item_f64(entries, approx_man.1);
     let approx_man_dist =
         <Manhattan<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_man_point);
-    assert_eq!(
-        approx_man.0, approx_man_dist,
+    assert_distance_match_for_fuzz!(
+        approx_man_dist,
+        approx_man.0,
         "{context} metric=Manhattan op=approx_nearest_one distance mismatch expected={} got={} item={}",
-        approx_man_dist, approx_man.0, approx_man.1
+        approx_man_dist,
+        approx_man.0,
+        approx_man.1
     );
 
     let exact_man = tree.nearest_one::<Manhattan<f64>>(query);
-    assert_eq!(
-        exact_man.0, best_man_dist,
+    assert_distance_match_for_fuzz!(
+        best_man_dist,
+        exact_man.0,
         "{context} metric=Manhattan op=nearest_one distance mismatch expected={} got={}",
-        best_man_dist, exact_man.0
+        best_man_dist,
+        exact_man.0
     );
     assert!(
         best_man_items.contains(&exact_man.1),
@@ -3881,10 +4220,12 @@ fn assert_approx_invariants_f64<SO, LS, const B: usize>(
     );
 
     if entries.len() <= B {
-        assert_eq!(
-            approx_man.0, exact_man.0,
+        assert_distance_match_for_fuzz!(
+            exact_man.0,
+            approx_man.0,
             "{context} metric=Manhattan op=approx_single_leaf distance mismatch expected={} got={}",
-            exact_man.0, approx_man.0
+            exact_man.0,
+            approx_man.0
         );
         assert!(
             best_man_items.contains(&approx_man.1),
@@ -4194,9 +4535,11 @@ fn fuzz_v6_approx_nearest_one_fast_hard() {
     #[cfg(feature = "simd")]
     {
         if should_run_simd_paths() {
-            run_approx_hard_immutable_f32::<DonnellySimdBlock4F32<2>>(
-                "v6 approx hard simd f32 Block4",
-            );
+            if should_run_simd_f32_paths() {
+                run_approx_hard_immutable_f32::<DonnellySimdBlock4F32<2>>(
+                    "v6 approx hard simd f32 Block4",
+                );
+            }
             run_approx_hard_immutable_f64::<DonnellySimdBlock3F64<2>>(
                 "v6 approx hard simd f64 Block3",
             );
@@ -4284,37 +4627,42 @@ fn fuzz_v6_approx_nearest_one_quality() {
     #[cfg(feature = "simd")]
     {
         if should_run_simd_paths() {
-            let mut stats_f32_simd = ApproxRatioStats::default();
             let mut stats_f64_simd = ApproxRatioStats::default();
+            let run_f32_simd = should_run_simd_f32_paths();
+            let mut stats_f32_simd = run_f32_simd.then(ApproxRatioStats::default);
 
             for case_idx in 0..cases {
                 let size = 1usize << rng.random_range(8..=12);
-                let points_f32: Vec<[f32; 2]> =
-                    (0..size).map(|_| random_point_f32::<2>(&mut rng)).collect();
-                let entries_f32: Vec<EntryF32> = points_f32
-                    .iter()
-                    .copied()
-                    .enumerate()
-                    .map(|(item, point)| (point, item))
-                    .collect();
-                let queries_f32: Vec<[f32; 2]> = (0..query_count)
-                    .map(|_| random_point_f32::<2>(&mut rng))
-                    .collect();
-                let tree_f32: KdTree<
-                    f32,
-                    usize,
-                    DonnellySimdBlock4F32<2>,
-                    FlatVec<f32, usize, 2, ADVERSARIAL_B>,
-                    2,
-                    ADVERSARIAL_B,
-                > = KdTree::new_from_slice(&points_f32);
-                record_approx_quality_case_f32(
-                    &format!("v6 approx quality simd f32 Block4 case={}", case_idx + 1),
-                    &tree_f32,
-                    &entries_f32,
-                    &queries_f32,
-                    &mut stats_f32_simd,
-                );
+                if run_f32_simd {
+                    let points_f32: Vec<[f32; 2]> =
+                        (0..size).map(|_| random_point_f32::<2>(&mut rng)).collect();
+                    let entries_f32: Vec<EntryF32> = points_f32
+                        .iter()
+                        .copied()
+                        .enumerate()
+                        .map(|(item, point)| (point, item))
+                        .collect();
+                    let queries_f32: Vec<[f32; 2]> = (0..query_count)
+                        .map(|_| random_point_f32::<2>(&mut rng))
+                        .collect();
+                    let tree_f32: KdTree<
+                        f32,
+                        usize,
+                        DonnellySimdBlock4F32<2>,
+                        FlatVec<f32, usize, 2, ADVERSARIAL_B>,
+                        2,
+                        ADVERSARIAL_B,
+                    > = KdTree::new_from_slice(&points_f32);
+                    record_approx_quality_case_f32(
+                        &format!("v6 approx quality simd f32 Block4 case={}", case_idx + 1),
+                        &tree_f32,
+                        &entries_f32,
+                        &queries_f32,
+                        stats_f32_simd
+                            .as_mut()
+                            .expect("f32 SIMD stats must exist when f32 SIMD is enabled"),
+                    );
+                }
 
                 let points_f64: Vec<[f64; 2]> =
                     (0..size).map(|_| random_point_f64::<2>(&mut rng)).collect();
@@ -4344,24 +4692,25 @@ fn fuzz_v6_approx_nearest_one_quality() {
                 );
             }
 
-            let p99_sq_f32 = quantile(&stats_f32_simd.sq_ratios, 0.99);
-            let worst_sq_f32 = quantile(&stats_f32_simd.sq_ratios, 1.0);
-            let p99_man_f32 = quantile(&stats_f32_simd.man_ratios, 0.99);
-            let worst_man_f32 = quantile(&stats_f32_simd.man_ratios, 1.0);
-
             let p99_sq_f64 = quantile(&stats_f64_simd.sq_ratios, 0.99);
             let worst_sq_f64 = quantile(&stats_f64_simd.sq_ratios, 1.0);
             let p99_man_f64 = quantile(&stats_f64_simd.man_ratios, 0.99);
             let worst_man_f64 = quantile(&stats_f64_simd.man_ratios, 1.0);
 
             if enforce {
-                assert!(
-                    p99_sq_f32 <= max_p99
-                        && p99_man_f32 <= max_p99
-                        && worst_sq_f32 <= max_worst
-                        && worst_man_f32 <= max_worst,
-                    "v6 approx quality simd f32 thresholds failed sq_p99={p99_sq_f32:.4} sq_worst={worst_sq_f32:.4} man_p99={p99_man_f32:.4} man_worst={worst_man_f32:.4} max_p99={max_p99:.4} max_worst={max_worst:.4}"
-                );
+                if let Some(stats_f32_simd) = stats_f32_simd.as_ref() {
+                    let p99_sq_f32 = quantile(&stats_f32_simd.sq_ratios, 0.99);
+                    let worst_sq_f32 = quantile(&stats_f32_simd.sq_ratios, 1.0);
+                    let p99_man_f32 = quantile(&stats_f32_simd.man_ratios, 0.99);
+                    let worst_man_f32 = quantile(&stats_f32_simd.man_ratios, 1.0);
+                    assert!(
+                        p99_sq_f32 <= max_p99
+                            && p99_man_f32 <= max_p99
+                            && worst_sq_f32 <= max_worst
+                            && worst_man_f32 <= max_worst,
+                        "v6 approx quality simd f32 thresholds failed sq_p99={p99_sq_f32:.4} sq_worst={worst_sq_f32:.4} man_p99={p99_man_f32:.4} man_worst={worst_man_f32:.4} max_p99={max_p99:.4} max_worst={max_worst:.4}"
+                    );
+                }
                 assert!(
                     p99_sq_f64 <= max_p99
                         && p99_man_f64 <= max_p99

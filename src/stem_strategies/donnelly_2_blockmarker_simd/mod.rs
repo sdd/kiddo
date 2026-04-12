@@ -153,24 +153,25 @@ where
 }
 
 #[inline(always)]
-fn fill_block3_backtrack_values<A, O, D, const K2: usize>(
+fn fill_block3_backtrack_values_and_bounds<A, O, D, const K2: usize>(
     stems: &[A],
     block_base_idx: usize,
     query_wide: O,
+    parent_lower_bound: O,
+    parent_upper_bound: O,
     old_off: O,
     rd: O,
     best_dist: O,
     new_off_values: &mut [O; 8],
     rd_values: &mut [O; 8],
+    lower_bounds: &mut [O; 8],
+    upper_bounds: &mut [O; 8],
 ) -> u8
 where
     A: AxisUnified<Coord = A>,
     O: AxisUnified<Coord = O>,
     D: crate::dist::DistanceMetricCore<A, Output = O>,
 {
-    // Block3 exact backtracking intentionally uses the same off[dim]-only lower-bound model
-    // as DonnellySimdDescent. Clipping by parent interval bounds was correct but destroyed
-    // pruning in practice by making this path explore far too many leaves.
     let old_dist1 = D::dist1(old_off, O::zero());
     let mut mask = 0u8;
 
@@ -189,8 +190,13 @@ where
             unsafe { *stems.get_unchecked(block_base_idx + upper_offset as usize) }
         };
 
-        let effective_lower = D::widen_coord(lower);
-        let effective_upper = D::widen_coord(upper);
+        let raw_lower = D::widen_coord(lower);
+        let raw_upper = D::widen_coord(upper);
+        let effective_lower = O::max(parent_lower_bound, raw_lower);
+        let effective_upper = coord_min(parent_upper_bound, raw_upper);
+
+        lower_bounds[sibling_idx] = effective_lower;
+        upper_bounds[sibling_idx] = effective_upper;
 
         if O::cmp(effective_lower, effective_upper) != std::cmp::Ordering::Less {
             new_off_values[sibling_idx] = O::max_value();
@@ -322,7 +328,7 @@ where
 /// `cargo-asm` hooks for isolating Block3 exact backtrack kernels.
 #[cfg(feature = "cargo_asm")]
 pub mod cargo_asm {
-    use super::fill_block3_backtrack_values;
+    use super::fill_block3_backtrack_values_and_bounds;
     use crate::dist::SquaredEuclidean;
 
     /// Hook for cargo-asm to render the exact Block3 backtrack fill kernel directly.
@@ -338,15 +344,21 @@ pub mod cargo_asm {
         new_off_values: &mut [f64; 8],
         rd_values: &mut [f64; 8],
     ) -> u8 {
-        fill_block3_backtrack_values::<f64, f64, SquaredEuclidean<f64>, 3>(
+        let mut lower_bounds = [0.0; 8];
+        let mut upper_bounds = [0.0; 8];
+        fill_block3_backtrack_values_and_bounds::<f64, f64, SquaredEuclidean<f64>, 3>(
             stems,
             block_base_idx,
             query_wide,
+            f64::MIN,
+            f64::MAX,
             old_off,
             rd,
             best_dist,
             new_off_values,
             rd_values,
+            &mut lower_bounds,
+            &mut upper_bounds,
         )
     }
 }
@@ -571,17 +583,23 @@ where
 
         let mut rd_values = [O::zero(); 8];
         let mut new_off_values = [O::zero(); 8];
+        let mut lower_bounds = [O::zero(); 8];
+        let mut upper_bounds = [O::zero(); 8];
         let child_idx = compare_block3(stems, query_val, block_base_idx);
 
-        let candidate_mask = fill_block3_backtrack_values::<A, O, D, K2>(
+        let candidate_mask = fill_block3_backtrack_values_and_bounds::<A, O, D, K2>(
             stems,
             block_base_idx,
             query_wide_val,
+            lower_bound,
+            upper_bound,
             old_off_val,
             rd,
             best_dist,
             &mut new_off_values,
             &mut rd_values,
+            &mut lower_bounds,
+            &mut upper_bounds,
         ) & !(1u8 << child_idx);
 
         if candidate_mask != 0 {
@@ -591,6 +609,8 @@ where
                 *self,
                 rd_values,
                 new_off_values,
+                lower_bounds,
+                upper_bounds,
                 candidate_mask,
                 dim_val,
                 old_off_val,
@@ -601,6 +621,8 @@ where
 
         unsafe {
             *off.get_unchecked_mut(dim_val) = new_off_values[child_idx as usize];
+            *lower.get_unchecked_mut(dim_val) = lower_bounds[child_idx as usize];
+            *upper.get_unchecked_mut(dim_val) = upper_bounds[child_idx as usize];
         }
 
         self.core.traverse_block(child_idx, Self::BLOCK_SIZE as u32);

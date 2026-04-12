@@ -324,6 +324,7 @@ mod tests {
         assert_eq!(actual.1 as usize, expected.item);
     }
 
+    #[allow(dead_code)]
     fn assert_nearest_f64(actual: (f64, u32), expected: &NearestNeighbour<f64, usize>) {
         assert_float_relative_eq!(actual.0, expected.distance, REL_EPS_F64);
         assert_eq!(actual.1 as usize, expected.item);
