@@ -24,6 +24,13 @@ pub struct DonnellyMarkerPf<BS: BlockSizeMarker, const CL: u32, const VB: u32, c
     _marker: PhantomData<BS>,
 }
 
+/// Scalar block-marker Donnelly strategy using block-sized dimension scheduling.
+#[derive(Copy, Clone, Debug)]
+pub struct DonnellyMarkerScalar<BS: BlockSizeMarker, const CL: u32, const VB: u32, const K: usize> {
+    core: DonnellyCore<CL, VB, K>,
+    _marker: PhantomData<BS>,
+}
+
 macro_rules! impl_donnelly_stem_strategy {
     ($marker:ty, $size:tt) => {
         impl<const CL: u32, const VB: u32, const K: usize> StemStrategy
@@ -111,6 +118,121 @@ macro_rules! impl_donnelly_stem_strategy {
             }
 
             fn block_size() -> usize { $size }
+
+            fn get_leaf_idx<A: AxisUnified, const K2: usize>(
+                stems: &[A],
+                query: &[A; K2],
+                max_stem_level: i32,
+            ) -> usize {
+                let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+                let mut strat = Self::new(stems_ptr);
+
+                while strat.level() + ($size as i32) <= max_stem_level + 1 {
+                    impl_donnelly_stem_strategy!(@unroll $size, stems, query, strat);
+                }
+
+                while strat.level() <= max_stem_level {
+                    let pivot = unsafe { stems.get_unchecked(strat.stem_idx()) };
+                    let is_right = unsafe { *query.get_unchecked(strat.dim()) } >= *pivot;
+                    strat.traverse(is_right);
+                }
+
+                strat.leaf_idx()
+            }
+        }
+
+        impl<const CL: u32, const VB: u32, const K: usize> StemStrategy
+            for DonnellyMarkerScalar<$marker, CL, VB, K>
+        {
+            const ROOT_IDX: usize = 0;
+
+            type DeferredState = Self;
+            type StackContext<A> =
+                crate::kd_tree::query_stack::QueryStackContext<A, Self::DeferredState>;
+            type Stack<A> = crate::kd_tree::query_stack::QueryStack<A, Self>;
+
+            #[inline(always)]
+            fn new(stems_ptr: NonNull<u8>) -> Self {
+                Self {
+                    core: DonnellyCore::new(stems_ptr),
+                    _marker: PhantomData,
+                }
+            }
+
+            #[inline(always)]
+            fn stem_idx(&self) -> usize {
+                self.core.stem_idx()
+            }
+
+            #[inline(always)]
+            fn deferred_state(&self) -> Self::DeferredState {
+                *self
+            }
+
+            #[inline(always)]
+            fn rehydrate_deferred_state(&mut self, state: Self::DeferredState) {
+                *self = state;
+            }
+
+            #[inline(always)]
+            fn leaf_idx(&self) -> usize {
+                self.core.leaf_idx()
+            }
+
+            #[inline(always)]
+            fn dim(&self) -> usize {
+                self.core.level() as usize / $size % K
+            }
+
+            #[inline(always)]
+            fn construction_dim(&self) -> usize {
+                self.core.level() as usize / $size % K
+            }
+
+            #[inline(always)]
+            fn level(&self) -> i32 {
+                self.core.level()
+            }
+
+            #[inline(always)]
+            fn traverse(&mut self, is_right: bool) {
+                self.core.traverse(is_right)
+            }
+
+            #[inline(always)]
+            fn traverse_head(&mut self, is_right: bool) {
+                self.core.traverse_head(is_right)
+            }
+
+            #[inline(always)]
+            fn traverse_tail(&mut self, is_right: bool) {
+                self.core.traverse_tail_with_block_size(is_right, $size)
+            }
+
+            #[inline(always)]
+            fn branch(&mut self) -> Self {
+                Self {
+                    core: self.core.branch(),
+                    _marker: PhantomData,
+                }
+            }
+
+            #[inline(always)]
+            fn child_indices(&self) -> (usize, usize) {
+                self.core.child_indices()
+            }
+
+            fn get_stem_node_count_from_leaf_node_count(_leaf_node_count: usize) -> usize {
+                unimplemented!()
+            }
+
+            fn stem_node_padding_factor() -> usize {
+                unimplemented!()
+            }
+
+            fn block_size() -> usize {
+                $size
+            }
 
             fn get_leaf_idx<A: AxisUnified, const K2: usize>(
                 stems: &[A],

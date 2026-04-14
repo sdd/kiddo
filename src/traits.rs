@@ -400,6 +400,37 @@ pub trait StemStrategy: Clone + Sync + Send {
             let old_dist1 = D::dist1(old_off, O::zero());
             let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
 
+            #[cfg(feature = "test_utils")]
+            {
+                if crate::test_utils::exact_query_trace::enabled()
+                    && std::any::type_name::<A>() == "f64"
+                    && std::any::type_name::<O>() == "f64"
+                {
+                    let pivot_f = unsafe { *(&pivot as *const A as *const f64) };
+                    let query_elem_f = unsafe { *(&query_elem as *const A as *const f64) };
+                    let old_off_f = unsafe { *(&old_off as *const O as *const f64) };
+                    let new_off_f = unsafe { *(&new_off as *const O as *const f64) };
+                    let rd_f = unsafe { *(&rd as *const O as *const f64) };
+                    let rd_far_f = unsafe { *(&rd_far as *const O as *const f64) };
+                    crate::test_utils::exact_query_trace::push(
+                        crate::test_utils::exact_query_trace::ExactQueryTraceEvent::ScalarStep {
+                            stem_idx: old_stem_idx,
+                            level: self.level() - 1,
+                            dim: *dim,
+                            pivot: pivot_f,
+                            query_elem: query_elem_f,
+                            is_right_child,
+                            old_off: old_off_f,
+                            new_off: new_off_f,
+                            rd: rd_f,
+                            rd_far: rd_far_f,
+                            near_stem_idx: self.stem_idx(),
+                            far_stem_idx: far_ctx.stem_idx(),
+                        },
+                    );
+                }
+            }
+
             // Only push if the sibling is worth exploring
             if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
                 stack.push(Self::StackContext::<O>::from_parts(
