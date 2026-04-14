@@ -49,27 +49,64 @@ struct Block3PendingSelection<O> {
 fn select_block3_pending_child<O>(
     rd_values: &[O; 8],
     new_off_values: &[O; 8],
-    pending_mask: u8,
-    max_dist: O,
+    candidate_mask: u8,
 ) -> Option<Block3PendingSelection<O>>
 where
-    O: AxisUnified<Coord = O> + SimdPrune + SimdSelectBestChildBlock3,
+    O: AxisUnified<Coord = O> + SimdSelectBestChildBlock3,
 {
-    let candidate_mask = simd::simd_prune_block::<O>(rd_values, max_dist, pending_mask);
-
     if candidate_mask == 0 {
         return None;
     }
 
     let child_idx =
-        O::simd_select_best_child_block3(rd_values, candidate_mask).expect("candidate_mask != 0");
+        O::simd_select_best_child_block3(rd_values, candidate_mask).unwrap_or_else(|| unsafe {
+            debug_assert!(false, "candidate_mask != 0");
+            core::hint::unreachable_unchecked()
+        });
 
     Some(Block3PendingSelection {
         child_idx,
         remaining_mask: candidate_mask & !(1u8 << child_idx),
-        child_rd: rd_values[child_idx as usize],
-        child_off: new_off_values[child_idx as usize],
+        child_rd: unsafe { *rd_values.get_unchecked(child_idx as usize) },
+        child_off: unsafe { *new_off_values.get_unchecked(child_idx as usize) },
     })
+}
+
+#[inline(always)]
+fn rebuild_interval_offs<O, const K: usize>(
+    query_wide: &[O; K],
+    lower: &[O; K],
+    upper: &[O; K],
+) -> [O; K]
+where
+    O: AxisUnified<Coord = O>,
+{
+    let mut off = [O::zero(); K];
+    for dim in 0..K {
+        off[dim] = crate::stem_strategies::donnelly_2_blockmarker_simd::interval_distance_1d(
+            query_wide[dim],
+            lower[dim],
+            upper[dim],
+        );
+    }
+    off
+}
+
+#[cfg(feature = "test_utils")]
+#[inline]
+fn force_mapped_simd_block_step() -> bool {
+    matches!(
+        std::env::var("KIDDO_FORCE_MAPPED_SIMD_BLOCK_STEP")
+            .ok()
+            .as_deref(),
+        Some("1") | Some("true") | Some("TRUE") | Some("yes") | Some("YES")
+    )
+}
+
+#[cfg(not(feature = "test_utils"))]
+#[inline]
+fn force_mapped_simd_block_step() -> bool {
+    false
 }
 
 #[cfg(feature = "cargo_asm")]
@@ -82,19 +119,16 @@ pub mod cargo_asm {
     pub fn donnelly_block3_pending_select_f64_cargo_asm_hook(
         rd_values: &[f64; 8],
         new_off_values: &[f64; 8],
-        pending_mask: u8,
-        max_dist: f64,
+        candidate_mask: u8,
     ) -> Option<(u8, u8, f64, f64)> {
-        select_block3_pending_child(rd_values, new_off_values, pending_mask, max_dist).map(
-            |selection| {
-                (
-                    selection.child_idx,
-                    selection.remaining_mask,
-                    selection.child_rd,
-                    selection.child_off,
-                )
-            },
-        )
+        select_block3_pending_child(rd_values, new_off_values, candidate_mask).map(|selection| {
+            (
+                selection.child_idx,
+                selection.remaining_mask,
+                selection.child_rd,
+                selection.child_off,
+            )
+        })
     }
 }
 
@@ -221,6 +255,11 @@ where
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS> + Default + 'static,
     {
+        if self.stem_leaf_resolution.uses_arithmetic() && SS::BLOCK_SIZE == 1 {
+            self.arithmetic_query::<QC, O, D>(query_ctx, process_leaf);
+            return;
+        }
+
         with_tls_query_stack::<SS::Stack<O>, _>(|stack| {
             stack.clear();
             self.backtracking_query_with_stack::<QC, O, D>(query_ctx, stack, process_leaf);
@@ -246,6 +285,11 @@ where
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS>,
     {
+        if self.stem_leaf_resolution.uses_arithmetic() && SS::BLOCK_SIZE == 1 {
+            self.arithmetic_query_with_stack::<QC, O, D>(query_ctx, stack, process_leaf);
+            return;
+        }
+
         SS::backtracking_query_with_stack::<A, T, O, D, QC, LS, K, B>(
             self,
             query_ctx,
@@ -289,6 +333,9 @@ where
         ));
 
         while let Some(stack_ctx) = stack.pop() {
+            #[cfg(feature = "test_utils")]
+            crate::test_utils::exact_query_stats::record_scalar_stack_pop();
+
             let (stem_state, restore_dim, old_off, rd) =
                 SS::StackContext::<O>::into_parts_with_restore_dim(stack_ctx);
             stem_strat.rehydrate_deferred_state(stem_state);
@@ -547,10 +594,372 @@ where
     /// Implementation of backtracking query with SIMD stack.
     /// Called by DonnellyMarkerSimd's backtracking_query_with_stack override.
     #[inline(always)]
+    pub(crate) fn backtracking_query_with_block3_simd_stack_impl<QC, O, D>(
+        &self,
+        query_ctx: &mut QC,
+        stack: &mut SS::Stack<O>,
+        mut process_leaf: impl FnMut(usize, &[O; K], &mut QC),
+    ) where
+        QC: QueryContext<A, O, K>,
+        O: AxisUnified<Coord = O>
+            + SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4,
+        D: KdTreeDistanceMetric<A, K, Output = O>
+            + DistanceMetricSimdBlock3<A, K, O>
+            + DistanceMetricSimdBlock4<A, K, O>,
+        SS: StemStrategy
+            + crate::stem_strategies::donnelly_2_blockmarker_simd::DeferredBlockTraversal,
+        SS::StackContext<O>: crate::kd_tree::query_stack_simd::Block3ExactStackContext<O, SS, K>
+            + crate::kd_tree::query_stack_simd::SimdIntervalStackContext<O, SS>,
+    {
+        use crate::kd_tree::query_stack_simd::{
+            Block3ExactStackContext, Block3ExactStackContextState,
+        };
+
+        let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
+        let stem_strat: SS = SS::new(stems_ptr);
+
+        let query: [A; K] = *query_ctx.query();
+        let mut query_wide: [O; K] = [O::zero(); K];
+        for dim in 0..K {
+            query_wide[dim] = D::widen_coord(query[dim]);
+        }
+
+        let mut off = [O::zero(); K];
+        let mut lower = [O::min_value(); K];
+        let mut upper = [O::max_value(); K];
+
+        stack.push(
+            <SS::StackContext<O> as Block3ExactStackContext<O, SS, K>>::new_single(stem_strat),
+        );
+
+        while let Some(ctx) = stack.pop() {
+            match <SS::StackContext<O> as Block3ExactStackContext<O, SS, K>>::into_block3_exact_state(ctx) {
+                Block3ExactStackContextState::Single {
+                    stem_strat: mut ss,
+                    dim: dim_val,
+                    lower_bound,
+                    upper_bound,
+                    old_off,
+                    rd,
+                } => {
+                    #[cfg(feature = "test_utils")]
+                    crate::test_utils::exact_query_stats::record_simd_single_pop();
+
+                    let restore_dim = dim_val;
+                    let mut dim = ss.dim();
+                    tracing::trace!(
+                        %restore_dim,
+                        resumed_dim = %dim,
+                        %old_off,
+                        %rd,
+                        ?off,
+                        "Popped single context"
+                    );
+
+                    let max_dist = query_ctx.max_dist();
+                    let rd_vs_max = O::cmp(rd, max_dist);
+                    let should_prune = rd_vs_max == std::cmp::Ordering::Greater
+                        || (query_ctx.prune_on_equal_max_dist()
+                            && rd_vs_max == std::cmp::Ordering::Equal);
+                    if should_prune {
+                        tracing::trace!(%rd, %max_dist, "Prune check: PRUNE");
+                        continue;
+                    }
+
+                    unsafe {
+                        *off.get_unchecked_mut(restore_dim) = old_off;
+                        *lower.get_unchecked_mut(restore_dim) = lower_bound;
+                        *upper.get_unchecked_mut(restore_dim) = upper_bound;
+                    }
+
+                    let best_dist = query_ctx.max_dist();
+                    if let Some(leaf_idx) = self.traverse_to_leaf_simd::<O, D>(
+                        &query,
+                        &query_wide,
+                        &mut ss,
+                        &mut lower,
+                        &mut upper,
+                        &mut off,
+                        &mut dim,
+                        rd,
+                        best_dist,
+                        stack,
+                    ) {
+                        tracing::trace!(%leaf_idx, "processing leaf");
+                        process_leaf(leaf_idx, &query_wide, query_ctx);
+                    }
+                }
+                Block3ExactStackContextState::Block3Pending {
+                    base,
+                    pending_mask,
+                    rd,
+                    lower: restored_lower,
+                    upper: restored_upper,
+                } => {
+                    #[cfg(feature = "test_utils")]
+                    crate::test_utils::exact_query_stats::record_block3_pending_pop(pending_mask);
+
+                    let dim_val = base.dim();
+                    lower = restored_lower;
+                    upper = restored_upper;
+                    off = rebuild_interval_offs(&query_wide, &lower, &upper);
+                    let old_off = off[dim_val];
+                    let lower_bound = lower[dim_val];
+                    let upper_bound = upper[dim_val];
+
+                    tracing::trace!(%dim_val, %old_off, %rd, %pending_mask, "Popped Block3 pending context");
+
+                    #[cfg(feature = "test_utils")]
+                    let trace_enabled =
+                        crate::test_utils::exact_query_trace::enabled()
+                            && std::any::type_name::<O>() == "f64";
+
+                    #[cfg(not(feature = "test_utils"))]
+                    let trace_enabled = false;
+
+                    let best_dist = query_ctx.max_dist();
+                    let query_wide_val = query_wide[dim_val];
+                    let (
+                        candidate_mask,
+                        selection,
+                        trace_pending_arrays,
+                    ) = if trace_enabled {
+                        let mut rd_values = [O::zero(); 8];
+                        let mut new_off_values = [O::zero(); 8];
+                        let mut lower_bounds = [O::zero(); 8];
+                        let mut upper_bounds = [O::zero(); 8];
+                        let candidate_mask = base
+                            .fill_block3_pending_values::<A, O, D, K>(
+                                &self.stems,
+                                query_wide_val,
+                                lower_bound,
+                                upper_bound,
+                                old_off,
+                                rd,
+                                best_dist,
+                                &mut new_off_values,
+                                &mut rd_values,
+                                &mut lower_bounds,
+                                &mut upper_bounds,
+                            )
+                            & pending_mask;
+                        let selection = select_block3_pending_child(
+                            &rd_values,
+                            &new_off_values,
+                            candidate_mask,
+                        )
+                        .map(|selection| {
+                            (
+                                selection.child_idx,
+                                selection.remaining_mask,
+                                selection.child_rd,
+                                selection.child_off,
+                                lower_bounds[selection.child_idx as usize],
+                                upper_bounds[selection.child_idx as usize],
+                            )
+                        });
+                        (
+                            candidate_mask,
+                            selection,
+                            Some((rd_values, new_off_values, lower_bounds, upper_bounds)),
+                        )
+                    } else {
+                        let candidate_mask = base
+                            .backtrack_block3_pending_mask::<A, O, D, K>(
+                                &self.stems,
+                                query_wide_val,
+                                lower_bound,
+                                upper_bound,
+                                old_off,
+                                rd,
+                                best_dist,
+                            )
+                            & pending_mask;
+
+                        let selection = if candidate_mask == 0 {
+                            None
+                        } else if candidate_mask.is_power_of_two() {
+                            let child_idx = candidate_mask.trailing_zeros() as u8;
+                            let (child_rd, child_off, child_lower_bound, child_upper_bound) = base
+                                .selected_block3_pending_child_state::<A, O, D>(
+                                    &self.stems,
+                                    child_idx,
+                                    query_wide_val,
+                                    lower_bound,
+                                    upper_bound,
+                                    old_off,
+                                    rd,
+                                );
+                            Some((
+                                child_idx,
+                                candidate_mask & !(1u8 << child_idx),
+                                child_rd,
+                                child_off,
+                                child_lower_bound,
+                                child_upper_bound,
+                            ))
+                        } else {
+                            let mut rd_values = [O::zero(); 8];
+                            let mut new_off_values = [O::zero(); 8];
+                            let mut lower_bounds = [O::zero(); 8];
+                            let mut upper_bounds = [O::zero(); 8];
+                            let candidate_mask = base
+                                .fill_block3_pending_values::<A, O, D, K>(
+                                    &self.stems,
+                                    query_wide_val,
+                                    lower_bound,
+                                    upper_bound,
+                                    old_off,
+                                    rd,
+                                    best_dist,
+                                    &mut new_off_values,
+                                    &mut rd_values,
+                                    &mut lower_bounds,
+                                    &mut upper_bounds,
+                                )
+                                & candidate_mask;
+                            let selection = select_block3_pending_child(
+                                &rd_values,
+                                &new_off_values,
+                                candidate_mask,
+                            )
+                            .map(|selection| {
+                                let child_idx = selection.child_idx as usize;
+                                (
+                                    selection.child_idx,
+                                    selection.remaining_mask,
+                                    selection.child_rd,
+                                    selection.child_off,
+                                    unsafe { *lower_bounds.get_unchecked(child_idx) },
+                                    unsafe { *upper_bounds.get_unchecked(child_idx) },
+                                )
+                            });
+                            selection
+                        };
+                        (candidate_mask, selection, None)
+                    };
+
+                    #[cfg(not(feature = "test_utils"))]
+                    let _ = (candidate_mask, &trace_pending_arrays);
+
+                    #[cfg(feature = "test_utils")]
+                    crate::test_utils::exact_query_stats::record_block3_candidate_mask(
+                        candidate_mask,
+                    );
+
+                    let Some((
+                        selected_child_idx,
+                        remaining_mask,
+                        selected_child_rd,
+                        selected_child_off,
+                        selected_lower_bound,
+                        selected_upper_bound,
+                    )) = selection
+                    else {
+                        tracing::trace!("All Block3 children pruned");
+                        continue;
+                    };
+
+                    #[cfg(feature = "test_utils")]
+                    {
+                        if let Some((rd_values, new_off_values, lower_bounds, upper_bounds)) =
+                            trace_pending_arrays
+                        {
+                            let old_off_f = unsafe { *(&old_off as *const O as *const f64) };
+                            let rd_f = unsafe { *(&rd as *const O as *const f64) };
+                            let lower_bound_f =
+                                unsafe { *(&lower_bound as *const O as *const f64) };
+                            let upper_bound_f =
+                                unsafe { *(&upper_bound as *const O as *const f64) };
+                            let child_off_f =
+                                unsafe { *(&selected_child_off as *const O as *const f64) };
+                            let child_rd_f =
+                                unsafe { *(&selected_child_rd as *const O as *const f64) };
+                            let new_off_values_f = unsafe {
+                                *(&new_off_values as *const [O; 8] as *const [f64; 8])
+                            };
+                            let rd_values_f =
+                                unsafe { *(&rd_values as *const [O; 8] as *const [f64; 8]) };
+                            let lower_bounds_f = unsafe {
+                                *(&lower_bounds as *const [O; 8] as *const [f64; 8])
+                            };
+                            let upper_bounds_f = unsafe {
+                                *(&upper_bounds as *const [O; 8] as *const [f64; 8])
+                            };
+                            crate::test_utils::exact_query_trace::push(
+                                crate::test_utils::exact_query_trace::ExactQueryTraceEvent::Block3PendingSelection {
+                                    stem_idx: base.stem_idx(),
+                                    level: base.level(),
+                                    dim: dim_val,
+                                    pending_mask,
+                                    candidate_mask,
+                                    selected_child_idx,
+                                    child_off: child_off_f,
+                                    child_rd: child_rd_f,
+                                    parent_lower_bound: lower_bound_f,
+                                    parent_upper_bound: upper_bound_f,
+                                    old_off: old_off_f,
+                                    rd: rd_f,
+                                    new_off_values: new_off_values_f,
+                                    rd_values: rd_values_f,
+                                    lower_bounds: lower_bounds_f,
+                                    upper_bounds: upper_bounds_f,
+                                },
+                            );
+                        }
+                    }
+
+                    if remaining_mask != 0 {
+                        stack.push(
+                            <SS::StackContext<O> as Block3ExactStackContext<O, SS, K>>::new_block3_pending_from_state(
+                                base,
+                                remaining_mask,
+                                rd,
+                                &lower,
+                                &upper,
+                            ),
+                        );
+                    }
+
+                    let mut ss = base.block_child(selected_child_idx);
+                    let mut dim = ss.dim();
+
+                    unsafe {
+                        *off.get_unchecked_mut(dim_val) = selected_child_off;
+                        *lower.get_unchecked_mut(dim_val) = selected_lower_bound;
+                        *upper.get_unchecked_mut(dim_val) = selected_upper_bound;
+                    }
+
+                    if let Some(leaf_idx) = self.traverse_to_leaf_simd::<O, D>(
+                        &query,
+                        &query_wide,
+                        &mut ss,
+                        &mut lower,
+                        &mut upper,
+                        &mut off,
+                        &mut dim,
+                        selected_child_rd,
+                        best_dist,
+                        stack,
+                    ) {
+                        tracing::trace!(%leaf_idx, "processing leaf");
+                        process_leaf(leaf_idx, &query_wide, query_ctx);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Implementation of backtracking query with SIMD stack.
+    /// Called by DonnellyMarkerSimd's backtracking_query_with_stack override.
+    #[inline(always)]
     pub(crate) fn backtracking_query_with_simd_stack_impl<QC, O, D>(
         &self,
         query_ctx: &mut QC,
-        stack: &mut crate::kd_tree::query_stack_simd::SimdQueryStack<O, SS>,
+        stack: &mut SS::Stack<O>,
         mut process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
@@ -670,8 +1079,7 @@ where
                     let Some(selection) = select_block3_pending_child(
                         &rd_values,
                         &new_off_values,
-                        pending_mask,
-                        query_ctx.max_dist(),
+                        simd::simd_prune_block(&rd_values, query_ctx.max_dist(), pending_mask),
                     ) else {
                         tracing::trace!("All Block3 children pruned");
                         continue;
@@ -914,21 +1322,22 @@ where
         dim: &mut usize,
         rd: O,
         best_dist: O,
-        stack: &mut crate::kd_tree::query_stack_simd::SimdQueryStack<O, SS>,
+        stack: &mut SS::Stack<O>,
     ) -> Option<usize>
     where
         O: AxisUnified<Coord = O> + SimdSelectBestChildBlock3 + BacktrackBlock3 + BacktrackBlock4,
         D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
-        SS: StemStrategy<
-                StackContext<O> = crate::kd_tree::query_stack_simd::SimdQueryStackContext<O, SS>,
-            > + crate::stem_strategies::donnelly_2_blockmarker_simd::DeferredBlockTraversal,
+        SS: StemStrategy
+            + crate::stem_strategies::donnelly_2_blockmarker_simd::DeferredBlockTraversal,
+        SS::StackContext<O>: crate::kd_tree::query_stack_simd::SimdIntervalStackContext<O, SS>,
     {
         let use_scalar_step = matches!(
             self.stem_leaf_resolution,
             crate::kd_tree::StemLeafResolution::Mapped { .. }
-        );
+        ) && SS::BLOCK_SIZE != 3
+            && !force_mapped_simd_block_step();
 
         loop {
             let stem_idx = stem_strat.stem_idx();
@@ -939,8 +1348,6 @@ where
             let stem_oob = stem_idx >= self.stems.len();
 
             let should_continue = if use_scalar_step {
-                use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
-
                 if stem_strat.level() > self.max_stem_level {
                     false
                 } else {
@@ -1003,14 +1410,14 @@ where
                             );
 
                         if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
-                            stack.push(SimdQueryStackContext::Single {
-                                stem_strat: far_ctx,
-                                dim: dim_val,
-                                lower_bound: far_lower,
-                                upper_bound: far_upper,
-                                old_off: new_off,
-                                rd: rd_far,
-                            });
+                            stack.push(<SS::StackContext<O> as crate::kd_tree::query_stack_simd::SimdIntervalStackContext<O, SS>>::new_single_with_bounds(
+                                far_ctx,
+                                dim_val,
+                                far_lower,
+                                far_upper,
+                                new_off,
+                                rd_far,
+                            ));
                         }
 
                         unsafe {
@@ -1029,12 +1436,6 @@ where
                     true
                 }
             } else {
-                // Delegate to strategy-specific block traversal step.
-                // SAFETY: Cast concrete SimdQueryStack to associated type SS::Stack for trait call.
-                let stack_ref = unsafe {
-                    &mut *(stack as *mut crate::kd_tree::query_stack_simd::SimdQueryStack<O, SS>
-                        as *mut SS::Stack<O>)
-                };
                 stem_strat.backtracking_traverse_step_with_bounds::<A, O, D, K>(
                     &self.stems,
                     query,
@@ -1046,7 +1447,7 @@ where
                     rd,
                     self.max_stem_level,
                     best_dist,
-                    stack_ref,
+                    stack,
                 )
             };
 

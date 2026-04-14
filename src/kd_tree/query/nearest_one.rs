@@ -28,6 +28,13 @@ where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: AxisUnified<Coord = D::Output> + 'static,
     {
+        #[cfg(feature = "test_utils")]
+        crate::test_utils::exact_query_stats::record_leaf_visit();
+        #[cfg(feature = "test_utils")]
+        crate::test_utils::exact_query_trace::push(
+            crate::test_utils::exact_query_trace::ExactQueryTraceEvent::LeafVisit { leaf_idx },
+        );
+
         match LS::LEAF_PROJECTION {
             LeafProjection::LeafArena => {
                 let arena = self.leaves.leaf_arena(leaf_idx);
@@ -240,16 +247,21 @@ where
 #[cfg(feature = "cargo_asm")]
 pub mod cargo_asm {
     use crate::dist::SquaredEuclidean;
-    use crate::kd_tree::leaf_strategies::FlatVec;
+    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas};
     use crate::kd_tree::query_stack::QueryStack;
     use crate::kd_tree::KdTree;
+    use crate::stem_strategies::{Block3, Donnelly, DonnellyMarkerSimd};
     use crate::Eytzinger;
 
     const K: usize = 3;
-    const BUCKET_SIZE: usize = 64;
+    const BUCKET_SIZE: usize = 32;
 
     type KdT =
         KdTree<f64, usize, Eytzinger<K>, FlatVec<f64, usize, K, BUCKET_SIZE>, K, BUCKET_SIZE>;
+    type ArenaLeaves = VecOfArenas<f64, usize, K, BUCKET_SIZE>;
+    type DonnellyKdT = KdTree<f64, usize, Donnelly<3, 64, 8, K>, ArenaLeaves, K, BUCKET_SIZE>;
+    type DonnellySimdKdT =
+        KdTree<f64, usize, DonnellyMarkerSimd<Block3, 64, 8, K>, ArenaLeaves, K, BUCKET_SIZE>;
 
     /// Hook for cargo-asm to render the v6 nearest-one call path.
     #[inline(never)]
@@ -271,6 +283,28 @@ pub mod cargo_asm {
         stack: &mut QueryStack<f64, Eytzinger<3>>,
     ) -> (f64, usize) {
         tree.nearest_one_arithmetic_with_stack::<SquaredEuclidean<f64>>(&query, stack)
+    }
+
+    /// Hook for cargo-asm to render the exact nearest-one path for scalar Donnelly.
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_nearest_one_donnelly_vec_of_arenas_cargo_asm_hook(
+        tree: &DonnellyKdT,
+        query: [f64; 3],
+        stack: &mut QueryStack<f64, Donnelly<3, 64, 8, 3>>,
+    ) -> (f64, usize) {
+        tree.nearest_one_with_stack::<SquaredEuclidean<f64>>(&query, stack)
+    }
+
+    /// Hook for cargo-asm to render the exact nearest-one path for Block3 Donnelly SIMD.
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_nearest_one_donnelly_blocksimd_vec_of_arenas_cargo_asm_hook(
+        tree: &DonnellySimdKdT,
+        query: [f64; 3],
+        stack: &mut <DonnellyMarkerSimd<Block3, 64, 8, 3> as crate::StemStrategy>::Stack<f64>,
+    ) -> (f64, usize) {
+        tree.nearest_one_with_stack::<SquaredEuclidean<f64>>(&query, stack)
     }
 }
 

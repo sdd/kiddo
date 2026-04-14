@@ -1,4 +1,7 @@
 #![allow(clippy::type_complexity, clippy::unit_arg)]
+pub mod exact_query_stats;
+pub mod exact_query_trace;
+
 use fixed::types::extra::Unsigned;
 use fixed::FixedU16;
 use rand::distr::{Distribution, StandardUniform};

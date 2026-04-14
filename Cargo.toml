@@ -218,6 +218,11 @@ name = "v6_stem_strategies"
 harness = false
 required-features = ["test_utils"]
 
+[[bench]]
+name = "v6_stem_strategies_focus"
+harness = false
+required-features = ["test_utils"]
+
 #[[example]]
 #name = "avx2-check"
 #path = "examples/avx2-check.rs"
@@ -411,6 +416,16 @@ required-features = ["profile_v5"]
 name = "profile_v6_leaf_strategies"
 path = "src/bin/profile_v6_leaf_strategies.rs"
 required-features = ["profile_v5"]
+
+[[bin]]
+name = "profile_v6_stem_exact_stats"
+path = "src/bin/profile_v6_stem_exact_stats.rs"
+required-features = ["simd", "test_utils"]
+
+[[bin]]
+name = "repro_donnelly_block3_exact_divergence"
+path = "src/bin/repro_donnelly_block3_exact_divergence.rs"
+required-features = ["simd", "test_utils"]
 
 [[test]]
 name = "donnelly_simd_regressions"

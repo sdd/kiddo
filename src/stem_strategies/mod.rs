@@ -27,7 +27,7 @@ pub use donnelly_2_blockmarker_simd::{
 };
 
 pub use donnelly_2::Donnelly;
-pub use donnelly_2_pf_blockmarker::DonnellyMarkerPf;
+pub use donnelly_2_pf_blockmarker::{DonnellyMarkerPf, DonnellyMarkerScalar};
 pub use donnelly_3::DonnellySwPre;
 pub use donnelly_simd_descent::DonnellySimdDescent;
 pub use eytzinger::Eytzinger;

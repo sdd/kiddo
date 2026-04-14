@@ -113,6 +113,20 @@ unsafe fn update_best_line_avx512_raw<T: Basics>(
 }
 
 #[inline(always)]
+unsafe fn update_best_line_avx512_masked_raw<T: Basics>(
+    d0: __m512d,
+    valid_mask: __mmask8,
+    items: *const T,
+    base: usize,
+    best_dist: f64,
+    best_item: T,
+) -> (f64, T) {
+    let inf = _mm512_set1_pd(f64::INFINITY);
+    let masked = _mm512_mask_blend_pd(valid_mask, inf, d0);
+    update_best_line_avx512_raw(masked, items, base, best_dist, best_item)
+}
+
+#[inline(always)]
 unsafe fn update_best_line_avx2_raw<T: Basics>(
     d0: __m256d,
     items: *const T,
@@ -137,33 +151,6 @@ unsafe fn update_best_line_avx2_raw<T: Basics>(
 
     let bcast = _mm256_set1_pd(chunk_min);
     let eq0 = _mm256_movemask_pd(_mm256_cmp_pd(d0, bcast, _CMP_EQ_OQ)) as u32;
-    core::hint::assert_unchecked(eq0 != 0);
-    let idx = eq0.trailing_zeros() as usize;
-
-    (chunk_min, std::ptr::read_unaligned(items.add(base + idx)))
-}
-
-#[inline(always)]
-unsafe fn update_best_line_avx128_raw<T: Basics>(
-    d0: __m128d,
-    items: *const T,
-    base: usize,
-    best_dist: f64,
-    best_item: T,
-) -> (f64, T) {
-    let bb = _mm_set1_pd(best_dist);
-    let m0 = _mm_movemask_pd(_mm_cmplt_pd(d0, bb)) as u32;
-
-    if m0 == 0 {
-        return (best_dist, best_item);
-    }
-
-    let hi64 = _mm_unpackhi_pd(d0, d0);
-    let min_scalar = _mm_min_sd(d0, hi64);
-    let chunk_min = _mm_cvtsd_f64(min_scalar);
-
-    let bcast = _mm_set1_pd(chunk_min);
-    let eq0 = _mm_movemask_pd(_mm_cmpeq_pd(d0, bcast)) as u32;
     core::hint::assert_unchecked(eq0 != 0);
     let idx = eq0.trailing_zeros() as usize;
 
@@ -374,12 +361,8 @@ macro_rules! impl_leaf_arena_kernel_k {
             )*
 
             let qv0 = _mm512_set1_pd(q0s);
-            let qy0 = _mm512_castpd512_pd256(qv0);
-            let qx0 = _mm256_castpd256_pd128(qy0);
             $(
                 let $qv = _mm512_set1_pd($qs);
-                let $qy = _mm512_castpd512_pd256($qv);
-                let $qx = _mm256_castpd256_pd128($qy);
             )*
 
             let mut best_dist_val = *best_dist;
@@ -457,7 +440,10 @@ macro_rules! impl_leaf_arena_kernel_k {
                 base += CHUNK_SIZE;
             }
 
-            if base + LINE_SIZE <= len {
+            if base < len {
+                let remaining = len - base;
+                let tail_mask = ((1u16 << remaining) - 1) as __mmask8;
+
                 #[cfg(feature = "leaf_nta_prefetch")]
                 {
                     prefetch_nta(p0.add(base) as *const u8);
@@ -466,87 +452,25 @@ macro_rules! impl_leaf_arena_kernel_k {
                     )*
                 }
 
-                let a0 = _mm512_loadu_pd(p0.add(base));
+                let a0 = _mm512_maskz_loadu_pd(tail_mask, p0.add(base));
                 let d0 = _mm512_sub_pd(a0, qv0);
                 #[allow(unused_mut)]
                 let mut acc = L::dist_k0_f64x8(d0);
 
                 $(
-                    let a = _mm512_loadu_pd($p.add(base));
+                    let a = _mm512_maskz_loadu_pd(tail_mask, $p.add(base));
                     let d = _mm512_sub_pd(a, $qv);
                     acc = L::dist_kn_f64x8(acc, d);
                 )*
 
-                (best_dist_val, best_item_val) = update_best_line_avx512_raw(
+                (best_dist_val, best_item_val) = update_best_line_avx512_masked_raw(
                     acc,
+                    tail_mask,
                     items,
                     base,
                     best_dist_val,
                     best_item_val,
                 );
-
-                base += LINE_SIZE;
-            }
-
-            if base + AVX2_LINE_SIZE <= len {
-                let a0 = _mm256_loadu_pd(p0.add(base));
-                let d0 = _mm256_sub_pd(a0, qy0);
-                #[allow(unused_mut)]
-                let mut acc = L::dist_k0_f64x4(d0);
-
-                $(
-                    let a = _mm256_loadu_pd($p.add(base));
-                    let d = _mm256_sub_pd(a, $qy);
-                    acc = L::dist_kn_f64x4(acc, d);
-                )*
-
-                (best_dist_val, best_item_val) = update_best_line_avx2_raw(
-                    acc,
-                    items,
-                    base,
-                    best_dist_val,
-                    best_item_val,
-                );
-
-                base += AVX2_LINE_SIZE;
-            }
-
-            if base + 2 <= len {
-                let a0 = _mm_loadu_pd(p0.add(base));
-                let d0 = _mm_sub_pd(a0, qx0);
-                #[allow(unused_mut)]
-                let mut acc = L::dist_k0_f64x2(d0);
-
-                $(
-                    let a = _mm_loadu_pd($p.add(base));
-                    let d = _mm_sub_pd(a, $qx);
-                    acc = L::dist_kn_f64x2(acc, d);
-                )*
-
-                (best_dist_val, best_item_val) = update_best_line_avx128_raw(
-                    acc,
-                    items,
-                    base,
-                    best_dist_val,
-                    best_item_val,
-                );
-
-                base += 2;
-            }
-
-            while base < len {
-                #[allow(unused_mut)]
-                let mut d = L::dist_k0_f64x1(*p0.add(base) - q0s);
-                $(
-                    d = L::dist_kn_f64x1(d, *$p.add(base) - $qs);
-                )*
-
-                if d < best_dist_val {
-                    best_dist_val = d;
-                    best_item_val = std::ptr::read_unaligned(items.add(base));
-                }
-
-                base += 1;
             }
 
             *best_dist = best_dist_val;
@@ -848,6 +772,27 @@ pub(crate) unsafe fn nearest_one_avx512_unchecked<AX, L, T, const K: usize, cons
         best_dist,
         best_item,
     );
+}
+
+#[cfg(all(feature = "cargo_asm", feature = "simd", target_arch = "x86_64"))]
+#[allow(dead_code)]
+#[doc(hidden)]
+#[inline(never)]
+#[unsafe(no_mangle)]
+pub fn v6_nearest_one_arena_leaf_cargo_asm_hook(
+    tile_base: *const u8,
+    len: usize,
+    query: &[f64; 3],
+    best_dist: &mut f64,
+    best_item: &mut usize,
+) {
+    unsafe {
+        leaf_nearest_one_arena_nozero_f64_k3::<
+            f64,
+            <crate::dist::SquaredEuclidean<f64> as crate::dist::DistanceMetricAvx512<f64>>::Avx512F64Ops,
+            usize,
+        >(tile_base, len, query.as_ptr(), best_dist, best_item);
+    }
 }
 
 const CHUNK_SIZE_F32: usize = 64;
