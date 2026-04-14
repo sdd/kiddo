@@ -33,6 +33,238 @@ where
         best_dist: O,
     ) -> u8;
 
+    /// Fills effective child bounds and exact-search deferred-state values for a Block3 node.
+    #[inline(always)]
+    fn fill_block3_values_and_bounds(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        parent_lower_bound: O,
+        parent_upper_bound: O,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+        new_off_values: &mut [O; 8],
+        rd_values: &mut [O; 8],
+        lower_bounds: &mut [O; 8],
+        upper_bounds: &mut [O; 8],
+    ) -> u8
+    where
+        A: AxisUnified<Coord = A>,
+        Self: DistanceMetricCore<A, Output = O> + Sized,
+    {
+        autovec_fill_block3_values_and_bounds::<A, O, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            parent_lower_bound,
+            parent_upper_bound,
+            old_off,
+            rd,
+            best_dist,
+            new_off_values,
+            rd_values,
+            lower_bounds,
+            upper_bounds,
+        )
+    }
+
+    /// Exact-search Block3 mask generation with inherited interval bounds.
+    #[inline(always)]
+    fn backtrack_block3_with_bounds_autovec(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        parent_lower_bound: O,
+        parent_upper_bound: O,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+    ) -> u8
+    where
+        A: AxisUnified<Coord = A>,
+        Self: DistanceMetricCore<A, Output = O> + Sized,
+    {
+        autovec_backtrack_block3_with_bounds::<A, O, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            parent_lower_bound,
+            parent_upper_bound,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[inline(always)]
+    /// AVX2 override for exact Block3 mask generation with inherited interval bounds.
+    unsafe fn backtrack_block3_with_bounds_avx2(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        parent_lower_bound: O,
+        parent_upper_bound: O,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+    ) -> u8
+    where
+        A: AxisUnified<Coord = A>,
+        Self: DistanceMetricCore<A, Output = O> + Sized,
+    {
+        Self::backtrack_block3_with_bounds_autovec(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            parent_lower_bound,
+            parent_upper_bound,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    /// AVX-512 override for exact Block3 mask generation with inherited interval bounds.
+    unsafe fn backtrack_block3_with_bounds_avx512(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        parent_lower_bound: O,
+        parent_upper_bound: O,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+    ) -> u8
+    where
+        A: AxisUnified<Coord = A>,
+        Self: DistanceMetricCore<A, Output = O> + Sized,
+    {
+        Self::backtrack_block3_with_bounds_autovec(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            parent_lower_bound,
+            parent_upper_bound,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+    #[inline(always)]
+    unsafe fn backtrack_block3_with_bounds_neon(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        parent_lower_bound: O,
+        parent_upper_bound: O,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+    ) -> u8
+    where
+        A: AxisUnified<Coord = A>,
+        Self: DistanceMetricCore<A, Output = O> + Sized,
+    {
+        Self::backtrack_block3_with_bounds_autovec(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            parent_lower_bound,
+            parent_upper_bound,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[inline(always)]
+    /// Compile-time dispatch to the best available exact Block3 mask generator with bounds.
+    fn backtrack_block3_with_bounds(
+        query_wide: O,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        parent_lower_bound: O,
+        parent_upper_bound: O,
+        old_off: O,
+        rd: O,
+        best_dist: O,
+    ) -> u8
+    where
+        A: AxisUnified<Coord = A>,
+        Self: DistanceMetricCore<A, Output = O> + Sized,
+    {
+        #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+        {
+            unsafe {
+                return Self::backtrack_block3_with_bounds_avx512(
+                    query_wide,
+                    stems_ptr,
+                    block_base_idx,
+                    parent_lower_bound,
+                    parent_upper_bound,
+                    old_off,
+                    rd,
+                    best_dist,
+                );
+            }
+        }
+
+        #[cfg(all(
+            feature = "simd",
+            target_arch = "x86_64",
+            target_feature = "avx2",
+            not(target_feature = "avx512f")
+        ))]
+        {
+            unsafe {
+                return Self::backtrack_block3_with_bounds_avx2(
+                    query_wide,
+                    stems_ptr,
+                    block_base_idx,
+                    parent_lower_bound,
+                    parent_upper_bound,
+                    old_off,
+                    rd,
+                    best_dist,
+                );
+            }
+        }
+
+        #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+        {
+            unsafe {
+                return Self::backtrack_block3_with_bounds_neon(
+                    query_wide,
+                    stems_ptr,
+                    block_base_idx,
+                    parent_lower_bound,
+                    parent_upper_bound,
+                    old_off,
+                    rd,
+                    best_dist,
+                );
+            }
+        }
+
+        #[allow(unreachable_code)]
+        Self::backtrack_block3_with_bounds_autovec(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            parent_lower_bound,
+            parent_upper_bound,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
     #[inline(always)]
     /// AVX2 override for Block3. Defaults to autovec unless metric overrides it.
@@ -471,6 +703,138 @@ where
     mask
 }
 
+#[inline(always)]
+fn autovec_fill_block3_values_and_bounds<A, O, D, const K: usize>(
+    query_wide: O,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    parent_lower_bound: O,
+    parent_upper_bound: O,
+    old_off: O,
+    rd: O,
+    best_dist: O,
+    new_off_values: &mut [O; 8],
+    rd_values: &mut [O; 8],
+    lower_bounds: &mut [O; 8],
+    upper_bounds: &mut [O; 8],
+) -> u8
+where
+    A: AxisUnified<Coord = A>,
+    O: AxisUnified<Coord = O>,
+    D: DistanceMetricCore<A, Output = O>,
+{
+    use super::{child_interval_bounds_block3, coord_min, interval_distance_1d};
+
+    let old_dist1 = D::dist1(old_off, O::zero());
+    let mut mask: u8 = 0;
+    let ptr = unsafe {
+        stems_ptr
+            .as_ptr()
+            .add(block_base_idx * std::mem::size_of::<A>()) as *const A
+    };
+
+    for sibling_idx in 0..8u8 {
+        let (lower_offset, upper_offset) = child_interval_bounds_block3(sibling_idx as usize);
+
+        let raw_lower = if lower_offset == 255 {
+            A::min_value()
+        } else {
+            unsafe { *ptr.add(lower_offset as usize) }
+        };
+
+        let raw_upper = if upper_offset == 255 {
+            A::max_value()
+        } else {
+            unsafe { *ptr.add(upper_offset as usize) }
+        };
+
+        let effective_lower = O::max(parent_lower_bound, D::widen_coord(raw_lower));
+        let effective_upper = coord_min(parent_upper_bound, D::widen_coord(raw_upper));
+
+        lower_bounds[sibling_idx as usize] = effective_lower;
+        upper_bounds[sibling_idx as usize] = effective_upper;
+
+        if O::cmp(effective_lower, effective_upper) != std::cmp::Ordering::Less {
+            new_off_values[sibling_idx as usize] = O::max_value();
+            rd_values[sibling_idx as usize] = O::max_value();
+            continue;
+        }
+
+        let new_off = interval_distance_1d(query_wide, effective_lower, effective_upper);
+        new_off_values[sibling_idx as usize] = new_off;
+
+        let new_dist1 = D::dist1(new_off, O::zero());
+        let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
+        rd_values[sibling_idx as usize] = rd_far;
+
+        if rd_far <= best_dist {
+            mask |= 1 << sibling_idx;
+        }
+    }
+
+    mask
+}
+
+#[inline(always)]
+fn autovec_backtrack_block3_with_bounds<A, O, D, const K: usize>(
+    query_wide: O,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    parent_lower_bound: O,
+    parent_upper_bound: O,
+    old_off: O,
+    rd: O,
+    best_dist: O,
+) -> u8
+where
+    A: AxisUnified<Coord = A>,
+    O: AxisUnified<Coord = O>,
+    D: DistanceMetricCore<A, Output = O>,
+{
+    use super::{child_interval_bounds_block3, coord_min, interval_distance_1d};
+
+    let old_dist1 = D::dist1(old_off, O::zero());
+    let mut mask: u8 = 0;
+    let ptr = unsafe {
+        stems_ptr
+            .as_ptr()
+            .add(block_base_idx * std::mem::size_of::<A>()) as *const A
+    };
+
+    for sibling_idx in 0..8u8 {
+        let (lower_offset, upper_offset) = child_interval_bounds_block3(sibling_idx as usize);
+
+        let raw_lower = if lower_offset == 255 {
+            A::min_value()
+        } else {
+            unsafe { *ptr.add(lower_offset as usize) }
+        };
+
+        let raw_upper = if upper_offset == 255 {
+            A::max_value()
+        } else {
+            unsafe { *ptr.add(upper_offset as usize) }
+        };
+
+        let effective_lower = O::max(parent_lower_bound, D::widen_coord(raw_lower));
+        let effective_upper = coord_min(parent_upper_bound, D::widen_coord(raw_upper));
+
+        if O::cmp(effective_lower, effective_upper) != std::cmp::Ordering::Less {
+            continue;
+        }
+
+        let new_off = interval_distance_1d(query_wide, effective_lower, effective_upper);
+        let new_dist1 = D::dist1(new_off, O::zero());
+        let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
+
+        if rd_far <= best_dist {
+            mask |= 1 << sibling_idx;
+        }
+    }
+
+    mask
+}
+
 /// Autovec fallback for Block4 backtrack mask computation.
 #[inline(always)]
 fn autovec_backtrack_block4<A, I, D, const K: usize>(
@@ -551,6 +915,88 @@ where
             query_wide,
             stems_ptr,
             block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    #[inline(always)]
+    fn fill_block3_values_and_bounds(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        parent_lower_bound: f64,
+        parent_upper_bound: f64,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+        new_off_values: &mut [f64; 8],
+        rd_values: &mut [f64; 8],
+        lower_bounds: &mut [f64; 8],
+        upper_bounds: &mut [f64; 8],
+    ) -> u8
+    where
+        A: AxisUnified<Coord = A>,
+        Self: DistanceMetricCore<A, Output = f64> + Sized,
+    {
+        #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+        unsafe {
+            return simd_fill_block3_f64_avx512_squared_euclidean(
+                query_wide,
+                stems_ptr,
+                block_base_idx,
+                parent_lower_bound,
+                parent_upper_bound,
+                old_off,
+                rd,
+                best_dist,
+                new_off_values,
+                rd_values,
+                lower_bounds,
+                upper_bounds,
+            );
+        }
+
+        #[allow(unreachable_code)]
+        autovec_fill_block3_values_and_bounds::<A, f64, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            parent_lower_bound,
+            parent_upper_bound,
+            old_off,
+            rd,
+            best_dist,
+            new_off_values,
+            rd_values,
+            lower_bounds,
+            upper_bounds,
+        )
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    #[inline(always)]
+    unsafe fn backtrack_block3_with_bounds_avx512(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        parent_lower_bound: f64,
+        parent_upper_bound: f64,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u8
+    where
+        A: AxisUnified<Coord = A>,
+        Self: DistanceMetricCore<A, Output = f64> + Sized,
+    {
+        simd_backtrack_block3_f64_avx512_squared_euclidean_with_bounds(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            parent_lower_bound,
+            parent_upper_bound,
             old_off,
             rd,
             best_dist,
@@ -2023,6 +2469,132 @@ unsafe fn simd_backtrack_block3_f64_avx512_squared_euclidean<const K: usize>(
 
     // Compare rd_far <= best_dist → __mmask8 directly
     _mm512_cmp_pd_mask(rd_far, best_dist_vec, _CMP_LE_OQ)
+}
+
+#[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+#[inline(always)]
+unsafe fn simd_fill_block3_f64_avx512_squared_euclidean(
+    query_wide: f64,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    parent_lower_bound: f64,
+    parent_upper_bound: f64,
+    old_off: f64,
+    rd: f64,
+    best_dist: f64,
+    new_off_values: &mut [f64; 8],
+    rd_values: &mut [f64; 8],
+    lower_bounds: &mut [f64; 8],
+    upper_bounds: &mut [f64; 8],
+) -> u8 {
+    use std::arch::x86_64::*;
+
+    let ptr = stems_ptr.as_ptr().add(block_base_idx * 8) as *const f64;
+    let mut pivots = [0.0f64; 8];
+    std::ptr::copy_nonoverlapping(ptr, pivots.as_mut_ptr(), 8);
+
+    let mut raw_lower_vals = [0.0f64; 8];
+    let mut raw_upper_vals = [0.0f64; 8];
+    for i in 0..8 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block3(i);
+        raw_lower_vals[i] = if lower_offset == 255 {
+            f64::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        raw_upper_vals[i] = if upper_offset == 255 {
+            f64::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let raw_lower = _mm512_loadu_pd(raw_lower_vals.as_ptr());
+    let raw_upper = _mm512_loadu_pd(raw_upper_vals.as_ptr());
+    let parent_lower_vec = _mm512_set1_pd(parent_lower_bound);
+    let parent_upper_vec = _mm512_set1_pd(parent_upper_bound);
+    let lower = _mm512_max_pd(raw_lower, parent_lower_vec);
+    let upper = _mm512_min_pd(raw_upper, parent_upper_vec);
+    _mm512_storeu_pd(lower_bounds.as_mut_ptr(), lower);
+    _mm512_storeu_pd(upper_bounds.as_mut_ptr(), upper);
+
+    let valid_mask = _mm512_cmp_pd_mask(lower, upper, _CMP_LT_OQ);
+    let query_vec = _mm512_set1_pd(query_wide);
+    let zero_vec = _mm512_setzero_pd();
+    let below = _mm512_max_pd(_mm512_sub_pd(lower, query_vec), zero_vec);
+    let above = _mm512_max_pd(_mm512_sub_pd(query_vec, upper), zero_vec);
+    let interval = _mm512_add_pd(below, above);
+
+    let max_vec = _mm512_set1_pd(f64::MAX);
+    let interval_out = _mm512_mask_mov_pd(max_vec, valid_mask, interval);
+    _mm512_storeu_pd(new_off_values.as_mut_ptr(), interval_out);
+
+    let old_off_sq_vec = _mm512_set1_pd(old_off * old_off);
+    let rd_vec = _mm512_set1_pd(rd);
+    let new_sq = _mm512_mul_pd(interval, interval);
+    let rd_far = _mm512_add_pd(rd_vec, _mm512_sub_pd(new_sq, old_off_sq_vec));
+    let rd_out = _mm512_mask_mov_pd(max_vec, valid_mask, rd_far);
+    _mm512_storeu_pd(rd_values.as_mut_ptr(), rd_out);
+
+    let best_dist_vec = _mm512_set1_pd(best_dist);
+    (_mm512_cmp_pd_mask(rd_out, best_dist_vec, _CMP_LE_OQ) & valid_mask) as u8
+}
+
+#[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+#[inline(always)]
+unsafe fn simd_backtrack_block3_f64_avx512_squared_euclidean_with_bounds(
+    query_wide: f64,
+    stems_ptr: NonNull<u8>,
+    block_base_idx: usize,
+    parent_lower_bound: f64,
+    parent_upper_bound: f64,
+    old_off: f64,
+    rd: f64,
+    best_dist: f64,
+) -> u8 {
+    use std::arch::x86_64::*;
+
+    let ptr = stems_ptr.as_ptr().add(block_base_idx * 8) as *const f64;
+    let mut pivots = [0.0f64; 8];
+    std::ptr::copy_nonoverlapping(ptr, pivots.as_mut_ptr(), 8);
+
+    let mut raw_lower_vals = [0.0f64; 8];
+    let mut raw_upper_vals = [0.0f64; 8];
+    for i in 0..8 {
+        let (lower_offset, upper_offset) = super::child_interval_bounds_block3(i);
+        raw_lower_vals[i] = if lower_offset == 255 {
+            f64::NEG_INFINITY
+        } else {
+            pivots[lower_offset as usize]
+        };
+        raw_upper_vals[i] = if upper_offset == 255 {
+            f64::INFINITY
+        } else {
+            pivots[upper_offset as usize]
+        };
+    }
+
+    let raw_lower = _mm512_loadu_pd(raw_lower_vals.as_ptr());
+    let raw_upper = _mm512_loadu_pd(raw_upper_vals.as_ptr());
+    let parent_lower_vec = _mm512_set1_pd(parent_lower_bound);
+    let parent_upper_vec = _mm512_set1_pd(parent_upper_bound);
+    let lower = _mm512_max_pd(raw_lower, parent_lower_vec);
+    let upper = _mm512_min_pd(raw_upper, parent_upper_vec);
+
+    let valid_mask = _mm512_cmp_pd_mask(lower, upper, _CMP_LT_OQ);
+    let query_vec = _mm512_set1_pd(query_wide);
+    let zero_vec = _mm512_setzero_pd();
+    let below = _mm512_max_pd(_mm512_sub_pd(lower, query_vec), zero_vec);
+    let above = _mm512_max_pd(_mm512_sub_pd(query_vec, upper), zero_vec);
+    let interval = _mm512_add_pd(below, above);
+
+    let old_off_sq_vec = _mm512_set1_pd(old_off * old_off);
+    let rd_vec = _mm512_set1_pd(rd);
+    let new_sq = _mm512_mul_pd(interval, interval);
+    let rd_far = _mm512_add_pd(rd_vec, _mm512_sub_pd(new_sq, old_off_sq_vec));
+
+    let best_dist_vec = _mm512_set1_pd(best_dist);
+    (_mm512_cmp_pd_mask(rd_far, best_dist_vec, _CMP_LE_OQ) & valid_mask) as u8
 }
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
