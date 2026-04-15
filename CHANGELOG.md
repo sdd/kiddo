@@ -10,6 +10,14 @@ I'm hoping to have v6 available soon, which will include both these changes as w
 - Improve the flexibility of T type, KdTree.size. Add generate nearest_one_point (https://github.com/sdd/kiddo/pull/214, @pjkundert)
 - Fix broken test of custom struct as T. Add test for `()` as T (https://github.com/sdd/kiddo/pull/243 @pjkundert)
 
+## [5.3.1] - 2026-04-15
+
+### 🐛 Bug Fixes
+
+- Add a compile-time assertion to prevent bucket size of less than 2 for `KdTree` to avoid UB when trying to split a bucket of size 1.
+  Fixes https://github.com/sdd/kiddo/issues/295. (Note that even though bucket sizes of 2 are possible, I would generally not recommend
+  using a value of B below 32 anyway, for best performance.)
+
 ## [5.3.0] - 2026-03-19
 
 I'm extremely grateful to @cbueth for his fantastic set of contributions to this release. The new distance metrics are a great addition to the library,
