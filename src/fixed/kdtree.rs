@@ -160,7 +160,16 @@ where
     T: Content,
     IDX: Index<T = IDX>,
 {
+    // Enforce bucket size of at least 2. B=1 can trigger UB in split fn
+    // https://github.com/sdd/kiddo/issues/295
+    const _VALID_B: () = {
+        assert!(B > 1, "Bucket size must be at least 2");
+    };
+
     pub(crate) fn new() -> Self {
+        #[allow(clippy::let_unit_value)]
+        let _ = Self::_VALID_B;
+
         Self {
             content_points: [[A::ZERO; K]; B],
             content_items: [T::zero(); B],
