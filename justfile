@@ -118,6 +118,22 @@ bench-v6-stem-strategies-focus FEATURES='simd,test_utils,logging_off' POINTS='41
     RUSTFLAGS='-C target-cpu=native' \
     cargo criterion --bench v6_stem_strategies_focus --features {{FEATURES}}
 
+bench-v6-stem-strategies-big FEATURES='simd,test_utils,logging_off' POINTS='16777216' QUERIES='10000':
+    RUSTC_WRAPPER= \
+    KIDDO_BENCH_POINTS={{POINTS}} \
+    KIDDO_BENCH_QUERIES={{QUERIES}} \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo criterion --bench v6_stem_strategies_focus --features {{FEATURES}}
+
+bench-v6-result-collection-focus FEATURES='simd,test_utils,logging_off' POINTS='16777216' QUERIES='100' MAX_QTY='16' MAX_DIST='0.0025':
+    RUSTC_WRAPPER= \
+    KIDDO_BENCH_POINTS={{POINTS}} \
+    KIDDO_BENCH_QUERIES={{QUERIES}} \
+    KIDDO_BENCH_MAX_QTY={{MAX_QTY}} \
+    KIDDO_BENCH_MAX_DIST={{MAX_DIST}} \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo criterion --bench v6_result_collection_focus --features {{FEATURES}}
+
 profile-v6-stem-exact-stats FEATURES='simd,test_utils,logging_off' POINTS='4194304' QUERIES='10000' REPEATS='1':
     RUSTC_WRAPPER= \
     KIDDO_PROFILE_POINTS={{POINTS}} \

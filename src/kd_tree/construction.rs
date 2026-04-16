@@ -102,6 +102,7 @@ where
         // Ensure the stem array is large enough
         if self.stems.len() < stem_idx + 1 {
             self.stems.resize(stem_idx + 1, A::max_value());
+            crate::huge_pages::maybe_advise_slice_huge_pages(self.stems.as_ptr(), self.stems.len());
         }
 
         self.stems[stem_idx] = pivot_val;
@@ -315,7 +316,7 @@ where
         crate::kd_tree::leaf_view::assert_leaf_scratch_capacity(max_leaf_len);
 
         // println!("Stems: {:?}", &stems);
-        Self {
+        let tree = Self {
             stems,
             leaves,
             stem_leaf_resolution,
@@ -323,7 +324,9 @@ where
             max_stem_level: actual_max_stem_level,
             max_leaf_len,
             _phantom: Default::default(),
-        }
+        };
+        tree.maybe_enable_huge_pages();
+        tree
     }
 
     fn new_from_slice_no_stems_with<F>(source: &[[A; K]], mut push_item: F) -> Self
@@ -360,7 +363,7 @@ where
         // rather than the current B / (B * 2) heuristic.
         crate::kd_tree::leaf_view::assert_leaf_scratch_capacity(max_leaf_len);
 
-        Self {
+        let tree = Self {
             stems: avec![A::max_value(); 0],
             leaves,
             stem_leaf_resolution,
@@ -368,7 +371,9 @@ where
             max_stem_level: -1,
             max_leaf_len,
             _phantom: Default::default(),
-        }
+        };
+        tree.maybe_enable_huge_pages();
+        tree
     }
 }
 

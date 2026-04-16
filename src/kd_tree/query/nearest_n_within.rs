@@ -4,8 +4,12 @@ use crate::kd_tree::leaf_view_chunked::nearest_n_within::{
     nearest_n_within_with_query_wide, nearest_n_within_with_query_wide_arena,
 };
 use crate::kd_tree::query_stack::StackTrait;
+#[cfg(not(feature = "small_n_result_collectors"))]
+use crate::kd_tree::result_collection::SortedVecResultCollection;
+use crate::kd_tree::result_collection::{BinaryHeapResultCollection, ResultCollection};
+#[cfg(feature = "small_n_result_collectors")]
 use crate::kd_tree::result_collection::{
-    BinaryHeapResultCollection, ResultCollection, SortedVecResultCollection,
+    SmallSortedVecResultCollection, SMALL_RESULT_COLLECTION_MAX_QTY,
 };
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
@@ -16,6 +20,7 @@ use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy}
 use crate::{NearestNeighbour, StemStrategy};
 use std::num::NonZeroUsize;
 
+#[cfg(not(feature = "small_n_result_collectors"))]
 const MAX_VEC_RESULT_SIZE: usize = 20;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
@@ -80,10 +85,25 @@ where
             self.nearest_n_within_inner::<D, Vec<NearestNeighbour<D::Output, T>>>(
                 query, max_dist, max_qty, sorted,
             )
-        } else if sorted && max_qty <= MAX_VEC_RESULT_SIZE {
+        } else if sorted {
+            #[cfg(feature = "small_n_result_collectors")]
+            if max_qty <= SMALL_RESULT_COLLECTION_MAX_QTY {
+                return self.nearest_n_within_inner::<D, SmallSortedVecResultCollection<
+                    NearestNeighbour<D::Output, T>,
+                >>(query, max_dist, max_qty, sorted);
+            }
+
+            #[cfg(not(feature = "small_n_result_collectors"))]
+            if max_qty <= MAX_VEC_RESULT_SIZE {
+                return self.nearest_n_within_inner::<
+                    D,
+                    SortedVecResultCollection<NearestNeighbour<D::Output, T>>,
+                >(query, max_dist, max_qty, sorted);
+            }
+
             self.nearest_n_within_inner::<
                 D,
-                SortedVecResultCollection<NearestNeighbour<D::Output, T>>,
+                BinaryHeapResultCollection<NearestNeighbour<D::Output, T>>,
             >(query, max_dist, max_qty, sorted)
         } else {
             self.nearest_n_within_inner::<

@@ -5,6 +5,10 @@ use crate::kd_tree::leaf_view_chunked::best_n_within::{
 };
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::result_collection::{BinaryHeapResultCollection, ResultCollection};
+#[cfg(feature = "small_n_result_collectors")]
+use crate::kd_tree::result_collection::{
+    SmallBinaryHeapResultCollection, SMALL_RESULT_COLLECTION_MAX_QTY,
+};
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::stem_strategies::donnelly_2_blockmarker_simd::{
@@ -71,10 +75,38 @@ where
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
         let max_qty = max_qty.into();
-        let mut req_ctx = BestNWithinReqCtx::<A, T, D::Output, K> {
+
+        #[cfg(feature = "small_n_result_collectors")]
+        if max_qty <= SMALL_RESULT_COLLECTION_MAX_QTY {
+            return self
+                .best_n_within_inner::<D, SmallBinaryHeapResultCollection<
+                    BestNeighbour<D::Output, T>,
+                >>(query, max_dist, max_qty)
+                .into_inner();
+        }
+
+        self.best_n_within_inner::<D, BinaryHeapResultCollection<BestNeighbour<D::Output, T>>>(
+            query, max_dist, max_qty,
+        )
+        .into_inner()
+    }
+
+    fn best_n_within_inner<D, R>(&self, query: &[A; K], max_dist: D::Output, max_qty: usize) -> R
+    where
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: crate::stem_strategies::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        R: ResultCollection<D::Output, BestNeighbour<D::Output, T>>,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    {
+        let mut req_ctx = BestNWithinReqCtx::<A, D::Output, R, K> {
             query,
             max_dist,
-            results: BinaryHeapResultCollection::with_max_qty(max_qty),
+            results: R::with_max_qty(max_qty),
         };
 
         self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
@@ -86,26 +118,24 @@ where
             );
         });
 
-        req_ctx.results.into_inner()
+        req_ctx.results
     }
 }
 
 #[allow(unused)]
 #[derive(Debug)]
-struct BestNWithinReqCtx<'a, A, T, O, const K: usize>
+struct BestNWithinReqCtx<'a, A, O, R, const K: usize>
 where
-    O: AxisUnified<Coord = O>, // + Ord,
-    T: Ord,
+    O: AxisUnified<Coord = O>,
 {
     query: &'a [A; K],
     max_dist: O,
-    results: BinaryHeapResultCollection<BestNeighbour<O, T>>,
+    results: R,
 }
 
-impl<'a, A, T, O, const K: usize> QueryContext<A, O, K> for BestNWithinReqCtx<'a, A, T, O, K>
+impl<'a, A, O, R, const K: usize> QueryContext<A, O, K> for BestNWithinReqCtx<'a, A, O, R, K>
 where
-    O: AxisUnified<Coord = O>, // + Ord,
-    T: Ord,
+    O: AxisUnified<Coord = O>,
 {
     fn query(&self) -> &[A; K] {
         self.query

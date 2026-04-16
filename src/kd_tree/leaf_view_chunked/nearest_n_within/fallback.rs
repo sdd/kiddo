@@ -46,6 +46,9 @@ pub(crate) fn nearest_n_within_with_query_wide_arena_fallback<AX, T, D, R, const
         return;
     }
 
+    #[cfg(feature = "buffered_result_collection")]
+    let mut buffer = crate::kd_tree::result_collection::ResultBuffer::new();
+
     arena.for_each_tiled_chunk(|tile| {
         for idx in 0..tile.len() {
             let mut candidate_dist = D::Output::zero();
@@ -58,11 +61,24 @@ pub(crate) fn nearest_n_within_with_query_wide_arena_fallback<AX, T, D, R, const
             }
 
             if candidate_dist <= dist {
-                results.add(NearestNeighbour {
+                let candidate = NearestNeighbour {
                     distance: candidate_dist,
                     item: unsafe { tile.item_unaligned(idx) },
-                });
+                };
+
+                #[cfg(feature = "buffered_result_collection")]
+                {
+                    buffer.push(candidate);
+                }
+
+                #[cfg(not(feature = "buffered_result_collection"))]
+                {
+                    results.add(candidate);
+                }
             }
         }
     });
+
+    #[cfg(feature = "buffered_result_collection")]
+    crate::kd_tree::result_collection::flush_result_buffer(results, &mut buffer);
 }

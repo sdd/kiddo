@@ -21,6 +21,8 @@ all-features = true
 cargo_asm = ["dep:rand", "dep:rand_chacha"]
 csv = ["dep:csv"]
 default = ["tracing", "fixed"]
+buffered_result_collection = ["dep:smallvec"]
+huge_pages = ["dep:libc"]
 leaf_view_chunked = []
 leaf_nta_prefetch = []
 modified_van_emde_boas = []
@@ -46,6 +48,7 @@ serde = [
 simd = []
 simulator = []
 rkyv_08 = ["dep:rkyv_08"]
+small_n_result_collectors = ["dep:smallvec"]
 test_utils = ["dep:rand", "dep:rand_chacha", "dep:rayon", "dep:fixed"]
 tracing = ["dep:tracing", "dep:tracing-subscriber"]
 unreliable_select_nth_unstable = []
@@ -113,6 +116,14 @@ features = ["laz-parallel"]
 
 [dependencies.log]
 version = "0.4"
+optional = true
+
+[dependencies.libc]
+version = "0.2"
+optional = true
+
+[dependencies.smallvec]
+version = "1"
 optional = true
 
 [dependencies.kiddo_v5]
@@ -245,6 +256,11 @@ required-features = ["test_utils"]
 
 [[bench]]
 name = "v6_stem_strategies_focus"
+harness = false
+required-features = ["test_utils"]
+
+[[bench]]
+name = "v6_result_collection_focus"
 harness = false
 required-features = ["test_utils"]
 
