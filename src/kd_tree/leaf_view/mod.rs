@@ -344,6 +344,21 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
         O: AxisUnified<Coord = O>,
         R: ResultCollection<O, NearestNeighbour<O, T>>,
     {
+        #[cfg(feature = "buffered_result_collection")]
+        {
+            let mut buffer = crate::kd_tree::result_collection::ResultBuffer::new();
+            dists.iter().zip(items).for_each(|(&d, &i)| {
+                if d <= dist {
+                    buffer.push(NearestNeighbour {
+                        distance: d,
+                        item: i,
+                    });
+                }
+            });
+            crate::kd_tree::result_collection::flush_result_buffer(results, &mut buffer);
+        }
+
+        #[cfg(not(feature = "buffered_result_collection"))]
         dists.iter().zip(items).for_each(|(&d, &i)| {
             if d <= dist {
                 results.add(NearestNeighbour {
@@ -475,6 +490,18 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics + Ord, const K: usize, const B: 
         O: AxisUnified<Coord = O>,
         R: ResultCollection<O, BestNeighbour<O, T>>,
     {
+        #[cfg(feature = "buffered_result_collection")]
+        {
+            let mut buffer = crate::kd_tree::result_collection::ResultBuffer::new();
+            dists.iter().zip(items).for_each(|(&d, &item)| {
+                if d <= dist {
+                    buffer.push(BestNeighbour { distance: d, item });
+                }
+            });
+            crate::kd_tree::result_collection::flush_result_buffer(results, &mut buffer);
+        }
+
+        #[cfg(not(feature = "buffered_result_collection"))]
         dists.iter().zip(items).for_each(|(&d, &item)| {
             if d <= dist {
                 results.add(BestNeighbour { distance: d, item });

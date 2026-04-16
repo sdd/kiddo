@@ -245,6 +245,13 @@ where
 
     /// Appends a new leaf to the storage.
     fn append_leaf(&mut self, leaf_points: &[&[AX]; K], leaf_items: &[T]);
+
+    /// Best-effort hook for enabling transparent huge pages on large contiguous buffers.
+    ///
+    /// Strategies with one or more long-lived contiguous allocations can override this to
+    /// call into crate-internal huge-page hints after construction.
+    #[inline]
+    fn maybe_enable_huge_pages(&self) {}
 }
 
 /// Trait for leaf strategies that support mutation (adding/removing points).

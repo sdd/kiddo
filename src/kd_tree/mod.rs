@@ -205,7 +205,7 @@ where
             (stems, -1, stem_leaf_resolution)
         };
 
-        Self {
+        let tree = Self {
             stems,
             leaves: LS::new_with_empty_leaf(),
             stem_leaf_resolution,
@@ -213,7 +213,9 @@ where
             max_stem_level,
             max_leaf_len: Self::initial_max_leaf_len(),
             _phantom: std::marker::PhantomData,
-        }
+        };
+        tree.maybe_enable_huge_pages();
+        tree
     }
 }
 
@@ -232,6 +234,12 @@ where
             crate::traits_unified_2::BucketLimitType::Hard => B,
             crate::traits_unified_2::BucketLimitType::Soft => B * 2,
         }
+    }
+
+    #[inline]
+    pub(crate) fn maybe_enable_huge_pages(&self) {
+        crate::huge_pages::maybe_collapse_slice_huge_pages(self.stems.as_ptr(), self.stems.len());
+        self.leaves.maybe_enable_huge_pages();
     }
 
     /// Returns `true` if the tree contains no points.

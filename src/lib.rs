@@ -104,6 +104,7 @@ pub mod best_neighbour;
 // #[doc(hidden)]
 // mod custom_serde;
 
+mod huge_pages;
 mod mirror_select_nth_unstable_by;
 
 #[doc(hidden)]

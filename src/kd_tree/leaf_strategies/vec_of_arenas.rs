@@ -140,6 +140,18 @@ where
 
         self.size += leaf_len;
     }
+
+    #[inline]
+    fn maybe_enable_huge_pages(&self) {
+        crate::huge_pages::maybe_collapse_slice_huge_pages(
+            self.leaf_extents.as_ptr(),
+            self.leaf_extents.len(),
+        );
+        crate::huge_pages::maybe_collapse_slice_huge_pages(
+            self.leaf_bytes.as_ptr(),
+            self.leaf_bytes.len(),
+        );
+    }
 }
 
 #[cfg(test)]
