@@ -1,11 +1,17 @@
 use crate::dist::KdTreeDistanceMetric;
 use crate::kd_tree::leaf_view::TlsLeafScratch;
+use crate::kd_tree::leaf_view_chunked::nearest_n_within::{
+    nearest_n_within_with_query_wide, nearest_n_within_with_query_wide_arena,
+};
 use crate::kd_tree::query_stack::StackTrait;
+use crate::kd_tree::result_collection::VisitorResultCollection;
+use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
+use crate::kd_tree::KdTreeQueryOps;
 use crate::stem_strategies::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
+use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
 use crate::{NearestNeighbour, StemStrategy};
 use std::num::NonZeroUsize;
 
@@ -16,10 +22,80 @@ where
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
+    #[inline(always)]
+    fn process_leaf_within_unsorted_visit<D, F>(
+        &self,
+        leaf_idx: usize,
+        query_wide: &[D::Output; K],
+        max_dist: D::Output,
+        visitor: &mut F,
+    ) where
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
+        F: FnMut(NearestNeighbour<D::Output, T>),
+    {
+        let mut results = VisitorResultCollection::new(visitor);
+
+        match LS::LEAF_PROJECTION {
+            LeafProjection::LeafArena => {
+                let arena = self.leaves.leaf_arena(leaf_idx);
+                nearest_n_within_with_query_wide_arena::<A, T, D, _, K>(
+                    &arena,
+                    query_wide,
+                    max_dist,
+                    &mut results,
+                );
+            }
+            LeafProjection::LeafView => {
+                let leaf = self.leaves.leaf_view(leaf_idx);
+                nearest_n_within_with_query_wide::<A, T, D, _, K, B>(
+                    &leaf,
+                    query_wide,
+                    max_dist,
+                    &mut results,
+                );
+            }
+        }
+    }
+
+    /// Visits every point within a given distance of the query point, unsorted.
+    ///
+    /// This avoids allocating a result collection and is the preferred API for
+    /// high-throughput range-query consumers that can process matches immediately.
+    #[inline]
+    pub fn within_unsorted_visit<D, F>(&self, query: &[A; K], max_dist: D::Output, mut visitor: F)
+    where
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: crate::stem_strategies::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+        F: FnMut(NearestNeighbour<D::Output, T>),
+    {
+        let mut req_ctx = WithinUnsortedVisitReqCtx {
+            query,
+            max_dist,
+            _phantom: std::marker::PhantomData,
+        };
+
+        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
+            self.process_leaf_within_unsorted_visit::<D, F>(
+                leaf_idx,
+                query_wide,
+                req_ctx.max_dist(),
+                &mut visitor,
+            );
+        });
+    }
+
     /// Finds all points within a given distance of the query point.
     ///
     /// Returns all points within `max_dist` of the query point, unsorted.
     /// This is faster than `within` when order doesn't matter.
+    #[inline]
     pub fn within_unsorted<D>(
         &self,
         query: &[A; K],
@@ -36,6 +112,50 @@ where
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
         self.nearest_n_within::<D>(query, max_dist, NonZeroUsize::MAX, false)
+    }
+
+    /// Returns an iterator over all points within a given distance, unsorted.
+    #[inline]
+    pub fn within_unsorted_iter<D>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+    ) -> crate::kd_tree::WithinUnsortedIter<'_, Self, A, T, SS, LS, D, K, B>
+    where
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: crate::stem_strategies::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    {
+        crate::kd_tree::WithinUnsortedIter::new(self, query, max_dist)
+    }
+}
+
+struct WithinUnsortedVisitReqCtx<'a, A, O, const K: usize>
+where
+    O: AxisUnified<Coord = O>,
+{
+    query: &'a [A; K],
+    max_dist: O,
+    _phantom: std::marker::PhantomData<A>,
+}
+
+impl<A, O, const K: usize> QueryContext<A, O, K> for WithinUnsortedVisitReqCtx<'_, A, O, K>
+where
+    O: AxisUnified<Coord = O>,
+{
+    #[inline(always)]
+    fn query(&self) -> &[A; K] {
+        self.query
+    }
+
+    #[inline(always)]
+    fn max_dist(&self) -> O {
+        self.max_dist
     }
 }
 
@@ -91,6 +211,60 @@ mod tests {
             stabilize_sort(&mut arena);
 
             assert_eq!(arena, flat, "len={len}");
+        }
+    }
+
+    #[test]
+    fn within_unsorted_visit_and_iter_match_materialized_results() {
+        let points: Vec<[f64; 3]> = (0..257)
+            .map(|idx| {
+                [
+                    ((idx * 7) % 101) as f64 / 101.0,
+                    ((idx * 17 + 3) % 101) as f64 / 101.0,
+                    ((idx * 31 + 5) % 101) as f64 / 101.0,
+                ]
+            })
+            .collect();
+        type Tree = KdTree<f64, u32, Eytzinger<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
+        let tree: Tree = KdTree::new_from_slice(&points);
+        let query = [0.37, 0.41, 0.43];
+        let radius = 0.12;
+
+        let mut materialized: Vec<(u32, u64)> = tree
+            .within_unsorted::<SquaredEuclidean<f64>>(&query, radius)
+            .into_iter()
+            .map(|result| (result.item, result.distance.to_bits()))
+            .collect();
+        let mut visited = Vec::new();
+        tree.within_unsorted_visit::<SquaredEuclidean<f64>, _>(&query, radius, |result| {
+            visited.push((result.item, result.distance.to_bits()));
+        });
+        let mut iterated: Vec<(u32, u64)> = tree
+            .within_unsorted_iter::<SquaredEuclidean<f64>>(&query, radius)
+            .map(|result| (result.item, result.distance.to_bits()))
+            .collect();
+
+        materialized.sort_unstable();
+        visited.sort_unstable();
+        iterated.sort_unstable();
+
+        assert_eq!(visited, materialized);
+        assert_eq!(iterated, materialized);
+    }
+
+    #[test]
+    fn iter_visits_every_point_item_pair() {
+        let points: Vec<[f64; 3]> = (0..129)
+            .map(|idx| [idx as f64, (idx * 2) as f64, (idx * 3) as f64])
+            .collect();
+        type Tree = KdTree<f64, u32, Eytzinger<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
+        let tree: Tree = KdTree::new_from_slice(&points);
+
+        let visited: Vec<(u32, [f64; 3])> = tree.iter().collect();
+
+        assert_eq!(visited.len(), points.len());
+        for (item, point) in visited {
+            assert_eq!(point, points[item as usize]);
         }
     }
 

@@ -1,6 +1,7 @@
 use crate::kd_tree::leaf_view::LeafView;
 use crate::traits_unified_2::{
-    AxisUnified, Basics, BucketLimitType, Immutable, LeafProjection, LeafStrategy,
+    AxisUnified, Basics, BucketLimitType, ConstructibleLeafStrategy, Immutable, LeafProjection,
+    LeafStrategy,
 };
 use crate::StemStrategy;
 
@@ -13,7 +14,7 @@ pub struct DummyLeafStrategy {}
 
 impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B> for DummyLeafStrategy
 where
-    AX: AxisUnified,
+    AX: AxisUnified<Coord = AX>,
     T: Basics,
     SS: StemStrategy,
 {
@@ -22,14 +23,6 @@ where
 
     const BUCKET_LIMIT_TYPE: BucketLimitType = BucketLimitType::Hard;
     const LEAF_PROJECTION: LeafProjection = LeafProjection::LeafView;
-
-    fn new_with_capacity(_capacity: usize) -> Self {
-        Self::default()
-    }
-
-    fn new_with_empty_leaf() -> Self {
-        Self::default()
-    }
 
     fn size(&self) -> usize {
         unimplemented!()
@@ -45,6 +38,22 @@ where
 
     fn leaf_view(&self, _leaf_idx: usize) -> LeafView<'_, AX, T, K, B> {
         unimplemented!()
+    }
+}
+
+impl<AX, T, SS, const K: usize, const B: usize> ConstructibleLeafStrategy<AX, T, SS, K, B>
+    for DummyLeafStrategy
+where
+    AX: AxisUnified<Coord = AX>,
+    T: Basics,
+    SS: StemStrategy,
+{
+    fn new_with_capacity(_capacity: usize) -> Self {
+        Self::default()
+    }
+
+    fn new_with_empty_leaf() -> Self {
+        Self::default()
     }
 
     fn append_leaf(&mut self, _leaf_points: &[&[AX]; K], _leaf_items: &[T]) {

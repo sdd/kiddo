@@ -13,6 +13,7 @@ use crate::kd_tree::result_collection::{
 };
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
+use crate::kd_tree::KdTreeQueryOps;
 use crate::stem_strategies::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
@@ -42,6 +43,16 @@ where
         D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
         R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
     {
+        #[cfg(feature = "result_collection_stats")]
+        let was_full = results.is_full();
+
+        #[cfg(feature = "result_collection_stats")]
+        if was_full {
+            crate::result_collection_stats::record_leaf_visit_after_full();
+        } else {
+            crate::result_collection_stats::record_leaf_visit_before_full();
+        }
+
         match LS::LEAF_PROJECTION {
             LeafProjection::LeafArena => {
                 let arena = self.leaves.leaf_arena(leaf_idx);
@@ -55,6 +66,14 @@ where
                     &leaf, query_wide, max_dist, results,
                 );
             }
+        }
+
+        #[cfg(feature = "result_collection_stats")]
+        {
+            if !was_full && results.is_full() {
+                crate::result_collection_stats::record_collection_full_transition();
+            }
+            crate::result_collection_stats::clear_leaf_phase();
         }
     }
 
@@ -139,10 +158,11 @@ where
         };
 
         self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
+            let leaf_max_dist = req_ctx.max_dist();
             self.process_leaf_nearest_n_within::<D, R>(
                 leaf_idx,
                 query_wide,
-                max_dist,
+                leaf_max_dist,
                 &mut req_ctx.results,
             );
         });
@@ -152,6 +172,48 @@ where
         } else {
             req_ctx.results.into_vec()
         }
+    }
+}
+
+#[allow(missing_docs)]
+#[cfg(feature = "cargo_asm")]
+pub mod cargo_asm {
+    use crate::dist::SquaredEuclidean;
+    use crate::kd_tree::leaf_strategies::VecOfArenas;
+    use crate::kd_tree::KdTree;
+    use crate::stem_strategies::donnelly_2_pf::DonnellyPf;
+    use std::num::NonZeroUsize;
+
+    const K: usize = 3;
+    const BUCKET_SIZE: usize = 32;
+    const MAX_DIST: f64 = 0.0025;
+    const MAX_QTY: usize = 16;
+
+    type ArenaLeaves = VecOfArenas<f64, u32, K, BUCKET_SIZE>;
+    type DonnellyPfKdT = KdTree<f64, u32, DonnellyPf<3, 64, 8, K>, ArenaLeaves, K, BUCKET_SIZE>;
+
+    /// Hook for cargo-asm to render the sorted nearest_n_within focus path.
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_sorted_nearest_n_within_donnelly_pf_focus_cargo_asm_hook(
+        tree: &DonnellyPfKdT,
+        query: [f64; 3],
+    ) -> (usize, u64, u64) {
+        let results = tree.nearest_n_within::<SquaredEuclidean<f64>>(
+            &query,
+            MAX_DIST,
+            NonZeroUsize::new(MAX_QTY).unwrap(),
+            true,
+        );
+
+        let mut checksum_item = 0u64;
+        let mut checksum_dist_bits = 0u64;
+        for result in results.iter() {
+            checksum_item = checksum_item.wrapping_add(result.item as u64);
+            checksum_dist_bits = checksum_dist_bits.wrapping_add(result.distance.to_bits());
+        }
+
+        (results.len(), checksum_item, checksum_dist_bits)
     }
 }
 
@@ -198,6 +260,10 @@ mod tests {
     use crate::dist::SquaredEuclidean;
     use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
+    #[cfg(feature = "result_collection_stats")]
+    use crate::result_collection_stats::{reset, snapshot};
+    #[cfg(all(feature = "result_collection_stats", feature = "simd"))]
+    use crate::stem_strategies::{Block3, DonnellyMarkerSimd};
     use crate::traits::Axis;
     use crate::Eytzinger;
 
@@ -500,5 +566,109 @@ mod tests {
                 dist_cmp
             }
         });
+    }
+
+    #[cfg(feature = "result_collection_stats")]
+    fn clustered_points_2d() -> Vec<[f64; 2]> {
+        const CLUSTERS: [[f64; 2]; 4] = [[0.10, 0.10], [0.90, 0.10], [0.10, 0.90], [0.90, 0.90]];
+        let mut points = Vec::new();
+
+        for center in CLUSTERS {
+            for idx in 0..32 {
+                let dx = (idx % 4) as f64 * 0.0015;
+                let dy = (idx / 4) as f64 * 0.0015;
+                points.push([center[0] + dx, center[1] + dy]);
+            }
+        }
+
+        points
+    }
+
+    #[cfg(feature = "result_collection_stats")]
+    #[test]
+    fn nearest_n_within_scalar_prunes_clustered_tree() {
+        const K: usize = 2;
+        const B: usize = 4;
+
+        let points = clustered_points_2d();
+        let query = [0.1045f64, 0.1045];
+        let max_qty = NonZeroUsize::new(4).unwrap();
+        let max_dist = 0.0004;
+
+        let tree: KdTree<f64, u32, Eytzinger<K>, VecOfArenas<f64, u32, K, B>, K, B> =
+            KdTree::new_from_slice(&points);
+
+        reset();
+        let result =
+            tree.nearest_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty, true);
+        let stats = snapshot();
+
+        let expected = linear_search(&points, &query, max_dist)
+            .into_iter()
+            .take(max_qty.get())
+            .collect::<Vec<_>>();
+
+        let mut actual = result
+            .into_iter()
+            .map(|n| (n.distance, n.item))
+            .collect::<Vec<_>>();
+        let mut expected = expected;
+        stabilize_sort(&mut actual);
+        stabilize_sort(&mut expected);
+
+        assert_eq!(actual, expected);
+        assert!(
+            stats.leaf_visits < tree.leaf_count() as u64,
+            "scalar path regressed to full leaf scan: leaf_visits={} leaf_count={}",
+            stats.leaf_visits,
+            tree.leaf_count()
+        );
+    }
+
+    #[cfg(all(feature = "result_collection_stats", feature = "simd"))]
+    #[test]
+    fn nearest_n_within_simd_prunes_clustered_tree() {
+        const K: usize = 2;
+        const B: usize = 4;
+
+        let points = clustered_points_2d();
+        let query = [0.1045f64, 0.1045];
+        let max_qty = NonZeroUsize::new(4).unwrap();
+        let max_dist = 0.0004;
+
+        let tree: KdTree<
+            f64,
+            u32,
+            DonnellyMarkerSimd<Block3, 64, 8, K>,
+            VecOfArenas<f64, u32, K, B>,
+            K,
+            B,
+        > = KdTree::new_from_slice(&points);
+
+        reset();
+        let result =
+            tree.nearest_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty, true);
+        let stats = snapshot();
+
+        let expected = linear_search(&points, &query, max_dist)
+            .into_iter()
+            .take(max_qty.get())
+            .collect::<Vec<_>>();
+
+        let mut actual = result
+            .into_iter()
+            .map(|n| (n.distance, n.item))
+            .collect::<Vec<_>>();
+        let mut expected = expected;
+        stabilize_sort(&mut actual);
+        stabilize_sort(&mut expected);
+
+        assert_eq!(actual, expected);
+        assert!(
+            stats.leaf_visits < tree.leaf_count() as u64,
+            "simd path regressed to full leaf scan: leaf_visits={} leaf_count={}",
+            stats.leaf_visits,
+            tree.leaf_count()
+        );
     }
 }

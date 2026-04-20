@@ -4,13 +4,16 @@ use crate::kd_tree::leaf_view_chunked::best_n_within::{
     best_n_within_with_query_wide, best_n_within_with_query_wide_arena,
 };
 use crate::kd_tree::query_stack::StackTrait;
-use crate::kd_tree::result_collection::{BinaryHeapResultCollection, ResultCollection};
+use crate::kd_tree::result_collection::{
+    BestNeighbourResultCollection, BinaryHeapResultCollection,
+};
 #[cfg(feature = "small_n_result_collectors")]
 use crate::kd_tree::result_collection::{
     SmallBinaryHeapResultCollection, SMALL_RESULT_COLLECTION_MAX_QTY,
 };
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
+use crate::kd_tree::KdTreeQueryOps;
 use crate::stem_strategies::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
@@ -36,21 +39,49 @@ where
     ) where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
-        R: ResultCollection<D::Output, BestNeighbour<D::Output, T>>,
+        R: BestNeighbourResultCollection<D::Output, T>,
     {
+        #[cfg(feature = "result_collection_stats")]
+        let was_full = results.is_full();
+
+        #[cfg(feature = "result_collection_stats")]
+        if was_full {
+            crate::result_collection_stats::record_leaf_visit_after_full();
+        } else {
+            crate::result_collection_stats::record_leaf_visit_before_full();
+        }
+
         match LS::LEAF_PROJECTION {
             LeafProjection::LeafArena => {
                 let arena = self.leaves.leaf_arena(leaf_idx);
+                let threshold_item = results.threshold_item();
                 best_n_within_with_query_wide_arena::<A, T, D, R, K>(
-                    &arena, query_wide, max_dist, results,
+                    &arena,
+                    query_wide,
+                    max_dist,
+                    threshold_item,
+                    results,
                 );
             }
             LeafProjection::LeafView => {
                 let leaf = self.leaves.leaf_view(leaf_idx);
+                let threshold_item = results.threshold_item();
                 best_n_within_with_query_wide::<A, T, D, R, K, B>(
-                    &leaf, query_wide, max_dist, results,
+                    &leaf,
+                    query_wide,
+                    max_dist,
+                    threshold_item,
+                    results,
                 );
             }
+        }
+
+        #[cfg(feature = "result_collection_stats")]
+        {
+            if !was_full && results.is_full() {
+                crate::result_collection_stats::record_collection_full_transition();
+            }
+            crate::result_collection_stats::clear_leaf_phase();
         }
     }
 
@@ -100,7 +131,7 @@ where
             + BacktrackBlock4
             + TlsLeafScratch
             + 'static,
-        R: ResultCollection<D::Output, BestNeighbour<D::Output, T>>,
+        R: BestNeighbourResultCollection<D::Output, T>,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
         let mut req_ctx = BestNWithinReqCtx::<A, D::Output, R, K> {
@@ -119,6 +150,47 @@ where
         });
 
         req_ctx.results
+    }
+}
+
+#[allow(missing_docs)]
+#[cfg(feature = "cargo_asm")]
+pub mod cargo_asm {
+    use crate::dist::SquaredEuclidean;
+    use crate::kd_tree::leaf_strategies::VecOfArenas;
+    use crate::kd_tree::KdTree;
+    use crate::stem_strategies::donnelly_2_pf::DonnellyPf;
+    use std::num::NonZeroUsize;
+
+    const K: usize = 3;
+    const BUCKET_SIZE: usize = 32;
+    const MAX_DIST: f64 = 0.0025;
+    const MAX_QTY: usize = 16;
+
+    type ArenaLeaves = VecOfArenas<f64, u32, K, BUCKET_SIZE>;
+    type DonnellyPfKdT = KdTree<f64, u32, DonnellyPf<3, 64, 8, K>, ArenaLeaves, K, BUCKET_SIZE>;
+
+    /// Hook for cargo-asm to render the best_n_within focus path.
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_best_n_within_donnelly_pf_focus_cargo_asm_hook(
+        tree: &DonnellyPfKdT,
+        query: [f64; 3],
+    ) -> (usize, u64, u64) {
+        let results = tree.best_n_within::<SquaredEuclidean<f64>>(
+            &query,
+            MAX_DIST,
+            NonZeroUsize::new(MAX_QTY).unwrap(),
+        );
+
+        let mut checksum_item = 0u64;
+        let mut checksum_dist_bits = 0u64;
+        for result in results.iter() {
+            checksum_item = checksum_item.wrapping_add(result.item as u64);
+            checksum_dist_bits = checksum_dist_bits.wrapping_add(result.distance.to_bits());
+        }
+
+        (results.len(), checksum_item, checksum_dist_bits)
     }
 }
 

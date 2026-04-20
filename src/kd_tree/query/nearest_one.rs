@@ -4,6 +4,7 @@ use crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
+use crate::kd_tree::KdTreeQueryOps;
 use crate::stem_strategies::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
@@ -250,6 +251,7 @@ pub mod cargo_asm {
     use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas};
     use crate::kd_tree::query_stack::QueryStack;
     use crate::kd_tree::KdTree;
+    use crate::kd_tree::KdTreeQueryOps;
     use crate::stem_strategies::{Block3, Donnelly, DonnellyMarkerSimd};
     use crate::Eytzinger;
 

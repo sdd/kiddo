@@ -1,6 +1,8 @@
-use crate::kd_tree::{KdTree, StemLeafResolution};
+use crate::kd_tree::KdTreeQueryOps;
+use crate::kd_tree::{KdTree, OwnedStemLeafResolution};
 use crate::traits_unified_2::{
-    AxisUnified, Basics, BucketLimitType, LeafStrategy, Mutability, MutableLeafStrategy,
+    AxisUnified, Basics, BucketLimitType, ConstructibleLeafStrategy, Mutability,
+    MutableLeafStrategy,
 };
 use crate::StemStrategy;
 use aligned_vec::{avec, AVec, ConstAlign, CACHELINE_ALIGN};
@@ -22,7 +24,7 @@ where
         // Find the target leaf
         let (stem_strat, parent_stem_idx, is_right_child) = self.find_leaf_with_context(point);
         let leaf_idx = match &self.stem_leaf_resolution {
-            StemLeafResolution::Mapped { leaf_idx_map, .. } => {
+            OwnedStemLeafResolution::Mapped { leaf_idx_map, .. } => {
                 leaf_idx_map[stem_strat.stem_idx()].unwrap().get()
             }
             _ => stem_strat.leaf_idx(),
@@ -108,7 +110,8 @@ where
         self.stems[stem_idx] = pivot_val;
 
         // Update the leaf_idx_map to point children to the two leaves
-        if let StemLeafResolution::Mapped { leaf_idx_map, .. } = &mut self.stem_leaf_resolution {
+        if let OwnedStemLeafResolution::Mapped { leaf_idx_map, .. } = &mut self.stem_leaf_resolution
+        {
             // Ensure the map is large enough
             if leaf_idx_map.len() < right_child_idx + 1 {
                 leaf_idx_map.resize(right_child_idx + 1, None);
@@ -139,7 +142,7 @@ where
         parent_stem_idx: Option<usize>,
     ) {
         match &self.stem_leaf_resolution {
-            StemLeafResolution::Pristine {
+            OwnedStemLeafResolution::Pristine {
                 stems_depth,
                 leaf_count,
             } => {
@@ -171,12 +174,12 @@ where
                     }
                 }
 
-                self.stem_leaf_resolution = StemLeafResolution::Mapped {
+                self.stem_leaf_resolution = OwnedStemLeafResolution::Mapped {
                     min_stem_leaf_idx,
                     leaf_idx_map,
                 };
             }
-            StemLeafResolution::Mapped { .. } => {
+            OwnedStemLeafResolution::Mapped { .. } => {
                 // Already mapped, just update the mapping
                 // TODO: implement mapping updates
             }
@@ -205,7 +208,7 @@ where
     A: AxisUnified<Coord = A>,
     T: Basics,
     SS: StemStrategy,
-    LS: LeafStrategy<A, T, SS, K, B>,
+    LS: ConstructibleLeafStrategy<A, T, SS, K, B>,
 {
     /// Creates a `KdTree`, balanced and optimised, populated
     /// with items from `source`.
@@ -381,7 +384,7 @@ impl<A, SS, LS, const K: usize, const B: usize> KdTree<A, (), SS, LS, K, B>
 where
     A: AxisUnified<Coord = A>,
     SS: StemStrategy,
-    LS: LeafStrategy<A, (), SS, K, B>,
+    LS: ConstructibleLeafStrategy<A, (), SS, K, B>,
 {
     /// Creates a `KdTree` with no stored item values (`T = ()`).
     ///
@@ -401,7 +404,7 @@ where
     A: AxisUnified<Coord = A>,
     T: Basics,
     SS: StemStrategy,
-    LS: LeafStrategy<A, T, SS, K, B>,
+    LS: ConstructibleLeafStrategy<A, T, SS, K, B>,
 {
     fn at_leaf_level(
         current_stem_level: i32,
@@ -607,9 +610,9 @@ where
     //       once confident that the debug_asserts never fire
     fn mapped_stem_leaf_resolution_from_terminals(
         terminal_stem_indices: &[usize],
-    ) -> StemLeafResolution {
+    ) -> OwnedStemLeafResolution {
         if terminal_stem_indices.is_empty() {
-            return StemLeafResolution::Mapped {
+            return OwnedStemLeafResolution::Mapped {
                 min_stem_leaf_idx: 0,
                 leaf_idx_map: Vec::new(),
             };
@@ -638,7 +641,7 @@ where
             leaf_idx_map[terminal_stem_idx] = NonMaxUsize::new(leaf_idx);
         }
 
-        StemLeafResolution::Mapped {
+        OwnedStemLeafResolution::Mapped {
             min_stem_leaf_idx: 0,
             leaf_idx_map,
         }

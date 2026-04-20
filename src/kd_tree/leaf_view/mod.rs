@@ -1,5 +1,5 @@
 use crate::dist::DistanceMetricUnified;
-use crate::kd_tree::result_collection::ResultCollection;
+use crate::kd_tree::result_collection::{BestNeighbourResultCollection, ResultCollection};
 use crate::traits_unified_2::{AxisUnified, Basics};
 use crate::{BestNeighbour, NearestNeighbour};
 use std::any::TypeId;
@@ -165,6 +165,16 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
     #[inline(always)]
     pub(crate) fn items(&self) -> &'a [T] {
         self.items
+    }
+
+    #[inline(always)]
+    pub(crate) fn point_item(&self, idx: usize) -> ([AX; K], T) {
+        debug_assert!(idx < self.items.len());
+        let point = array_init::array_init(|dim| unsafe {
+            *self.points.get_unchecked(dim).get_unchecked(idx)
+        });
+        let item = unsafe { *self.items.get_unchecked(idx) };
+        (point, item)
     }
 
     #[allow(dead_code)]
@@ -344,23 +354,10 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
         O: AxisUnified<Coord = O>,
         R: ResultCollection<O, NearestNeighbour<O, T>>,
     {
-        #[cfg(feature = "buffered_result_collection")]
-        {
-            let mut buffer = crate::kd_tree::result_collection::ResultBuffer::new();
-            dists.iter().zip(items).for_each(|(&d, &i)| {
-                if d <= dist {
-                    buffer.push(NearestNeighbour {
-                        distance: d,
-                        item: i,
-                    });
-                }
-            });
-            crate::kd_tree::result_collection::flush_result_buffer(results, &mut buffer);
-        }
-
-        #[cfg(not(feature = "buffered_result_collection"))]
         dists.iter().zip(items).for_each(|(&d, &i)| {
             if d <= dist {
+                #[cfg(feature = "result_collection_stats")]
+                crate::result_collection_stats::record_candidate_emitted();
                 results.add(NearestNeighbour {
                     distance: d,
                     item: i,
@@ -438,6 +435,37 @@ where
             byte_offset += tile_byte_len;
         });
     }
+
+    #[inline(always)]
+    pub(crate) fn point_item(&self, idx: usize) -> ([AX; K], T) {
+        debug_assert!(idx < self.len);
+        let mut base = 0usize;
+        let mut byte_offset = 0usize;
+
+        for width in LEAF_ARENA_TILE_WIDTHS {
+            while self.len - base >= width {
+                if idx < base + width {
+                    let tile: LeafArenaTile<'_, AX, T, K> = LeafArenaTile {
+                        bytes: unsafe { self.bytes.add(byte_offset) },
+                        len: width,
+                        _phantom: PhantomData,
+                    };
+                    let tile_idx = idx - base;
+                    let point = array_init::array_init(|dim| unsafe {
+                        tile.point_unaligned(dim, tile_idx)
+                    });
+                    let item = unsafe { tile.item_unaligned(tile_idx) };
+                    return (point, item);
+                }
+
+                base += width;
+                byte_offset +=
+                    K * width * std::mem::size_of::<AX>() + width * std::mem::size_of::<T>();
+            }
+        }
+
+        unsafe { std::hint::unreachable_unchecked() }
+    }
 }
 
 impl<AX, T, const K: usize> LeafArenaTile<'_, AX, T, K>
@@ -485,25 +513,25 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics + Ord, const K: usize, const B: 
     LeafView<'a, AX, T, K, B>
 {
     #[cfg_attr(not(feature = "no_inline"), inline)]
-    pub(crate) fn update_best_dists<O, R>(dists: &[O], items: &[T], dist: O, results: &mut R)
-    where
+    pub(crate) fn update_best_dists<O, R>(
+        dists: &[O],
+        items: &[T],
+        dist: O,
+        threshold_item: Option<T>,
+        results: &mut R,
+    ) where
         O: AxisUnified<Coord = O>,
-        R: ResultCollection<O, BestNeighbour<O, T>>,
+        R: BestNeighbourResultCollection<O, T>,
     {
-        #[cfg(feature = "buffered_result_collection")]
-        {
-            let mut buffer = crate::kd_tree::result_collection::ResultBuffer::new();
-            dists.iter().zip(items).for_each(|(&d, &item)| {
-                if d <= dist {
-                    buffer.push(BestNeighbour { distance: d, item });
-                }
-            });
-            crate::kd_tree::result_collection::flush_result_buffer(results, &mut buffer);
-        }
-
-        #[cfg(not(feature = "buffered_result_collection"))]
         dists.iter().zip(items).for_each(|(&d, &item)| {
             if d <= dist {
+                if threshold_item.is_some_and(|worst_item| item >= worst_item) {
+                    #[cfg(feature = "result_collection_stats")]
+                    crate::result_collection_stats::record_best_item_threshold_reject();
+                    return;
+                }
+                #[cfg(feature = "result_collection_stats")]
+                crate::result_collection_stats::record_candidate_emitted();
                 results.add(BestNeighbour { distance: d, item });
             }
         })

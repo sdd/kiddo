@@ -14,9 +14,11 @@ use std::collections::BinaryHeap;
 pub(crate) const SMALL_RESULT_COLLECTION_MAX_QTY: usize = 32;
 
 #[cfg(feature = "buffered_result_collection")]
+#[allow(dead_code)]
 pub(crate) const BUFFERED_RESULT_COLLECTION_INLINE_CAPACITY: usize = 64;
 
 #[cfg(feature = "buffered_result_collection")]
+#[allow(dead_code)]
 pub(crate) type ResultBuffer<E> = SmallVec<[E; BUFFERED_RESULT_COLLECTION_INLINE_CAPACITY]>;
 
 pub trait ResultCollection<O: AxisUnified<Coord = O>, E>: Sized {
@@ -33,6 +35,17 @@ pub trait ResultCollection<O: AxisUnified<Coord = O>, E>: Sized {
     where
         I: IntoIterator<Item = E>,
     {
+        #[cfg(feature = "result_collection_stats")]
+        {
+            let iter = entries.into_iter();
+            crate::result_collection_stats::record_collector_add_all_call(iter.size_hint().0);
+            for entry in iter {
+                self.add(entry);
+            }
+            return;
+        }
+
+        #[cfg(not(feature = "result_collection_stats"))]
         for entry in entries {
             self.add(entry);
         }
@@ -42,6 +55,80 @@ pub trait ResultCollection<O: AxisUnified<Coord = O>, E>: Sized {
     fn is_full(&self) -> bool {
         self.len() >= self.max_qty()
     }
+}
+
+pub(crate) struct VisitorResultCollection<'a, O, E, F>
+where
+    O: AxisUnified<Coord = O>,
+    F: FnMut(E),
+{
+    visitor: &'a mut F,
+    len: usize,
+    _phantom: std::marker::PhantomData<(O, E)>,
+}
+
+impl<'a, O, E, F> VisitorResultCollection<'a, O, E, F>
+where
+    O: AxisUnified<Coord = O>,
+    F: FnMut(E),
+{
+    #[inline(always)]
+    pub(crate) fn new(visitor: &'a mut F) -> Self {
+        Self {
+            visitor,
+            len: 0,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<O, E, F> ResultCollection<O, E> for VisitorResultCollection<'_, O, E, F>
+where
+    O: AxisUnified<Coord = O>,
+    F: FnMut(E),
+{
+    #[inline(always)]
+    fn with_max_qty(_max_qty: usize) -> Self {
+        panic!("VisitorResultCollection must be constructed with VisitorResultCollection::new")
+    }
+
+    #[inline(always)]
+    fn max_qty(&self) -> usize {
+        usize::MAX
+    }
+
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.len
+    }
+
+    #[inline(always)]
+    fn add(&mut self, entry: E) {
+        self.len += 1;
+        (self.visitor)(entry);
+    }
+
+    #[inline(always)]
+    fn threshold_distance(&self) -> Option<O> {
+        None
+    }
+
+    #[inline(always)]
+    fn into_vec(self) -> Vec<E> {
+        Vec::new()
+    }
+
+    #[inline(always)]
+    fn into_sorted_vec(self) -> Vec<E> {
+        Vec::new()
+    }
+}
+
+#[doc(hidden)]
+pub trait BestNeighbourResultCollection<O: AxisUnified<Coord = O>, T: Content>:
+    ResultCollection<O, BestNeighbour<O, T>>
+{
+    fn threshold_item(&self) -> Option<T>;
 }
 
 #[derive(Debug)]
@@ -147,21 +234,32 @@ fn small_sorted_insert<E: Ord>(
 ) {
     if inner.len() < max_qty {
         let insert_at = inner.partition_point(|existing| *existing <= entry);
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_sorted_insert(insert_at, inner.len() - insert_at);
         inner.insert(insert_at, entry);
     } else if entry < *inner.last().unwrap() {
         let insert_at = inner.partition_point(|existing| *existing <= entry);
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_sorted_insert(
+            insert_at,
+            inner.len().saturating_sub(insert_at + 1),
+        );
         inner.insert(insert_at, entry);
         inner.pop();
     }
 }
 
 #[cfg(feature = "buffered_result_collection")]
+#[allow(dead_code)]
 #[inline(always)]
 pub(crate) fn flush_result_buffer<O, E, R>(results: &mut R, buffer: &mut ResultBuffer<E>)
 where
     O: AxisUnified<Coord = O>,
     R: ResultCollection<O, E>,
 {
+    #[cfg(feature = "result_collection_stats")]
+    crate::result_collection_stats::record_buffer_flush(buffer.len());
+
     if !buffer.is_empty() {
         results.add_all(buffer.drain(..));
     }
@@ -186,20 +284,47 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     }
 
     fn add(&mut self, entry: NearestNeighbour<O, T>) {
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_collector_add_call();
+
         if self.inner.len() < self.max_qty {
+            #[cfg(feature = "result_collection_stats")]
+            crate::result_collection_stats::record_heap_add_push();
             self.inner.push(entry);
         } else {
             let mut max_heap_value = self.inner.peek_mut().unwrap();
             if entry < *max_heap_value {
+                #[cfg(feature = "result_collection_stats")]
+                crate::result_collection_stats::record_heap_add_replacement();
                 *max_heap_value = entry;
+            } else {
+                #[cfg(feature = "result_collection_stats")]
+                crate::result_collection_stats::record_heap_add_discard();
             }
         }
     }
 
+    #[allow(unreachable_code)]
     fn add_all<I>(&mut self, entries: I)
     where
         I: IntoIterator<Item = NearestNeighbour<O, T>>,
     {
+        #[cfg(feature = "result_collection_stats")]
+        {
+            let iter = entries.into_iter();
+            crate::result_collection_stats::record_collector_add_all_call(iter.size_hint().0);
+            let mut combined = std::mem::take(&mut self.inner).into_vec();
+            combined.extend(iter);
+
+            if combined.len() > self.max_qty {
+                combined.sort_unstable();
+                combined.truncate(self.max_qty);
+            }
+
+            self.inner = BinaryHeap::from(combined);
+            return;
+        }
+
         let mut combined = std::mem::take(&mut self.inner).into_vec();
         combined.extend(entries);
 
@@ -212,11 +337,15 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     }
 
     fn threshold_distance(&self) -> Option<O> {
-        if self.is_full() {
+        let is_full = self.is_full();
+        let result = if is_full {
             self.inner.peek().map(|n| n.distance)
         } else {
             None
-        }
+        };
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_threshold_distance_call(is_full, result.is_some());
+        result
     }
 
     fn into_vec(self) -> Vec<NearestNeighbour<O, T>> {
@@ -247,20 +376,47 @@ impl<O: AxisUnified<Coord = O>, T: Content> ResultCollection<O, BestNeighbour<O,
     }
 
     fn add(&mut self, entry: BestNeighbour<O, T>) {
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_collector_add_call();
+
         if self.inner.len() < self.max_qty {
+            #[cfg(feature = "result_collection_stats")]
+            crate::result_collection_stats::record_heap_add_push();
             self.inner.push(entry);
         } else {
             let mut max_heap_value = self.inner.peek_mut().unwrap();
             if entry < *max_heap_value {
+                #[cfg(feature = "result_collection_stats")]
+                crate::result_collection_stats::record_heap_add_replacement();
                 *max_heap_value = entry;
+            } else {
+                #[cfg(feature = "result_collection_stats")]
+                crate::result_collection_stats::record_heap_add_discard();
             }
         }
     }
 
+    #[allow(unreachable_code)]
     fn add_all<I>(&mut self, entries: I)
     where
         I: IntoIterator<Item = BestNeighbour<O, T>>,
     {
+        #[cfg(feature = "result_collection_stats")]
+        {
+            let iter = entries.into_iter();
+            crate::result_collection_stats::record_collector_add_all_call(iter.size_hint().0);
+            let mut combined = std::mem::take(&mut self.inner).into_vec();
+            combined.extend(iter);
+
+            if combined.len() > self.max_qty {
+                combined.sort_unstable();
+                combined.truncate(self.max_qty);
+            }
+
+            self.inner = BinaryHeap::from(combined);
+            return;
+        }
+
         let mut combined = std::mem::take(&mut self.inner).into_vec();
         combined.extend(entries);
 
@@ -285,6 +441,19 @@ impl<O: AxisUnified<Coord = O>, T: Content> ResultCollection<O, BestNeighbour<O,
     }
 }
 
+impl<O: AxisUnified<Coord = O>, T: Content> BestNeighbourResultCollection<O, T>
+    for BinaryHeapResultCollection<BestNeighbour<O, T>>
+{
+    #[inline(always)]
+    fn threshold_item(&self) -> Option<T> {
+        if self.is_full() {
+            self.inner.peek().map(|n| n.item)
+        } else {
+            None
+        }
+    }
+}
+
 impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     for SortedVecResultCollection<NearestNeighbour<O, T>>
 {
@@ -304,18 +473,53 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     }
 
     fn add(&mut self, entry: NearestNeighbour<O, T>) {
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_collector_add_call();
+
         if self.inner.len() < self.max_qty {
+            #[cfg(feature = "result_collection_stats")]
+            {
+                let insert_at = self.inner.partition_point(|existing| *existing <= entry);
+                crate::result_collection_stats::record_sorted_insert(
+                    insert_at,
+                    self.inner.len() - insert_at,
+                );
+            }
             self.inner.insert(entry);
         } else if entry < *self.inner.last().unwrap() {
+            #[cfg(feature = "result_collection_stats")]
+            {
+                let insert_at = self.inner.partition_point(|existing| *existing <= entry);
+                crate::result_collection_stats::record_sorted_insert(
+                    insert_at,
+                    self.inner.len().saturating_sub(insert_at + 1),
+                );
+            }
             self.inner.pop();
             self.inner.push(entry);
         }
     }
 
+    #[allow(unreachable_code)]
     fn add_all<I>(&mut self, entries: I)
     where
         I: IntoIterator<Item = NearestNeighbour<O, T>>,
     {
+        #[cfg(feature = "result_collection_stats")]
+        {
+            let iter = entries.into_iter();
+            crate::result_collection_stats::record_collector_add_all_call(iter.size_hint().0);
+            let mut combined = std::mem::take(&mut self.inner).into_vec();
+            combined.extend(iter);
+            self.inner = SortedVec::from_unsorted(combined);
+            if self.inner.len() > self.max_qty {
+                self.inner.mutate_vec(|vec| {
+                    vec.truncate(self.max_qty);
+                });
+            }
+            return;
+        }
+
         let mut combined = std::mem::take(&mut self.inner).into_vec();
         combined.extend(entries);
         self.inner = SortedVec::from_unsorted(combined);
@@ -327,11 +531,15 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     }
 
     fn threshold_distance(&self) -> Option<O> {
-        if self.is_full() {
+        let is_full = self.is_full();
+        let result = if is_full {
             self.inner.last().map(|n| n.distance)
         } else {
             None
-        }
+        };
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_threshold_distance_call(is_full, result.is_some());
+        result
     }
 
     fn into_vec(self) -> Vec<NearestNeighbour<O, T>> {
@@ -364,20 +572,48 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     }
 
     fn add(&mut self, entry: NearestNeighbour<O, T>) {
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_collector_add_call();
+
         if self.inner.len() < self.max_qty {
+            #[cfg(feature = "result_collection_stats")]
+            crate::result_collection_stats::record_heap_add_push();
             self.inner.push(entry);
             let len = self.inner.len();
             sift_up_max_heap(self.inner.as_mut_slice(), len - 1);
         } else if entry < self.inner[0] {
+            #[cfg(feature = "result_collection_stats")]
+            crate::result_collection_stats::record_heap_add_replacement();
             self.inner[0] = entry;
             sift_down_max_heap(self.inner.as_mut_slice(), 0);
+        } else {
+            #[cfg(feature = "result_collection_stats")]
+            crate::result_collection_stats::record_heap_add_discard();
         }
     }
 
+    #[allow(unreachable_code)]
     fn add_all<I>(&mut self, entries: I)
     where
         I: IntoIterator<Item = NearestNeighbour<O, T>>,
     {
+        #[cfg(feature = "result_collection_stats")]
+        {
+            let iter = entries.into_iter();
+            crate::result_collection_stats::record_collector_add_all_call(iter.size_hint().0);
+            let mut combined = std::mem::take(&mut self.inner).into_vec();
+            combined.extend(iter);
+
+            if combined.len() > self.max_qty {
+                combined.sort_unstable();
+                combined.truncate(self.max_qty);
+            }
+
+            self.inner.extend(combined);
+            heapify_max_heap(self.inner.as_mut_slice());
+            return;
+        }
+
         let mut combined = std::mem::take(&mut self.inner).into_vec();
         combined.extend(entries);
 
@@ -391,11 +627,15 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     }
 
     fn threshold_distance(&self) -> Option<O> {
-        if self.is_full() {
+        let is_full = self.is_full();
+        let result = if is_full {
             self.inner.first().map(|n| n.distance)
         } else {
             None
-        }
+        };
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_threshold_distance_call(is_full, result.is_some());
+        result
     }
 
     fn into_vec(self) -> Vec<NearestNeighbour<O, T>> {
@@ -430,20 +670,48 @@ impl<O: AxisUnified<Coord = O>, T: Content> ResultCollection<O, BestNeighbour<O,
     }
 
     fn add(&mut self, entry: BestNeighbour<O, T>) {
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_collector_add_call();
+
         if self.inner.len() < self.max_qty {
+            #[cfg(feature = "result_collection_stats")]
+            crate::result_collection_stats::record_heap_add_push();
             self.inner.push(entry);
             let len = self.inner.len();
             sift_up_max_heap(self.inner.as_mut_slice(), len - 1);
         } else if entry < self.inner[0] {
+            #[cfg(feature = "result_collection_stats")]
+            crate::result_collection_stats::record_heap_add_replacement();
             self.inner[0] = entry;
             sift_down_max_heap(self.inner.as_mut_slice(), 0);
+        } else {
+            #[cfg(feature = "result_collection_stats")]
+            crate::result_collection_stats::record_heap_add_discard();
         }
     }
 
+    #[allow(unreachable_code)]
     fn add_all<I>(&mut self, entries: I)
     where
         I: IntoIterator<Item = BestNeighbour<O, T>>,
     {
+        #[cfg(feature = "result_collection_stats")]
+        {
+            let iter = entries.into_iter();
+            crate::result_collection_stats::record_collector_add_all_call(iter.size_hint().0);
+            let mut combined = std::mem::take(&mut self.inner).into_vec();
+            combined.extend(iter);
+
+            if combined.len() > self.max_qty {
+                combined.sort_unstable();
+                combined.truncate(self.max_qty);
+            }
+
+            self.inner.extend(combined);
+            heapify_max_heap(self.inner.as_mut_slice());
+            return;
+        }
+
         let mut combined = std::mem::take(&mut self.inner).into_vec();
         combined.extend(entries);
 
@@ -472,6 +740,20 @@ impl<O: AxisUnified<Coord = O>, T: Content> ResultCollection<O, BestNeighbour<O,
 }
 
 #[cfg(feature = "small_n_result_collectors")]
+impl<O: AxisUnified<Coord = O>, T: Content> BestNeighbourResultCollection<O, T>
+    for SmallBinaryHeapResultCollection<BestNeighbour<O, T>>
+{
+    #[inline(always)]
+    fn threshold_item(&self) -> Option<T> {
+        if self.is_full() {
+            self.inner.first().map(|n| n.item)
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(feature = "small_n_result_collectors")]
 impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     for SmallSortedVecResultCollection<NearestNeighbour<O, T>>
 {
@@ -492,13 +774,30 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     }
 
     fn add(&mut self, entry: NearestNeighbour<O, T>) {
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_collector_add_call();
         small_sorted_insert(&mut self.inner, self.max_qty, entry);
     }
 
+    #[allow(unreachable_code)]
     fn add_all<I>(&mut self, entries: I)
     where
         I: IntoIterator<Item = NearestNeighbour<O, T>>,
     {
+        #[cfg(feature = "result_collection_stats")]
+        {
+            let iter = entries.into_iter();
+            crate::result_collection_stats::record_collector_add_all_call(iter.size_hint().0);
+            let mut combined = std::mem::take(&mut self.inner).into_vec();
+            combined.extend(iter);
+            combined.sort_unstable();
+            if combined.len() > self.max_qty {
+                combined.truncate(self.max_qty);
+            }
+            self.inner.extend(combined);
+            return;
+        }
+
         let mut combined = std::mem::take(&mut self.inner).into_vec();
         combined.extend(entries);
         combined.sort_unstable();
@@ -509,11 +808,15 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     }
 
     fn threshold_distance(&self) -> Option<O> {
-        if self.is_full() {
+        let is_full = self.is_full();
+        let result = if is_full {
             self.inner.last().map(|n| n.distance)
         } else {
             None
-        }
+        };
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_threshold_distance_call(is_full, result.is_some());
+        result
     }
 
     fn into_vec(self) -> Vec<NearestNeighbour<O, T>> {
@@ -522,6 +825,266 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
 
     fn into_sorted_vec(self) -> Vec<NearestNeighbour<O, T>> {
         self.inner.into_vec()
+    }
+}
+
+#[allow(missing_docs)]
+#[cfg(feature = "cargo_asm")]
+pub mod cargo_asm {
+    use super::*;
+
+    const MAX_QTY: usize = 16;
+
+    const SORTED_NEAREST_INPUTS: [NearestNeighbour<f64, u32>; MAX_QTY] = [
+        NearestNeighbour {
+            distance: 0.91,
+            item: 91,
+        },
+        NearestNeighbour {
+            distance: 0.12,
+            item: 12,
+        },
+        NearestNeighbour {
+            distance: 0.54,
+            item: 54,
+        },
+        NearestNeighbour {
+            distance: 0.07,
+            item: 7,
+        },
+        NearestNeighbour {
+            distance: 0.63,
+            item: 63,
+        },
+        NearestNeighbour {
+            distance: 0.33,
+            item: 33,
+        },
+        NearestNeighbour {
+            distance: 0.88,
+            item: 88,
+        },
+        NearestNeighbour {
+            distance: 0.19,
+            item: 19,
+        },
+        NearestNeighbour {
+            distance: 0.41,
+            item: 41,
+        },
+        NearestNeighbour {
+            distance: 0.02,
+            item: 2,
+        },
+        NearestNeighbour {
+            distance: 0.76,
+            item: 76,
+        },
+        NearestNeighbour {
+            distance: 0.27,
+            item: 27,
+        },
+        NearestNeighbour {
+            distance: 0.69,
+            item: 69,
+        },
+        NearestNeighbour {
+            distance: 0.58,
+            item: 58,
+        },
+        NearestNeighbour {
+            distance: 0.15,
+            item: 15,
+        },
+        NearestNeighbour {
+            distance: 0.47,
+            item: 47,
+        },
+    ];
+
+    const BEST_INPUTS: [BestNeighbour<f64, u32>; MAX_QTY] = [
+        BestNeighbour {
+            distance: 0.91,
+            item: 91,
+        },
+        BestNeighbour {
+            distance: 0.12,
+            item: 12,
+        },
+        BestNeighbour {
+            distance: 0.54,
+            item: 54,
+        },
+        BestNeighbour {
+            distance: 0.07,
+            item: 7,
+        },
+        BestNeighbour {
+            distance: 0.63,
+            item: 63,
+        },
+        BestNeighbour {
+            distance: 0.33,
+            item: 33,
+        },
+        BestNeighbour {
+            distance: 0.88,
+            item: 88,
+        },
+        BestNeighbour {
+            distance: 0.19,
+            item: 19,
+        },
+        BestNeighbour {
+            distance: 0.41,
+            item: 41,
+        },
+        BestNeighbour {
+            distance: 0.02,
+            item: 2,
+        },
+        BestNeighbour {
+            distance: 0.76,
+            item: 76,
+        },
+        BestNeighbour {
+            distance: 0.27,
+            item: 27,
+        },
+        BestNeighbour {
+            distance: 0.69,
+            item: 69,
+        },
+        BestNeighbour {
+            distance: 0.58,
+            item: 58,
+        },
+        BestNeighbour {
+            distance: 0.15,
+            item: 15,
+        },
+        BestNeighbour {
+            distance: 0.47,
+            item: 47,
+        },
+    ];
+
+    #[inline(always)]
+    fn checksum_nearest(results: &[NearestNeighbour<f64, u32>]) -> (usize, u64, u64) {
+        let mut checksum_item = 0u64;
+        let mut checksum_dist = 0u64;
+
+        for entry in results {
+            checksum_item = checksum_item.wrapping_add(entry.item as u64);
+            checksum_dist = checksum_dist.wrapping_add(entry.distance.to_bits());
+        }
+
+        (results.len(), checksum_item, checksum_dist)
+    }
+
+    #[inline(always)]
+    fn checksum_best(results: &[BestNeighbour<f64, u32>]) -> (usize, u64, u64) {
+        let mut checksum_item = 0u64;
+        let mut checksum_dist = 0u64;
+
+        for entry in results {
+            checksum_item = checksum_item.wrapping_add(entry.item as u64);
+            checksum_dist = checksum_dist.wrapping_add(entry.distance.to_bits());
+        }
+
+        (results.len(), checksum_item, checksum_dist)
+    }
+
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_sorted_vec_result_collection_add_cargo_asm_hook() -> (usize, u64, u64) {
+        let mut results =
+            SortedVecResultCollection::<NearestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+        for entry in SORTED_NEAREST_INPUTS {
+            results.add(entry);
+        }
+        let vec = results.into_sorted_vec();
+        checksum_nearest(&vec)
+    }
+
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_sorted_vec_result_collection_add_all_cargo_asm_hook() -> (usize, u64, u64) {
+        let mut results =
+            SortedVecResultCollection::<NearestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+        results.add_all(SORTED_NEAREST_INPUTS);
+        let vec = results.into_sorted_vec();
+        checksum_nearest(&vec)
+    }
+
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_binary_heap_result_collection_add_cargo_asm_hook() -> (usize, u64, u64) {
+        let mut results =
+            BinaryHeapResultCollection::<BestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+        for entry in BEST_INPUTS {
+            results.add(entry);
+        }
+        let vec = results.into_sorted_vec();
+        checksum_best(&vec)
+    }
+
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_binary_heap_result_collection_add_all_cargo_asm_hook() -> (usize, u64, u64) {
+        let mut results =
+            BinaryHeapResultCollection::<BestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+        results.add_all(BEST_INPUTS);
+        let vec = results.into_sorted_vec();
+        checksum_best(&vec)
+    }
+
+    #[cfg(feature = "small_n_result_collectors")]
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_small_sorted_vec_result_collection_add_cargo_asm_hook() -> (usize, u64, u64) {
+        let mut results =
+            SmallSortedVecResultCollection::<NearestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+        for entry in SORTED_NEAREST_INPUTS {
+            results.add(entry);
+        }
+        let vec = results.into_sorted_vec();
+        checksum_nearest(&vec)
+    }
+
+    #[cfg(feature = "small_n_result_collectors")]
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_small_sorted_vec_result_collection_add_all_cargo_asm_hook() -> (usize, u64, u64) {
+        let mut results =
+            SmallSortedVecResultCollection::<NearestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+        results.add_all(SORTED_NEAREST_INPUTS);
+        let vec = results.into_sorted_vec();
+        checksum_nearest(&vec)
+    }
+
+    #[cfg(feature = "small_n_result_collectors")]
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_small_binary_heap_result_collection_add_cargo_asm_hook() -> (usize, u64, u64) {
+        let mut results =
+            SmallBinaryHeapResultCollection::<BestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+        for entry in BEST_INPUTS {
+            results.add(entry);
+        }
+        let vec = results.into_sorted_vec();
+        checksum_best(&vec)
+    }
+
+    #[cfg(feature = "small_n_result_collectors")]
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_small_binary_heap_result_collection_add_all_cargo_asm_hook() -> (usize, u64, u64) {
+        let mut results =
+            SmallBinaryHeapResultCollection::<BestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+        results.add_all(BEST_INPUTS);
+        let vec = results.into_sorted_vec();
+        checksum_best(&vec)
     }
 }
 

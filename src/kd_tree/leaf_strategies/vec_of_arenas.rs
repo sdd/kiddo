@@ -1,17 +1,85 @@
 use crate::kd_tree::leaf_view::LeafArena;
 use crate::kd_tree::leaf_view::LeafView;
 use crate::traits_unified_2::{
-    AxisUnified, Basics, BucketLimitType, Immutable, LeafProjection, LeafStrategy,
+    AxisUnified, Basics, BucketLimitType, ConstructibleLeafStrategy, Immutable, LeafProjection,
+    LeafStrategy,
 };
 use crate::StemStrategy;
 use aligned_vec::{AVec, CACHELINE_ALIGN};
 
 /// Immutable leaf storage using chunk-tiled arenas encoded into a single byte buffer.
+#[cfg_attr(
+    feature = "rkyv_08",
+    derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
+)]
+#[cfg_attr(feature = "rkyv_08", rkyv(crate = rkyv_08))]
 pub struct VecOfArenas<A, T, const K: usize, const B: usize> {
     leaf_extents: Vec<(usize, usize)>,
+    #[cfg_attr(
+        feature = "rkyv_08",
+        rkyv(with = crate::rkyv_08_impl::AsAlignedCachelineABox)
+    )]
     leaf_bytes: AVec<u8>,
     size: usize,
     _phantom: std::marker::PhantomData<(A, T)>,
+}
+
+#[cfg(feature = "rkyv_08")]
+impl<A, T, const K: usize, const B: usize> ArchivedVecOfArenas<A, T, K, B>
+where
+    A: rkyv_08::Archive + Copy,
+    T: rkyv_08::Archive + Copy,
+{
+    /// Returns the number of items in a leaf.
+    #[inline]
+    pub fn leaf_len(&self, leaf_idx: usize) -> usize {
+        self.leaf_extents[leaf_idx].1.to_native() as usize
+    }
+
+    /// Returns an arena-backed view over a leaf.
+    #[inline]
+    pub fn leaf_arena(&self, leaf_idx: usize) -> LeafArena<'_, A, T, K> {
+        let extent = &self.leaf_extents[leaf_idx];
+        let offset = extent.0.to_native() as usize;
+        let len = extent.1.to_native() as usize;
+        let bytes = self.leaf_bytes.get().as_slice();
+        LeafArena::new(unsafe { bytes.as_ptr().add(offset) }, len)
+    }
+}
+
+#[cfg(feature = "rkyv_08")]
+impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B>
+    for ArchivedVecOfArenas<AX, T, K, B>
+where
+    AX: rkyv_08::Archive + AxisUnified<Coord = AX>,
+    T: rkyv_08::Archive + Basics,
+    SS: StemStrategy,
+{
+    type Num = AX;
+    type Mutability = Immutable;
+
+    const BUCKET_LIMIT_TYPE: BucketLimitType = BucketLimitType::Soft;
+    const LEAF_PROJECTION: LeafProjection = LeafProjection::LeafArena;
+
+    fn size(&self) -> usize {
+        self.size.to_native() as usize
+    }
+
+    fn leaf_count(&self) -> usize {
+        self.leaf_extents.len()
+    }
+
+    fn leaf_len(&self, leaf_idx: usize) -> usize {
+        ArchivedVecOfArenas::leaf_len(self, leaf_idx)
+    }
+
+    fn leaf_view(&self, _leaf_idx: usize) -> LeafView<'_, AX, T, K, B> {
+        unimplemented!("VecOfArenas currently exposes only arena-backed hot paths")
+    }
+
+    fn leaf_arena(&self, leaf_idx: usize) -> LeafArena<'_, AX, T, K> {
+        ArchivedVecOfArenas::leaf_arena(self, leaf_idx)
+    }
 }
 
 #[cfg(test)]
@@ -66,19 +134,6 @@ where
     const BUCKET_LIMIT_TYPE: BucketLimitType = BucketLimitType::Soft;
     const LEAF_PROJECTION: LeafProjection = LeafProjection::LeafArena;
 
-    fn new_with_capacity(capacity: usize) -> Self {
-        Self {
-            leaf_extents: Vec::with_capacity(capacity / B + 1),
-            leaf_bytes: AVec::new(CACHELINE_ALIGN),
-            size: 0,
-            _phantom: std::marker::PhantomData,
-        }
-    }
-
-    fn new_with_empty_leaf() -> Self {
-        unimplemented!("VecOfArenas is immutable-focused and should be constructed from slices")
-    }
-
     fn size(&self) -> usize {
         self.size
     }
@@ -106,6 +161,39 @@ where
         }
 
         LeafArena::new(unsafe { self.leaf_bytes.as_ptr().add(offset) }, len)
+    }
+
+    #[inline]
+    fn maybe_enable_huge_pages(&self) {
+        crate::huge_pages::maybe_collapse_slice_huge_pages(
+            self.leaf_extents.as_ptr(),
+            self.leaf_extents.len(),
+        );
+        crate::huge_pages::maybe_collapse_slice_huge_pages(
+            self.leaf_bytes.as_ptr(),
+            self.leaf_bytes.len(),
+        );
+    }
+}
+
+impl<AX, T, SS, const K: usize, const B: usize> ConstructibleLeafStrategy<AX, T, SS, K, B>
+    for VecOfArenas<AX, T, K, B>
+where
+    AX: AxisUnified<Coord = AX>,
+    T: Basics,
+    SS: StemStrategy,
+{
+    fn new_with_capacity(capacity: usize) -> Self {
+        Self {
+            leaf_extents: Vec::with_capacity(capacity / B + 1),
+            leaf_bytes: AVec::new(CACHELINE_ALIGN),
+            size: 0,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    fn new_with_empty_leaf() -> Self {
+        unimplemented!("VecOfArenas is immutable-focused and should be constructed from slices")
     }
 
     fn append_leaf(&mut self, leaf_points: &[&[AX]; K], leaf_items: &[T]) {
@@ -140,17 +228,12 @@ where
 
         self.size += leaf_len;
     }
+}
 
-    #[inline]
-    fn maybe_enable_huge_pages(&self) {
-        crate::huge_pages::maybe_collapse_slice_huge_pages(
-            self.leaf_extents.as_ptr(),
-            self.leaf_extents.len(),
-        );
-        crate::huge_pages::maybe_collapse_slice_huge_pages(
-            self.leaf_bytes.as_ptr(),
-            self.leaf_bytes.len(),
-        );
+#[cfg(test)]
+impl<A, T, const K: usize, const B: usize> VecOfArenas<A, T, K, B> {
+    pub(crate) fn leaf_bytes_ptr(&self) -> *const u8 {
+        self.leaf_bytes.as_ptr()
     }
 }
 
@@ -159,12 +242,12 @@ mod tests {
     use super::VecOfArenas;
     use crate::kd_tree::leaf_strategies::vec_of_arenas::extend_bytes_from_slice;
     use crate::kd_tree::leaf_view::LeafArena;
-    use crate::traits_unified_2::LeafStrategy;
+    use crate::traits_unified_2::{ConstructibleLeafStrategy, LeafStrategy};
     use crate::Eytzinger;
 
     #[test]
     fn vec_of_arenas_appends_leafs_with_expected_extents() {
-        let mut leaves = <VecOfArenas<f64, u32, 3, 32> as LeafStrategy<
+        let mut leaves = <VecOfArenas<f64, u32, 3, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
             Eytzinger<3>,
@@ -176,11 +259,13 @@ mod tests {
         let z = [7.0, 8.0, 9.0];
         let items = [10u32, 11, 12];
 
-        <VecOfArenas<f64, u32, 3, 32> as LeafStrategy<f64, u32, Eytzinger<3>, 3, 32>>::append_leaf(
-            &mut leaves,
-            &[&x, &y, &z],
-            &items,
-        );
+        <VecOfArenas<f64, u32, 3, 32> as ConstructibleLeafStrategy<
+            f64,
+            u32,
+            Eytzinger<3>,
+            3,
+            32,
+        >>::append_leaf(&mut leaves, &[&x, &y, &z], &items);
 
         assert_eq!(leaves.size, 3);
         assert_eq!(leaves.leaf_extents.len(), 1);
@@ -193,7 +278,7 @@ mod tests {
 
     #[test]
     fn vec_of_arenas_decodes_tiled_points_and_items() {
-        let mut leaves = <VecOfArenas<f64, u32, 3, 32> as LeafStrategy<
+        let mut leaves = <VecOfArenas<f64, u32, 3, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
             Eytzinger<3>,
@@ -205,11 +290,13 @@ mod tests {
         let z: Vec<f64> = (200..240).map(|v| v as f64).collect();
         let items: Vec<u32> = (1000..1040).collect();
 
-        <VecOfArenas<f64, u32, 3, 32> as LeafStrategy<f64, u32, Eytzinger<3>, 3, 32>>::append_leaf(
-            &mut leaves,
-            &[&x, &y, &z],
-            &items,
-        );
+        <VecOfArenas<f64, u32, 3, 32> as ConstructibleLeafStrategy<
+            f64,
+            u32,
+            Eytzinger<3>,
+            3,
+            32,
+        >>::append_leaf(&mut leaves, &[&x, &y, &z], &items);
 
         let arena =
             <VecOfArenas<f64, u32, 3, 32> as LeafStrategy<f64, u32, Eytzinger<3>, 3, 32>>::leaf_arena(
@@ -240,7 +327,7 @@ mod tests {
 
     #[test]
     fn vec_of_arenas_uses_descending_chunk_sizes_per_leaf() {
-        let mut leaves = <VecOfArenas<f64, u32, 3, 32> as LeafStrategy<
+        let mut leaves = <VecOfArenas<f64, u32, 3, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
             Eytzinger<3>,
@@ -252,11 +339,13 @@ mod tests {
         let z: Vec<f64> = (200..247).map(|v| v as f64).collect();
         let items: Vec<u32> = (1000..1047).collect();
 
-        <VecOfArenas<f64, u32, 3, 32> as LeafStrategy<f64, u32, Eytzinger<3>, 3, 32>>::append_leaf(
-            &mut leaves,
-            &[&x, &y, &z],
-            &items,
-        );
+        <VecOfArenas<f64, u32, 3, 32> as ConstructibleLeafStrategy<
+            f64,
+            u32,
+            Eytzinger<3>,
+            3,
+            32,
+        >>::append_leaf(&mut leaves, &[&x, &y, &z], &items);
 
         let arena =
             <VecOfArenas<f64, u32, 3, 32> as LeafStrategy<f64, u32, Eytzinger<3>, 3, 32>>::leaf_arena(
