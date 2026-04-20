@@ -1,7 +1,7 @@
 use crate::dist::KdTreeDistanceMetric;
 use crate::kd_tree::query_stack::{ScalarStackContext, StackTrait};
 use crate::kd_tree::traits::QueryContext;
-use crate::kd_tree::KdTree;
+use crate::kd_tree::{KdTreeAccessor, StemLeafResolution};
 use crate::stem_strategies::{
     donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4},
     DistanceMetricSimdBlock3, DistanceMetricSimdBlock4, SimdPrune, SimdSelectBestChildBlock3,
@@ -132,7 +132,19 @@ pub mod cargo_asm {
     }
 }
 
-impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
+impl<Tree, A, T, SS, LS, const K: usize, const B: usize> KdTreeQueryOps<A, T, SS, LS, K, B> for Tree
+where
+    Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
+    A: AxisUnified<Coord = A>,
+    T: Basics + Copy + Default + PartialOrd + PartialEq,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+{
+}
+
+#[allow(missing_docs, private_bounds)]
+pub trait KdTreeQueryOps<A, T, SS, LS, const K: usize, const B: usize>:
+    KdTreeAccessor<A, T, SS, LS, K, B> + Sized
 where
     A: AxisUnified<Coord = A>,
     T: Basics + Copy + Default + PartialOrd + PartialEq,
@@ -140,8 +152,8 @@ where
     LS: LeafStrategy<A, T, SS, K, B>,
 {
     #[inline]
-    pub(crate) fn get_leaf_idx(&self, query: &[A; K]) -> usize {
-        if self.stem_leaf_resolution.uses_arithmetic() {
+    fn get_leaf_idx(&self, query: &[A; K]) -> usize {
+        if self.stem_leaf_resolution().uses_arithmetic() {
             self.get_leaf_idx_unmapped(query)
         } else {
             self.get_leaf_idx_mapped(query)
@@ -150,7 +162,7 @@ where
 
     /// Non-backtracking query
     #[inline]
-    pub(crate) fn straight_query<QC, O>(&self, query_ctx: QC, mut process_leaf: impl FnMut(usize))
+    fn straight_query<QC, O>(&self, query_ctx: QC, mut process_leaf: impl FnMut(usize))
     where
         QC: QueryContext<A, O, K>,
     {
@@ -162,37 +174,37 @@ where
 
     /// Get the leaf index for a query (unmapped leaves)
     #[inline]
-    pub(crate) fn get_leaf_idx_unmapped(&self, query: &[A; K]) -> usize {
-        SS::get_leaf_idx(&self.stems, query, self.max_stem_level)
+    fn get_leaf_idx_unmapped(&self, query: &[A; K]) -> usize {
+        SS::get_leaf_idx(self.stems(), query, self.max_stem_level())
     }
 
     /// Get the leaf index for a query (mapped leaves)
     #[inline(always)]
-    pub(crate) fn get_leaf_idx_mapped(&self, query: &[A; K]) -> usize {
-        let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
+    fn get_leaf_idx_mapped(&self, query: &[A; K]) -> usize {
+        let stems_ptr = NonNull::new(self.stems().as_ptr() as *mut u8).unwrap();
         let mut stem_strat: SS = SS::new(stems_ptr);
 
-        while stem_strat.level() <= self.max_stem_level {
+        while stem_strat.level() <= self.max_stem_level() {
             if let Some(leaf_idx) = self.resolve_terminal_stem(stem_strat.stem_idx()) {
                 return leaf_idx;
             }
 
-            let pivot = unsafe { self.stems.get_unchecked(stem_strat.stem_idx()) };
+            let pivot = unsafe { self.stems().get_unchecked(stem_strat.stem_idx()) };
             let is_right_child: bool = *unsafe { query.get_unchecked(stem_strat.dim()) } >= *pivot;
             stem_strat.traverse(is_right_child);
         }
 
-        self.stem_leaf_resolution
+        self.stem_leaf_resolution()
             .resolve_terminal_stem_idx(stem_strat.stem_idx(), stem_strat.leaf_idx())
     }
 
     // TODO: don't like this structure
     /// Check if a stem points directly to a leaf
     #[inline(always)]
-    pub(crate) fn resolve_terminal_stem(&self, stem_idx: usize) -> Option<usize> {
-        if self.stem_leaf_resolution.is_terminal_stem_idx(stem_idx) {
+    fn resolve_terminal_stem(&self, stem_idx: usize) -> Option<usize> {
+        if self.stem_leaf_resolution().is_terminal_stem_idx(stem_idx) {
             Some(
-                self.stem_leaf_resolution
+                self.stem_leaf_resolution()
                     .resolve_terminal_stem_idx(stem_idx, 0),
             )
         } else {
@@ -208,38 +220,13 @@ where
         level: i32,
         leaf_idx_prefix: usize,
     ) -> bool {
-        match &self.stem_leaf_resolution {
-            crate::kd_tree::StemLeafResolution::Arithmetic {
-                stems_depth,
-                leaf_count,
-            }
-            | crate::kd_tree::StemLeafResolution::Pristine {
-                stems_depth,
-                leaf_count,
-            } => {
-                if *leaf_count == 0 {
-                    return false;
-                }
-
-                let consumed_levels = level.max(0) as usize;
-                if consumed_levels >= *stems_depth {
-                    return leaf_idx_prefix < *leaf_count;
-                }
-
-                let remaining = (*stems_depth - consumed_levels) as u32;
-                let min_leaf_idx = leaf_idx_prefix.checked_shl(remaining).unwrap_or(usize::MAX);
-                min_leaf_idx < *leaf_count
-            }
-            crate::kd_tree::StemLeafResolution::Mapped { .. } => {
-                stem_idx < self.stems.len()
-                    || self.stem_leaf_resolution.is_terminal_stem_idx(stem_idx)
-            }
-        }
+        let _ = (level, leaf_idx_prefix);
+        stem_idx < self.stems().len() || self.stem_leaf_resolution().is_terminal_stem_idx(stem_idx)
     }
 
     /// Backtracking query
     #[inline(always)]
-    pub(crate) fn backtracking_query<QC, O, D>(
+    fn backtracking_query<QC, O, D>(
         &self,
         query_ctx: &mut QC,
         process_leaf: impl FnMut(usize, &[O; K], &mut QC),
@@ -255,7 +242,7 @@ where
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS> + Default + 'static,
     {
-        if self.stem_leaf_resolution.uses_arithmetic() && SS::BLOCK_SIZE == 1 {
+        if self.stem_leaf_resolution().uses_arithmetic() && SS::BLOCK_SIZE == 1 {
             self.arithmetic_query::<QC, O, D>(query_ctx, process_leaf);
             return;
         }
@@ -268,7 +255,7 @@ where
 
     /// Backtracking query with explicit stack
     #[inline(always)]
-    pub(crate) fn backtracking_query_with_stack<QC, O, D>(
+    fn backtracking_query_with_stack<QC, O, D>(
         &self,
         query_ctx: &mut QC,
         stack: &mut SS::Stack<O>,
@@ -285,12 +272,12 @@ where
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS>,
     {
-        if self.stem_leaf_resolution.uses_arithmetic() && SS::BLOCK_SIZE == 1 {
+        if self.stem_leaf_resolution().uses_arithmetic() && SS::BLOCK_SIZE == 1 {
             self.arithmetic_query_with_stack::<QC, O, D>(query_ctx, stack, process_leaf);
             return;
         }
 
-        SS::backtracking_query_with_stack::<A, T, O, D, QC, LS, K, B>(
+        SS::backtracking_query_with_stack::<Self, A, T, O, D, QC, LS, K, B>(
             self,
             query_ctx,
             stack,
@@ -302,7 +289,7 @@ where
     /// Called by default StemStrategy::backtracking_query_with_stack implementation.
     /// SIMD strategies override the trait method with custom implementations.
     #[inline(always)]
-    pub(crate) fn backtracking_query_with_stack_impl<QC, O, D>(
+    fn backtracking_query_with_stack_impl<QC, O, D>(
         &self,
         query_ctx: &mut QC,
         stack: &mut SS::Stack<O>,
@@ -316,7 +303,7 @@ where
         SS::Stack<O>: StackTrait<O, SS>,
         SS::StackContext<O>: ScalarStackContext<O, SS::DeferredState>,
     {
-        let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
+        let stems_ptr = NonNull::new(self.stems().as_ptr() as *mut u8).unwrap();
         let mut stem_strat: SS = SS::new(stems_ptr);
 
         let query: [A; K] = *query_ctx.query();
@@ -331,8 +318,12 @@ where
             O::zero(),
             O::zero(),
         ));
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_query_stack_push();
 
         while let Some(stack_ctx) = stack.pop() {
+            #[cfg(feature = "result_collection_stats")]
+            crate::result_collection_stats::record_query_stack_pop();
             #[cfg(feature = "test_utils")]
             crate::test_utils::exact_query_stats::record_scalar_stack_pop();
 
@@ -350,6 +341,8 @@ where
             let should_prune = rd_vs_max == std::cmp::Ordering::Greater
                 || (query_ctx.prune_on_equal_max_dist() && rd_vs_max == std::cmp::Ordering::Equal);
             if should_prune {
+                #[cfg(feature = "result_collection_stats")]
+                crate::result_collection_stats::record_query_prune();
                 tracing::trace!(%rd, %max_dist, "SCALAR Prune check: PRUNE");
                 continue;
             }
@@ -382,7 +375,7 @@ where
 
     /// Arithmetic-resolution backtracking query.
     #[inline(always)]
-    pub(crate) fn arithmetic_query<QC, O, D>(
+    fn arithmetic_query<QC, O, D>(
         &self,
         query_ctx: &mut QC,
         process_leaf: impl FnMut(usize, &[O; K], &mut QC),
@@ -401,7 +394,7 @@ where
 
     /// Arithmetic-resolution backtracking query with explicit stack.
     #[inline(always)]
-    pub(crate) fn arithmetic_query_with_stack<QC, O, D>(
+    fn arithmetic_query_with_stack<QC, O, D>(
         &self,
         query_ctx: &mut QC,
         stack: &mut SS::Stack<O>,
@@ -415,7 +408,7 @@ where
         SS::Stack<O>: StackTrait<O, SS>,
         SS::StackContext<O>: ScalarStackContext<O, SS::DeferredState>,
     {
-        SS::arithmetic_query_with_stack::<A, T, O, D, QC, LS, K, B>(
+        SS::arithmetic_query_with_stack::<Self, A, T, O, D, QC, LS, K, B>(
             self,
             query_ctx,
             stack,
@@ -426,7 +419,7 @@ where
     /// Implementation of arithmetic-resolution query with scalar stack.
     /// Called by default StemStrategy::arithmetic_query_with_stack implementation.
     #[inline(always)]
-    pub(crate) fn arithmetic_query_with_stack_impl<QC, O, D>(
+    fn arithmetic_query_with_stack_impl<QC, O, D>(
         &self,
         query_ctx: &mut QC,
         stack: &mut SS::Stack<O>,
@@ -439,11 +432,11 @@ where
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS>,
     {
-        if self.is_empty() {
+        if self.size() == 0 {
             return;
         }
 
-        let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
+        let stems_ptr = NonNull::new(self.stems().as_ptr() as *mut u8).unwrap();
         let mut stem_strat: SS = SS::new(stems_ptr);
 
         let query: [A; K] = *query_ctx.query();
@@ -459,8 +452,12 @@ where
             O::zero(),
             O::zero(),
         ));
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_query_stack_push();
 
         while let Some(stack_ctx) = stack.pop() {
+            #[cfg(feature = "result_collection_stats")]
+            crate::result_collection_stats::record_query_stack_pop();
             let (stem_state, restore_dim, old_off, rd) =
                 SS::StackContext::<O>::into_parts_with_restore_dim(stack_ctx);
             stem_strat.rehydrate_deferred_state(stem_state);
@@ -471,6 +468,8 @@ where
             let should_prune = rd_vs_max == std::cmp::Ordering::Greater
                 || (query_ctx.prune_on_equal_max_dist() && rd_vs_max == std::cmp::Ordering::Equal);
             if should_prune {
+                #[cfg(feature = "result_collection_stats")]
+                crate::result_collection_stats::record_query_prune();
                 continue;
             }
 
@@ -478,11 +477,11 @@ where
             let best_dist = query_ctx.max_dist();
 
             loop {
-                if stem_strat.level() > self.max_stem_level {
+                if stem_strat.level() > self.max_stem_level() {
                     break;
                 }
 
-                let pivot = unsafe { *self.stems.get_unchecked(stem_strat.stem_idx()) };
+                let pivot = unsafe { *self.stems().get_unchecked(stem_strat.stem_idx()) };
                 if pivot < A::max_value() {
                     let query_elem = unsafe { *query.get_unchecked(dim) };
                     let is_right_child = query_elem >= pivot;
@@ -498,11 +497,14 @@ where
                     let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
 
                     if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
-                        stack.push(SS::StackContext::<O>::from_parts(
+                        stack.push(SS::StackContext::<O>::from_parts_with_restore_dim(
                             far_ctx.deferred_state(),
+                            dim,
                             new_off,
                             rd_far,
                         ));
+                        #[cfg(feature = "result_collection_stats")]
+                        crate::result_collection_stats::record_query_stack_push();
                     }
                 } else {
                     stem_strat.traverse(false);
@@ -555,13 +557,13 @@ where
             // Delegate to stem strategy for traversal step
             // Default impl does level-by-level, block-based strategies do block-at-once
             let should_continue = stem_strat.backtracking_traverse_step::<A, O, D, K>(
-                &self.stems,
+                self.stems(),
                 query,
                 query_wide,
                 off,
                 dim,
                 rd,
-                self.max_stem_level,
+                self.max_stem_level(),
                 best_dist,
                 stack,
             );
@@ -586,7 +588,7 @@ where
         // }
 
         Some(
-            self.stem_leaf_resolution
+            self.stem_leaf_resolution()
                 .resolve_terminal_stem_idx(stem_strat.stem_idx(), stem_strat.leaf_idx()),
         )
     }
@@ -594,7 +596,7 @@ where
     /// Implementation of backtracking query with SIMD stack.
     /// Called by DonnellyMarkerSimd's backtracking_query_with_stack override.
     #[inline(always)]
-    pub(crate) fn backtracking_query_with_block3_simd_stack_impl<QC, O, D>(
+    fn backtracking_query_with_block3_simd_stack_impl<QC, O, D>(
         &self,
         query_ctx: &mut QC,
         stack: &mut SS::Stack<O>,
@@ -618,7 +620,7 @@ where
             Block3ExactStackContext, Block3ExactStackContextState,
         };
 
-        let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
+        let stems_ptr = NonNull::new(self.stems().as_ptr() as *mut u8).unwrap();
         let stem_strat: SS = SS::new(stems_ptr);
 
         let query: [A; K] = *query_ctx.query();
@@ -634,8 +636,12 @@ where
         stack.push(
             <SS::StackContext<O> as Block3ExactStackContext<O, SS, K>>::new_single(stem_strat),
         );
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_query_stack_push();
 
         while let Some(ctx) = stack.pop() {
+            #[cfg(feature = "result_collection_stats")]
+            crate::result_collection_stats::record_query_stack_pop();
             match <SS::StackContext<O> as Block3ExactStackContext<O, SS, K>>::into_block3_exact_state(ctx) {
                 Block3ExactStackContextState::Single {
                     stem_strat: mut ss,
@@ -665,6 +671,8 @@ where
                         || (query_ctx.prune_on_equal_max_dist()
                             && rd_vs_max == std::cmp::Ordering::Equal);
                     if should_prune {
+                        #[cfg(feature = "result_collection_stats")]
+                        crate::result_collection_stats::record_query_prune();
                         tracing::trace!(%rd, %max_dist, "Prune check: PRUNE");
                         continue;
                     }
@@ -733,7 +741,7 @@ where
                         let mut upper_bounds = [O::zero(); 8];
                         let candidate_mask = base
                             .fill_block3_pending_values::<A, O, D, K>(
-                                &self.stems,
+                                self.stems(),
                                 query_wide_val,
                                 lower_bound,
                                 upper_bound,
@@ -769,7 +777,7 @@ where
                     } else {
                         let candidate_mask = base
                             .backtrack_block3_pending_mask::<A, O, D, K>(
-                                &self.stems,
+                                self.stems(),
                                 query_wide_val,
                                 lower_bound,
                                 upper_bound,
@@ -785,7 +793,7 @@ where
                             let child_idx = candidate_mask.trailing_zeros() as u8;
                             let (child_rd, child_off, child_lower_bound, child_upper_bound) = base
                                 .selected_block3_pending_child_state::<A, O, D>(
-                                    &self.stems,
+                                    self.stems(),
                                     child_idx,
                                     query_wide_val,
                                     lower_bound,
@@ -808,7 +816,7 @@ where
                             let mut upper_bounds = [O::zero(); 8];
                             let candidate_mask = base
                                 .fill_block3_pending_values::<A, O, D, K>(
-                                    &self.stems,
+                                    self.stems(),
                                     query_wide_val,
                                     lower_bound,
                                     upper_bound,
@@ -859,6 +867,8 @@ where
                         selected_upper_bound,
                     )) = selection
                     else {
+                        #[cfg(feature = "result_collection_stats")]
+                        crate::result_collection_stats::record_query_prune();
                         tracing::trace!("All Block3 children pruned");
                         continue;
                     };
@@ -922,6 +932,8 @@ where
                                 &upper,
                             ),
                         );
+                        #[cfg(feature = "result_collection_stats")]
+                        crate::result_collection_stats::record_query_stack_push();
                     }
 
                     let mut ss = base.block_child(selected_child_idx);
@@ -956,7 +968,7 @@ where
     /// Implementation of backtracking query with SIMD stack.
     /// Called by DonnellyMarkerSimd's backtracking_query_with_stack override.
     #[inline(always)]
-    pub(crate) fn backtracking_query_with_simd_stack_impl<QC, O, D>(
+    fn backtracking_query_with_simd_stack_impl<QC, O, D>(
         &self,
         query_ctx: &mut QC,
         stack: &mut SS::Stack<O>,
@@ -977,7 +989,7 @@ where
     {
         use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
 
-        let stems_ptr = NonNull::new(self.stems.as_ptr() as *mut u8).unwrap();
+        let stems_ptr = NonNull::new(self.stems().as_ptr() as *mut u8).unwrap();
         let stem_strat: SS = SS::new(stems_ptr);
 
         let query: [A; K] = *query_ctx.query();
@@ -991,9 +1003,13 @@ where
         let mut upper = [O::max_value(); K];
 
         stack.push(SimdQueryStackContext::new_single(stem_strat));
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_query_stack_push();
 
         // Backtracking loop
         while let Some(ctx) = stack.pop() {
+            #[cfg(feature = "result_collection_stats")]
+            crate::result_collection_stats::record_query_stack_pop();
             match ctx {
                 SimdQueryStackContext::Single {
                     stem_strat: mut ss,
@@ -1022,6 +1038,8 @@ where
                         || (query_ctx.prune_on_equal_max_dist()
                             && rd_vs_max == std::cmp::Ordering::Equal);
                     if should_prune {
+                        #[cfg(feature = "result_collection_stats")]
+                        crate::result_collection_stats::record_query_prune();
                         tracing::trace!(%rd, %max_dist, "Prune check: PRUNE");
                         continue;
                     }
@@ -1081,6 +1099,8 @@ where
                         &new_off_values,
                         simd::simd_prune_block(&rd_values, query_ctx.max_dist(), pending_mask),
                     ) else {
+                        #[cfg(feature = "result_collection_stats")]
+                        crate::result_collection_stats::record_query_prune();
                         tracing::trace!("All Block3 children pruned");
                         continue;
                     };
@@ -1098,6 +1118,8 @@ where
                             lower_bound,
                             upper_bound,
                         ));
+                        #[cfg(feature = "result_collection_stats")]
+                        crate::result_collection_stats::record_query_stack_push();
                     }
 
                     let mut ss = base.block_child(selection.child_idx);
@@ -1154,6 +1176,8 @@ where
                         simd::simd_prune_block::<O>(&rd_values, max_dist, sibling_mask);
 
                     if surviving_mask == 0 {
+                        #[cfg(feature = "result_collection_stats")]
+                        crate::result_collection_stats::record_query_prune();
                         tracing::trace!("All siblings pruned");
                         continue;
                     }
@@ -1262,6 +1286,8 @@ where
                         simd::simd_prune_block::<O>(&rd_values, max_dist, sibling_mask);
 
                     if surviving_mask == 0 {
+                        #[cfg(feature = "result_collection_stats")]
+                        crate::result_collection_stats::record_query_prune();
                         tracing::trace!("All deferred block siblings pruned");
                         continue;
                     }
@@ -1333,10 +1359,8 @@ where
             + crate::stem_strategies::donnelly_2_blockmarker_simd::DeferredBlockTraversal,
         SS::StackContext<O>: crate::kd_tree::query_stack_simd::SimdIntervalStackContext<O, SS>,
     {
-        let use_scalar_step = matches!(
-            self.stem_leaf_resolution,
-            crate::kd_tree::StemLeafResolution::Mapped { .. }
-        ) && SS::BLOCK_SIZE != 3
+        let use_scalar_step = !self.stem_leaf_resolution().uses_arithmetic()
+            && SS::BLOCK_SIZE != 3
             && !force_mapped_simd_block_step();
 
         loop {
@@ -1345,17 +1369,17 @@ where
             if let Some(leaf_idx) = self.resolve_terminal_stem(stem_idx) {
                 return Some(leaf_idx);
             }
-            let stem_oob = stem_idx >= self.stems.len();
+            let stem_oob = stem_idx >= self.stems().len();
 
             let should_continue = if use_scalar_step {
-                if stem_strat.level() > self.max_stem_level {
+                if stem_strat.level() > self.max_stem_level() {
                     false
                 } else {
                     let dim_val = *dim;
                     let pivot = if stem_oob {
                         A::max_value()
                     } else {
-                        unsafe { *self.stems.get_unchecked(stem_idx) }
+                        unsafe { *self.stems().get_unchecked(stem_idx) }
                     };
 
                     let old_off = unsafe { *off.get_unchecked(dim_val) };
@@ -1437,7 +1461,7 @@ where
                 }
             } else {
                 stem_strat.backtracking_traverse_step_with_bounds::<A, O, D, K>(
-                    &self.stems,
+                    self.stems(),
                     query,
                     query_wide,
                     lower,
@@ -1445,7 +1469,7 @@ where
                     off,
                     dim,
                     rd,
-                    self.max_stem_level,
+                    self.max_stem_level(),
                     best_dist,
                     stack,
                 )
@@ -1478,7 +1502,7 @@ where
         // }
 
         Some(
-            self.stem_leaf_resolution
+            self.stem_leaf_resolution()
                 .resolve_terminal_stem_idx(stem_strat.stem_idx(), stem_strat.leaf_idx()),
         )
     }

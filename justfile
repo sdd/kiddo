@@ -134,6 +134,18 @@ bench-v6-result-collection-focus FEATURES='simd,test_utils,logging_off' POINTS='
     RUSTFLAGS='-C target-cpu=native' \
     cargo criterion --bench v6_result_collection_focus --features {{FEATURES}}
 
+asm-v6-sorted-nearest-n-within-donnelly-pf-focus-clean FEATURES='simd,cargo_asm,logging_off' SUFFIX='baseline':
+    RUSTC_WRAPPER= cargo asm --simplify --features {{FEATURES}} --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "v6_sorted_nearest_n_within_donnelly_pf_focus_cargo_asm_hook" | python3 scripts/clean_cargo_asm.py > v6_sorted_nearest_n_within_donnelly_pf_focus_{{SUFFIX}}_clean.asm
+
+asm-v6-best-n-within-donnelly-pf-focus-clean FEATURES='simd,cargo_asm,logging_off' SUFFIX='baseline':
+    RUSTC_WRAPPER= cargo asm --simplify --features {{FEATURES}} --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "v6_best_n_within_donnelly_pf_focus_cargo_asm_hook" | python3 scripts/clean_cargo_asm.py > v6_best_n_within_donnelly_pf_focus_{{SUFFIX}}_clean.asm
+
+asm-v6-result-collection-hook-clean HOOK FEATURES='simd,cargo_asm,logging_off' SUFFIX='baseline':
+    RUSTC_WRAPPER= cargo asm --simplify --features {{FEATURES}} --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "{{HOOK}}" | python3 scripts/clean_cargo_asm.py > {{HOOK}}_{{SUFFIX}}_clean.asm
+
+mca-v6-result-collection-focus ASM_FILE OUT_FILE:
+    llvm-mca -march=x86-64 -mcpu=znver5 -x86-asm-syntax=intel -skip-unsupported-instructions=parse-failure --instruction-info --summary-view {{ASM_FILE}} > {{OUT_FILE}} 2>&1
+
 profile-v6-stem-exact-stats FEATURES='simd,test_utils,logging_off' POINTS='4194304' QUERIES='10000' REPEATS='1':
     RUSTC_WRAPPER= \
     KIDDO_PROFILE_POINTS={{POINTS}} \
@@ -141,6 +153,23 @@ profile-v6-stem-exact-stats FEATURES='simd,test_utils,logging_off' POINTS='41943
     KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
     RUSTFLAGS='-C target-cpu=native' \
     cargo run --release --bin profile_v6_stem_exact_stats --features {{FEATURES}}
+
+build-v6-profile-archives FEATURES='rkyv_08,simd,test_utils,logging_off' POINTS='16777216' QUERIES='100' PREFIX='./target/kiddo-profile-v6-result-collection':
+    RUSTC_WRAPPER= \
+    KIDDO_PROFILE_POINTS={{POINTS}} \
+    KIDDO_PROFILE_QUERIES={{QUERIES}} \
+    KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo run --release --bin build_v6_profile_archives --features {{FEATURES}}
+
+profile-v6-result-collection-stats FEATURES='rkyv_08,simd,test_utils,result_collection_stats,logging_off' REPEATS='1' MAX_QTY='16' MAX_DIST='0.0025' PREFIX='./target/kiddo-profile-v6-result-collection':
+    RUSTC_WRAPPER= \
+    KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
+    KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
+    KIDDO_PROFILE_MAX_QTY={{MAX_QTY}} \
+    KIDDO_PROFILE_MAX_DIST={{MAX_DIST}} \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo run --release --bin profile_v6_result_collection_stats --features {{FEATURES}}
 
 repro-donnelly-block3-exact-divergence FEATURES='simd,test_utils,logging_off' POINTS='4194304' QUERIES='10000':
     RUSTC_WRAPPER= \

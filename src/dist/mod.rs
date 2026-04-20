@@ -44,7 +44,7 @@ use crate::traits_unified_2::AxisUnified;
 use crate::{
     kd_tree::{
         leaf_view::{LeafArena, LeafView},
-        result_collection::ResultCollection,
+        result_collection::{BestNeighbourResultCollection, ResultCollection},
     },
     BestNeighbour, NearestNeighbour,
 };
@@ -55,59 +55,44 @@ pub use squared_euclidean::SquaredEuclidean;
 
 macro_rules! with_nearest_result_emitter {
     ($results:expr, $distance_ty:ty, $item_ty:ty, $emit:ident, $body:block) => {{
-        #[cfg(feature = "buffered_result_collection")]
-        let mut buffer = crate::kd_tree::result_collection::ResultBuffer::new();
-
         let mut $emit = |candidate_dist: $distance_ty, item: $item_ty| {
+            #[cfg(feature = "result_collection_stats")]
+            crate::result_collection_stats::record_candidate_emitted();
+
             let candidate = NearestNeighbour {
                 distance: std::mem::transmute_copy::<$distance_ty, Self::Output>(&candidate_dist),
                 item,
             };
 
-            #[cfg(feature = "buffered_result_collection")]
-            {
-                buffer.push(candidate);
-            }
-
-            #[cfg(not(feature = "buffered_result_collection"))]
-            {
-                $results.add(candidate);
-            }
+            $results.add(candidate);
         };
 
         $body
-
-        #[cfg(feature = "buffered_result_collection")]
-        crate::kd_tree::result_collection::flush_result_buffer($results, &mut buffer);
     }};
 }
 
 macro_rules! with_best_result_emitter {
-    ($results:expr, $distance_ty:ty, $item_ty:ty, $emit:ident, $body:block) => {{
-        #[cfg(feature = "buffered_result_collection")]
-        let mut buffer = crate::kd_tree::result_collection::ResultBuffer::new();
-
+    ($results:expr, $threshold_item:expr, $distance_ty:ty, $item_ty:ty, $emit:ident, $body:block) => {{
+        let threshold_item = $threshold_item;
         let mut $emit = |candidate_dist: $distance_ty, item: $item_ty| {
+            if threshold_item.is_some_and(|worst_item| item >= worst_item) {
+                #[cfg(feature = "result_collection_stats")]
+                crate::result_collection_stats::record_best_item_threshold_reject();
+                return;
+            }
+
+            #[cfg(feature = "result_collection_stats")]
+            crate::result_collection_stats::record_candidate_emitted();
+
             let candidate = BestNeighbour {
                 distance: std::mem::transmute_copy::<$distance_ty, Self::Output>(&candidate_dist),
                 item,
             };
 
-            #[cfg(feature = "buffered_result_collection")]
-            {
-                buffer.push(candidate);
-            }
-
-            #[cfg(not(feature = "buffered_result_collection"))]
-            {
-                $results.add(candidate);
-            }
+            $results.add(candidate);
         };
 
         $body
-
-        #[cfg(feature = "buffered_result_collection")]
-        crate::kd_tree::result_collection::flush_result_buffer($results, &mut buffer);
     }};
 }
 
@@ -399,13 +384,14 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
         leaf: &LeafView<'_, A, T, K, B>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
+        threshold_item: Option<T>,
         results: &mut R,
     ) -> bool
     where
         A: AxisUnified<Coord = A> + 'static,
         T: crate::traits_unified_2::Basics + Ord,
         Self::Output: AxisUnified<Coord = Self::Output> + 'static,
-        R: ResultCollection<Self::Output, BestNeighbour<Self::Output, T>>,
+        R: BestNeighbourResultCollection<Self::Output, T>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
             && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
@@ -416,7 +402,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
                 &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f64, T, K, B>);
             let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
             let max_dist = *(&max_dist as *const Self::Output as *const f64);
-            with_best_result_emitter!(results, f64, T, emit, {
+            with_best_result_emitter!(results, threshold_item, f64, T, emit, {
                 crate::kd_tree::leaf_view_chunked::best_n_within::avx512::best_n_within_avx512_unchecked::<
                     Self::Avx512F64Ops,
                     T,
@@ -438,7 +424,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
                 &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f32, T, K, B>);
             let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
             let max_dist = *(&max_dist as *const Self::Output as *const f32);
-            with_best_result_emitter!(results, f32, T, emit, {
+            with_best_result_emitter!(results, threshold_item, f32, T, emit, {
                 crate::kd_tree::leaf_view_chunked::best_n_within::avx512::best_n_within_avx512_unchecked_f32::<
                     Self::Avx512F32Ops,
                     T,
@@ -461,13 +447,14 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
         arena: &LeafArena<'_, A, T, K>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
+        threshold_item: Option<T>,
         results: &mut R,
     ) -> bool
     where
         A: AxisUnified<Coord = A> + 'static,
         T: crate::traits_unified_2::Basics + Ord,
         Self::Output: AxisUnified<Coord = Self::Output> + 'static,
-        R: ResultCollection<Self::Output, BestNeighbour<Self::Output, T>>,
+        R: BestNeighbourResultCollection<Self::Output, T>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
             && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
@@ -476,7 +463,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
         {
             let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
             let max_dist = *(&max_dist as *const Self::Output as *const f64);
-            with_best_result_emitter!(results, f64, T, emit, {
+            with_best_result_emitter!(results, threshold_item, f64, T, emit, {
                 let mut tile_base = arena.as_ptr();
                 let mut remaining = arena.len();
 
@@ -505,7 +492,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
         {
             let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
             let max_dist = *(&max_dist as *const Self::Output as *const f32);
-            with_best_result_emitter!(results, f32, T, emit, {
+            with_best_result_emitter!(results, threshold_item, f32, T, emit, {
                 let mut tile_base = arena.as_ptr();
                 let mut remaining = arena.len();
 
@@ -689,13 +676,14 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
         leaf: &LeafView<'_, A, T, K, B>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
+        threshold_item: Option<T>,
         results: &mut R,
     ) -> bool
     where
         A: AxisUnified<Coord = A> + 'static,
         T: crate::traits_unified_2::Basics + Ord,
         Self::Output: AxisUnified<Coord = Self::Output> + 'static,
-        R: ResultCollection<Self::Output, BestNeighbour<Self::Output, T>>,
+        R: BestNeighbourResultCollection<Self::Output, T>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
             && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
@@ -706,7 +694,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
                 &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f64, T, K, B>);
             let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
             let max_dist = *(&max_dist as *const Self::Output as *const f64);
-            with_best_result_emitter!(results, f64, T, emit, {
+            with_best_result_emitter!(results, threshold_item, f64, T, emit, {
                 crate::kd_tree::leaf_view_chunked::best_n_within::avx2::best_n_within_avx2_unchecked_f64::<
                     Self::Avx2F64Ops,
                     T,
@@ -728,7 +716,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
                 &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f32, T, K, B>);
             let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
             let max_dist = *(&max_dist as *const Self::Output as *const f32);
-            with_best_result_emitter!(results, f32, T, emit, {
+            with_best_result_emitter!(results, threshold_item, f32, T, emit, {
                 crate::kd_tree::leaf_view_chunked::best_n_within::avx2::best_n_within_avx2_unchecked_f32::<
                     Self::Avx2F32Ops,
                     T,
@@ -751,13 +739,14 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
         arena: &LeafArena<'_, A, T, K>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
+        threshold_item: Option<T>,
         results: &mut R,
     ) -> bool
     where
         A: AxisUnified<Coord = A> + 'static,
         T: crate::traits_unified_2::Basics + Ord,
         Self::Output: AxisUnified<Coord = Self::Output> + 'static,
-        R: ResultCollection<Self::Output, BestNeighbour<Self::Output, T>>,
+        R: BestNeighbourResultCollection<Self::Output, T>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
             && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
@@ -766,7 +755,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
         {
             let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
             let max_dist = *(&max_dist as *const Self::Output as *const f64);
-            with_best_result_emitter!(results, f64, T, emit, {
+            with_best_result_emitter!(results, threshold_item, f64, T, emit, {
                 let mut tile_base = arena.as_ptr();
                 let mut remaining = arena.len();
 
@@ -795,7 +784,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
         {
             let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
             let max_dist = *(&max_dist as *const Self::Output as *const f32);
-            with_best_result_emitter!(results, f32, T, emit, {
+            with_best_result_emitter!(results, threshold_item, f32, T, emit, {
                 let mut tile_base = arena.as_ptr();
                 let mut remaining = arena.len();
 
@@ -979,13 +968,14 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
         leaf: &LeafView<'_, A, T, K, B>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
+        threshold_item: Option<T>,
         results: &mut R,
     ) -> bool
     where
         A: AxisUnified<Coord = A> + 'static,
         T: crate::traits_unified_2::Basics + Ord,
         Self::Output: AxisUnified<Coord = Self::Output> + 'static,
-        R: ResultCollection<Self::Output, BestNeighbour<Self::Output, T>>,
+        R: BestNeighbourResultCollection<Self::Output, T>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
             && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
@@ -996,7 +986,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
                 &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f64, T, K, B>);
             let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
             let max_dist = *(&max_dist as *const Self::Output as *const f64);
-            with_best_result_emitter!(results, f64, T, emit, {
+            with_best_result_emitter!(results, threshold_item, f64, T, emit, {
                 crate::kd_tree::leaf_view_chunked::best_n_within::neon::best_n_within_neon_unchecked_f64::<
                     Self::NeonF64Ops,
                     T,
@@ -1018,7 +1008,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
                 &*(leaf as *const LeafView<'_, A, T, K, B> as *const LeafView<'_, f32, T, K, B>);
             let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
             let max_dist = *(&max_dist as *const Self::Output as *const f32);
-            with_best_result_emitter!(results, f32, T, emit, {
+            with_best_result_emitter!(results, threshold_item, f32, T, emit, {
                 crate::kd_tree::leaf_view_chunked::best_n_within::neon::best_n_within_neon_unchecked_f32::<
                     Self::NeonF32Ops,
                     T,
@@ -1041,13 +1031,14 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
         arena: &LeafArena<'_, A, T, K>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
+        threshold_item: Option<T>,
         results: &mut R,
     ) -> bool
     where
         A: AxisUnified<Coord = A> + 'static,
         T: crate::traits_unified_2::Basics + Ord,
         Self::Output: AxisUnified<Coord = Self::Output> + 'static,
-        R: ResultCollection<Self::Output, BestNeighbour<Self::Output, T>>,
+        R: BestNeighbourResultCollection<Self::Output, T>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
             && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
@@ -1056,7 +1047,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
         {
             let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f64; K]);
             let max_dist = *(&max_dist as *const Self::Output as *const f64);
-            with_best_result_emitter!(results, f64, T, emit, {
+            with_best_result_emitter!(results, threshold_item, f64, T, emit, {
                 let mut tile_base = arena.as_ptr();
                 let mut remaining = arena.len();
 
@@ -1085,7 +1076,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
         {
             let query_wide = &*(query_wide as *const [Self::Output; K] as *const [f32; K]);
             let max_dist = *(&max_dist as *const Self::Output as *const f32);
-            with_best_result_emitter!(results, f32, T, emit, {
+            with_best_result_emitter!(results, threshold_item, f32, T, emit, {
                 let mut tile_base = arena.as_ptr();
                 let mut remaining = arena.len();
 

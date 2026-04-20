@@ -26,19 +26,19 @@ pub(crate) trait Mutability: sealed::Sealed + 'static {
     /// Returns true if this is a mutable strategy
     fn is_mutable() -> bool;
 
-    /// Creates the appropriate StemLeafResolution for this mutability type
+    /// Creates the appropriate OwnedStemLeafResolution for this mutability type
     fn initial_stem_leaf_resolution<SS: StemStrategy>(
         stems_depth: usize,
         leaf_count: usize,
-    ) -> crate::kd_tree::StemLeafResolution;
+    ) -> crate::kd_tree::OwnedStemLeafResolution;
 }
 
 fn build_mapped_stem_leaf_resolution<SS: StemStrategy>(
     stems_depth: usize,
     leaf_count: usize,
-) -> crate::kd_tree::StemLeafResolution {
+) -> crate::kd_tree::OwnedStemLeafResolution {
     if leaf_count == 0 {
-        return crate::kd_tree::StemLeafResolution::Mapped {
+        return crate::kd_tree::OwnedStemLeafResolution::Mapped {
             min_stem_leaf_idx: 0,
             leaf_idx_map: Vec::new(),
         };
@@ -74,7 +74,7 @@ fn build_mapped_stem_leaf_resolution<SS: StemStrategy>(
             Some(NonMaxUsize::new(leaf_idx).expect("leaf_idx overflow"));
     }
 
-    crate::kd_tree::StemLeafResolution::Mapped {
+    crate::kd_tree::OwnedStemLeafResolution::Mapped {
         min_stem_leaf_idx,
         leaf_idx_map,
     }
@@ -95,8 +95,8 @@ impl Mutability for Immutable {
     fn initial_stem_leaf_resolution<SS: StemStrategy>(
         stems_depth: usize,
         leaf_count: usize,
-    ) -> crate::kd_tree::StemLeafResolution {
-        crate::kd_tree::StemLeafResolution::Arithmetic {
+    ) -> crate::kd_tree::OwnedStemLeafResolution {
+        crate::kd_tree::OwnedStemLeafResolution::Arithmetic {
             stems_depth,
             leaf_count,
         }
@@ -118,7 +118,7 @@ impl Mutability for Mutable {
     fn initial_stem_leaf_resolution<SS: StemStrategy>(
         stems_depth: usize,
         leaf_count: usize,
-    ) -> crate::kd_tree::StemLeafResolution {
+    ) -> crate::kd_tree::OwnedStemLeafResolution {
         // Start in Mapped state with min_stem_leaf_idx = 0 for simplicity.
         // TODO: Optimize later with Pristine state and dynamic min_stem_leaf_idx
         build_mapped_stem_leaf_resolution::<SS>(stems_depth, leaf_count)
@@ -187,7 +187,7 @@ pub enum LeafProjection {
     LeafArena,
 }
 
-/// Strategy for how leaf storage is laid out and constructed.
+/// Query/access strategy for how leaf storage is laid out.
 /// - AX: Axis marker implementing AxisUnified (selects float or fixed semantics).
 /// - T: item/content type stored alongside points.
 /// - SS: stem layout strategy used to map split values into KdTree::stems (external).
@@ -195,7 +195,7 @@ pub enum LeafProjection {
 /// - B: nominal bucket size (strategies may use or ignore it).
 pub trait LeafStrategy<AX, T, SS, const K: usize, const B: usize>
 where
-    AX: AxisUnified,
+    AX: AxisUnified<Coord = AX>,
     T: Basics,
     SS: StemStrategy,
 {
@@ -211,14 +211,6 @@ where
 
     /// The leaf projection exposed by this strategy.
     const LEAF_PROJECTION: LeafProjection;
-
-    // ---- Construction ----
-
-    /// Create a builder with an intended capacity (in points).
-    fn new_with_capacity(capacity: usize) -> Self;
-
-    /// Create a new LeafStrategy with a single, empty leaf
-    fn new_with_empty_leaf() -> Self;
 
     // ---- Introspection / minimal accessors ----
 
@@ -243,8 +235,18 @@ where
         unimplemented!("leaf_arena is unsupported for this leaf strategy")
     }
 
-    /// Appends a new leaf to the storage.
-    fn append_leaf(&mut self, leaf_points: &[&[AX]; K], leaf_items: &[T]);
+    /// Returns the point/item pair at `pos_in_leaf`.
+    #[inline(always)]
+    fn leaf_point_item(&self, leaf_idx: usize, pos_in_leaf: usize) -> ([AX; K], T)
+    where
+        AX: Copy,
+        T: Copy,
+    {
+        match Self::LEAF_PROJECTION {
+            LeafProjection::LeafView => self.leaf_view(leaf_idx).point_item(pos_in_leaf),
+            LeafProjection::LeafArena => self.leaf_arena(leaf_idx).point_item(pos_in_leaf),
+        }
+    }
 
     /// Best-effort hook for enabling transparent huge pages on large contiguous buffers.
     ///
@@ -254,11 +256,31 @@ where
     fn maybe_enable_huge_pages(&self) {}
 }
 
-/// Trait for leaf strategies that support mutation (adding/removing points).
-pub trait MutableLeafStrategy<AX, T, SS, const K: usize, const B: usize>:
+/// Leaf strategies that can be constructed by `KdTree` builders.
+///
+/// Archived leaf strategies only need to implement [`LeafStrategy`], not this trait.
+pub trait ConstructibleLeafStrategy<AX, T, SS, const K: usize, const B: usize>:
     LeafStrategy<AX, T, SS, K, B>
 where
-    AX: AxisUnified,
+    AX: AxisUnified<Coord = AX>,
+    T: Basics,
+    SS: StemStrategy,
+{
+    /// Create a builder with an intended capacity (in points).
+    fn new_with_capacity(capacity: usize) -> Self;
+
+    /// Create a new LeafStrategy with a single, empty leaf.
+    fn new_with_empty_leaf() -> Self;
+
+    /// Appends a new leaf to the storage.
+    fn append_leaf(&mut self, leaf_points: &[&[AX]; K], leaf_items: &[T]);
+}
+
+/// Trait for leaf strategies that support mutation (adding/removing points).
+pub trait MutableLeafStrategy<AX, T, SS, const K: usize, const B: usize>:
+    ConstructibleLeafStrategy<AX, T, SS, K, B>
+where
+    AX: AxisUnified<Coord = AX>,
     T: Basics,
     SS: StemStrategy,
 {
@@ -438,7 +460,7 @@ macro_rules! impl_axis_float {
                 // );
                 if a < b {
                     std::cmp::Ordering::Less
-                } else if b > a {
+                } else if a > b {
                     std::cmp::Ordering::Greater
                 } else {
                     std::cmp::Ordering::Equal
@@ -737,4 +759,20 @@ pub fn bench_update_nearest_f32_64(
     update_nearest(&acc, items, &mut best_dist, &mut best_item);
 
     (best_dist, best_item)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AxisUnified;
+
+    #[test]
+    fn float_axis_cmp_orders_greater_correctly() {
+        assert_eq!(f64::cmp(2.0, 1.0), std::cmp::Ordering::Greater);
+        assert_eq!(f64::cmp(1.0, 2.0), std::cmp::Ordering::Less);
+        assert_eq!(f64::cmp(1.5, 1.5), std::cmp::Ordering::Equal);
+
+        assert_eq!(f32::cmp(2.0, 1.0), std::cmp::Ordering::Greater);
+        assert_eq!(f32::cmp(1.0, 2.0), std::cmp::Ordering::Less);
+        assert_eq!(f32::cmp(1.5, 1.5), std::cmp::Ordering::Equal);
+    }
 }

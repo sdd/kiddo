@@ -2,6 +2,7 @@ use crate::dist::KdTreeDistanceMetric;
 use crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
+use crate::kd_tree::KdTreeQueryOps;
 use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
 use crate::StemStrategy;
 

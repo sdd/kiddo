@@ -4,46 +4,54 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use elapsed::ElapsedDuration;
-use kiddo::immutable::float::kdtree::ArchivedR8ImmutableKdTree;
-use kiddo::stem_strategies::Eytzinger;
+use kiddo::kd_tree::leaf_strategies::VecOfArenas;
+use kiddo::kd_tree::ArchivedKdTree;
+use kiddo::stem_strategies::EytzingerPf;
+use kiddo::SquaredEuclidean;
 use memmap::MmapOptions;
-use rkyv_08::access_unchecked;
+use rkyv_08::access;
+use rkyv_08::rancor::Error as RkyvError;
 use rkyv_08::vec::ArchivedVec;
 
-const QUERY_POINT_QTY: usize = 20_000_000;
 const BUCKET_SIZE: usize = 2;
 
-type ArchivedTree = ArchivedR8ImmutableKdTree<f32, usize, Eytzinger<4>, 4, BUCKET_SIZE>;
+type ArchivedTree = ArchivedKdTree<
+    f32,
+    usize,
+    EytzingerPf<4, 4>,
+    VecOfArenas<f32, usize, 4, BUCKET_SIZE>,
+    4,
+    BUCKET_SIZE,
+>;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // faster unsafe ZC Deserialize API
     let start = Instant::now();
 
-    // memmap the tree file into a buffer
     let tree_file = File::open("./examples/immutable-test-tree-eytz-f32-rkyv_08.rkyv")?;
     let tree_buf = unsafe { MmapOptions::new().map(&tree_file)? };
-
-    // Get archived tree using unsafe method
-    let tree = unsafe { access_unchecked::<ArchivedTree>(&tree_buf) };
-
-    // memmap the tree file into a buffer
-    let query_file = File::open("./examples/immutable-test-points-f32-rkyv_08.rkyv")?;
-    let query_buf = unsafe { MmapOptions::new().map(&query_file)? };
-
-    // Get archived tree using unsafe method
-    let query_points = unsafe { access_unchecked::<ArchivedVec<[f32; 4]>>(&query_buf) };
-
+    let archived_tree = access::<ArchivedTree, RkyvError>(&tree_buf[..])?;
     println!(
-        "Deserialization complete. ({})",
-        ElapsedDuration::new(start.elapsed())
+        "Checked zero-copy metadata: size={} leaf_count={} max_stem_level={} max_leaf_len={}",
+        archived_tree.size(),
+        archived_tree.leaf_count(),
+        archived_tree.max_stem_level(),
+        archived_tree.max_leaf_len()
     );
 
-    println!("Performing {QUERY_POINT_QTY:?} random NN queries...");
+    let query_file = File::open("./examples/immutable-test-points-f32-rkyv_08.rkyv")?;
+    let query_buf = unsafe { MmapOptions::new().map(&query_file)? };
+    let query_points = access::<ArchivedVec<[f32; 4]>, RkyvError>(&query_buf[..])?;
+
+    println!(
+        "Zero-copy access complete. ({})",
+        ElapsedDuration::new(start.elapsed())
+    );
+    println!("Running {} approximate NN queries...", query_points.len());
 
     let start = Instant::now();
-    query_points.iter().for_each(|point| {
-        black_box(tree.get_leaf_node_idx(point));
-    });
+    for point in query_points.iter() {
+        black_box(archived_tree.approx_nearest_one::<SquaredEuclidean<f32>>(point));
+    }
     println!(
         "Queries complete. ({})",
         ElapsedDuration::new(start.elapsed())

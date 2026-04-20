@@ -1,6 +1,6 @@
 use crate::dist::KdTreeDistanceMetric;
 use crate::kd_tree::leaf_view::{LeafArena, LeafView, TlsLeafScratch};
-use crate::kd_tree::result_collection::ResultCollection;
+use crate::kd_tree::result_collection::BestNeighbourResultCollection;
 use crate::traits_unified_2::{AxisUnified, Basics};
 use crate::BestNeighbour;
 
@@ -9,16 +9,23 @@ pub(crate) fn best_n_within_with_query_wide_fallback<AX, T, D, R, const K: usize
     leaf: &LeafView<'_, AX, T, K, B>,
     query_wide: &[D::Output; K],
     dist: D::Output,
+    threshold_item: Option<T>,
     results: &mut R,
 ) where
     AX: AxisUnified<Coord = AX> + 'static,
     T: Basics + Ord,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
-    R: ResultCollection<D::Output, BestNeighbour<D::Output, T>>,
+    R: BestNeighbourResultCollection<D::Output, T>,
 {
     leaf.with_dists_for_slice_wide::<D, _>(query_wide, |dists| {
-        LeafView::<AX, T, K, B>::update_best_dists(dists, leaf.items(), dist, results);
+        LeafView::<AX, T, K, B>::update_best_dists(
+            dists,
+            leaf.items(),
+            dist,
+            threshold_item,
+            results,
+        );
     });
 }
 
@@ -27,20 +34,18 @@ pub(crate) fn best_n_within_with_query_wide_arena_fallback<AX, T, D, R, const K:
     arena: &LeafArena<'_, AX, T, K>,
     query_wide: &[D::Output; K],
     dist: D::Output,
+    threshold_item: Option<T>,
     results: &mut R,
 ) where
     AX: AxisUnified<Coord = AX> + 'static,
     T: Basics + Ord,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: AxisUnified<Coord = D::Output> + 'static,
-    R: ResultCollection<D::Output, BestNeighbour<D::Output, T>>,
+    R: BestNeighbourResultCollection<D::Output, T>,
 {
     if arena.is_empty() {
         return;
     }
-
-    #[cfg(feature = "buffered_result_collection")]
-    let mut buffer = crate::kd_tree::result_collection::ResultBuffer::new();
 
     arena.for_each_tiled_chunk(|tile| {
         for idx in 0..tile.len() {
@@ -54,24 +59,22 @@ pub(crate) fn best_n_within_with_query_wide_arena_fallback<AX, T, D, R, const K:
             }
 
             if candidate_dist <= dist {
+                let item = unsafe { tile.item_unaligned(idx) };
+                if threshold_item.is_some_and(|worst_item| item >= worst_item) {
+                    #[cfg(feature = "result_collection_stats")]
+                    crate::result_collection_stats::record_best_item_threshold_reject();
+                    continue;
+                }
+                #[cfg(feature = "result_collection_stats")]
+                crate::result_collection_stats::record_candidate_emitted();
+
                 let candidate = BestNeighbour {
                     distance: candidate_dist,
-                    item: unsafe { tile.item_unaligned(idx) },
+                    item,
                 };
 
-                #[cfg(feature = "buffered_result_collection")]
-                {
-                    buffer.push(candidate);
-                }
-
-                #[cfg(not(feature = "buffered_result_collection"))]
-                {
-                    results.add(candidate);
-                }
+                results.add(candidate);
             }
         }
     });
-
-    #[cfg(feature = "buffered_result_collection")]
-    crate::kd_tree::result_collection::flush_result_buffer(results, &mut buffer);
 }

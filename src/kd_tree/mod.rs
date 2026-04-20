@@ -1,6 +1,9 @@
 //! Flexible kd-trees that can be used with float or fixed point, mutable or immutable, and selectable stem ordering strategies
 
+#[cfg(feature = "rkyv_08")]
+mod archived_query;
 mod construction;
+mod iter;
 /// Leaf storage strategies for the kd-tree
 pub mod leaf_strategies;
 /// Leaf view abstraction for accessing leaf data
@@ -8,25 +11,90 @@ pub mod leaf_view;
 // #[cfg(feature = "leaf_view_chunked")]
 pub(crate) mod leaf_view_chunked;
 mod query;
-mod query_orchestrator;
+pub(crate) mod query_orchestrator;
 pub(crate) mod query_stack;
 pub(crate) mod query_stack_simd;
 pub(crate) mod result_collection;
 pub(crate) mod traits;
 
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
+pub use iter::{KdTreeIter, WithinUnsortedIter};
+pub use query_orchestrator::KdTreeQueryOps;
+
+use crate::traits_unified_2::{AxisUnified, Basics, ConstructibleLeafStrategy, LeafStrategy};
 use crate::StemStrategy;
 use aligned_vec::{AVec, CACHELINE_ALIGN};
 use nonmax::NonMaxUsize;
 
-/// Strategy for resolving stem indices to leaf indices during traversal.
+/// Query-facing interface for resolving stem indices to leaf indices during traversal.
+pub trait StemLeafResolution {
+    /// Returns true if this resolution strategy uses arithmetic (fast path).
+    fn uses_arithmetic(&self) -> bool;
+
+    /// Resolves a terminal stem index to a leaf index.
+    fn resolve_terminal_stem_idx(&self, stem_idx: usize, arithmetic_leaf_idx: usize) -> usize;
+
+    /// Returns true if `stem_idx` has an explicit terminal mapping in mapped mode.
+    fn is_terminal_stem_idx(&self, stem_idx: usize) -> bool;
+}
+
+#[inline(always)]
+fn resolve_arithmetic_terminal_stem_idx(
+    stem_idx: usize,
+    arithmetic_leaf_idx: usize,
+    stems_depth: usize,
+    leaf_count: usize,
+) -> usize {
+    if arithmetic_leaf_idx >= leaf_count {
+        panic!(
+            "arithmetic leaf resolution out of bounds: stem_idx={} arithmetic_leaf_idx={} leaf_count={} stems_depth={}",
+            stem_idx, arithmetic_leaf_idx, leaf_count, stems_depth
+        );
+    }
+
+    arithmetic_leaf_idx
+}
+
+#[inline(always)]
+fn resolve_mapped_terminal_stem_idx(
+    stem_idx: usize,
+    min_stem_leaf_idx: usize,
+    map_len: usize,
+    mut get_map_entry: impl FnMut(usize) -> Option<usize>,
+) -> usize {
+    if stem_idx >= min_stem_leaf_idx {
+        let map_idx = stem_idx - min_stem_leaf_idx;
+        get_map_entry(map_idx).unwrap_or_else(|| {
+            panic!(
+                "mapped leaf resolution miss: stem_idx={} map_idx={} leaf_idx_map_len={}",
+                stem_idx, map_idx, map_len
+            )
+        })
+    } else {
+        panic!(
+            "mapped leaf resolution miss: stem_idx={} below min_stem_leaf_idx={}",
+            stem_idx, min_stem_leaf_idx
+        )
+    }
+}
+
+/// Owned strategy for resolving stem indices to leaf indices during traversal.
 ///
 /// Different variants optimize for different tree usage patterns:
 /// - `Arithmetic`: For immutable trees where all leaves are at the same depth
 /// - `Pristine`: For mutable trees that haven't had structural mutations yet
 /// - `Mapped`: For mutable trees after leaf splits/merges have occurred
+#[cfg_attr(
+    feature = "rkyv_08",
+    derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
+)]
+#[cfg_attr(feature = "rkyv_08", rkyv(crate = rkyv_08))]
+#[cfg_attr(
+    feature = "rkyv_08",
+    rkyv(archived = ArchivedStemLeafResolution)
+)]
+#[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq)]
-pub enum StemLeafResolution {
+pub enum OwnedStemLeafResolution {
     /// Immutable strategies: leaf index can be calculated arithmetically.
     ///
     /// All leaves are guaranteed to be at the same depth, so leaf indices
@@ -56,48 +124,36 @@ pub enum StemLeafResolution {
         min_stem_leaf_idx: usize,
         /// Maps stem indices to leaf indices.
         /// `None` means the stem has children, `Some(idx)` means it points to leaf `idx`.
+        #[cfg_attr(
+            feature = "rkyv_08",
+            rkyv(with = rkyv_08::with::Map<crate::rkyv_08_impl::OptionNonMaxUsizeAsUsize>)
+        )]
         leaf_idx_map: Vec<Option<NonMaxUsize>>,
     },
 }
 
-impl StemLeafResolution {
-    /// Returns true if this resolution strategy uses arithmetic (fast path).
+impl StemLeafResolution for OwnedStemLeafResolution {
     #[inline(always)]
-    pub fn uses_arithmetic(&self) -> bool {
+    fn uses_arithmetic(&self) -> bool {
         matches!(self, Self::Arithmetic { .. } | Self::Pristine { .. })
     }
 
-    /// Resolves a terminal stem index to a leaf index.
-    ///
-    /// In mapped mode, this requires an explicit terminal map entry and panics on misses.
-    /// In arithmetic/pristine mode, `arithmetic_leaf_idx` is returned.
     #[inline(always)]
-    pub fn resolve_terminal_stem_idx(&self, stem_idx: usize, arithmetic_leaf_idx: usize) -> usize {
+    fn resolve_terminal_stem_idx(&self, stem_idx: usize, arithmetic_leaf_idx: usize) -> usize {
         match self {
             Self::Mapped {
                 min_stem_leaf_idx,
                 leaf_idx_map,
-            } => {
-                if stem_idx >= *min_stem_leaf_idx {
-                    let map_idx = stem_idx - *min_stem_leaf_idx;
+            } => resolve_mapped_terminal_stem_idx(
+                stem_idx,
+                *min_stem_leaf_idx,
+                leaf_idx_map.len(),
+                |map_idx| {
                     leaf_idx_map
                         .get(map_idx)
                         .and_then(|opt| opt.map(|n| n.get()))
-                        .unwrap_or_else(|| {
-                            panic!(
-                                "mapped leaf resolution miss: stem_idx={} map_idx={} leaf_idx_map_len={}",
-                                stem_idx,
-                                map_idx,
-                                leaf_idx_map.len()
-                            )
-                        })
-                } else {
-                    panic!(
-                        "mapped leaf resolution miss: stem_idx={} below min_stem_leaf_idx={}",
-                        stem_idx, min_stem_leaf_idx
-                    )
-                }
-            }
+                },
+            ),
             Self::Arithmetic {
                 stems_depth,
                 leaf_count,
@@ -105,21 +161,17 @@ impl StemLeafResolution {
             | Self::Pristine {
                 stems_depth,
                 leaf_count,
-            } => {
-                if arithmetic_leaf_idx >= *leaf_count {
-                    panic!(
-                        "arithmetic leaf resolution out of bounds: stem_idx={} arithmetic_leaf_idx={} leaf_count={} stems_depth={}",
-                        stem_idx, arithmetic_leaf_idx, leaf_count, stems_depth
-                    );
-                }
-                arithmetic_leaf_idx
-            }
+            } => resolve_arithmetic_terminal_stem_idx(
+                stem_idx,
+                arithmetic_leaf_idx,
+                *stems_depth,
+                *leaf_count,
+            ),
         }
     }
 
-    /// Returns true if `stem_idx` has an explicit terminal mapping in mapped mode.
     #[inline(always)]
-    pub fn is_terminal_stem_idx(&self, stem_idx: usize) -> bool {
+    fn is_terminal_stem_idx(&self, stem_idx: usize) -> bool {
         match self {
             Self::Mapped {
                 min_stem_leaf_idx,
@@ -128,6 +180,86 @@ impl StemLeafResolution {
                 if stem_idx >= *min_stem_leaf_idx {
                     let map_idx = stem_idx - *min_stem_leaf_idx;
                     leaf_idx_map.get(map_idx).is_some_and(Option::is_some)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+}
+
+impl OwnedStemLeafResolution {
+    /// Returns true if this resolution strategy uses arithmetic leaf-index resolution.
+    #[inline(always)]
+    pub fn uses_arithmetic(&self) -> bool {
+        <Self as StemLeafResolution>::uses_arithmetic(self)
+    }
+
+    /// Resolves a terminal stem index to a leaf index.
+    #[inline(always)]
+    pub fn resolve_terminal_stem_idx(&self, stem_idx: usize, arithmetic_leaf_idx: usize) -> usize {
+        <Self as StemLeafResolution>::resolve_terminal_stem_idx(self, stem_idx, arithmetic_leaf_idx)
+    }
+
+    /// Returns true if `stem_idx` maps directly to a leaf.
+    #[inline(always)]
+    pub fn is_terminal_stem_idx(&self, stem_idx: usize) -> bool {
+        <Self as StemLeafResolution>::is_terminal_stem_idx(self, stem_idx)
+    }
+}
+
+#[cfg(feature = "rkyv_08")]
+impl StemLeafResolution for ArchivedStemLeafResolution {
+    #[inline(always)]
+    fn uses_arithmetic(&self) -> bool {
+        matches!(self, Self::Arithmetic { .. } | Self::Pristine { .. })
+    }
+
+    #[inline(always)]
+    fn resolve_terminal_stem_idx(&self, stem_idx: usize, arithmetic_leaf_idx: usize) -> usize {
+        match self {
+            Self::Mapped {
+                min_stem_leaf_idx,
+                leaf_idx_map,
+            } => resolve_mapped_terminal_stem_idx(
+                stem_idx,
+                min_stem_leaf_idx.to_native() as usize,
+                leaf_idx_map.len(),
+                |map_idx| {
+                    let value = leaf_idx_map.get(map_idx)?.to_native() as usize;
+                    (value != usize::MAX).then_some(value)
+                },
+            ),
+            Self::Arithmetic {
+                stems_depth,
+                leaf_count,
+            }
+            | Self::Pristine {
+                stems_depth,
+                leaf_count,
+            } => resolve_arithmetic_terminal_stem_idx(
+                stem_idx,
+                arithmetic_leaf_idx,
+                stems_depth.to_native() as usize,
+                leaf_count.to_native() as usize,
+            ),
+        }
+    }
+
+    #[inline(always)]
+    fn is_terminal_stem_idx(&self, stem_idx: usize) -> bool {
+        match self {
+            Self::Mapped {
+                min_stem_leaf_idx,
+                leaf_idx_map,
+            } => {
+                let min_stem_leaf_idx = min_stem_leaf_idx.to_native() as usize;
+                if stem_idx >= min_stem_leaf_idx {
+                    let map_idx = stem_idx - min_stem_leaf_idx;
+                    leaf_idx_map
+                        .get(map_idx)
+                        .is_some_and(|value| value.to_native() as usize != usize::MAX)
                 } else {
                     false
                 }
@@ -146,6 +278,11 @@ impl StemLeafResolution {
 /// * `LS` - Leaf storage strategy
 /// * `K` - Dimensionality (number of dimensions)
 /// * `B` - Bucket size (maximum items per leaf node)
+#[cfg_attr(
+    feature = "rkyv_08",
+    derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
+)]
+#[cfg_attr(feature = "rkyv_08", rkyv(crate = rkyv_08))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct KdTree<
     A,              // Axis
@@ -155,9 +292,13 @@ pub struct KdTree<
     const K: usize, // dimensionality
     const B: usize, // bucket size
 > {
+    #[cfg_attr(
+        feature = "rkyv_08",
+        rkyv(with = crate::rkyv_08_impl::AsAlignedCachelineABox)
+    )]
     stems: AVec<A>,
     leaves: LS,
-    pub(crate) stem_leaf_resolution: StemLeafResolution,
+    pub(crate) stem_leaf_resolution: OwnedStemLeafResolution,
 
     size: usize,
     max_stem_level: i32,
@@ -165,11 +306,175 @@ pub struct KdTree<
     pub(crate) _phantom: std::marker::PhantomData<(SS, T)>,
 }
 
+/// Read-only query access over owned and archived kd-tree storage.
+pub trait KdTreeAccessor<A, T, SS, LS, const K: usize, const B: usize>
+where
+    A: AxisUnified<Coord = A>,
+    T: Basics,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+{
+    /// Stem/branch pivot values in the stem strategy's native layout.
+    fn stems(&self) -> &[A];
+
+    /// Leaf storage.
+    fn leaves(&self) -> &LS;
+
+    /// Stem-to-leaf resolution strategy.
+    fn stem_leaf_resolution(&self) -> &impl StemLeafResolution;
+
+    /// Total number of items.
+    fn size(&self) -> usize;
+
+    /// Deepest stem level that can contain an actual pivot.
+    fn max_stem_level(&self) -> i32;
+
+    /// Maximum leaf length used for scratch sizing.
+    fn max_leaf_len(&self) -> usize;
+
+    /// Number of leaves.
+    #[inline]
+    fn leaf_count(&self) -> usize {
+        self.leaves().leaf_count()
+    }
+}
+
+impl<A, T, SS, LS, const K: usize, const B: usize> KdTreeAccessor<A, T, SS, LS, K, B>
+    for KdTree<A, T, SS, LS, K, B>
+where
+    A: AxisUnified<Coord = A>,
+    T: Basics,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+{
+    #[inline(always)]
+    fn stems(&self) -> &[A] {
+        self.stems.as_slice()
+    }
+
+    #[inline(always)]
+    fn leaves(&self) -> &LS {
+        &self.leaves
+    }
+
+    #[inline(always)]
+    fn stem_leaf_resolution(&self) -> &impl StemLeafResolution {
+        &self.stem_leaf_resolution
+    }
+
+    #[inline(always)]
+    fn size(&self) -> usize {
+        self.size
+    }
+
+    #[inline(always)]
+    fn max_stem_level(&self) -> i32 {
+        self.max_stem_level
+    }
+
+    #[inline(always)]
+    fn max_leaf_len(&self) -> usize {
+        self.max_leaf_len
+    }
+}
+
+#[cfg(feature = "rkyv_08")]
+impl<A, T, SS, LS, const K: usize, const B: usize> ArchivedKdTree<A, T, SS, LS, K, B>
+where
+    A: rkyv_08::Archive + AxisUnified<Coord = A>,
+    T: Basics,
+    SS: StemStrategy,
+    LS: rkyv_08::Archive,
+    rkyv_08::Archived<LS>: LeafStrategy<A, T, SS, K, B>,
+{
+    #[inline]
+    pub(crate) fn archived_stems(&self) -> &[rkyv_08::Archived<A>] {
+        self.stems.get().as_slice()
+    }
+
+    #[inline]
+    /// Returns `true` if the archived tree contains no points.
+    pub fn is_empty(&self) -> bool {
+        self.size.to_native() as usize == 0
+    }
+
+    #[inline]
+    /// Returns the number of points in the archived tree.
+    pub fn size(&self) -> usize {
+        self.size.to_native() as usize
+    }
+
+    #[inline]
+    /// Returns the maximum stem level in the archived tree.
+    pub fn max_stem_level(&self) -> i32 {
+        self.max_stem_level.to_native()
+    }
+
+    #[inline]
+    /// Returns the configured maximum leaf size heuristic used to size hot-path scratch buffers.
+    pub fn max_leaf_len(&self) -> usize {
+        self.max_leaf_len.to_native() as usize
+    }
+
+    #[inline]
+    /// Returns the number of leaf nodes in the archived tree.
+    pub fn leaf_count(&self) -> usize {
+        self.leaves.leaf_count()
+    }
+
+    #[inline]
+    /// Returns an iterator over all item/point pairs in the archived tree.
+    pub fn iter(&self) -> KdTreeIter<'_, Self, A, T, SS, rkyv_08::Archived<LS>, K, B> {
+        KdTreeIter::new(self)
+    }
+}
+
+#[cfg(feature = "rkyv_08")]
+impl<A, T, SS, LS, const K: usize, const B: usize>
+    KdTreeAccessor<A, T, SS, rkyv_08::Archived<LS>, K, B> for ArchivedKdTree<A, T, SS, LS, K, B>
+where
+    A: rkyv_08::Archive + AxisUnified<Coord = A>,
+    T: Basics,
+    SS: StemStrategy,
+    LS: rkyv_08::Archive,
+    rkyv_08::Archived<LS>: LeafStrategy<A, T, SS, K, B>,
+{
+    #[inline(always)]
+    fn stems(&self) -> &[A] {
+        crate::rkyv_utils::transform_slice(self.archived_stems())
+    }
+
+    #[inline(always)]
+    fn leaves(&self) -> &rkyv_08::Archived<LS> {
+        &self.leaves
+    }
+
+    #[inline(always)]
+    fn stem_leaf_resolution(&self) -> &impl StemLeafResolution {
+        &self.stem_leaf_resolution
+    }
+
+    #[inline(always)]
+    fn size(&self) -> usize {
+        self.size.to_native() as usize
+    }
+
+    #[inline(always)]
+    fn max_stem_level(&self) -> i32 {
+        self.max_stem_level.to_native()
+    }
+
+    #[inline(always)]
+    fn max_leaf_len(&self) -> usize {
+        self.max_leaf_len.to_native() as usize
+    }
+}
+
 impl<A, T, SS, LS, const K: usize, const B: usize> Default for KdTree<A, T, SS, LS, K, B>
 where
     A: AxisUnified<Coord = A>,
     T: Basics,
-    LS: LeafStrategy<A, T, SS, K, B>,
+    LS: ConstructibleLeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
     fn default() -> Self {
@@ -188,7 +493,7 @@ where
             let mut leaf_idx_map = vec![None; root_idx + 1];
             leaf_idx_map[root_idx] = NonMaxUsize::new(0);
 
-            let stem_leaf_resolution = crate::kd_tree::StemLeafResolution::Mapped {
+            let stem_leaf_resolution = crate::kd_tree::OwnedStemLeafResolution::Mapped {
                 min_stem_leaf_idx: 0,
                 leaf_idx_map,
             };
@@ -197,7 +502,7 @@ where
         } else {
             // Immutable trees start empty
             let stems = AVec::new(CACHELINE_ALIGN);
-            let stem_leaf_resolution = StemLeafResolution::Arithmetic {
+            let stem_leaf_resolution = OwnedStemLeafResolution::Arithmetic {
                 stems_depth: 0,
                 leaf_count: 0,
             };
@@ -272,6 +577,12 @@ where
         self.max_leaf_len
     }
 
+    /// Returns an iterator over all item/point pairs in the tree.
+    #[inline]
+    pub fn iter(&self) -> KdTreeIter<'_, Self, A, T, SS, LS, K, B> {
+        KdTreeIter::new(self)
+    }
+
     /// Find which leaf contains a specific item.
     /// Returns `Some((leaf_idx, position_in_leaf))` if found, `None` if not found.
     pub fn find_leaf_for_item(&self, target_item: T) -> Option<(usize, usize)>
@@ -297,7 +608,7 @@ impl<A, T, SS, LS, const K: usize, const B: usize> FromIterator<(usize, [A; K])>
 where
     A: AxisUnified<Coord = A>,
     T: Basics,
-    LS: LeafStrategy<A, T, SS, K, B> + Default,
+    LS: ConstructibleLeafStrategy<A, T, SS, K, B> + Default,
     SS: StemStrategy,
 {
     fn from_iter<I: IntoIterator<Item = (usize, [A; K])>>(_iter: I) -> Self {
@@ -344,9 +655,9 @@ where
         writeln!(f)?;
 
         // Display stem_leaf_resolution
-        writeln!(f, "  StemLeafResolution:")?;
+        writeln!(f, "  OwnedStemLeafResolution:")?;
         match &self.stem_leaf_resolution {
-            StemLeafResolution::Arithmetic {
+            OwnedStemLeafResolution::Arithmetic {
                 stems_depth,
                 leaf_count,
             } => {
@@ -355,7 +666,7 @@ where
                 writeln!(f, "      leaf_count: {}", leaf_count)?;
                 writeln!(f, "    }}")?;
             }
-            StemLeafResolution::Pristine {
+            OwnedStemLeafResolution::Pristine {
                 stems_depth,
                 leaf_count,
             } => {
@@ -364,7 +675,7 @@ where
                 writeln!(f, "      leaf_count: {}", leaf_count)?;
                 writeln!(f, "    }}")?;
             }
-            StemLeafResolution::Mapped {
+            OwnedStemLeafResolution::Mapped {
                 min_stem_leaf_idx,
                 leaf_idx_map,
             } => {
@@ -416,8 +727,16 @@ mod tests {
     use super::*;
     use crate::kd_tree::leaf_strategies::dummy::DummyLeafStrategy;
     use crate::kd_tree::leaf_strategies::FlatVec;
+    #[cfg(feature = "rkyv_08")]
+    use crate::kd_tree::leaf_strategies::VecOfArenas;
     use crate::stem_strategies::Donnelly;
+    #[cfg(feature = "rkyv_08")]
+    use crate::stem_strategies::EytzingerPf;
     use crate::Eytzinger;
+    #[cfg(feature = "rkyv_08")]
+    use crate::SquaredEuclidean;
+    #[cfg(feature = "rkyv_08")]
+    use std::num::NonZeroUsize;
 
     #[test]
     fn test_default() {
@@ -493,6 +812,160 @@ mod tests {
             "Leaf index should be valid. leaf_idx={}, leaf_count={}",
             leaf_idx,
             tree.leaf_count()
+        );
+    }
+
+    #[cfg(feature = "rkyv_08")]
+    #[test]
+    fn rkyv_archived_donnelly_stems_stay_cacheline_aligned() {
+        type Tree = KdTree<f64, u32, Donnelly<3, 64, 8, 3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
+
+        let points: Vec<[f64; 3]> = (0..4096)
+            .map(|i| {
+                let x = i as f64 / 4096.0;
+                [x, x * 2.0, x * 3.0]
+            })
+            .collect();
+
+        let tree = Tree::new_from_slice(&points);
+
+        let bytes = rkyv_08::api::high::to_bytes_in::<_, rkyv_08::rancor::Error>(
+            &tree,
+            rkyv_08::util::AlignedVec::<128>::new(),
+        )
+        .unwrap();
+
+        let archived = rkyv_08::access::<
+            ArchivedKdTree<f64, u32, Donnelly<3, 64, 8, 3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>,
+            rkyv_08::rancor::Error,
+        >(bytes.as_slice())
+        .unwrap();
+
+        assert_eq!(bytes.as_ptr() as usize % 128, 0);
+        assert_eq!(archived.archived_stems().as_ptr() as usize % 128, 0);
+        assert_eq!(archived.size(), tree.size());
+        assert_eq!(archived.leaf_count(), tree.leaf_count());
+        assert_eq!(archived.max_stem_level(), tree.max_stem_level());
+    }
+
+    #[cfg(feature = "rkyv_08")]
+    #[test]
+    fn rkyv_roundtrip_preserves_alignment_and_query_results() {
+        type Tree = KdTree<f64, u32, Donnelly<3, 64, 8, 3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
+        type ArchivedTree =
+            ArchivedKdTree<f64, u32, Donnelly<3, 64, 8, 3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
+
+        let points: Vec<[f64; 3]> = (0..2048)
+            .map(|i| {
+                let x = i as f64 / 2048.0;
+                [x, (i % 127) as f64 / 127.0, (i % 63) as f64 / 63.0]
+            })
+            .collect();
+
+        let tree = Tree::new_from_slice(&points);
+        let query = [0.123, 0.456, 0.789];
+        let expected = tree.nearest_one::<SquaredEuclidean<f64>>(&query);
+
+        let bytes = rkyv_08::api::high::to_bytes_in::<_, rkyv_08::rancor::Error>(
+            &tree,
+            rkyv_08::util::AlignedVec::<128>::new(),
+        )
+        .unwrap();
+
+        let archived =
+            rkyv_08::access::<ArchivedTree, rkyv_08::rancor::Error>(bytes.as_slice()).unwrap();
+        let roundtrip =
+            rkyv_08::api::high::from_bytes::<Tree, rkyv_08::rancor::Error>(bytes.as_slice())
+                .unwrap();
+
+        assert_eq!(archived.size(), tree.size());
+        assert_eq!(
+            roundtrip.stems.as_ptr() as usize % aligned_vec::CACHELINE_ALIGN,
+            0
+        );
+        assert_eq!(
+            roundtrip.leaves.leaf_bytes_ptr() as usize % aligned_vec::CACHELINE_ALIGN,
+            0
+        );
+        assert_eq!(
+            roundtrip.nearest_one::<SquaredEuclidean<f64>>(&query),
+            expected
+        );
+    }
+
+    #[cfg(feature = "rkyv_08")]
+    #[test]
+    fn rkyv_archived_vec_of_arenas_supports_queries() {
+        type Tree = KdTree<f64, u32, EytzingerPf<3, 8>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
+        type ArchivedTree =
+            ArchivedKdTree<f64, u32, EytzingerPf<3, 8>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
+
+        let points: Vec<[f64; 3]> = (0..4096)
+            .map(|i| {
+                [
+                    (i % 257) as f64 / 257.0,
+                    (i % 131) as f64 / 131.0,
+                    (i % 67) as f64 / 67.0,
+                ]
+            })
+            .collect();
+
+        let tree = Tree::new_from_slice(&points);
+        let query = [0.321, 0.456, 0.789];
+        let max_qty = NonZeroUsize::new(8).unwrap();
+        let max_dist = 0.025;
+
+        let bytes = rkyv_08::api::high::to_bytes_in::<_, rkyv_08::rancor::Error>(
+            &tree,
+            rkyv_08::util::AlignedVec::<128>::new(),
+        )
+        .unwrap();
+        let archived =
+            rkyv_08::access::<ArchivedTree, rkyv_08::rancor::Error>(bytes.as_slice()).unwrap();
+
+        assert_eq!(
+            archived.approx_nearest_one::<SquaredEuclidean<f64>>(&query),
+            tree.approx_nearest_one::<SquaredEuclidean<f64>>(&query)
+        );
+        assert_eq!(
+            archived.nearest_one::<SquaredEuclidean<f64>>(&query),
+            tree.nearest_one::<SquaredEuclidean<f64>>(&query)
+        );
+        assert_eq!(
+            archived.nearest_n::<SquaredEuclidean<f64>>(&query, max_qty, true),
+            tree.nearest_n::<SquaredEuclidean<f64>>(&query, max_qty, true)
+        );
+        assert_eq!(
+            archived.nearest_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty, true),
+            tree.nearest_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty, true)
+        );
+        assert_eq!(
+            archived.within::<SquaredEuclidean<f64>>(&query, max_dist),
+            tree.within::<SquaredEuclidean<f64>>(&query, max_dist)
+        );
+        assert_eq!(
+            archived
+                .within_unsorted::<SquaredEuclidean<f64>>(&query, max_dist)
+                .len(),
+            tree.within_unsorted::<SquaredEuclidean<f64>>(&query, max_dist)
+                .len()
+        );
+        assert_eq!(
+            archived
+                .within_unsorted_iter::<SquaredEuclidean<f64>>(&query, max_dist)
+                .count(),
+            tree.within_unsorted_iter::<SquaredEuclidean<f64>>(&query, max_dist)
+                .count()
+        );
+        let archived_iter: Vec<_> = archived.iter().collect();
+        let tree_iter: Vec<_> = tree.iter().collect();
+        assert_eq!(archived_iter, tree_iter);
+        assert_eq!(
+            archived
+                .best_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty)
+                .into_sorted_vec(),
+            tree.best_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty)
+                .into_sorted_vec()
         );
     }
 }

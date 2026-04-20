@@ -43,7 +43,7 @@ impl<A, SS: StemStrategy> Default for QueryStack<A, SS> {
 #[derive(Debug)]
 pub struct QueryStackContext<A, S> {
     pub stem_state: S,
-    // pub dim: usize,
+    pub restore_dim: Option<usize>,
     pub old_off: A,
     pub rd: A,
 }
@@ -118,7 +118,7 @@ impl<A: AxisUnified<Coord = A>, S> QueryStackContext<A, S> {
     pub fn new(stem_state: S) -> Self {
         Self {
             stem_state,
-            // dim: 0,
+            restore_dim: None,
             old_off: A::zero(),
             rd: A::zero(),
         }
@@ -126,8 +126,8 @@ impl<A: AxisUnified<Coord = A>, S> QueryStackContext<A, S> {
 }
 
 impl<A, S> QueryStackContext<A, S> {
-    pub fn into_parts(self) -> (S, /*usize,*/ A, A) {
-        (self.stem_state, /*self.dim,*/ self.old_off, self.rd)
+    pub fn into_parts(self) -> (S, A, A) {
+        (self.stem_state, self.old_off, self.rd)
     }
 }
 
@@ -136,6 +136,17 @@ impl<A, S> ScalarStackContext<A, S> for QueryStackContext<A, S> {
     fn from_parts(stem_state: S, old_off: A, rd: A) -> Self {
         Self {
             stem_state,
+            restore_dim: None,
+            old_off,
+            rd,
+        }
+    }
+
+    #[inline(always)]
+    fn from_parts_with_restore_dim(stem_state: S, restore_dim: usize, old_off: A, rd: A) -> Self {
+        Self {
+            stem_state,
+            restore_dim: Some(restore_dim),
             old_off,
             rd,
         }
@@ -144,5 +155,10 @@ impl<A, S> ScalarStackContext<A, S> for QueryStackContext<A, S> {
     #[inline(always)]
     fn into_parts(self) -> (S, A, A) {
         QueryStackContext::into_parts(self)
+    }
+
+    #[inline(always)]
+    fn into_parts_with_restore_dim(self) -> (S, Option<usize>, A, A) {
+        (self.stem_state, self.restore_dim, self.old_off, self.rd)
     }
 }

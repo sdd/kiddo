@@ -997,13 +997,15 @@ where
         true
     }
 
-    fn backtracking_query_with_stack<A, T, O, D, QC, LS, const K2: usize, const B: usize>(
-        tree: &crate::kd_tree::KdTree<A, T, Self, LS, K2, B>,
+    fn backtracking_query_with_stack<Tree, A, T, O, D, QC, LS, const K2: usize, const B: usize>(
+        tree: &Tree,
         query_ctx: &mut QC,
         stack: &mut Self::Stack<O>,
         process_leaf: impl FnMut(usize, &[O; K2], &mut QC),
     ) where
         Self: Sized,
+        Tree: crate::kd_tree::KdTreeAccessor<A, T, Self, LS, K2, B>
+            + crate::kd_tree::KdTreeQueryOps<A, T, Self, LS, K2, B>,
         A: crate::traits_unified_2::AxisUnified<Coord = A>,
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
         O: crate::traits_unified_2::AxisUnified<Coord = O>
@@ -1465,13 +1467,15 @@ where
         true
     }
 
-    fn backtracking_query_with_stack<A, T, O, D, QC, LS, const K2: usize, const B: usize>(
-        tree: &crate::kd_tree::KdTree<A, T, Self, LS, K2, B>,
+    fn backtracking_query_with_stack<Tree, A, T, O, D, QC, LS, const K2: usize, const B: usize>(
+        tree: &Tree,
         query_ctx: &mut QC,
         stack: &mut Self::Stack<O>,
         process_leaf: impl FnMut(usize, &[O; K2], &mut QC),
     ) where
         Self: Sized,
+        Tree: crate::kd_tree::KdTreeAccessor<A, T, Self, LS, K2, B>
+            + crate::kd_tree::KdTreeQueryOps<A, T, Self, LS, K2, B>,
         A: crate::traits_unified_2::AxisUnified<Coord = A>,
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
         O: crate::traits_unified_2::AxisUnified<Coord = O>
