@@ -26,3 +26,25 @@ pub(crate) fn transform<T, U>(item: &U) -> &T {
 
     unsafe { std::mem::transmute::<&U, &T>(item) }
 }
+
+#[allow(dead_code)]
+pub(crate) fn transform_slice<T, U>(items: &[U]) -> &[T] {
+    debug_assert_eq!(
+        size_of::<T>(),
+        size_of::<U>(),
+        "size of {} does not match size of {}",
+        std::any::type_name::<T>(),
+        std::any::type_name::<U>()
+    );
+
+    debug_assert!(
+        align_of::<T>() <= align_of::<U>(),
+        "alignment of {} ({}) is greater than alignment of {} ({})",
+        std::any::type_name::<T>(),
+        align_of::<T>(),
+        std::any::type_name::<U>(),
+        align_of::<U>()
+    );
+
+    unsafe { std::slice::from_raw_parts(items.as_ptr() as *const T, items.len()) }
+}

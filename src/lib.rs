@@ -106,6 +106,11 @@ pub mod best_neighbour;
 
 mod huge_pages;
 mod mirror_select_nth_unstable_by;
+#[cfg(feature = "result_collection_stats")]
+#[doc(hidden)]
+pub mod result_collection_stats;
+#[cfg(feature = "rkyv_08")]
+mod rkyv_08_impl;
 
 #[doc(hidden)]
 pub mod nearest_neighbour;
@@ -117,10 +122,6 @@ pub mod traits;
 /// Stem Orderings
 pub mod stem_strategies;
 pub use traits::StemStrategy;
-
-#[doc(hidden)]
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
-pub mod within_unsorted_iter;
 
 #[cfg(feature = "simulator")]
 pub mod cache_simulator;
@@ -135,10 +136,8 @@ pub mod traits_unified_2;
 
 pub use crate::dist::{DotProduct, Manhattan, SquaredEuclidean};
 pub use crate::kd_tree::KdTree;
+pub use crate::kd_tree::WithinUnsortedIter;
 pub use best_neighbour::BestNeighbour;
 pub use nearest_neighbour::NearestNeighbour;
 
 pub use crate::stem_strategies::Eytzinger;
-
-// #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
-// pub use within_unsorted_iter::WithinUnsortedIter;

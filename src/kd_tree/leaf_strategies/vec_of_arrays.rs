@@ -1,20 +1,31 @@
 use crate::kd_tree::leaf_view::LeafView;
 use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
 use crate::traits_unified_2::{
-    AxisUnified, Basics, BucketLimitType, LeafProjection, LeafStrategy, Mutable,
-    MutableLeafStrategy,
+    AxisUnified, Basics, BucketLimitType, ConstructibleLeafStrategy, LeafProjection, LeafStrategy,
+    Mutable, MutableLeafStrategy,
 };
 use crate::StemStrategy;
 
 /// A leaf storage strategy using vectors of fixed-size arrays.
 ///
 /// Stores each leaf as a fixed-size array for better cache locality.
+#[cfg_attr(
+    feature = "rkyv_08",
+    derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
+)]
+#[cfg_attr(feature = "rkyv_08", rkyv(crate = rkyv_08))]
 pub struct VecOfArrays<A, T, const K: usize, const B: usize> {
     leaves: Vec<LeafNode<A, T, K, B>>,
     size: usize,
 }
 
 /// A single leaf node storing up to B points.
+#[cfg_attr(
+    feature = "rkyv_08",
+    derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
+)]
+#[cfg_attr(feature = "rkyv_08", rkyv(crate = rkyv_08))]
+#[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeafNode<A, T, const K: usize, const B: usize> {
     /// Point coordinates organized by dimension
@@ -38,6 +49,79 @@ where
     const BUCKET_LIMIT_TYPE: BucketLimitType = BucketLimitType::Hard;
     const LEAF_PROJECTION: LeafProjection = LeafProjection::LeafView;
 
+    fn size(&self) -> usize {
+        self.size
+    }
+
+    fn leaf_count(&self) -> usize {
+        self.leaves.len()
+    }
+
+    fn leaf_len(&self, leaf_idx: usize) -> usize {
+        self.leaves[leaf_idx].size
+    }
+
+    fn leaf_view(&self, leaf_idx: usize) -> LeafView<'_, AX, T, K, B> {
+        let leaf = &self.leaves[leaf_idx];
+
+        let points: [&[AX]; K] =
+            array_init::array_init(|i| &leaf.content_points[i].as_slice()[..leaf.size]);
+        let leaf_items_view = &leaf.content_items[..leaf.size];
+
+        LeafView::new(points, leaf_items_view)
+    }
+}
+
+#[cfg(feature = "rkyv_08")]
+impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B>
+    for ArchivedVecOfArrays<AX, T, K, B>
+where
+    AX: rkyv_08::Archive + AxisUnified<Coord = AX>,
+    T: rkyv_08::Archive + Basics,
+    SS: StemStrategy,
+{
+    type Num = AX;
+    type Mutability = Mutable;
+
+    const BUCKET_LIMIT_TYPE: BucketLimitType = BucketLimitType::Hard;
+    const LEAF_PROJECTION: LeafProjection = LeafProjection::LeafView;
+
+    fn size(&self) -> usize {
+        self.size.to_native() as usize
+    }
+
+    fn leaf_count(&self) -> usize {
+        self.leaves.len()
+    }
+
+    fn leaf_len(&self, leaf_idx: usize) -> usize {
+        self.leaves[leaf_idx].size.to_native() as usize
+    }
+
+    fn leaf_view(&self, leaf_idx: usize) -> LeafView<'_, AX, T, K, B> {
+        let leaf = &self.leaves[leaf_idx];
+        let leaf_len = leaf.size.to_native() as usize;
+
+        let points: [&[AX]; K] = array_init::array_init(|i| {
+            crate::rkyv_utils::transform_slice::<AX, _>(
+                leaf.content_points[i].as_slice().get(..leaf_len).unwrap(),
+            )
+        });
+        let leaf_items_view = crate::rkyv_utils::transform_slice::<T, _>(
+            leaf.content_items.as_slice().get(..leaf_len).unwrap(),
+        );
+
+        LeafView::new(points, leaf_items_view)
+    }
+}
+
+impl<AX, T, SS, const K: usize, const B: usize> ConstructibleLeafStrategy<AX, T, SS, K, B>
+    for VecOfArrays<AX, T, K, B>
+where
+    AX: AxisUnified<Coord = AX>,
+    T: Basics,
+    SS: StemStrategy,
+{
     fn new_with_capacity(capacity: usize) -> Self {
         Self {
             leaves: Vec::with_capacity(capacity / B + 1),
@@ -60,28 +144,6 @@ where
         result.leaves.push(leaf);
 
         result
-    }
-
-    fn size(&self) -> usize {
-        self.size
-    }
-
-    fn leaf_count(&self) -> usize {
-        self.leaves.len()
-    }
-
-    fn leaf_len(&self, _leaf_idx: usize) -> usize {
-        todo!()
-    }
-
-    fn leaf_view(&self, leaf_idx: usize) -> LeafView<'_, AX, T, K, B> {
-        let leaf = &self.leaves[leaf_idx];
-
-        let points: [&[AX]; K] =
-            array_init::array_init(|i| &leaf.content_points[i].as_slice()[..leaf.size]);
-        let leaf_items_view = &leaf.content_items[..leaf.size];
-
-        LeafView::new(points, leaf_items_view)
     }
 
     fn append_leaf(&mut self, leaf_points: &[&[AX]; K], leaf_items: &[T]) {

@@ -433,8 +433,9 @@ pub trait StemStrategy: Clone + Sync + Send {
 
             // Only push if the sibling is worth exploring
             if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
-                stack.push(Self::StackContext::<O>::from_parts(
+                stack.push(Self::StackContext::<O>::from_parts_with_restore_dim(
                     far_ctx.deferred_state(),
+                    *dim,
                     new_off,
                     rd_far,
                 ));
@@ -501,13 +502,15 @@ pub trait StemStrategy: Clone + Sync + Send {
     /// This method exists to allow strategies to customize backtracking behavior at compile time.
     #[allow(clippy::too_many_arguments)]
     #[inline(always)]
-    fn backtracking_query_with_stack<A, T, O, D, QC, LS, const K2: usize, const B: usize>(
-        tree: &crate::kd_tree::KdTree<A, T, Self, LS, K2, B>,
+    fn backtracking_query_with_stack<Tree, A, T, O, D, QC, LS, const K2: usize, const B: usize>(
+        tree: &Tree,
         query_ctx: &mut QC,
         stack: &mut Self::Stack<O>,
         process_leaf: impl FnMut(usize, &[O; K2], &mut QC),
     ) where
         Self: Sized,
+        Tree: crate::kd_tree::KdTreeAccessor<A, T, Self, LS, K2, B>
+            + crate::kd_tree::KdTreeQueryOps<A, T, Self, LS, K2, B>,
         A: AxisUnified<Coord = A>,
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
         O: AxisUnified<Coord = O>
@@ -531,13 +534,15 @@ pub trait StemStrategy: Clone + Sync + Send {
     /// Strategies may override this to provide a more specialized arithmetic walk.
     #[allow(clippy::too_many_arguments)]
     #[inline(always)]
-    fn arithmetic_query_with_stack<A, T, O, D, QC, LS, const K2: usize, const B: usize>(
-        tree: &crate::kd_tree::KdTree<A, T, Self, LS, K2, B>,
+    fn arithmetic_query_with_stack<Tree, A, T, O, D, QC, LS, const K2: usize, const B: usize>(
+        tree: &Tree,
         query_ctx: &mut QC,
         stack: &mut Self::Stack<O>,
         process_leaf: impl FnMut(usize, &[O; K2], &mut QC),
     ) where
         Self: Sized,
+        Tree: crate::kd_tree::KdTreeAccessor<A, T, Self, LS, K2, B>
+            + crate::kd_tree::KdTreeQueryOps<A, T, Self, LS, K2, B>,
         A: AxisUnified<Coord = A>,
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
         O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
