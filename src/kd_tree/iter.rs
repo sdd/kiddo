@@ -3,11 +3,16 @@ use crate::kd_tree::leaf_view::TlsLeafScratch;
 use crate::kd_tree::leaf_view_chunked::nearest_n_within::{
     nearest_n_within_with_query_wide, nearest_n_within_with_query_wide_arena,
 };
+use crate::kd_tree::result_collection::ResultCollection;
 use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
 use crate::{NearestNeighbour, StemStrategy};
+use std::mem::MaybeUninit;
 use std::ptr::NonNull;
 
 use super::{KdTreeAccessor, StemLeafResolution};
+
+const WITHIN_UNSORTED_ITER_INLINE_STACK_CAPACITY: usize = 64;
+const WITHIN_UNSORTED_ITER_INLINE_RESULT_CAPACITY: usize = 64;
 
 /// Iterator over all point/item pairs in a kd-tree.
 pub struct KdTreeIter<'a, Tree, A, T, SS, LS, const K: usize, const B: usize>
@@ -102,7 +107,193 @@ struct TraversalFrame<SS, O, const K: usize> {
     rd: O,
 }
 
+struct InlineStack<T, const N: usize> {
+    inline: [MaybeUninit<T>; N],
+    inline_len: usize,
+    spill: Vec<T>,
+}
+
+impl<T, const N: usize> InlineStack<T, N> {
+    #[inline]
+    fn new() -> Self {
+        Self {
+            inline: [const { MaybeUninit::uninit() }; N],
+            inline_len: 0,
+            spill: Vec::new(),
+        }
+    }
+
+    #[inline]
+    fn push(&mut self, value: T) {
+        if self.spill.is_empty() && self.inline_len < N {
+            unsafe { self.inline.get_unchecked_mut(self.inline_len) }.write(value);
+            self.inline_len += 1;
+        } else {
+            self.spill.push(value);
+        }
+    }
+
+    #[inline]
+    fn pop(&mut self) -> Option<T> {
+        if let Some(value) = self.spill.pop() {
+            return Some(value);
+        }
+
+        if self.inline_len == 0 {
+            None
+        } else {
+            self.inline_len -= 1;
+            Some(unsafe {
+                self.inline
+                    .get_unchecked(self.inline_len)
+                    .assume_init_read()
+            })
+        }
+    }
+}
+
+impl<T, const N: usize> Drop for InlineStack<T, N> {
+    fn drop(&mut self) {
+        while self.inline_len != 0 {
+            self.inline_len -= 1;
+            unsafe {
+                self.inline
+                    .get_unchecked_mut(self.inline_len)
+                    .assume_init_drop()
+            };
+        }
+    }
+}
+
+struct InlineResultBuffer<E, const N: usize> {
+    inline: [MaybeUninit<E>; N],
+    inline_len: usize,
+    spill: Vec<E>,
+}
+
+impl<E, const N: usize> InlineResultBuffer<E, N> {
+    #[inline]
+    fn new() -> Self {
+        Self {
+            inline: [const { MaybeUninit::uninit() }; N],
+            inline_len: 0,
+            spill: Vec::new(),
+        }
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        while self.inline_len != 0 {
+            self.inline_len -= 1;
+            unsafe {
+                self.inline
+                    .get_unchecked_mut(self.inline_len)
+                    .assume_init_drop()
+            };
+        }
+        self.spill.clear();
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.inline_len + self.spill.len()
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<E: Copy, const N: usize> InlineResultBuffer<E, N> {
+    #[inline]
+    fn push(&mut self, value: E) {
+        if self.spill.is_empty() && self.inline_len < N {
+            unsafe { self.inline.get_unchecked_mut(self.inline_len) }.write(value);
+            self.inline_len += 1;
+        } else {
+            self.spill.push(value);
+        }
+    }
+
+    #[inline]
+    fn get(&self, idx: usize) -> E {
+        if idx < self.inline_len {
+            unsafe { self.inline.get_unchecked(idx).assume_init_read() }
+        } else {
+            unsafe { *self.spill.get_unchecked(idx - self.inline_len) }
+        }
+    }
+}
+
+impl<E, const N: usize> Drop for InlineResultBuffer<E, N> {
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
+impl<O, E, const N: usize> ResultCollection<O, E> for InlineResultBuffer<E, N>
+where
+    O: AxisUnified<Coord = O>,
+    E: Copy + Ord,
+{
+    #[inline(always)]
+    fn with_max_qty(_max_qty: usize) -> Self {
+        Self::new()
+    }
+
+    #[inline(always)]
+    fn max_qty(&self) -> usize {
+        usize::MAX
+    }
+
+    #[inline(always)]
+    fn len(&self) -> usize {
+        InlineResultBuffer::len(self)
+    }
+
+    #[inline(always)]
+    fn add(&mut self, entry: E) {
+        self.push(entry);
+    }
+
+    #[inline(always)]
+    fn threshold_distance(&self) -> Option<O> {
+        None
+    }
+
+    #[inline]
+    fn into_vec(self) -> Vec<E> {
+        self.into_vec_unsorted()
+    }
+
+    #[inline]
+    fn into_sorted_vec(self) -> Vec<E> {
+        let mut result = self.into_vec_unsorted();
+        result.sort_unstable();
+        result
+    }
+}
+
+impl<E: Copy, const N: usize> InlineResultBuffer<E, N> {
+    #[inline]
+    fn into_vec_unsorted(mut self) -> Vec<E> {
+        let mut result = Vec::with_capacity(self.len());
+        for idx in 0..self.inline_len {
+            result.push(unsafe { self.inline.get_unchecked(idx).assume_init_read() });
+        }
+        result.append(&mut self.spill);
+        self.inline_len = 0;
+        result
+    }
+}
+
 /// Lazy iterator returned by `within_unsorted_iter`.
+///
+/// This is the ergonomic streaming API for callers who want to avoid materializing the full
+/// result set. It keeps traversal state and per-leaf matches inline in the common case, spilling
+/// to heap allocation only if the tree depth or a single leaf's match count exceeds the inline
+/// capacities.
 pub struct WithinUnsortedIter<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize>
 where
     A: AxisUnified<Coord = A> + 'static,
@@ -117,8 +308,12 @@ where
     query: [A; K],
     query_wide: [D::Output; K],
     max_dist: D::Output,
-    stack: Vec<TraversalFrame<SS, D::Output, K>>,
-    leaf_results: Vec<NearestNeighbour<D::Output, T>>,
+    stack:
+        InlineStack<TraversalFrame<SS, D::Output, K>, WITHIN_UNSORTED_ITER_INLINE_STACK_CAPACITY>,
+    leaf_results: InlineResultBuffer<
+        NearestNeighbour<D::Output, T>,
+        WITHIN_UNSORTED_ITER_INLINE_RESULT_CAPACITY,
+    >,
     leaf_result_pos: usize,
     _phantom: std::marker::PhantomData<(T, LS, D)>,
 }
@@ -136,7 +331,7 @@ where
 {
     #[inline]
     pub(crate) fn new(tree: &'a Tree, query: &[A; K], max_dist: D::Output) -> Self {
-        let mut stack = Vec::with_capacity((tree.max_stem_level().max(0) as usize) + 1);
+        let mut stack = InlineStack::new();
         if tree.size() != 0 {
             let stems_ptr = NonNull::new(tree.stems().as_ptr() as *mut u8).unwrap();
             stack.push(TraversalFrame {
@@ -152,7 +347,7 @@ where
             query_wide: query.map(D::widen_coord),
             max_dist,
             stack,
-            leaf_results: Vec::new(),
+            leaf_results: InlineResultBuffer::new(),
             leaf_result_pos: 0,
             _phantom: std::marker::PhantomData,
         }
@@ -212,6 +407,8 @@ where
 
     #[inline]
     fn load_next_non_empty_leaf(&mut self) -> bool {
+        // TODO: specialize this traversal cursor for Donnelly Block SIMD so iterator traversal
+        // follows the same block-at-once pruning path as the callback/materialized queries.
         while let Some(frame) = self.stack.pop() {
             if D::Output::cmp(frame.rd, self.max_dist) == std::cmp::Ordering::Greater {
                 continue;
@@ -287,7 +484,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             if self.leaf_result_pos < self.leaf_results.len() {
-                let result = unsafe { *self.leaf_results.get_unchecked(self.leaf_result_pos) };
+                let result = self.leaf_results.get(self.leaf_result_pos);
                 self.leaf_result_pos += 1;
                 return Some(result);
             }

@@ -264,7 +264,11 @@ where
         self.nearest_n_within::<D>(query, max_dist, NonZeroUsize::MAX, true)
     }
 
-    /// Finds all points within a given distance of the query point, unsorted.
+    /// Visits every point within a given distance of the query point, unsorted.
+    ///
+    /// This is the lowest-overhead streaming range-query API for archived trees. It runs
+    /// traversal and optimized leaf kernels, but routes each match directly to `visitor`
+    /// instead of building a result collection.
     pub fn within_unsorted_visit<D, F>(&self, query: &[A; K], max_dist: D::Output, mut visitor: F)
     where
         D: KdTreeDistanceMetric<A, K>,
@@ -315,7 +319,10 @@ where
         results
     }
 
-    /// Returns an iterator over all points within a given distance, unsorted.
+    /// Returns a streaming iterator over all points within a given distance, unsorted.
+    ///
+    /// This avoids materializing the full result set returned by [`within_unsorted`](Self::within_unsorted).
+    /// For the absolute lowest overhead, use [`within_unsorted_visit`](Self::within_unsorted_visit).
     pub fn within_unsorted_iter<D>(
         &self,
         query: &[A; K],
