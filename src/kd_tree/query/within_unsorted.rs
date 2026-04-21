@@ -60,8 +60,12 @@ where
 
     /// Visits every point within a given distance of the query point, unsorted.
     ///
-    /// This avoids allocating a result collection and is the preferred API for
-    /// high-throughput range-query consumers that can process matches immediately.
+    /// This is the lowest-overhead streaming range-query API. It runs the normal
+    /// traversal and optimized leaf kernels, but routes each match directly to
+    /// `visitor` instead of building a result collection.
+    ///
+    /// Prefer this over [`within_unsorted_iter`](Self::within_unsorted_iter) when callback
+    /// style is acceptable and allocation/dispatch overhead matters.
     #[inline]
     pub fn within_unsorted_visit<D, F>(&self, query: &[A; K], max_dist: D::Output, mut visitor: F)
     where
@@ -114,7 +118,14 @@ where
         self.nearest_n_within::<D>(query, max_dist, NonZeroUsize::MAX, false)
     }
 
-    /// Returns an iterator over all points within a given distance, unsorted.
+    /// Returns a streaming iterator over all points within a given distance, unsorted.
+    ///
+    /// This avoids materializing the full result set returned by
+    /// [`within_unsorted`](Self::within_unsorted). The iterator keeps traversal state and
+    /// per-leaf matches inline in the common case, spilling to heap allocation only if the
+    /// tree depth or a single leaf's match count exceeds the inline capacities.
+    ///
+    /// For the absolute lowest overhead, use [`within_unsorted_visit`](Self::within_unsorted_visit).
     #[inline]
     pub fn within_unsorted_iter<D>(
         &self,
