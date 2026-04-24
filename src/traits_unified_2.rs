@@ -1,6 +1,6 @@
 //! Definitions and implementations for some traits that are used by KdTree, LeafStrategies, StemStrategies and DistanceMEtrics
 
-use crate::kd_tree::leaf_view::{LeafArena, LeafView};
+use crate::leaf_view::{LeafArena, LeafView};
 use crate::StemStrategy;
 use fixed::traits::LossyFrom;
 use fixed::types::extra::{U0, U16, U8};
@@ -137,8 +137,8 @@ pub trait AxisUnified:
     + AddAssign<Self>
     + Debug
     + Display
-    + crate::stem_strategies::CompareBlock3
-    + crate::stem_strategies::CompareBlock4
+    + crate::stem_strategy::CompareBlock3
+    + crate::stem_strategy::CompareBlock4
 {
     /// Coordinate scalar type stored in the tree and queries.
     type Coord: Copy;
@@ -369,7 +369,7 @@ pub trait DistanceMetricUnified<A: Copy, const K: usize> {
     }
 
     // ---- SIMD distance checks for backtracking ----
-    // (moved to BacktrackBlock3/BacktrackBlock4 traits in stem_strategies)
+    // (moved to BacktrackBlock3/BacktrackBlock4 traits in stem_strategy)
 }
 
 /// Helper macro to implement SIMD block support (CompareBlock and SimdPrune) for a specific block size.
@@ -378,7 +378,7 @@ pub trait DistanceMetricUnified<A: Copy, const K: usize> {
 #[allow(unused_macros)]
 macro_rules! impl_simd_block_support {
     ($t:ty, 3, $prune_fn:path, $compare_fn:path) => {
-        impl crate::stem_strategies::CompareBlock3 for $t {
+        impl crate::stem_strategy::CompareBlock3 for $t {
             #[inline(always)]
             fn compare_block3_impl(
                 stems_ptr: std::ptr::NonNull<u8>,
@@ -393,7 +393,7 @@ macro_rules! impl_simd_block_support {
     };
 
     ($t:ty, 4, $prune_fn:path, $compare_fn:path) => {
-        impl crate::stem_strategies::CompareBlock4 for $t {
+        impl crate::stem_strategy::CompareBlock4 for $t {
             #[inline(always)]
             fn compare_block4_impl(
                 stems_ptr: std::ptr::NonNull<u8>,

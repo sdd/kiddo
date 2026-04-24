@@ -1,20 +1,20 @@
 use crate::dist::KdTreeDistanceMetric;
-use crate::kd_tree::leaf_view::TlsLeafScratch;
-use crate::kd_tree::leaf_view_chunked::nearest_n_within::{
+use crate::leaf_view::TlsLeafScratch;
+use crate::leaf_view_chunked::nearest_n_within::{
     nearest_n_within_with_query_wide, nearest_n_within_with_query_wide_arena,
 };
 use crate::kd_tree::query_stack::StackTrait;
 #[cfg(not(feature = "small_n_result_collectors"))]
-use crate::kd_tree::result_collection::SortedVecResultCollection;
-use crate::kd_tree::result_collection::{BinaryHeapResultCollection, ResultCollection};
+use crate::results::result_collection::SortedVecResultCollection;
+use crate::results::result_collection::{BinaryHeapResultCollection, ResultCollection};
 #[cfg(feature = "small_n_result_collectors")]
-use crate::kd_tree::result_collection::{
+use crate::results::result_collection::{
     SmallSortedVecResultCollection, SMALL_RESULT_COLLECTION_MAX_QTY,
 };
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::kd_tree::KdTreeQueryOps;
-use crate::stem_strategies::donnelly_2_blockmarker_simd::{
+use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
@@ -48,9 +48,9 @@ where
 
         #[cfg(feature = "result_collection_stats")]
         if was_full {
-            crate::result_collection_stats::record_leaf_visit_after_full();
+            crate::results::result_collection_stats::record_leaf_visit_after_full();
         } else {
-            crate::result_collection_stats::record_leaf_visit_before_full();
+            crate::results::result_collection_stats::record_leaf_visit_before_full();
         }
 
         match LS::LEAF_PROJECTION {
@@ -71,9 +71,9 @@ where
         #[cfg(feature = "result_collection_stats")]
         {
             if !was_full && results.is_full() {
-                crate::result_collection_stats::record_collection_full_transition();
+                crate::results::result_collection_stats::record_collection_full_transition();
             }
-            crate::result_collection_stats::clear_leaf_phase();
+            crate::results::result_collection_stats::clear_leaf_phase();
         }
     }
 
@@ -90,7 +90,7 @@ where
     ) -> Vec<NearestNeighbour<D::Output, T>>
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
@@ -141,7 +141,7 @@ where
     ) -> Vec<NearestNeighbour<D::Output, T>>
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
@@ -179,9 +179,9 @@ where
 #[cfg(feature = "cargo_asm")]
 pub mod cargo_asm {
     use crate::dist::SquaredEuclidean;
-    use crate::kd_tree::leaf_strategies::VecOfArenas;
+    use crate::leaf_strategy::VecOfArenas;
     use crate::kd_tree::KdTree;
-    use crate::stem_strategies::donnelly_2_pf::DonnellyPf;
+    use crate::stem_strategy::donnelly_2_pf::DonnellyPf;
     use std::num::NonZeroUsize;
 
     const K: usize = 3;
@@ -258,12 +258,12 @@ mod tests {
     use test_log::test;
 
     use crate::dist::SquaredEuclidean;
-    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
+    use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
     #[cfg(feature = "result_collection_stats")]
-    use crate::result_collection_stats::{reset, snapshot};
+    use crate::results::result_collection_stats::{reset, snapshot};
     #[cfg(all(feature = "result_collection_stats", feature = "simd"))]
-    use crate::stem_strategies::{Block3, DonnellyMarkerSimd};
+    use crate::stem_strategy::{Block3, DonnellyMarkerSimd};
     use crate::traits::Axis;
     use crate::Eytzinger;
 

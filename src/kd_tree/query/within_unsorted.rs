@@ -1,14 +1,14 @@
 use crate::dist::KdTreeDistanceMetric;
-use crate::kd_tree::leaf_view::TlsLeafScratch;
-use crate::kd_tree::leaf_view_chunked::nearest_n_within::{
+use crate::leaf_view::TlsLeafScratch;
+use crate::leaf_view_chunked::nearest_n_within::{
     nearest_n_within_with_query_wide, nearest_n_within_with_query_wide_arena,
 };
 use crate::kd_tree::query_stack::StackTrait;
-use crate::kd_tree::result_collection::VisitorResultCollection;
+use crate::results::result_collection::VisitorResultCollection;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::kd_tree::KdTreeQueryOps;
-use crate::stem_strategies::donnelly_2_blockmarker_simd::{
+use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
@@ -70,7 +70,7 @@ where
     pub fn within_unsorted_visit<D, F>(&self, query: &[A; K], max_dist: D::Output, mut visitor: F)
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
@@ -107,7 +107,7 @@ where
     ) -> Vec<NearestNeighbour<D::Output, T>>
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
@@ -134,7 +134,7 @@ where
     ) -> crate::kd_tree::WithinUnsortedIter<'_, Self, A, T, SS, LS, D, K, B>
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
@@ -178,7 +178,7 @@ mod tests {
     use std::cmp::Ordering;
 
     use crate::dist::SquaredEuclidean;
-    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
+    use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
     use crate::traits::Axis;
     use crate::Eytzinger;

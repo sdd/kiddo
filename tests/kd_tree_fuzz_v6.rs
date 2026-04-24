@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use std::any::TypeId;
 use std::array;
 use std::collections::{BinaryHeap, HashSet};
@@ -7,16 +9,16 @@ use std::io::{IsTerminal, Write};
 use std::num::NonZeroUsize;
 use std::sync::{Mutex, OnceLock};
 
-use kiddo::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
+use kiddo::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
 use kiddo::kd_tree::KdTree;
-use kiddo::nearest_neighbour::NearestNeighbour;
-use kiddo::stem_strategies::{Donnelly, Eytzinger};
+use kiddo::results::nearest_neighbour::NearestNeighbour;
+use kiddo::stem_strategy::{Donnelly, Eytzinger};
 use kiddo::traits_unified_2::{AxisUnified, LeafStrategy};
 use kiddo::StemStrategy;
 use kiddo::{dist::DistanceMetricCore, Manhattan, SquaredEuclidean};
 
 #[cfg(feature = "simd")]
-use kiddo::stem_strategies::{Block3, Block4, DonnellyMarkerSimd};
+use kiddo::stem_strategy::{Block3, Block4, DonnellyMarkerSimd};
 
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -86,8 +88,8 @@ impl FuzzConfig {
     fn for_simd(self) -> Self {
         if read_env_bool("KIDDO_FUZZ_V6_SIMD_FAST", false) {
             Self {
-                cases: self.cases.min(SIMD_FAST_CASES).max(1),
-                query_count: self.query_count.min(SIMD_FAST_QUERY_COUNT).max(1),
+                cases: self.cases.clamp(1, SIMD_FAST_CASES),
+                query_count: self.query_count.clamp(1, SIMD_FAST_QUERY_COUNT),
                 ..self
             }
         } else {
@@ -233,7 +235,7 @@ fn random_radius_f64<const K: usize>(rng: &mut StdRng) -> f64 {
 }
 
 fn sort_by_distance_then_index<A: AxisUnified<Coord = A> + PartialOrd>(
-    items: &mut Vec<(A, usize)>,
+    items: &mut [(A, usize)],
 ) {
     items.sort_by(|a, b| {
         a.0.partial_cmp(&b.0)
@@ -330,7 +332,7 @@ fn compare_nearest_n_sorted<
         }
     }
 
-    while j < got.len() && distance_lt_for_fuzz(got[j].0, tail_dist) {
+    if j < got.len() && distance_lt_for_fuzz(got[j].0, tail_dist) {
         return Err(format!(
             "unexpected distance in results {got_dist:?} < tail {tail_dist:?}",
             got_dist = got[j].0
@@ -380,8 +382,8 @@ fn within_boundary_matches_for_fuzz<A: Copy + PartialEq + 'static>(dist: A, radi
 fn compare_within_results<
     A: AxisUnified<Coord = A> + PartialEq + std::fmt::Debug + std::fmt::Display + 'static,
 >(
-    expected: &mut Vec<(A, usize)>,
-    got: &mut Vec<(A, usize)>,
+    expected: &mut [(A, usize)],
+    got: &mut [(A, usize)],
     radius: A,
 ) -> Result<(), String> {
     sort_by_item_idx(expected);
@@ -865,7 +867,7 @@ fn assert_nearest_n_unsorted_contains_top_k<
     radius_sq: A,
     radius_man: A,
     expected_top_k: &[(A, usize)],
-    got_unsorted: &mut Vec<(A, usize)>,
+    got_unsorted: &mut [(A, usize)],
 ) {
     sort_by_distance_then_index(got_unsorted);
 
@@ -3141,6 +3143,16 @@ const ADVERSARIAL_PATTERNS: [AdversarialPattern; 4] = [
 type EntryF32 = ([f32; 2], usize);
 #[cfg(feature = "simd")]
 type EntryF64 = ([f64; 2], usize);
+type ApproxTreeF32Builder = fn(
+    &[[f32; 2]],
+) -> KdTree<
+    f32,
+    usize,
+    Eytzinger<2>,
+    FlatVec<f32, usize, 2, ADVERSARIAL_B>,
+    2,
+    ADVERSARIAL_B,
+>;
 
 fn adversarial_queries_f32() -> [[f32; 2]; 6] {
     [
@@ -4564,17 +4576,7 @@ fn fuzz_v6_approx_nearest_one_quality() {
 
     let mut rng = StdRng::seed_from_u64(DEFAULT_SEED ^ 0x55aa_33cc);
 
-    let mut run_f32 = |label: &str,
-                       build_tree: fn(
-        &[[f32; 2]],
-    ) -> KdTree<
-        f32,
-        usize,
-        Eytzinger<2>,
-        FlatVec<f32, usize, 2, ADVERSARIAL_B>,
-        2,
-        ADVERSARIAL_B,
-    >| {
+    let mut run_f32 = |label: &str, build_tree: ApproxTreeF32Builder| {
         let mut stats = ApproxRatioStats::default();
         for case_idx in 0..cases {
             let size = 1usize << rng.random_range(8..=12);

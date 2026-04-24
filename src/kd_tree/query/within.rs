@@ -1,8 +1,8 @@
 use crate::dist::KdTreeDistanceMetric;
-use crate::kd_tree::leaf_view::TlsLeafScratch;
+use crate::leaf_view::TlsLeafScratch;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::KdTree;
-use crate::stem_strategies::donnelly_2_blockmarker_simd::{
+use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
@@ -26,7 +26,7 @@ where
     ) -> Vec<NearestNeighbour<D::Output, T>>
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
@@ -46,7 +46,7 @@ mod tests {
     use std::cmp::Ordering;
 
     use crate::dist::Manhattan;
-    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
+    use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
     use crate::traits::Axis;
     use crate::Eytzinger;

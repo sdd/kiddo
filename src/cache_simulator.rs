@@ -1,4 +1,3 @@
-// src/cache_sim.rs
 #![allow(unused, missing_docs)]
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;

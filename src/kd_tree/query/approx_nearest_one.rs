@@ -1,5 +1,5 @@
 use crate::dist::KdTreeDistanceMetric;
-use crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
+use crate::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::kd_tree::KdTreeQueryOps;
@@ -26,7 +26,7 @@ where
         match LS::LEAF_PROJECTION {
             LeafProjection::LeafArena => {
                 let arena = self.leaves.leaf_arena(leaf_idx);
-                crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide_arena::<
+                crate::leaf_view_chunked::nearest_one::nearest_one_with_query_wide_arena::<
                     A,
                     T,
                     D,
@@ -90,7 +90,7 @@ impl<A, O, const K: usize> QueryContext<A, O, K> for ApproxNearestOneReqCtx<'_, 
 #[cfg(feature = "cargo_asm")]
 pub mod cargo_asm {
     use crate::dist::SquaredEuclidean;
-    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
+    use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
     use crate::Eytzinger;
 
@@ -141,9 +141,9 @@ mod tests {
     use rand::Rng;
     use rand::SeedableRng;
 
-    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
+    use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
-    use crate::stem_strategies::{Donnelly, DonnellyMarkerPf};
+    use crate::stem_strategy::{Donnelly, DonnellyMarkerPf};
 
     use crate::dist::SquaredEuclidean;
     use crate::Eytzinger;
@@ -362,7 +362,7 @@ mod tests {
 
     #[test]
     fn v6_approx_nearest_one_flat_vec_f32_donnelly_marker() {
-        use crate::stem_strategies::Block4;
+        use crate::stem_strategy::Block4;
 
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
@@ -398,7 +398,7 @@ mod tests {
 
     #[test]
     fn v6_approx_nearest_one_donnelly_marker_matches_eytzinger() {
-        use crate::stem_strategies::Block4;
+        use crate::stem_strategy::Block4;
 
         // Verify that DonnellyMarkerPf produces the same results as Eytzinger
         // for the same input data
@@ -508,7 +508,7 @@ mod tests {
 
     #[test]
     fn v6_approx_nearest_one_donnelly_marker_matches_donnelly() {
-        use crate::stem_strategies::Block4;
+        use crate::stem_strategy::Block4;
 
         // Verify that DonnellyMarkerPf produces the same results as Donnelly
         // for the same input data
@@ -575,8 +575,8 @@ mod tests {
     #[cfg(feature = "simd")]
     #[cfg(target_arch = "x86_64")]
     fn v6_approx_nearest_one_donnelly_marker_simd_f64() {
-        use crate::stem_strategies::Block3;
-        use crate::stem_strategies::DonnellyMarkerSimd;
+        use crate::stem_strategy::Block3;
+        use crate::stem_strategy::DonnellyMarkerSimd;
 
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
@@ -637,8 +637,8 @@ mod tests {
     #[cfg(feature = "simd")]
     #[cfg(target_arch = "x86_64")]
     fn v6_approx_nearest_one_donnelly_marker_simd_f32() {
-        use crate::stem_strategies::Block4;
-        use crate::stem_strategies::DonnellyMarkerSimd;
+        use crate::stem_strategy::Block4;
+        use crate::stem_strategy::DonnellyMarkerSimd;
 
         // Test DonnellyMarkerSimd with f32 data
         let mut rng = StdRng::seed_from_u64(RNG_SEED);

@@ -1,26 +1,16 @@
 //! Flexible kd-trees that can be used with float or fixed point, mutable or immutable, and selectable stem ordering strategies
 
-#![cfg_attr(feature = "rkyv_08", allow(missing_docs))]
 
-#[cfg(feature = "rkyv_08")]
-mod archived_query;
 mod construction;
 mod iter;
-/// Leaf storage strategies for the kd-tree
-pub mod leaf_strategies;
-/// Leaf view abstraction for accessing leaf data
-pub mod leaf_view;
-// #[cfg(feature = "leaf_view_chunked")]
-pub(crate) mod leaf_view_chunked;
 mod query;
-pub(crate) mod query_orchestrator;
+pub(crate) mod orchestrator;
 pub(crate) mod query_stack;
 pub(crate) mod query_stack_simd;
-pub(crate) mod result_collection;
 pub(crate) mod traits;
 
 pub use iter::{KdTreeIter, WithinUnsortedIter};
-pub use query_orchestrator::KdTreeQueryOps;
+pub use orchestrator::KdTreeQueryOps;
 
 use crate::traits_unified_2::{AxisUnified, Basics, ConstructibleLeafStrategy, LeafStrategy};
 use crate::StemStrategy;
@@ -129,7 +119,7 @@ pub enum OwnedStemLeafResolution {
         /// `None` means the stem has children, `Some(idx)` means it points to leaf `idx`.
         #[cfg_attr(
             feature = "rkyv_08",
-            rkyv(with = rkyv_08::with::Map<crate::rkyv_08_impl::OptionNonMaxUsizeAsUsize>)
+            rkyv(with = rkyv_08::with::Map<crate::rkyv::adapters::OptionNonMaxUsizeAsUsize>)
         )]
         leaf_idx_map: Vec<Option<NonMaxUsize>>,
     },
@@ -298,7 +288,7 @@ pub struct KdTree<
 > {
     #[cfg_attr(
         feature = "rkyv_08",
-        rkyv(with = crate::rkyv_08_impl::AsAlignedCachelineABox)
+        rkyv(with = crate::rkyv::adapters::AsAlignedCachelineABox)
     )]
     stems: AVec<A>,
     leaves: LS,
@@ -445,7 +435,7 @@ where
 {
     #[inline(always)]
     fn stems(&self) -> &[A] {
-        crate::rkyv_utils::transform_slice(self.archived_stems())
+        crate::rkyv::utils::transform_slice(self.archived_stems())
     }
 
     #[inline(always)]
@@ -729,13 +719,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kd_tree::leaf_strategies::dummy::DummyLeafStrategy;
-    use crate::kd_tree::leaf_strategies::FlatVec;
+    use crate::leaf_strategy::dummy::DummyLeafStrategy;
+    use crate::leaf_strategy::FlatVec;
     #[cfg(feature = "rkyv_08")]
-    use crate::kd_tree::leaf_strategies::VecOfArenas;
-    use crate::stem_strategies::Donnelly;
+    use crate::leaf_strategy::VecOfArenas;
+    use crate::stem_strategy::Donnelly;
     #[cfg(feature = "rkyv_08")]
-    use crate::stem_strategies::EytzingerPf;
+    use crate::stem_strategy::EytzingerPf;
     use crate::Eytzinger;
     #[cfg(feature = "rkyv_08")]
     use crate::SquaredEuclidean;

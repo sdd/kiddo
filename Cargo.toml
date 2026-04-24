@@ -624,11 +624,6 @@ name = "donnelly_simd_regressions"
 path = "tests/donnelly_simd_regressions.rs"
 
 [[test]]
-name = "kd_tree_fuzz"
-path = "tests/kd_tree_fuzz.rs"
-required-features = ["fuzz"]
-
-[[test]]
 name = "kd_tree_fuzz_v6"
 path = "tests/kd_tree_fuzz_v6.rs"
 required-features = ["fuzz"]

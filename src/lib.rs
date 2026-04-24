@@ -47,7 +47,7 @@
 //! ```rust
 //! use std::num::NonZero;
 //!
-//! use kiddo::kd_tree::leaf_strategies::VecOfArrays;
+//! use kiddo::leaf_strategy::VecOfArrays;
 //! use kiddo::SquaredEuclidean;
 //! use kiddo::NearestNeighbour;
 //! use kiddo::{Eytzinger, KdTree};
@@ -97,30 +97,36 @@
 extern crate core;
 extern crate doc_comment;
 
-#[doc(hidden)]
-pub mod best_neighbour;
+
 // #[doc(hidden)]
 // #[cfg(feature = "serde")]
 // #[doc(hidden)]
 // mod custom_serde;
 
 pub mod huge_pages;
-mod mirror_select_nth_unstable_by;
-#[cfg(feature = "result_collection_stats")]
-#[doc(hidden)]
-pub mod result_collection_stats;
-#[cfg(feature = "rkyv_08")]
-mod rkyv_08_impl;
 
-#[doc(hidden)]
-pub mod nearest_neighbour;
+mod mirror_select_nth_unstable_by;
+
+#[cfg(feature = "rkyv_08")]
+mod rkyv;
+
 #[doc(hidden)]
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 pub mod traits;
 
+/// Leaf storage strategies for the kd-tree
+pub mod leaf_strategy;
+
+/// Leaf view abstraction for accessing leaf data
+pub mod leaf_view;
+
+/// Chunked Leaf view abstraction for accessing leaf data
+pub(crate) mod leaf_view_chunked;
+
+
 /// Stem Orderings
-pub mod stem_strategies;
+pub mod stem_strategy;
 pub use traits::StemStrategy;
 
 #[cfg(feature = "simulator")]
@@ -128,16 +134,17 @@ pub mod cache_simulator;
 
 /// Distance metrics
 pub mod dist;
-mod donnelly_stem_layout;
 pub mod kd_tree;
-mod rkyv_utils;
-// pub mod traits_unified;
+
+/// Structs that are returned as query results
+pub mod results;
+
 pub mod traits_unified_2;
 
 pub use crate::dist::{DotProduct, Manhattan, SquaredEuclidean};
 pub use crate::kd_tree::KdTree;
 pub use crate::kd_tree::WithinUnsortedIter;
-pub use best_neighbour::BestNeighbour;
-pub use nearest_neighbour::NearestNeighbour;
+pub use results::best_neighbour::BestNeighbour;
+pub use results::nearest_neighbour::NearestNeighbour;
 
-pub use crate::stem_strategies::Eytzinger;
+pub use crate::stem_strategy::Eytzinger;
