@@ -3,11 +3,11 @@ use assert_float_eq::assert_float_relative_eq;
 #[cfg(feature = "simd")]
 use kiddo::dist::DistanceMetricCore;
 #[cfg(feature = "simd")]
-use kiddo::kd_tree::leaf_strategies::FlatVec;
+use kiddo::leaf_strategy::FlatVec;
 #[cfg(feature = "simd")]
 use kiddo::kd_tree::KdTree;
 #[cfg(feature = "simd")]
-use kiddo::stem_strategies::{Block3, Block4, Donnelly, DonnellyMarkerSimd};
+use kiddo::stem_strategy::{Block3, Block4, Donnelly, DonnellyMarkerSimd};
 #[cfg(feature = "simd")]
 use kiddo::BestNeighbour;
 #[cfg(feature = "simd")]

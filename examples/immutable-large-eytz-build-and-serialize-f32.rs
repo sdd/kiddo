@@ -4,9 +4,9 @@ use std::io::Write;
 use std::time::Instant;
 
 use elapsed::ElapsedDuration;
-use kiddo::kd_tree::leaf_strategies::VecOfArenas;
+use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::kd_tree::KdTree;
-use kiddo::stem_strategies::EytzingerPf;
+use kiddo::stem_strategy::EytzingerPf;
 use rand::{Rng, SeedableRng};
 use rkyv_08::{rancor::Error as RkyvError, to_bytes};
 use ubyte::ToByteUnit;

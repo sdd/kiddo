@@ -7,16 +7,16 @@ use std::env;
 use std::num::NonZeroUsize;
 
 use kiddo::dist::DistanceMetricCore;
-use kiddo::kd_tree::leaf_strategies::{FlatVec, VecOfArrays};
+use kiddo::leaf_strategy::{FlatVec, VecOfArrays};
 use kiddo::kd_tree::KdTree as V6KdTree;
-use kiddo::nearest_neighbour::NearestNeighbour;
-use kiddo::stem_strategies::{Donnelly, Eytzinger};
+use kiddo::results::nearest_neighbour::NearestNeighbour;
+use kiddo::stem_strategy::{Donnelly, Eytzinger};
 use kiddo::traits::Axis;
 use kiddo::StemStrategy;
 use kiddo::{Manhattan as V6Manhattan, SquaredEuclidean as V6SquaredEuclidean};
 
 #[cfg(feature = "simd")]
-use kiddo::stem_strategies::{Block3, Block4, DonnellyMarkerSimd};
+use kiddo::stem_strategy::{Block3, Block4, DonnellyMarkerSimd};
 
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};

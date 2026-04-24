@@ -1,7 +1,7 @@
 use kiddo::dist::SquaredEuclidean;
-use kiddo::kd_tree::leaf_strategies::VecOfArenas;
+use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::kd_tree::KdTree;
-use kiddo::stem_strategies::{Block3, Donnelly, DonnellyMarkerSimd};
+use kiddo::stem_strategy::{Block3, Donnelly, DonnellyMarkerSimd};
 use kiddo::test_utils::exact_query_stats::{reset, snapshot, ExactQueryStats};
 use rand::Rng;
 use rand::SeedableRng;

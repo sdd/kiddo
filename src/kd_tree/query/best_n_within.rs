@@ -1,20 +1,20 @@
 use crate::dist::KdTreeDistanceMetric;
-use crate::kd_tree::leaf_view::TlsLeafScratch;
-use crate::kd_tree::leaf_view_chunked::best_n_within::{
+use crate::leaf_view::TlsLeafScratch;
+use crate::leaf_view_chunked::best_n_within::{
     best_n_within_with_query_wide, best_n_within_with_query_wide_arena,
 };
 use crate::kd_tree::query_stack::StackTrait;
-use crate::kd_tree::result_collection::{
+use crate::results::result_collection::{
     BestNeighbourResultCollection, BinaryHeapResultCollection,
 };
 #[cfg(feature = "small_n_result_collectors")]
-use crate::kd_tree::result_collection::{
+use crate::results::result_collection::{
     SmallBinaryHeapResultCollection, SMALL_RESULT_COLLECTION_MAX_QTY,
 };
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::kd_tree::KdTreeQueryOps;
-use crate::stem_strategies::donnelly_2_blockmarker_simd::{
+use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
@@ -46,9 +46,9 @@ where
 
         #[cfg(feature = "result_collection_stats")]
         if was_full {
-            crate::result_collection_stats::record_leaf_visit_after_full();
+            crate::results::result_collection_stats::record_leaf_visit_after_full();
         } else {
-            crate::result_collection_stats::record_leaf_visit_before_full();
+            crate::results::result_collection_stats::record_leaf_visit_before_full();
         }
 
         match LS::LEAF_PROJECTION {
@@ -79,9 +79,9 @@ where
         #[cfg(feature = "result_collection_stats")]
         {
             if !was_full && results.is_full() {
-                crate::result_collection_stats::record_collection_full_transition();
+                crate::results::result_collection_stats::record_collection_full_transition();
             }
-            crate::result_collection_stats::clear_leaf_phase();
+            crate::results::result_collection_stats::clear_leaf_phase();
         }
     }
 
@@ -97,7 +97,7 @@ where
     ) -> BinaryHeap<BestNeighbour<D::Output, T>>
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
@@ -125,7 +125,7 @@ where
     fn best_n_within_inner<D, R>(&self, query: &[A; K], max_dist: D::Output, max_qty: usize) -> R
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
@@ -157,9 +157,9 @@ where
 #[cfg(feature = "cargo_asm")]
 pub mod cargo_asm {
     use crate::dist::SquaredEuclidean;
-    use crate::kd_tree::leaf_strategies::VecOfArenas;
+    use crate::leaf_strategy::VecOfArenas;
     use crate::kd_tree::KdTree;
-    use crate::stem_strategies::donnelly_2_pf::DonnellyPf;
+    use crate::stem_strategy::donnelly_2_pf::DonnellyPf;
     use std::num::NonZeroUsize;
 
     const K: usize = 3;
@@ -226,7 +226,7 @@ mod tests {
     use rand::SeedableRng;
 
     use crate::dist::SquaredEuclidean;
-    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
+    use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
     use crate::{BestNeighbour, Eytzinger};
 

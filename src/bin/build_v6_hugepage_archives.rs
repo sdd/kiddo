@@ -1,6 +1,6 @@
-use kiddo::kd_tree::leaf_strategies::VecOfArenas;
+use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::kd_tree::KdTree;
-use kiddo::stem_strategies::donnelly_2_pf::DonnellyPf;
+use kiddo::stem_strategy::donnelly_2_pf::DonnellyPf;
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;

@@ -1,8 +1,8 @@
 use kiddo::dist::SquaredEuclidean;
-use kiddo::kd_tree::leaf_strategies::VecOfArenas;
+use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::result_collection_stats::{reset, snapshot, ResultCollectionStats};
-use kiddo::stem_strategies::donnelly_2_pf::DonnellyPf;
-use kiddo::stem_strategies::Eytzinger;
+use kiddo::stem_strategy::donnelly_2_pf::DonnellyPf;
+use kiddo::stem_strategy::Eytzinger;
 use std::hint::black_box;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};

@@ -1,4 +1,4 @@
-use kiddo::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
+use kiddo::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
 use kiddo::kd_tree::KdTree;
 use kiddo::Eytzinger;
 use kiddo::SquaredEuclidean;
