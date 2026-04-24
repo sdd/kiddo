@@ -171,6 +171,94 @@ profile-v6-result-collection-stats FEATURES='rkyv_08,simd,test_utils,result_coll
     RUSTFLAGS='-C target-cpu=native' \
     cargo run --release --bin profile_v6_result_collection_stats --features {{FEATURES}}
 
+build-v6-hugepage-archives FEATURES='rkyv_08,test_utils,logging_off' POINTS='33554432' QUERIES='100000' PREFIX='./target/kiddo-hugepage-v6':
+    RUSTC_WRAPPER= \
+    KIDDO_PROFILE_POINTS={{POINTS}} \
+    KIDDO_PROFILE_QUERIES={{QUERIES}} \
+    KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo run --release --bin build_v6_hugepage_archives --features {{FEATURES}}
+
+build-profile-v6-archived-hugepages FEATURES='rkyv_08,huge_pages,simd,logging_off':
+    RUSTC_WRAPPER= \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo build --release --bin profile_v6_archived_huge_pages --features {{FEATURES}}
+
+profile-v6-archived-hugepages FEATURES='rkyv_08,huge_pages,simd,logging_off' MODE='collapse' LOAD='mmap' QUERY='nearest-one' REPEATS='100' PREFIX='./target/kiddo-hugepage-v6' START_DELAY_MS='0':
+    RUSTC_WRAPPER= \
+    KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
+    KIDDO_PROFILE_HUGE_PAGES={{MODE}} \
+    KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
+    KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
+    KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
+    KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo run --release --bin profile_v6_archived_huge_pages --features {{FEATURES}}
+
+perf-v6-archived-hugepages FEATURES='rkyv_08,huge_pages,simd,logging_off' MODE='collapse' LOAD='mmap' QUERY='nearest-one' REPEATS='100' PREFIX='./target/kiddo-hugepage-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
+    RUSTC_WRAPPER= \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo build --release --bin profile_v6_archived_huge_pages --features {{FEATURES}}
+    KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
+    KIDDO_PROFILE_HUGE_PAGES={{MODE}} \
+    KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
+    KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
+    KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
+    KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
+    perf stat -D {{PERF_DELAY_MS}} \
+        -e cycles,instructions,branches,branch-misses,cache-references,cache-misses,L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses,dTLB-loads,dTLB-load-misses,page-faults,minor-faults,major-faults \
+        ./target/release/profile_v6_archived_huge_pages
+
+perf-v6-archived-hugepages-pair FEATURES='rkyv_08,huge_pages,simd,logging_off' LOAD='mmap' QUERY='nearest-one' REPEATS='100' PREFIX='./target/kiddo-hugepage-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
+    just perf-v6-archived-hugepages-tlb "{{FEATURES}}" nohuge "{{LOAD}}" "{{QUERY}}" "{{REPEATS}}" "{{PREFIX}}" "{{START_DELAY_MS}}" "{{PERF_DELAY_MS}}"
+    just perf-v6-archived-hugepages-tlb "{{FEATURES}}" collapse "{{LOAD}}" "{{QUERY}}" "{{REPEATS}}" "{{PREFIX}}" "{{START_DELAY_MS}}" "{{PERF_DELAY_MS}}"
+
+perf-v6-archived-hugepages-core FEATURES='rkyv_08,huge_pages,simd,logging_off' MODE='collapse' LOAD='mmap' QUERY='nearest-one' REPEATS='100' PREFIX='./target/kiddo-hugepage-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
+    RUSTC_WRAPPER= \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo build --release --bin profile_v6_archived_huge_pages --features {{FEATURES}}
+    KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
+    KIDDO_PROFILE_HUGE_PAGES={{MODE}} \
+    KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
+    KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
+    KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
+    KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
+    perf stat -D {{PERF_DELAY_MS}} \
+        -e cycles,instructions,branches,branch-misses \
+        ./target/release/profile_v6_archived_huge_pages
+
+perf-v6-archived-hugepages-cache FEATURES='rkyv_08,huge_pages,simd,logging_off' MODE='collapse' LOAD='mmap' QUERY='nearest-one' REPEATS='100' PREFIX='./target/kiddo-hugepage-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
+    RUSTC_WRAPPER= \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo build --release --bin profile_v6_archived_huge_pages --features {{FEATURES}}
+    KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
+    KIDDO_PROFILE_HUGE_PAGES={{MODE}} \
+    KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
+    KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
+    KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
+    KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
+    perf stat -D {{PERF_DELAY_MS}} \
+        -e cache-references,cache-misses,L1-dcache-loads,L1-dcache-load-misses \
+        ./target/release/profile_v6_archived_huge_pages
+
+perf-v6-archived-hugepages-tlb FEATURES='rkyv_08,huge_pages,simd,logging_off' MODE='collapse' LOAD='mmap' QUERY='nearest-one' REPEATS='100' PREFIX='./target/kiddo-hugepage-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
+    RUSTC_WRAPPER= \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo build --release --bin profile_v6_archived_huge_pages --features {{FEATURES}}
+    KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
+    KIDDO_PROFILE_HUGE_PAGES={{MODE}} \
+    KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
+    KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
+    KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
+    KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
+    perf stat -D {{PERF_DELAY_MS}} \
+        -e dTLB-loads,dTLB-load-misses,page-faults,minor-faults,major-faults \
+        ./target/release/profile_v6_archived_huge_pages
+
+perf-v6-archived-hugepages-tlb-pair FEATURES='rkyv_08,huge_pages,simd,logging_off' LOAD='mmap' QUERY='nearest-one' REPEATS='100' PREFIX='./target/kiddo-hugepage-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
+    just perf-v6-archived-hugepages-tlb "{{FEATURES}}" nohuge "{{LOAD}}" "{{QUERY}}" "{{REPEATS}}" "{{PREFIX}}" "{{START_DELAY_MS}}" "{{PERF_DELAY_MS}}"
+    just perf-v6-archived-hugepages-tlb "{{FEATURES}}" collapse "{{LOAD}}" "{{QUERY}}" "{{REPEATS}}" "{{PREFIX}}" "{{START_DELAY_MS}}" "{{PERF_DELAY_MS}}"
+
 repro-donnelly-block3-exact-divergence FEATURES='simd,test_utils,logging_off' POINTS='4194304' QUERIES='10000':
     RUSTC_WRAPPER= \
     KIDDO_REPRO_POINTS={{POINTS}} \

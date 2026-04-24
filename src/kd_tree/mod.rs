@@ -1,5 +1,7 @@
 //! Flexible kd-trees that can be used with float or fixed point, mutable or immutable, and selectable stem ordering strategies
 
+#![cfg_attr(feature = "rkyv_08", allow(missing_docs))]
+
 #[cfg(feature = "rkyv_08")]
 mod archived_query;
 mod construction;
@@ -88,6 +90,7 @@ fn resolve_mapped_terminal_stem_idx(
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
 )]
 #[cfg_attr(feature = "rkyv_08", rkyv(crate = rkyv_08))]
+#[cfg_attr(feature = "rkyv_08", rkyv(attr(allow(missing_docs))))]
 #[cfg_attr(
     feature = "rkyv_08",
     rkyv(archived = ArchivedStemLeafResolution)
@@ -283,6 +286,7 @@ impl StemLeafResolution for ArchivedStemLeafResolution {
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
 )]
 #[cfg_attr(feature = "rkyv_08", rkyv(crate = rkyv_08))]
+#[cfg_attr(feature = "rkyv_08", rkyv(attr(allow(missing_docs))))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct KdTree<
     A,              // Axis
