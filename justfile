@@ -82,7 +82,7 @@ asm-k6-approx-nearest-one-eytz-voa-v3-avx512-clean:
     RUSTC_WRAPPER= cargo asm --simplify --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "v6_approx_nearest_one_eytzinger_vec_of_arrays_cargo_asm_hook" | python3 scripts/clean_cargo_asm.py > v6_approx_nearest_one_eytzinger_vec_of_arrays_v3_avx512_clean.asm
 
 asm-k6-approx-nearest-one-eytz-voarena-v3-avx512:
-    cargo asm --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "v6_approx_nearest_one_eytzinger_vec_of_arenas_cargo_asm_hook" > v6_approx_nearest_one_eytzinger_vec_of_arenas_v3_avx512.asm
+    cargo asm --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "v6_approx_nearest_one_eytzinger_vec_of_arenas_cargo_asm_hook" | python3 scripts/clean_cargo_asm.py > v6_approx_nearest_one_eytzinger_vec_of_arenas_v3_avx512.asm
 
 asm-k6-approx-nearest-one-eytz-voarena-v3-avx512-clean:
     RUSTC_WRAPPER= cargo asm --simplify --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "v6_approx_nearest_one_eytzinger_vec_of_arenas_cargo_asm_hook" | python3 scripts/clean_cargo_asm.py > v6_approx_nearest_one_eytzinger_vec_of_arenas_v3_avx512_clean.asm
@@ -270,19 +270,19 @@ asm-k6-nearest-one-eytz-v3-core-avx512:
     cargo asm --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "v6_nearest_one_eytzinger_arithmetic_core_cargo_asm_hook" > v6_nearest_one_eytzinger_v3_core_avx512.asm
 
 asm-k6-nearest-one-eytz-v3-leaf-avx512:
-    cargo asm --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "kiddo::kd_tree::leaf_view_chunked::nearest_one::avx512::leaf_nearest_one_chunked_nozero_f64_k3::<f64, kiddo::dist::squared_euclidean::SquaredEuclidean<f64>, usize>" > v6_nearest_one_eytzinger_v3_leaf_avx512.asm
+    cargo asm --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "kiddo::leaf_view_chunked::nearest_one::avx512::leaf_nearest_one_chunked_nozero_f64_k3::<f64, kiddo::dist::squared_euclidean::SquaredEuclidean<f64>, usize>" > v6_nearest_one_eytzinger_v3_leaf_avx512.asm
 
 asm-k6-nearest-one-arena-leaf-v3-avx512-clean:
     RUSTC_WRAPPER= cargo asm --simplify --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "v6_nearest_one_arena_leaf_cargo_asm_hook" | python3 scripts/clean_cargo_asm.py > v6_nearest_one_arena_leaf_v3_avx512_clean.asm
 
 asm-k6-nearest-one-eytz-v3-leaf-avx512-clean:
-    RUSTC_WRAPPER= cargo asm --simplify --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "kiddo::kd_tree::leaf_view_chunked::nearest_one::avx512::leaf_nearest_one_chunked_nozero_f64_k3::<f64, kiddo::dist::squared_euclidean::SquaredEuclidean<f64>, usize>" | python3 scripts/clean_cargo_asm.py > v6_nearest_one_eytzinger_v3_leaf_avx512_clean.asm
+    RUSTC_WRAPPER= cargo asm --simplify --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "kiddo::leaf_view_chunked::nearest_one::avx512::leaf_nearest_one_chunked_nozero_f64_k3::<f64, kiddo::dist::squared_euclidean::SquaredEuclidean<f64>, usize>" | python3 scripts/clean_cargo_asm.py > v6_nearest_one_eytzinger_v3_leaf_avx512_clean.asm
 
 asm-k6-nearest-one-voarena-v3-leaf-avx512:
-    cargo asm --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "kiddo::kd_tree::leaf_view_chunked::nearest_one::avx512::leaf_nearest_one_arena_nozero_f64_k3::<f64, kiddo::dist::squared_euclidean::SquaredEuclidean<f64>, usize>" > v6_nearest_one_arena_leaf_k3_avx512.asm
+    cargo asm --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "kiddo::leaf_view_chunked::nearest_one::avx512::leaf_nearest_one_arena_nozero_f64_k3::<f64, kiddo::dist::squared_euclidean::SquaredEuclidean<f64>, usize>" > v6_nearest_one_arena_leaf_k3_avx512.asm
 
 asm-k6-nearest-one-voarena-v3-leaf-avx512-clean:
-    RUSTC_WRAPPER= cargo asm --simplify --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "kiddo::kd_tree::leaf_view_chunked::nearest_one::avx512::leaf_nearest_one_arena_nozero_f64_k3::<f64, kiddo::dist::squared_euclidean::SquaredEuclidean<f64>, usize>" | python3 scripts/clean_cargo_asm.py > v6_nearest_one_arena_leaf_k3_avx512_clean.asm
+    RUSTC_WRAPPER= cargo asm --simplify --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "kiddo::leaf_view_chunked::nearest_one::avx512::leaf_nearest_one_arena_nozero_f64_k3::<f64, kiddo::dist::squared_euclidean::SquaredEuclidean<f64>, usize>" | python3 scripts/clean_cargo_asm.py > v6_nearest_one_arena_leaf_k3_avx512_clean.asm
 
 objdump-k6-nearest-one-eytz:
     cargo objdump --release --lib --features cargo_asm,logging_off -- --disassemble-symbols="kiddo::immutable::float::query::nearest_one::cargo_asm::v6_nearest_one_eytzinger_with_stack" --demangle > v6_nearest_one_eytzinger.objdump

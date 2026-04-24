@@ -4,8 +4,8 @@ mod linux {
     use kiddo::huge_pages::{
         mapping_report_for_slice, prepare_archived_bytes, HugePageMappingReport, HugePageMode,
     };
-    use kiddo::kd_tree::leaf_strategies::VecOfArenas;
-    use kiddo::stem_strategies::donnelly_2_pf::DonnellyPf;
+    use kiddo::leaf_strategy::VecOfArenas;
+    use kiddo::stem_strategy::donnelly_2_pf::DonnellyPf;
     use rkyv_08::util::AlignedVec;
     use std::error::Error;
     use std::fs::File;

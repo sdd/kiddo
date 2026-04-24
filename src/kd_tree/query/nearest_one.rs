@@ -1,11 +1,11 @@
 use crate::dist::KdTreeDistanceMetric;
-use crate::kd_tree::leaf_view::TlsLeafScratch;
-use crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
+use crate::leaf_view::TlsLeafScratch;
+use crate::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::kd_tree::KdTreeQueryOps;
-use crate::stem_strategies::donnelly_2_blockmarker_simd::{
+use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
@@ -39,7 +39,7 @@ where
         match LS::LEAF_PROJECTION {
             LeafProjection::LeafArena => {
                 let arena = self.leaves.leaf_arena(leaf_idx);
-                crate::kd_tree::leaf_view_chunked::nearest_one::nearest_one_with_query_wide_arena::<
+                crate::leaf_view_chunked::nearest_one::nearest_one_with_query_wide_arena::<
                     A,
                     T,
                     D,
@@ -62,7 +62,7 @@ where
     pub fn nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
@@ -82,7 +82,7 @@ where
     fn nearest_one_mapped<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
@@ -112,7 +112,7 @@ where
     fn nearest_one_arithmetic<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
@@ -151,7 +151,7 @@ where
     ) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
@@ -190,7 +190,7 @@ where
     ) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
@@ -213,7 +213,7 @@ where
     ) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategies::SimdPrune
+        D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4
@@ -248,11 +248,10 @@ where
 #[cfg(feature = "cargo_asm")]
 pub mod cargo_asm {
     use crate::dist::SquaredEuclidean;
-    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas};
+    use crate::leaf_strategy::{FlatVec, VecOfArenas};
     use crate::kd_tree::query_stack::QueryStack;
     use crate::kd_tree::KdTree;
-    use crate::kd_tree::KdTreeQueryOps;
-    use crate::stem_strategies::{Block3, Donnelly, DonnellyMarkerSimd};
+    use crate::stem_strategy::{Block3, Donnelly, DonnellyMarkerSimd};
     use crate::Eytzinger;
 
     const K: usize = 3;
@@ -346,9 +345,9 @@ mod tests {
     use test_log::test;
 
     use crate::dist::SquaredEuclidean;
-    use crate::kd_tree::leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
+    use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
-    use crate::stem_strategies::Donnelly;
+    use crate::stem_strategy::Donnelly;
     use crate::traits::Axis;
     use crate::{Eytzinger, NearestNeighbour};
 
@@ -667,7 +666,7 @@ mod tests {
     #[cfg(feature = "simd")]
     #[cfg(target_arch = "x86_64")]
     fn v6_query_nearest_one_donnelly_marker_simd_f64() {
-        use crate::stem_strategies::{Block3, DonnellyMarkerPf, DonnellyMarkerSimd};
+        use crate::stem_strategy::{Block3, DonnellyMarkerPf, DonnellyMarkerSimd};
 
         // Test DonnellyMarkerSimd with f64 data using exact nearest_one query
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
@@ -748,7 +747,7 @@ mod tests {
     #[cfg(feature = "simd")]
     #[cfg(target_arch = "x86_64")]
     fn v6_query_nearest_one_donnelly_marker_simd_block4_f32() {
-        use crate::stem_strategies::{Block4, DonnellyMarkerSimd};
+        use crate::stem_strategy::{Block4, DonnellyMarkerSimd};
 
         // Test DonnellyMarkerSimd with f32 data using exact nearest_one query
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);

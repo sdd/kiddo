@@ -1,7 +1,7 @@
 //! Definitions and implementations for some traits that are common between the [`float`](crate::mutable::float), [`immutable`](crate::immutable) and [`fixed`](crate::mutable::fixed)  modules
 // use std::num::NonZero;
 use crate::kd_tree::query_stack::{ScalarStackContext, StackTrait};
-use crate::stem_strategies::donnelly_2_blockmarker_simd::backtrack_traits::{
+use crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::{
     BacktrackBlock3, BacktrackBlock4,
 };
 use crate::traits_unified_2::AxisUnified;
@@ -360,8 +360,8 @@ pub trait StemStrategy: Clone + Sync + Send {
         A: AxisUnified<Coord = A>,
         O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
         D: crate::dist::DistanceMetricCore<A, Output = O>
-            + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, O>
-            + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, O>,
+            + crate::stem_strategy::DistanceMetricSimdBlock3<A, K, O>
+            + crate::stem_strategy::DistanceMetricSimdBlock4<A, K, O>,
         Self::Stack<O>: StackTrait<O, Self>,
     {
         // Default implementation for scalar strategies
@@ -471,12 +471,12 @@ pub trait StemStrategy: Clone + Sync + Send {
         Self: Sized,
         A: AxisUnified<Coord = A>,
         O: AxisUnified<Coord = O>
-            + crate::stem_strategies::SimdSelectBestChildBlock3
+            + crate::stem_strategy::SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
         D: crate::dist::DistanceMetricCore<A, Output = O>
-            + crate::stem_strategies::DistanceMetricSimdBlock3<A, K, O>
-            + crate::stem_strategies::DistanceMetricSimdBlock4<A, K, O>,
+            + crate::stem_strategy::DistanceMetricSimdBlock3<A, K, O>
+            + crate::stem_strategy::DistanceMetricSimdBlock4<A, K, O>,
         Self::Stack<O>: StackTrait<O, Self>,
     {
         let _ = lower;
@@ -514,13 +514,13 @@ pub trait StemStrategy: Clone + Sync + Send {
         A: AxisUnified<Coord = A>,
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
         O: AxisUnified<Coord = O>
-            + crate::stem_strategies::SimdPrune
-            + crate::stem_strategies::SimdSelectBestChildBlock3
+            + crate::stem_strategy::SimdPrune
+            + crate::stem_strategy::SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
         D: crate::dist::KdTreeDistanceMetric<A, K2, Output = O>
-            + crate::stem_strategies::DistanceMetricSimdBlock3<A, K2, O>
-            + crate::stem_strategies::DistanceMetricSimdBlock4<A, K2, O>,
+            + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>
+            + crate::stem_strategy::DistanceMetricSimdBlock4<A, K2, O>,
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
         LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
         Self::Stack<O>: StackTrait<O, Self>,
@@ -547,8 +547,8 @@ pub trait StemStrategy: Clone + Sync + Send {
         T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
         O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
         D: crate::dist::KdTreeDistanceMetric<A, K2, Output = O>
-            + crate::stem_strategies::DistanceMetricSimdBlock3<A, K2, O>
-            + crate::stem_strategies::DistanceMetricSimdBlock4<A, K2, O>,
+            + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>
+            + crate::stem_strategy::DistanceMetricSimdBlock4<A, K2, O>,
         QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
         LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
         Self::Stack<O>: StackTrait<O, Self>,

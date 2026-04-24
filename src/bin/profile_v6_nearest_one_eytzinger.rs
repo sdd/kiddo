@@ -1,4 +1,4 @@
-use kiddo::kd_tree::leaf_strategies::FlatVec;
+use kiddo::leaf_strategy::FlatVec;
 use kiddo::kd_tree::KdTree;
 use kiddo::Eytzinger;
 use kiddo::SquaredEuclidean;

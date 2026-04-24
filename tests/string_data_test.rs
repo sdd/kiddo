@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
 use std::num::NonZero;
 
-use kiddo::kd_tree::leaf_strategies::VecOfArrays;
+use kiddo::leaf_strategy::VecOfArrays;
 use kiddo::kd_tree::KdTree;
 use kiddo::{Eytzinger, SquaredEuclidean};
 

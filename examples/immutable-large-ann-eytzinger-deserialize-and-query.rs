@@ -4,9 +4,9 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use elapsed::ElapsedDuration;
-use kiddo::kd_tree::leaf_strategies::VecOfArenas;
+use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::kd_tree::ArchivedKdTree;
-use kiddo::stem_strategies::EytzingerPf;
+use kiddo::stem_strategy::EytzingerPf;
 use kiddo::SquaredEuclidean;
 use memmap::MmapOptions;
 use rkyv_08::access;

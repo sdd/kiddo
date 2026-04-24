@@ -1,9 +1,9 @@
 use crate::dist::KdTreeDistanceMetric;
-use crate::kd_tree::leaf_view::TlsLeafScratch;
-use crate::kd_tree::leaf_view_chunked::nearest_n_within::{
+use crate::leaf_view::TlsLeafScratch;
+use crate::leaf_view_chunked::nearest_n_within::{
     nearest_n_within_with_query_wide, nearest_n_within_with_query_wide_arena,
 };
-use crate::kd_tree::result_collection::ResultCollection;
+use crate::results::result_collection::ResultCollection;
 use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
 use crate::{NearestNeighbour, StemStrategy};
 use std::mem::MaybeUninit;

@@ -519,7 +519,11 @@ pub(crate) fn maybe_collapse_slice_huge_pages<T>(ptr: *const T, len: usize) {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_smaps_for_range, HugePageMappingReport};
+
+    #[cfg(target_os = "linux")]
+    use super::parse_smaps_for_range;
+    #[cfg(target_os = "linux")]
+    use super::HugePageMappingReport;
 
     #[test]
     #[cfg(target_os = "linux")]

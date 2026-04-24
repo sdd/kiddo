@@ -217,7 +217,7 @@ where
     ///
     /// ```rust
     /// use kiddo::kd_tree::KdTree;
-    /// use kiddo::kd_tree::leaf_strategies::FlatVec;
+    /// use kiddo::leaf_strategy::FlatVec;
     /// use kiddo::Eytzinger;
     ///
     /// let points: Vec<[f64; 3]> = vec!([1.0f64, 2.0f64, 3.0f64]);
@@ -316,7 +316,7 @@ where
         let max_leaf_len = Self::initial_max_leaf_len();
         // TODO: if we keep max_leaf_len, populate this from the actual constructed leaf sizes
         // rather than the current B / (B * 2) heuristic.
-        crate::kd_tree::leaf_view::assert_leaf_scratch_capacity(max_leaf_len);
+        crate::leaf_view::assert_leaf_scratch_capacity(max_leaf_len);
 
         // println!("Stems: {:?}", &stems);
         let tree = Self {
@@ -364,7 +364,7 @@ where
         let max_leaf_len = Self::initial_max_leaf_len();
         // TODO: if we keep max_leaf_len, populate this from the actual constructed leaf sizes
         // rather than the current B / (B * 2) heuristic.
-        crate::kd_tree::leaf_view::assert_leaf_scratch_capacity(max_leaf_len);
+        crate::leaf_view::assert_leaf_scratch_capacity(max_leaf_len);
 
         let tree = Self {
             stems: avec![A::max_value(); 0],
