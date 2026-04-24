@@ -14,6 +14,7 @@ use crate::StemStrategy;
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
 )]
 #[cfg_attr(feature = "rkyv_08", rkyv(crate = rkyv_08))]
+#[cfg_attr(feature = "rkyv_08", rkyv(attr(allow(missing_docs))))]
 pub struct VecOfArrays<A, T, const K: usize, const B: usize> {
     leaves: Vec<LeafNode<A, T, K, B>>,
     size: usize,
@@ -25,6 +26,7 @@ pub struct VecOfArrays<A, T, const K: usize, const B: usize> {
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
 )]
 #[cfg_attr(feature = "rkyv_08", rkyv(crate = rkyv_08))]
+#[cfg_attr(feature = "rkyv_08", rkyv(attr(allow(missing_docs))))]
 #[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeafNode<A, T, const K: usize, const B: usize> {
