@@ -1,10 +1,10 @@
 use crate::dist::KdTreeDistanceMetric;
-use crate::leaf_view::TlsLeafScratch;
-use crate::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::kd_tree::KdTreeQueryOps;
+use crate::leaf_view::TlsLeafScratch;
+use crate::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
@@ -248,9 +248,9 @@ where
 #[cfg(feature = "cargo_asm")]
 pub mod cargo_asm {
     use crate::dist::SquaredEuclidean;
-    use crate::leaf_strategy::{FlatVec, VecOfArenas};
     use crate::kd_tree::query_stack::QueryStack;
     use crate::kd_tree::KdTree;
+    use crate::leaf_strategy::{FlatVec, VecOfArenas};
     use crate::stem_strategy::{Block3, Donnelly, DonnellyMarkerSimd};
     use crate::Eytzinger;
 
@@ -345,8 +345,8 @@ mod tests {
     use test_log::test;
 
     use crate::dist::SquaredEuclidean;
-    use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
+    use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::stem_strategy::Donnelly;
     use crate::traits::Axis;
     use crate::{Eytzinger, NearestNeighbour};

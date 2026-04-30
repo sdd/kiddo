@@ -1,6 +1,6 @@
 use kiddo::dist::{DistanceMetricCore, SquaredEuclidean};
-use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::kd_tree::KdTree;
+use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::stem_strategy::{Block3, Donnelly, DonnellyMarkerScalar, DonnellyMarkerSimd};
 use kiddo::test_utils::exact_query_stats::{reset, snapshot, ExactQueryStats};
 use kiddo::test_utils::exact_query_trace;
@@ -39,10 +39,8 @@ fn build_queries(query_count: usize) -> Vec<[f64; K]> {
 }
 
 fn squared_euclidean_dist(a: &[f64; K], b: &[f64; K]) -> f64 {
-    let aw =
-        (*a).map(<SquaredEuclidean<f64> as DistanceMetricCore<f64>>::widen_coord);
-    let bw =
-        (*b).map(<SquaredEuclidean<f64> as DistanceMetricCore<f64>>::widen_coord);
+    let aw = (*a).map(<SquaredEuclidean<f64> as DistanceMetricCore<f64>>::widen_coord);
+    let bw = (*b).map(<SquaredEuclidean<f64> as DistanceMetricCore<f64>>::widen_coord);
     <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist::<K>(&aw, &bw)
 }
 

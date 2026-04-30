@@ -160,10 +160,10 @@ mod test {
     use std::num::NonZeroUsize;
 
     use crate::dist::SquaredEuclidean;
+    use crate::kd_tree::KdTreeAccessor;
     use crate::leaf_strategy::flat_vec::FlatVec;
     use crate::traits_unified_2::LeafStrategy;
     use crate::{kd_tree, Eytzinger};
-    use crate::kd_tree::KdTreeAccessor;
 
     #[test]
     fn create_single_leaf_flat_vec_float_kd_tree() {

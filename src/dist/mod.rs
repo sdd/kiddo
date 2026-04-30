@@ -51,6 +51,7 @@ pub use dot_product::DotProduct;
 pub use manhattan::Manhattan;
 pub use squared_euclidean::SquaredEuclidean;
 
+#[cfg(feature = "simd")]
 macro_rules! with_nearest_result_emitter {
     ($results:expr, $distance_ty:ty, $item_ty:ty, $emit:ident, $body:block) => {{
         let mut $emit = |candidate_dist: $distance_ty, item: $item_ty| {
@@ -69,6 +70,7 @@ macro_rules! with_nearest_result_emitter {
     }};
 }
 
+#[cfg(feature = "simd")]
 macro_rules! with_best_result_emitter {
     ($results:expr, $threshold_item:expr, $distance_ty:ty, $item_ty:ty, $emit:ident, $body:block) => {{
         let threshold_item = $threshold_item;

@@ -68,13 +68,13 @@ impl<const K: usize, const VB: usize> StemStrategy for EytzingerPf<K, VB> {
     fn simulate_traverse(
         &mut self,
         is_right: bool,
-        event_tx: &std::sync::mpsc::Sender<crate::cache_simulator::Event>,
+        event_tx: &std::sync::mpsc::Sender<crate::test_utils::cache_simulator::Event>,
     ) {
         self.traverse(is_right);
 
         // MCA analysis shows that Eytzinger step_pure is just one LEA instr with est 3.5IPC and est
         // RThroughput of 0.5. Adding the estimate for the level and dim updating gets us to 1.5 to 2 cycles
-        let _ = event_tx.send(crate::cache_simulator::Event::Working(2));
+        let _ = event_tx.send(crate::test_utils::cache_simulator::Event::Working(2));
     }
 
     fn branch(&mut self) -> Self {

@@ -309,7 +309,7 @@ pub trait StemStrategy: Clone + Sync + Send {
     fn simulate_traverse(
         &mut self,
         _is_right: bool,
-        _event_tx: &std::sync::mpsc::Sender<crate::cache_simulator::Event>,
+        _event_tx: &std::sync::mpsc::Sender<crate::test_utils::cache_simulator::Event>,
     ) {
         unimplemented!();
     }

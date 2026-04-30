@@ -5,8 +5,8 @@ use codspeed_criterion_compat::{
     Criterion, Throughput,
 };
 use kiddo::dist::SquaredEuclidean;
-use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::kd_tree::KdTree;
+use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::stem_strategy::donnelly_2_pf::DonnellyPf;
 use kiddo::stem_strategy::eytzinger_pf_far::EytzingerPfFar;
 #[cfg(all(

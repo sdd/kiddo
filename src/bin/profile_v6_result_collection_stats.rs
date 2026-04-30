@@ -1,6 +1,6 @@
 use kiddo::dist::SquaredEuclidean;
 use kiddo::leaf_strategy::VecOfArenas;
-use kiddo::result_collection_stats::{reset, snapshot, ResultCollectionStats};
+use kiddo::results::result_collection_stats::{reset, snapshot, ResultCollectionStats};
 use kiddo::stem_strategy::donnelly_2_pf::DonnellyPf;
 use kiddo::stem_strategy::Eytzinger;
 use std::hint::black_box;

@@ -100,9 +100,9 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
     fn simulate_traverse(
         &mut self,
         is_right: bool,
-        event_tx: &std::sync::mpsc::Sender<crate::cache_simulator::Event>,
+        event_tx: &std::sync::mpsc::Sender<crate::test_utils::cache_simulator::Event>,
     ) {
-        use crate::cache_simulator::{Event, PrefetchLevel};
+        use crate::test_utils::cache_simulator::{Event, PrefetchLevel};
 
         let min_idx = self.stem_idx & Self::line_mask();
         let min_row_idx = min_idx.wrapping_sub(self.minor_level).wrapping_sub(1);

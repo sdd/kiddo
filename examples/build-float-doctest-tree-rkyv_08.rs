@@ -3,8 +3,8 @@ use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 
-use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::kd_tree::KdTree;
+use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::stem_strategy::EytzingerPf;
 use rkyv_08::{rancor::Error as RkyvError, to_bytes};
 

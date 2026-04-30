@@ -482,10 +482,10 @@ mod test {
     use rand::Rng;
 
     use crate::dist::SquaredEuclidean;
+    use crate::kd_tree::KdTreeAccessor;
     use crate::leaf_strategy::vec_of_arrays::VecOfArrays;
     use crate::traits_unified_2::LeafStrategy;
     use crate::{kd_tree, Eytzinger};
-    use crate::kd_tree::KdTreeAccessor;
 
     #[test]
     fn create_single_leaf_vec_of_arrays_float_kd_tree() {

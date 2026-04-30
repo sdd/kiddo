@@ -47,7 +47,7 @@ pub struct ResultCollectionStats {
 
 thread_local! {
     static STATS: Cell<ResultCollectionStats> = Cell::new(ResultCollectionStats::default());
-    static LEAF_PHASE: Cell<LeafPhase> = Cell::new(LeafPhase::Unknown);
+    static LEAF_PHASE: Cell<LeafPhase> = const { Cell::new(LeafPhase::Unknown) };
 }
 
 #[inline]
