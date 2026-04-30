@@ -97,7 +97,6 @@
 extern crate core;
 extern crate doc_comment;
 
-
 // #[doc(hidden)]
 // #[cfg(feature = "serde")]
 // #[doc(hidden)]
@@ -124,13 +123,9 @@ pub mod leaf_view;
 /// Chunked Leaf view abstraction for accessing leaf data
 pub(crate) mod leaf_view_chunked;
 
-
 /// Stem Orderings
 pub mod stem_strategy;
 pub use traits::StemStrategy;
-
-#[cfg(feature = "simulator")]
-pub mod cache_simulator;
 
 /// Distance metrics
 pub mod dist;

@@ -7,8 +7,8 @@ use std::env;
 use std::num::NonZeroUsize;
 
 use kiddo::dist::DistanceMetricCore;
-use kiddo::leaf_strategy::{FlatVec, VecOfArrays};
 use kiddo::kd_tree::KdTree as V6KdTree;
+use kiddo::leaf_strategy::{FlatVec, VecOfArrays};
 use kiddo::results::nearest_neighbour::NearestNeighbour;
 use kiddo::stem_strategy::{Donnelly, Eytzinger};
 use kiddo::traits::Axis;

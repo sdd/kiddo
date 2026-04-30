@@ -1,18 +1,18 @@
 use crate::dist::KdTreeDistanceMetric;
+use crate::kd_tree::query_stack::StackTrait;
+use crate::kd_tree::traits::QueryContext;
+use crate::kd_tree::KdTreeQueryOps;
+use crate::kd_tree::{ArchivedKdTree, KdTreeAccessor};
 use crate::leaf_view::TlsLeafScratch;
 use crate::leaf_view_chunked::best_n_within::best_n_within_with_query_wide_arena;
 use crate::leaf_view_chunked::nearest_n_within::nearest_n_within_with_query_wide_arena;
 use crate::leaf_view_chunked::nearest_one::{
     nearest_one_with_query_wide, nearest_one_with_query_wide_arena,
 };
-use crate::kd_tree::query_stack::StackTrait;
 use crate::results::result_collection::{
     BestNeighbourResultCollection, BinaryHeapResultCollection, ResultCollection,
     VisitorResultCollection,
 };
-use crate::kd_tree::traits::QueryContext;
-use crate::kd_tree::KdTreeQueryOps;
-use crate::kd_tree::{ArchivedKdTree, KdTreeAccessor};
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };

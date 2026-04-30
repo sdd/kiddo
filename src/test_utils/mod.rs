@@ -1,4 +1,6 @@
 #![allow(clippy::type_complexity, clippy::unit_arg)]
+#[cfg(feature = "simulator")]
+pub mod cache_simulator;
 pub mod exact_query_stats;
 pub mod exact_query_trace;
 

@@ -1,5 +1,5 @@
-use kiddo::leaf_strategy::FlatVec;
 use kiddo::kd_tree::KdTree;
+use kiddo::leaf_strategy::FlatVec;
 use kiddo::Eytzinger;
 use kiddo::SquaredEuclidean;
 use rand::Rng;

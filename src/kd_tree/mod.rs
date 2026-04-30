@@ -1,10 +1,11 @@
 //! Flexible kd-trees that can be used with float or fixed point, mutable or immutable, and selectable stem ordering strategies
 
+#![allow(missing_docs)]
 
 mod construction;
 mod iter;
-mod query;
 pub(crate) mod orchestrator;
+mod query;
 pub(crate) mod query_stack;
 pub(crate) mod query_stack_simd;
 pub(crate) mod traits;

@@ -9,11 +9,11 @@ use std::io::{IsTerminal, Write};
 use std::num::NonZeroUsize;
 use std::sync::{Mutex, OnceLock};
 
-use kiddo::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
 use kiddo::kd_tree::KdTree;
+use kiddo::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
 use kiddo::results::nearest_neighbour::NearestNeighbour;
 use kiddo::stem_strategy::{Donnelly, Eytzinger};
-use kiddo::traits_unified_2::{AxisUnified, LeafStrategy};
+use kiddo::traits_unified_2::{AxisUnified, ConstructibleLeafStrategy, LeafStrategy};
 use kiddo::StemStrategy;
 use kiddo::{dist::DistanceMetricCore, Manhattan, SquaredEuclidean};
 
@@ -234,9 +234,7 @@ fn random_radius_f64<const K: usize>(rng: &mut StdRng) -> f64 {
     rng.random_range(0.0f64..(0.5f64 * K as f64))
 }
 
-fn sort_by_distance_then_index<A: AxisUnified<Coord = A> + PartialOrd>(
-    items: &mut [(A, usize)],
-) {
+fn sort_by_distance_then_index<A: AxisUnified<Coord = A> + PartialOrd>(items: &mut [(A, usize)]) {
     items.sort_by(|a, b| {
         a.0.partial_cmp(&b.0)
             .expect("NaN distance in sort")
@@ -1795,7 +1793,7 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
 ) where
     SO: StemStrategy + 'static,
     <SO as StemStrategy>::Stack<f32>: 'static,
-    LS: LeafStrategy<f32, usize, SO, K, B>,
+    LS: LeafStrategy<f32, usize, SO, K, B> + ConstructibleLeafStrategy<f32, usize, SO, K, B>,
 {
     let mut progress = ProgressReporter::new(label, cfg.cases, cfg.query_count);
     for case_idx in 0..cfg.cases {
@@ -2205,7 +2203,7 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
 ) where
     SO: StemStrategy + 'static,
     <SO as StemStrategy>::Stack<f64>: 'static,
-    LS: LeafStrategy<f64, usize, SO, K, B>,
+    LS: LeafStrategy<f64, usize, SO, K, B> + ConstructibleLeafStrategy<f64, usize, SO, K, B>,
 {
     let mut progress = ProgressReporter::new(label, cfg.cases, cfg.query_count);
     for case_idx in 0..cfg.cases {
@@ -3793,7 +3791,8 @@ fn run_adversarial_immutable_f32_with_leaf<SO, LS>(label: &str)
 where
     SO: StemStrategy + 'static,
     <SO as StemStrategy>::Stack<f32>: 'static,
-    LS: LeafStrategy<f32, usize, SO, 2, ADVERSARIAL_B>,
+    LS: LeafStrategy<f32, usize, SO, 2, ADVERSARIAL_B>
+        + ConstructibleLeafStrategy<f32, usize, SO, 2, ADVERSARIAL_B>,
 {
     let queries = adversarial_queries_f32();
 
@@ -3925,7 +3924,8 @@ fn run_adversarial_immutable_f64_with_leaf<SO, LS>(label: &str)
 where
     SO: StemStrategy + 'static,
     <SO as StemStrategy>::Stack<f64>: 'static,
-    LS: LeafStrategy<f64, usize, SO, 2, ADVERSARIAL_B>,
+    LS: LeafStrategy<f64, usize, SO, 2, ADVERSARIAL_B>
+        + ConstructibleLeafStrategy<f64, usize, SO, 2, ADVERSARIAL_B>,
 {
     let queries = adversarial_queries_f64();
 

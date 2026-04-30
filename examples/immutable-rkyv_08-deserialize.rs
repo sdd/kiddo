@@ -4,8 +4,8 @@ use std::num::NonZero;
 use std::time::Instant;
 
 use elapsed::ElapsedDuration;
-use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::kd_tree::{ArchivedKdTree, KdTree};
+use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::stem_strategy::EytzingerPf;
 use kiddo::SquaredEuclidean;
 use memmap::MmapOptions;

@@ -30,6 +30,7 @@ pub trait ResultCollection<O: AxisUnified<Coord = O>, E>: Sized {
     fn into_vec(self) -> Vec<E>;
     fn into_sorted_vec(self) -> Vec<E>;
 
+    #[cfg(feature = "buffered_result_collection")]
     #[inline(always)]
     fn add_all<I>(&mut self, entries: I)
     where
@@ -38,11 +39,12 @@ pub trait ResultCollection<O: AxisUnified<Coord = O>, E>: Sized {
         #[cfg(feature = "result_collection_stats")]
         {
             let iter = entries.into_iter();
-            crate::results::result_collection_stats::record_collector_add_all_call(iter.size_hint().0);
+            crate::results::result_collection_stats::record_collector_add_all_call(
+                iter.size_hint().0,
+            );
             for entry in iter {
                 self.add(entry);
             }
-            return;
         }
 
         #[cfg(not(feature = "result_collection_stats"))]
@@ -235,7 +237,10 @@ fn small_sorted_insert<E: Ord>(
     if inner.len() < max_qty {
         let insert_at = inner.partition_point(|existing| *existing <= entry);
         #[cfg(feature = "result_collection_stats")]
-        crate::results::result_collection_stats::record_sorted_insert(insert_at, inner.len() - insert_at);
+        crate::results::result_collection_stats::record_sorted_insert(
+            insert_at,
+            inner.len() - insert_at,
+        );
         inner.insert(insert_at, entry);
     } else if entry < *inner.last().unwrap() {
         let insert_at = inner.partition_point(|existing| *existing <= entry);
@@ -304,7 +309,8 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
         }
     }
 
-    #[allow(unreachable_code)]
+    #[cfg(feature = "buffered_result_collection")]
+    // #[allow(unreachable_code)]
     fn add_all<I>(&mut self, entries: I)
     where
         I: IntoIterator<Item = NearestNeighbour<O, T>>,
@@ -312,7 +318,9 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
         #[cfg(feature = "result_collection_stats")]
         {
             let iter = entries.into_iter();
-            crate::results::result_collection_stats::record_collector_add_all_call(iter.size_hint().0);
+            crate::results::result_collection_stats::record_collector_add_all_call(
+                iter.size_hint().0,
+            );
             let mut combined = std::mem::take(&mut self.inner).into_vec();
             combined.extend(iter);
 
@@ -344,7 +352,10 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
             None
         };
         #[cfg(feature = "result_collection_stats")]
-        crate::results::result_collection_stats::record_threshold_distance_call(is_full, result.is_some());
+        crate::results::result_collection_stats::record_threshold_distance_call(
+            is_full,
+            result.is_some(),
+        );
         result
     }
 
@@ -396,7 +407,8 @@ impl<O: AxisUnified<Coord = O>, T: Content> ResultCollection<O, BestNeighbour<O,
         }
     }
 
-    #[allow(unreachable_code)]
+    // #[allow(unreachable_code)]
+    #[cfg(feature = "buffered_result_collection")]
     fn add_all<I>(&mut self, entries: I)
     where
         I: IntoIterator<Item = BestNeighbour<O, T>>,
@@ -404,7 +416,9 @@ impl<O: AxisUnified<Coord = O>, T: Content> ResultCollection<O, BestNeighbour<O,
         #[cfg(feature = "result_collection_stats")]
         {
             let iter = entries.into_iter();
-            crate::results::result_collection_stats::record_collector_add_all_call(iter.size_hint().0);
+            crate::results::result_collection_stats::record_collector_add_all_call(
+                iter.size_hint().0,
+            );
             let mut combined = std::mem::take(&mut self.inner).into_vec();
             combined.extend(iter);
 
@@ -500,7 +514,8 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
         }
     }
 
-    #[allow(unreachable_code)]
+    // #[allow(unreachable_code)]
+    #[cfg(feature = "buffered_result_collection")]
     fn add_all<I>(&mut self, entries: I)
     where
         I: IntoIterator<Item = NearestNeighbour<O, T>>,
@@ -508,7 +523,9 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
         #[cfg(feature = "result_collection_stats")]
         {
             let iter = entries.into_iter();
-            crate::results::result_collection_stats::record_collector_add_all_call(iter.size_hint().0);
+            crate::results::result_collection_stats::record_collector_add_all_call(
+                iter.size_hint().0,
+            );
             let mut combined = std::mem::take(&mut self.inner).into_vec();
             combined.extend(iter);
             self.inner = SortedVec::from_unsorted(combined);
@@ -538,7 +555,10 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
             None
         };
         #[cfg(feature = "result_collection_stats")]
-        crate::results::result_collection_stats::record_threshold_distance_call(is_full, result.is_some());
+        crate::results::result_collection_stats::record_threshold_distance_call(
+            is_full,
+            result.is_some(),
+        );
         result
     }
 
@@ -600,7 +620,9 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
         #[cfg(feature = "result_collection_stats")]
         {
             let iter = entries.into_iter();
-            crate::results::result_collection_stats::record_collector_add_all_call(iter.size_hint().0);
+            crate::results::result_collection_stats::record_collector_add_all_call(
+                iter.size_hint().0,
+            );
             let mut combined = std::mem::take(&mut self.inner).into_vec();
             combined.extend(iter);
 
@@ -634,7 +656,10 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
             None
         };
         #[cfg(feature = "result_collection_stats")]
-        crate::results::result_collection_stats::record_threshold_distance_call(is_full, result.is_some());
+        crate::results::result_collection_stats::record_threshold_distance_call(
+            is_full,
+            result.is_some(),
+        );
         result
     }
 
@@ -698,7 +723,9 @@ impl<O: AxisUnified<Coord = O>, T: Content> ResultCollection<O, BestNeighbour<O,
         #[cfg(feature = "result_collection_stats")]
         {
             let iter = entries.into_iter();
-            crate::results::result_collection_stats::record_collector_add_all_call(iter.size_hint().0);
+            crate::results::result_collection_stats::record_collector_add_all_call(
+                iter.size_hint().0,
+            );
             let mut combined = std::mem::take(&mut self.inner).into_vec();
             combined.extend(iter);
 
@@ -787,7 +814,9 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
         #[cfg(feature = "result_collection_stats")]
         {
             let iter = entries.into_iter();
-            crate::results::result_collection_stats::record_collector_add_all_call(iter.size_hint().0);
+            crate::results::result_collection_stats::record_collector_add_all_call(
+                iter.size_hint().0,
+            );
             let mut combined = std::mem::take(&mut self.inner).into_vec();
             combined.extend(iter);
             combined.sort_unstable();
@@ -815,7 +844,10 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
             None
         };
         #[cfg(feature = "result_collection_stats")]
-        crate::results::result_collection_stats::record_threshold_distance_call(is_full, result.is_some());
+        crate::results::result_collection_stats::record_threshold_distance_call(
+            is_full,
+            result.is_some(),
+        );
         result
     }
 
@@ -1007,6 +1039,7 @@ pub mod cargo_asm {
         checksum_nearest(&vec)
     }
 
+    #[cfg(feature = "buffered_result_collection")]
     #[inline(never)]
     #[unsafe(no_mangle)]
     pub fn v6_sorted_vec_result_collection_add_all_cargo_asm_hook() -> (usize, u64, u64) {
@@ -1029,6 +1062,7 @@ pub mod cargo_asm {
         checksum_best(&vec)
     }
 
+    #[cfg(feature = "buffered_result_collection")]
     #[inline(never)]
     #[unsafe(no_mangle)]
     pub fn v6_binary_heap_result_collection_add_all_cargo_asm_hook() -> (usize, u64, u64) {
@@ -1109,6 +1143,7 @@ impl<O: AxisUnified<Coord = O>, E: Ord> ResultCollection<O, E> for Vec<E> {
         self.push(entry)
     }
 
+    #[cfg(feature = "buffered_result_collection")]
     fn add_all<I>(&mut self, entries: I)
     where
         I: IntoIterator<Item = E>,

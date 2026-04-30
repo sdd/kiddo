@@ -134,9 +134,9 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
     fn simulate_traverse(
         &mut self,
         is_right: bool,
-        event_tx: &std::sync::mpsc::Sender<crate::cache_simulator::Event>,
+        event_tx: &std::sync::mpsc::Sender<crate::test_utils::cache_simulator::Event>,
     ) {
-        use crate::cache_simulator::Event;
+        use crate::test_utils::cache_simulator::Event;
 
         // Execute the real traversal logic
         self.traverse(is_right);

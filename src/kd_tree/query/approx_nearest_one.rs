@@ -1,8 +1,8 @@
 use crate::dist::KdTreeDistanceMetric;
-use crate::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
 use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTree;
 use crate::kd_tree::KdTreeQueryOps;
+use crate::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
 use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
 use crate::StemStrategy;
 
@@ -90,8 +90,8 @@ impl<A, O, const K: usize> QueryContext<A, O, K> for ApproxNearestOneReqCtx<'_, 
 #[cfg(feature = "cargo_asm")]
 pub mod cargo_asm {
     use crate::dist::SquaredEuclidean;
-    use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
+    use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::Eytzinger;
 
     const K: usize = 3;
@@ -141,8 +141,8 @@ mod tests {
     use rand::Rng;
     use rand::SeedableRng;
 
-    use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
+    use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::stem_strategy::{Donnelly, DonnellyMarkerPf};
 
     use crate::dist::SquaredEuclidean;

@@ -1,7 +1,7 @@
 use crate::dist::KdTreeDistanceMetric;
-use crate::leaf_view::TlsLeafScratch;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::KdTree;
+use crate::leaf_view::TlsLeafScratch;
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
@@ -46,8 +46,8 @@ mod tests {
     use std::cmp::Ordering;
 
     use crate::dist::Manhattan;
-    use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::kd_tree::KdTree;
+    use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::traits::Axis;
     use crate::Eytzinger;
 
