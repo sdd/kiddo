@@ -12,7 +12,7 @@ use std::num::NonZero;
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: AxisUnified<Coord = A> + 'static,
-    T: Basics + Ord,
+    T: Basics + PartialOrd,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
@@ -51,8 +51,8 @@ mod tests {
     use crate::dist::SquaredEuclidean;
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
-    use crate::traits::Axis;
     use crate::Eytzinger;
+    use crate::traits_unified_2::AxisUnified;
 
     const RNG_SEED: u64 = 42;
     const TILE_BOUNDARY_CASES: [usize; 7] = [1, 2, 4, 8, 32, 33, 47];
@@ -205,14 +205,15 @@ mod tests {
         }
     }
 
-    fn linear_search<A: Axis, R, const K: usize>(
+    fn linear_search<A, R, const K: usize>(
         content: &[[A; K]],
         qty: usize,
         query_point: &[A; K],
     ) -> Vec<(A, R)>
     where
+        A: AxisUnified<Coord = A>,
         usize: Cast<R>,
-        crate::dist::SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
+        SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
     {
         let mut results: Vec<(A, R)> = vec![];
 
@@ -230,22 +231,23 @@ mod tests {
         results
     }
 
-    fn squared_euclidean_dist<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A
+    fn squared_euclidean_dist<A, const K: usize>(a: &[A; K], b: &[A; K]) -> A
     where
-        crate::dist::SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
+        A: AxisUnified<Coord = A>,
+        SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
     {
         let aw = (*a).map(|coord| {
-            <crate::dist::SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(
+            <SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(
                 coord,
             )
         });
         let bw = (*b).map(|coord| {
-            <crate::dist::SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(
+            <SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(
                 coord,
             )
         });
 
-        <crate::dist::SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::dist::<K>(
+        <SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::dist::<K>(
             &aw, &bw,
         )
     }

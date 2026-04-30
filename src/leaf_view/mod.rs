@@ -509,7 +509,7 @@ pub(crate) fn try_identity_widen_axis<AX: 'static, O: 'static>(axis: &[AX]) -> O
     }
 }
 
-impl<'a, AX: AxisUnified<Coord = AX>, T: Basics + Ord, const K: usize, const B: usize>
+impl<'a, AX: AxisUnified<Coord = AX>, T: Basics + PartialOrd, const K: usize, const B: usize>
     LeafView<'a, AX, T, K, B>
 {
     #[cfg_attr(not(feature = "no_inline"), inline)]

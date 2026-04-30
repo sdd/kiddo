@@ -35,7 +35,7 @@ use std::any::TypeId;
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     DistanceMetricSimdBlock3, DistanceMetricSimdBlock4,
 };
-use crate::traits_unified_2::AxisUnified;
+use crate::traits_unified_2::{AxisUnified, Basics};
 #[cfg(any(
     all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
     all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"),
@@ -834,7 +834,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: AxisUnified<Coord = A> + 'static,
-        T: crate::traits_unified_2::Basics + Ord,
+        T: Basics,
         Self::Output: AxisUnified<Coord = Self::Output> + 'static,
         R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
     {
@@ -973,7 +973,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: AxisUnified<Coord = A> + 'static,
-        T: crate::traits_unified_2::Basics + Ord,
+        T: Basics + PartialOrd,
         Self::Output: AxisUnified<Coord = Self::Output> + 'static,
         R: BestNeighbourResultCollection<Self::Output, T>,
     {
@@ -1036,7 +1036,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: AxisUnified<Coord = A> + 'static,
-        T: crate::traits_unified_2::Basics + Ord,
+        T: crate::traits_unified_2::Basics + PartialOrd,
         Self::Output: AxisUnified<Coord = Self::Output> + 'static,
         R: BestNeighbourResultCollection<Self::Output, T>,
     {

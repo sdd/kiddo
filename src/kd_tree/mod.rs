@@ -721,7 +721,7 @@ where
 mod tests {
     use super::*;
     use crate::leaf_strategy::dummy::DummyLeafStrategy;
-    use crate::leaf_strategy::FlatVec;
+    use crate::leaf_strategy::{FlatVec, VecOfArrays};
     #[cfg(feature = "rkyv_08")]
     use crate::leaf_strategy::VecOfArenas;
     use crate::stem_strategy::Donnelly;
@@ -962,5 +962,18 @@ mod tests {
             tree.best_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty)
                 .into_sorted_vec()
         );
+    }
+
+    #[test]
+    fn can_create_points_only_tree() {
+
+        // points-only tree can be created by specifying T / Item parameter as ()
+        type Tree = KdTree<f64, (), Eytzinger<3>, VecOfArrays<f64, (), 3, 256>, 3, 256>;
+
+        let points = vec![[0.0f64; 3]];
+
+        let kd_tree = Tree::new_from_slice_no_items(&points);
+
+        assert_eq!(kd_tree.size, 1);
     }
 }

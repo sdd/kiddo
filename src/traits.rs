@@ -7,17 +7,17 @@ use crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::{
 use crate::traits_unified_2::AxisUnified;
 // use crate::{BestNeighbour, NearestNeighbour, WithinUnsortedIter};
 use aligned_vec::AVec;
-use az::Cast;
-use divrem::DivCeil;
-use fixed::prelude::ToFixed;
-use fixed::traits::Fixed;
-use num_traits::float::FloatCore;
-use num_traits::{PrimInt, Unsigned, Zero};
-use std::fmt::Debug;
-use std::iter::Sum;
+// use az::Cast;
+// use divrem::DivCeil;
+// use fixed::prelude::ToFixed;
+// use fixed::traits::Fixed;
+// use num_traits::float::FloatCore;
+// use num_traits::{PrimInt, Unsigned, Zero};
+// use std::fmt::Debug;
+// use std::iter::Sum;
 use std::ptr::NonNull;
 
-/// Axis trait represents the traits that must be implemented
+/*/// Axis trait represents the traits that must be implemented
 /// by the type that is used as the first generic parameter, `A`,
 /// on float `KdTree`s. This will be [`f64`] or [`f32`],
 /// or [`f16`](https://docs.rs/half/latest/half/struct.f16.html) if used with
@@ -145,7 +145,7 @@ impl Index for u16 {
 #[allow(dead_code)]
 pub(crate) fn is_stem_index<IDX: Index<T = IDX>>(x: IDX) -> bool {
     x < <IDX as Index>::leaf_offset()
-}
+}*/
 
 /// Trait that needs to be implemented by any potential stem ordering
 /// algorithm used by a KdTree.
@@ -557,38 +557,38 @@ pub trait StemStrategy: Clone + Sync + Send {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::traits::Index;
-
-    #[test]
-    fn test_u16() {
-        assert_eq!(<u16 as Index>::max(), u16::MAX);
-        assert_eq!(<u16 as Index>::min(), 0u16);
-        assert_eq!(<u16 as Index>::leaf_offset(), 32_767u16);
-        assert_eq!(256u16.ilog2(), 8u32);
-        assert_eq!(u16::capacity_with_bucket_size(32), 1_048_576);
-    }
-
-    #[test]
-    fn test_u32() {
-        assert_eq!(<u32 as Index>::max(), u32::MAX);
-        assert_eq!(<u32 as Index>::min(), 0u32);
-        assert_eq!(<u32 as Index>::leaf_offset(), 2_147_483_647);
-        assert_eq!(256u32.ilog2(), 8u32);
-
-        #[cfg(target_pointer_width = "64")]
-        assert_eq!(u32::capacity_with_bucket_size(32), 68_719_476_736);
-
-        #[cfg(target_pointer_width = "32")]
-        assert_eq!(u32::capacity_with_bucket_size(32), u32::MAX);
-    }
-    #[test]
-    fn test_u32_simulate_32bit_target_pointer() {
-        // TODO: replace this with wasm-bindgen-tests at some point
-        let bucket_size: u32 = 32;
-        let capacity_with_bucket_size =
-            (u32::MAX - u32::MAX.overflowing_shr(1).0).saturating_mul(bucket_size);
-        assert_eq!(capacity_with_bucket_size, u32::MAX);
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use crate::traits::Index;
+//
+//     #[test]
+//     fn test_u16() {
+//         assert_eq!(<u16 as Index>::max(), u16::MAX);
+//         assert_eq!(<u16 as Index>::min(), 0u16);
+//         assert_eq!(<u16 as Index>::leaf_offset(), 32_767u16);
+//         assert_eq!(256u16.ilog2(), 8u32);
+//         assert_eq!(u16::capacity_with_bucket_size(32), 1_048_576);
+//     }
+//
+//     #[test]
+//     fn test_u32() {
+//         assert_eq!(<u32 as Index>::max(), u32::MAX);
+//         assert_eq!(<u32 as Index>::min(), 0u32);
+//         assert_eq!(<u32 as Index>::leaf_offset(), 2_147_483_647);
+//         assert_eq!(256u32.ilog2(), 8u32);
+//
+//         #[cfg(target_pointer_width = "64")]
+//         assert_eq!(u32::capacity_with_bucket_size(32), 68_719_476_736);
+//
+//         #[cfg(target_pointer_width = "32")]
+//         assert_eq!(u32::capacity_with_bucket_size(32), u32::MAX);
+//     }
+//     #[test]
+//     fn test_u32_simulate_32bit_target_pointer() {
+//         // TODO: replace this with wasm-bindgen-tests at some point
+//         let bucket_size: u32 = 32;
+//         let capacity_with_bucket_size =
+//             (u32::MAX - u32::MAX.overflowing_shr(1).0).saturating_mul(bucket_size);
+//         assert_eq!(capacity_with_bucket_size, u32::MAX);
+//     }
+// }

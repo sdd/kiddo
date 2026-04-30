@@ -25,7 +25,7 @@ use std::num::NonZero;
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: AxisUnified<Coord = A> + 'static,
-    T: Basics + Ord,
+    T: Basics + PartialOrd,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {

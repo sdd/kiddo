@@ -297,7 +297,7 @@ impl<E: Copy, const N: usize> InlineResultBuffer<E, N> {
 pub struct WithinUnsortedIter<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize>
 where
     A: AxisUnified<Coord = A> + 'static,
-    T: Basics + Ord,
+    T: Basics + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     D: KdTreeDistanceMetric<A, K>,
@@ -322,7 +322,7 @@ impl<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize>
     WithinUnsortedIter<'a, Tree, A, T, SS, LS, D, K, B>
 where
     A: AxisUnified<Coord = A> + 'static,
-    T: Basics + Ord,
+    T: Basics + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     D: KdTreeDistanceMetric<A, K>,
@@ -471,7 +471,7 @@ impl<Tree, A, T, SS, LS, D, const K: usize, const B: usize> Iterator
     for WithinUnsortedIter<'_, Tree, A, T, SS, LS, D, K, B>
 where
     A: AxisUnified<Coord = A> + 'static,
-    T: Basics + Ord,
+    T: Basics + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     D: KdTreeDistanceMetric<A, K>,

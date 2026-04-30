@@ -178,6 +178,33 @@ mod tests {
     }
 
     #[test]
+    fn v6_approx_nearest_one_flat_vec_f32_no_items() {
+        let mut rng = StdRng::seed_from_u64(RNG_SEED);
+
+        let mut points: Vec<[f32; 3]> = vec![];
+        for _ in 0..65_536 {
+            let x = rng.random_range(0.0..1.0);
+            let y = rng.random_range(0.0..1.0);
+            let z = rng.random_range(0.0..1.0);
+            points.push([x, y, z]);
+        }
+
+        let tree: KdTree<f32, (), Eytzinger<3>, FlatVec<f32, (), 3, 32>, 3, 32> =
+            KdTree::new_from_slice_no_items(&points);
+
+        assert!(!tree.is_empty());
+        assert_eq!(tree.size(), 65_536);
+        assert_eq!(tree.leaf_count(), 2048);
+        assert_eq!(tree.max_stem_level(), 10);
+
+        let query_point = [0.5, 0.5, 0.5];
+
+        let results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
+
+        assert_eq!(results, (0.0014114721, ()));
+    }
+
+    #[test]
     fn v6_approx_nearest_one_vec_of_arrays_f32() {
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
