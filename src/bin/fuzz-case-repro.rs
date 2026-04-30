@@ -11,7 +11,6 @@ use kiddo::kd_tree::KdTree as V6KdTree;
 use kiddo::leaf_strategy::{FlatVec, VecOfArrays};
 use kiddo::results::nearest_neighbour::NearestNeighbour;
 use kiddo::stem_strategy::{Donnelly, Eytzinger};
-use kiddo::traits::Axis;
 use kiddo::StemStrategy;
 use kiddo::{Manhattan as V6Manhattan, SquaredEuclidean as V6SquaredEuclidean};
 
@@ -20,6 +19,7 @@ use kiddo::stem_strategy::{Block3, Block4, DonnellyMarkerSimd};
 
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
+use kiddo::traits_unified_2::AxisUnified;
 
 const DEFAULT_MIN_POW: u32 = 10;
 const DEFAULT_MAX_POW: u32 = 24;
@@ -762,7 +762,7 @@ fn run_checks<A, const K: usize, FNearestOne, FNearestN, FWithin>(
     within: FWithin,
 ) -> Result<(), String>
 where
-    A: Axis + std::fmt::Debug + std::fmt::Display + 'static,
+    A: AxisUnified<Coord = A> + 'static,
     V6SquaredEuclidean<A>: DistanceMetricCore<A, Output = A>,
     V6Manhattan<A>: DistanceMetricCore<A, Output = A>,
     FNearestOne: Fn(Metric) -> NearestNeighbour<A, usize>,
@@ -864,11 +864,14 @@ enum Metric {
     Manhattan,
 }
 
-fn check_nearest_one<A: Axis + std::fmt::Debug + 'static>(
+fn check_nearest_one<A>(
     metric: &str,
     result: NearestNeighbour<A, usize>,
     expected: &MetricState<A>,
-) -> Result<(), String> {
+) -> Result<(), String>
+where
+    A: AxisUnified<Coord = A> + 'static,
+{
     if !distances_match_for_repro(result.distance, expected.best_dist) {
         return Err(format!(
             "nearest_one {metric} mismatch: expected_dist={:?} got_dist={:?}",
@@ -1019,7 +1022,10 @@ fn random_point_count(cfg: FuzzConfig, rng: &mut StdRng) -> usize {
     }
 }
 
-fn sort_by_distance_then_index<A: Axis>(items: &mut [(A, usize)]) {
+fn sort_by_distance_then_index<A: Copy>(items: &mut [(A, usize)])
+where
+    A: AxisUnified<Coord = A>,
+{
     items.sort_by(|a, b| {
         a.0.partial_cmp(&b.0)
             .expect("NaN distance in sort")
@@ -1059,10 +1065,13 @@ fn distance_lt_for_repro<A: Copy + PartialOrd + PartialEq + 'static>(lhs: A, rhs
     lhs < rhs && !distances_match_for_repro(lhs, rhs)
 }
 
-fn compare_nearest_n_sorted<A: Axis + std::fmt::Debug + 'static>(
+fn compare_nearest_n_sorted<A>(
     expected: &[(A, usize)],
     got: &[(A, usize)],
-) -> Result<(), String> {
+) -> Result<(), String>
+where
+    A: AxisUnified<Coord = A> + 'static,
+{
     if expected.len() != got.len() {
         return Err(format!(
             "len mismatch expected={} got={}",
@@ -1151,11 +1160,14 @@ fn within_boundary_matches_for_repro<A: Copy + PartialEq + 'static>(dist: A, rad
     distances_match_for_repro(dist, radius)
 }
 
-fn compare_within_results<A: Axis + std::fmt::Display + std::fmt::Debug + 'static>(
+fn compare_within_results<A>(
     expected: &mut [(A, usize)],
     got: &mut [(A, usize)],
     radius: A,
-) -> Result<(), String> {
+) -> Result<(), String>
+where
+    A: AxisUnified<Coord = A> + 'static,
+{
     sort_by_item_idx(expected);
     sort_by_item_idx(got);
 
@@ -1237,7 +1249,7 @@ fn format_preview<A: std::fmt::Debug>(items: &[(A, usize)], limit: usize) -> Str
     }
 }
 
-struct MetricState<A: Axis> {
+struct MetricState<A: AxisUnified> {
     best_dist: A,
     best_items: Vec<usize>,
     heap: BinaryHeap<NearestNeighbour<A, usize>>,
@@ -1246,10 +1258,13 @@ struct MetricState<A: Axis> {
     radius: A,
 }
 
-impl<A: Axis> MetricState<A> {
+impl<A> MetricState<A>
+where
+    A: AxisUnified<Coord = A> + 'static,
+{
     fn new(max_qty: usize, radius: A) -> Self {
         Self {
-            best_dist: A::infinity(),
+            best_dist: A::max_value(),
             best_items: Vec::new(),
             heap: BinaryHeap::with_capacity(max_qty + 1),
             within: Vec::new(),
@@ -1306,7 +1321,7 @@ impl<A: Axis> MetricState<A> {
     }
 }
 
-fn brute_states<A: Axis, const K: usize>(
+fn brute_states<A, const K: usize>(
     points: &[[A; K]],
     query: &[A; K],
     max_qty: usize,
@@ -1314,6 +1329,7 @@ fn brute_states<A: Axis, const K: usize>(
     radius_manhattan: A,
 ) -> (MetricState<A>, MetricState<A>)
 where
+    A: AxisUnified<Coord = A> + 'static,
     V6SquaredEuclidean<A>: DistanceMetricCore<A, Output = A>,
     V6Manhattan<A>: DistanceMetricCore<A, Output = A>,
 {

@@ -348,8 +348,8 @@ mod tests {
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::stem_strategy::Donnelly;
-    use crate::traits::Axis;
     use crate::{Eytzinger, NearestNeighbour};
+    use crate::traits_unified_2::AxisUnified;
 
     const REL_EPS_F32: f32 = 1.0e-6;
     const REL_EPS_F64: f64 = 1.0e-12;
@@ -381,6 +381,24 @@ mod tests {
 
         assert_float_relative_eq!(result.0, 0.0075, REL_EPS_F64);
         assert_eq!(result.1, 3);
+    }
+
+    #[test]
+    fn nearest_one_vec_of_arenas_small_f64_no_items() {
+        let points = vec![
+            [0.0f64, 0.0, 0.0],
+            [1.0, 1.0, 1.0],
+            [2.0, 2.0, 2.0],
+            [0.5, 0.5, 0.6],
+        ];
+
+        let tree: KdTree<f64, (), Eytzinger<3>, VecOfArenas<f64, (), 3, 32>, 3, 32> =
+            KdTree::new_from_slice_no_items(&points);
+
+        let result = tree.nearest_one::<SquaredEuclidean<f64>>(&[0.45, 0.55, 0.65]);
+
+        assert_float_relative_eq!(result.0, 0.0075, REL_EPS_F64);
+        assert_eq!(result.1, ());
     }
 
     #[test]
@@ -618,14 +636,15 @@ mod tests {
         }
     }
 
-    fn linear_search<A: Axis, const K: usize>(
+    fn linear_search<A, const K: usize>(
         content: &[[A; K]],
         query_point: &[A; K],
     ) -> NearestNeighbour<A, usize>
     where
-        crate::dist::SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
+        A: AxisUnified<Coord = A>,
+        SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
     {
-        let mut best_dist: A = A::infinity();
+        let mut best_dist: A = A::max_value();
         let mut best_item: usize = usize::MAX;
 
         for (idx, p) in content.iter().enumerate() {
@@ -642,9 +661,10 @@ mod tests {
         }
     }
 
-    fn squared_euclidean_dist<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A
+    fn squared_euclidean_dist<A, const K: usize>(a: &[A; K], b: &[A; K]) -> A
     where
-        crate::dist::SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
+        A: AxisUnified<Coord = A>,
+        SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
     {
         let aw = (*a).map(|coord| {
             <crate::dist::SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(

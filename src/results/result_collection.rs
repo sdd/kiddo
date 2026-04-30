@@ -1,14 +1,15 @@
-use super::nearest_neighbour::NearestNeighbour;
-use crate::traits::Content;
-use crate::traits_unified_2::AxisUnified;
-use crate::BestNeighbour;
+use std::collections::BinaryHeap;
+
 #[cfg(any(
     feature = "buffered_result_collection",
     feature = "small_n_result_collectors"
 ))]
 use smallvec::SmallVec;
 use sorted_vec::SortedVec;
-use std::collections::BinaryHeap;
+
+use super::nearest_neighbour::NearestNeighbour;
+use crate::traits_unified_2::{AxisUnified, Basics};
+use crate::BestNeighbour;
 
 #[cfg(feature = "small_n_result_collectors")]
 pub(crate) const SMALL_RESULT_COLLECTION_MAX_QTY: usize = 32;
@@ -127,7 +128,7 @@ where
 }
 
 #[doc(hidden)]
-pub trait BestNeighbourResultCollection<O: AxisUnified<Coord = O>, T: Content>:
+pub trait BestNeighbourResultCollection<O: AxisUnified<Coord = O>, T: Basics + PartialOrd>:
     ResultCollection<O, BestNeighbour<O, T>>
 {
     fn threshold_item(&self) -> Option<T>;
@@ -310,7 +311,7 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     }
 
     #[cfg(feature = "buffered_result_collection")]
-    // #[allow(unreachable_code)]
+    #[allow(unreachable_code)] // needed because of early return when result_collection_stats feature is enabled
     fn add_all<I>(&mut self, entries: I)
     where
         I: IntoIterator<Item = NearestNeighbour<O, T>>,
@@ -368,7 +369,7 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     }
 }
 
-impl<O: AxisUnified<Coord = O>, T: Content> ResultCollection<O, BestNeighbour<O, T>>
+impl<O: AxisUnified<Coord = O>, T: Basics + PartialOrd> ResultCollection<O, BestNeighbour<O, T>>
     for BinaryHeapResultCollection<BestNeighbour<O, T>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
@@ -407,7 +408,7 @@ impl<O: AxisUnified<Coord = O>, T: Content> ResultCollection<O, BestNeighbour<O,
         }
     }
 
-    // #[allow(unreachable_code)]
+    #[allow(unreachable_code)] // needed because of early return when result_collection_stats feature is enabled
     #[cfg(feature = "buffered_result_collection")]
     fn add_all<I>(&mut self, entries: I)
     where
@@ -455,7 +456,7 @@ impl<O: AxisUnified<Coord = O>, T: Content> ResultCollection<O, BestNeighbour<O,
     }
 }
 
-impl<O: AxisUnified<Coord = O>, T: Content> BestNeighbourResultCollection<O, T>
+impl<O: AxisUnified<Coord = O>, T: Basics + PartialOrd> BestNeighbourResultCollection<O, T>
     for BinaryHeapResultCollection<BestNeighbour<O, T>>
 {
     #[inline(always)]
@@ -514,7 +515,7 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
         }
     }
 
-    // #[allow(unreachable_code)]
+    #[allow(unreachable_code)] // needed because of early return when result_collection_stats feature is enabled
     #[cfg(feature = "buffered_result_collection")]
     fn add_all<I>(&mut self, entries: I)
     where
@@ -675,7 +676,7 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
 }
 
 #[cfg(feature = "small_n_result_collectors")]
-impl<O: AxisUnified<Coord = O>, T: Content> ResultCollection<O, BestNeighbour<O, T>>
+impl<O: AxisUnified<Coord = O>, T: Basics + PartialOrd> ResultCollection<O, BestNeighbour<O, T>>
     for SmallBinaryHeapResultCollection<BestNeighbour<O, T>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
@@ -767,7 +768,7 @@ impl<O: AxisUnified<Coord = O>, T: Content> ResultCollection<O, BestNeighbour<O,
 }
 
 #[cfg(feature = "small_n_result_collectors")]
-impl<O: AxisUnified<Coord = O>, T: Content> BestNeighbourResultCollection<O, T>
+impl<O: AxisUnified<Coord = O>, T: Basics + PartialOrd> BestNeighbourResultCollection<O, T>
     for SmallBinaryHeapResultCollection<BestNeighbour<O, T>>
 {
     #[inline(always)]

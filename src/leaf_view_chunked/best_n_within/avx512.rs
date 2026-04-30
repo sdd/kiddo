@@ -12,7 +12,7 @@ pub(crate) unsafe fn best_n_within_avx512_unchecked<L, T, F, const K: usize, con
     emit: &mut F,
 ) where
     L: Avx512F64LeafOps,
-    T: Basics + Ord,
+    T: Basics + PartialOrd,
     F: FnMut(f64, T),
 {
     crate::leaf_view_chunked::nearest_n_within::avx512::nearest_n_within_avx512_unchecked::<
@@ -33,7 +33,7 @@ pub(crate) unsafe fn best_n_within_avx512_arena_unchecked<L, T, F, const K: usiz
     emit: &mut F,
 ) where
     L: Avx512F64LeafOps,
-    T: Basics + Ord,
+    T: Basics + PartialOrd,
     F: FnMut(f64, T),
 {
     crate::leaf_view_chunked::nearest_n_within::avx512::nearest_n_within_avx512_arena_unchecked::<
@@ -52,7 +52,7 @@ pub(crate) unsafe fn best_n_within_avx512_unchecked_f32<L, T, F, const K: usize,
     emit: &mut F,
 ) where
     L: Avx512F32LeafOps,
-    T: Basics + Ord,
+    T: Basics + PartialOrd,
     F: FnMut(f32, T),
 {
     crate::leaf_view_chunked::nearest_n_within::avx512::nearest_n_within_avx512_unchecked_f32::<
@@ -73,7 +73,7 @@ pub(crate) unsafe fn best_n_within_avx512_arena_unchecked_f32<L, T, F, const K: 
     emit: &mut F,
 ) where
     L: Avx512F32LeafOps,
-    T: Basics + Ord,
+    T: Basics + PartialOrd,
     F: FnMut(f32, T),
 {
     crate::leaf_view_chunked::nearest_n_within::avx512::nearest_n_within_avx512_arena_unchecked_f32::<

@@ -27,7 +27,7 @@ const MAX_VEC_RESULT_SIZE: usize = 20;
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: AxisUnified<Coord = A> + 'static,
-    T: Basics + Ord,
+    T: Basics + PartialOrd,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
@@ -264,8 +264,8 @@ mod tests {
     use crate::results::result_collection_stats::{reset, snapshot};
     #[cfg(all(feature = "result_collection_stats", feature = "simd"))]
     use crate::stem_strategy::{Block3, DonnellyMarkerSimd};
-    use crate::traits::Axis;
     use crate::Eytzinger;
+    use crate::traits_unified_2::AxisUnified;
 
     const RNG_SEED: u64 = 42;
 
@@ -283,6 +283,35 @@ mod tests {
 
         let tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points);
+
+        assert!(!tree.is_empty());
+        assert_eq!(tree.size(), 65_536);
+        assert_eq!(tree.leaf_count(), 2048);
+        assert_eq!(tree.max_stem_level(), 10);
+
+        let query_point = [0.5, 0.5, 0.5];
+        let radius = 0.1;
+        let max_qty = NonZeroUsize::new(10).unwrap();
+
+        let results =
+            tree.nearest_n_within::<SquaredEuclidean<f32>>(&query_point, radius, max_qty, true);
+        assert_eq!(results.len(), 10);
+    }
+
+    #[test]
+    fn nearest_n_within_sorted_flat_vec_f32_no_items() {
+        let mut rng = StdRng::seed_from_u64(RNG_SEED);
+
+        let mut points: Vec<[f32; 3]> = vec![];
+        for _ in 0..65_536 {
+            let x = rng.random_range(0.0..1.0);
+            let y = rng.random_range(0.0..1.0);
+            let z = rng.random_range(0.0..1.0);
+            points.push([x, y, z]);
+        }
+
+        let tree: KdTree<f32, (), Eytzinger<3>, FlatVec<f32, (), 3, 32>, 3, 32> =
+            KdTree::new_from_slice_no_items(&points);
 
         assert!(!tree.is_empty());
         assert_eq!(tree.size(), 65_536);
@@ -515,13 +544,14 @@ mod tests {
         }
     }
 
-    fn linear_search<A: Axis, const K: usize>(
+    fn linear_search<A, const K: usize>(
         content: &[[A; K]],
         query_point: &[A; K],
         radius: A,
     ) -> Vec<(A, u32)>
     where
-        crate::dist::SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
+        A: AxisUnified<Coord = A> + 'static,
+        SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
     {
         let mut matching_items = vec![];
 
@@ -537,27 +567,31 @@ mod tests {
         matching_items
     }
 
-    fn squared_euclidean_dist<A: Axis, const K: usize>(a: &[A; K], b: &[A; K]) -> A
+    fn squared_euclidean_dist<A, const K: usize>(a: &[A; K], b: &[A; K]) -> A
     where
-        crate::dist::SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
+        A: AxisUnified<Coord = A>,
+        SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
     {
         let aw = (*a).map(|coord| {
-            <crate::dist::SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(
+            <SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(
                 coord,
             )
         });
         let bw = (*b).map(|coord| {
-            <crate::dist::SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(
+            <SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(
                 coord,
             )
         });
 
-        <crate::dist::SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::dist::<K>(
+        <SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::dist::<K>(
             &aw, &bw,
         )
     }
 
-    fn stabilize_sort<A: Axis>(matching_items: &mut [(A, u32)]) {
+    fn stabilize_sort<A>(matching_items: &mut [(A, u32)])
+    where
+        A: AxisUnified<Coord = A>,
+    {
         matching_items.sort_unstable_by(|a, b| {
             let dist_cmp = a.0.partial_cmp(&b.0).unwrap();
             if dist_cmp == Ordering::Equal {

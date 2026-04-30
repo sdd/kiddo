@@ -361,15 +361,7 @@ pub trait DistanceMetricUnified<A: Copy, const K: usize> {
     #[inline(always)]
     fn cmp(a: Self::Output, b: Self::Output) -> std::cmp::Ordering {
         a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal)
-        // match Self::ORDERING {
-        //     std::cmp::Ordering::Less => base,
-        //     std::cmp::Ordering::Greater => base.reverse(),
-        //     std::cmp::Ordering::Equal => std::cmp::Ordering::Equal,
-        // }
     }
-
-    // ---- SIMD distance checks for backtracking ----
-    // (moved to BacktrackBlock3/BacktrackBlock4 traits in stem_strategy)
 }
 
 /// Helper macro to implement SIMD block support (CompareBlock and SimdPrune) for a specific block size.
@@ -388,8 +380,6 @@ macro_rules! impl_simd_block_support {
                 $compare_fn(stems_ptr, block_base_idx, query_val)
             }
         }
-
-        // SimdPrune implementation for Block3 will be added in Step 4
     };
 
     ($t:ty, 4, $prune_fn:path, $compare_fn:path) => {
@@ -403,13 +393,9 @@ macro_rules! impl_simd_block_support {
                 $compare_fn(stems_ptr, block_base_idx, query_val)
             }
         }
-
-        // SimdPrune implementation for Block4 will be added in Step 4
     };
 
-    // Block5 support placeholder for future
     ($t:ty, 5, $prune_fn:path, $compare_fn:path) => {
-        // Block5 traits don't exist yet
         compile_error!("Block5 support is not yet implemented");
     };
 }
@@ -417,17 +403,14 @@ macro_rules! impl_simd_block_support {
 /// Macro to implement AxisUnified for floating-point types.
 #[macro_export]
 macro_rules! impl_axis_float {
-    // Pattern with SIMD block support
     ($t:ty, SIMD_BLOCK_SUPPORT => ( $( $block_size:literal => ($prune_fn:path, $compare_fn:path) ),* $(,)? )) => {
-        impl_axis_float!($t); // First implement the basic AxisUnified trait
+        impl_axis_float!($t);
 
-        // Then implement SIMD block support for each specified block size
         $(
             impl_simd_block_support!($t, $block_size, $prune_fn, $compare_fn);
         )*
     };
 
-    // Base pattern without SIMD block support (uses default unimplemented!() from traits)
     ($t:ty) => {
         impl AxisUnified for $t {
             type Coord = $t;

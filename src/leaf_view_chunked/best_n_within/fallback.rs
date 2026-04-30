@@ -13,7 +13,7 @@ pub(crate) fn best_n_within_with_query_wide_fallback<AX, T, D, R, const K: usize
     results: &mut R,
 ) where
     AX: AxisUnified<Coord = AX> + 'static,
-    T: Basics + Ord,
+    T: Basics + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
@@ -38,7 +38,7 @@ pub(crate) fn best_n_within_with_query_wide_arena_fallback<AX, T, D, R, const K:
     results: &mut R,
 ) where
     AX: AxisUnified<Coord = AX> + 'static,
-    T: Basics + Ord,
+    T: Basics + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: AxisUnified<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,

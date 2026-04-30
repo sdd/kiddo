@@ -16,7 +16,7 @@ use crate::results::result_collection::{
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
-use crate::traits::Content;
+// use crate::traits::Content;
 use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
 use crate::{BestNeighbour, NearestNeighbour, StemStrategy};
 use std::collections::BinaryHeap;
@@ -114,7 +114,7 @@ where
 impl<A, T, SS, LS, const K: usize, const B: usize> ArchivedKdTree<A, T, SS, LS, K, B>
 where
     A: rkyv_08::Archive + AxisUnified<Coord = A> + 'static,
-    T: Basics + Ord,
+    T: Basics + PartialOrd,
     SS: StemStrategy,
     LS: rkyv_08::Archive,
     rkyv_08::Archived<LS>: LeafStrategy<A, T, SS, K, B>,
@@ -345,7 +345,7 @@ where
 impl<A, T, SS, LS, const K: usize, const B: usize> ArchivedKdTree<A, T, SS, LS, K, B>
 where
     A: rkyv_08::Archive + AxisUnified<Coord = A> + 'static,
-    T: Basics + Content,
+    T: Basics + PartialOrd,
     SS: StemStrategy,
     LS: rkyv_08::Archive,
     rkyv_08::Archived<LS>: LeafStrategy<A, T, SS, K, B>,
