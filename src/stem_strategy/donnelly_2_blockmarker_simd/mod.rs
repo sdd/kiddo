@@ -3,12 +3,12 @@
 //! This module provides SIMD-optimized block-at-once traversal strategies for kd-trees.
 //! Architecture-specific implementations are in submodules.
 
-use crate::stem_strategy::donnelly_core::DonnellyCore;
-use crate::stem_strategy::{Block3, Block4, BlockSizeMarker};
-use crate::traits_unified_2::AxisUnified;
-use crate::StemStrategy;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
+
+use crate::stem_strategy::donnelly_core::DonnellyCore;
+use crate::stem_strategy::{Block3, Block4, BlockSizeMarker};
+use crate::{Axis, Basics, LeafStrategy, StemStrategy};
 
 // Compile-time gate for valid 64-byte-line Donnelly SIMD block/VB pairings.
 trait ValidBlock3Config64 {}
@@ -39,7 +39,7 @@ pub use backtrack_traits::{
     BacktrackBlock3, BacktrackBlock4, DistanceMetricSimdBlock3, DistanceMetricSimdBlock4,
 };
 
-pub(crate) trait DeferredBlockTraversal: crate::StemStrategy + Copy {
+pub(crate) trait DeferredBlockTraversal: StemStrategy + Copy {
     fn block_child(&self, child_idx: u8) -> Self;
 
     fn backtrack_block3_pending_mask<A, O, D, const K2: usize>(
@@ -53,10 +53,9 @@ pub(crate) trait DeferredBlockTraversal: crate::StemStrategy + Copy {
         best_dist: O,
     ) -> u8
     where
-        A: AxisUnified<Coord = A>,
-        O: AxisUnified<Coord = O>,
-        D: crate::dist::DistanceMetricCore<A, Output = O>
-            + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>,
+        A: Axis<Coord = A>,
+        O: Axis<Coord = O>,
+        D: crate::dist::DistanceMetricCore<A, Output = O> + DistanceMetricSimdBlock3<A, K2, O>,
     {
         let _ = (
             stems,
@@ -81,8 +80,8 @@ pub(crate) trait DeferredBlockTraversal: crate::StemStrategy + Copy {
         rd: O,
     ) -> (O, O, O, O)
     where
-        A: AxisUnified<Coord = A>,
-        O: AxisUnified<Coord = O>,
+        A: Axis<Coord = A>,
+        O: Axis<Coord = O>,
         D: crate::dist::DistanceMetricCore<A, Output = O>,
     {
         let _ = (
@@ -112,8 +111,8 @@ pub(crate) trait DeferredBlockTraversal: crate::StemStrategy + Copy {
         upper_bounds: &mut [O; 8],
     ) -> u8
     where
-        A: AxisUnified<Coord = A>,
-        O: AxisUnified<Coord = O>,
+        A: Axis<Coord = A>,
+        O: Axis<Coord = O>,
         D: crate::dist::DistanceMetricCore<A, Output = O>
             + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>,
     {
@@ -224,7 +223,7 @@ pub(crate) const fn child_interval_bounds_block4(child_idx: usize) -> (u8, u8) {
 #[inline(always)]
 pub(crate) fn interval_distance_1d<O>(query: O, lower: O, upper: O) -> O
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     let below = O::max(O::zero(), lower - query);
     let above = O::max(O::zero(), query - upper);
@@ -234,7 +233,7 @@ where
 #[inline(always)]
 fn coord_min<O>(a: O, b: O) -> O
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     if O::cmp(a, b) == std::cmp::Ordering::Greater {
         b
@@ -259,8 +258,8 @@ fn fill_block3_backtrack_values_and_bounds<A, O, D, const K2: usize>(
     upper_bounds: &mut [O; 8],
 ) -> u8
 where
-    A: AxisUnified<Coord = A>,
-    O: AxisUnified<Coord = O>,
+    A: Axis<Coord = A>,
+    O: Axis<Coord = O>,
     D: crate::dist::DistanceMetricCore<A, Output = O>
         + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>,
 {
@@ -292,8 +291,8 @@ fn backtrack_block3_with_bounds<A, O, D, const K2: usize>(
     best_dist: O,
 ) -> u8
 where
-    A: AxisUnified<Coord = A>,
-    O: AxisUnified<Coord = O>,
+    A: Axis<Coord = A>,
+    O: Axis<Coord = O>,
     D: crate::dist::DistanceMetricCore<A, Output = O>
         + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>,
 {
@@ -319,8 +318,8 @@ fn selected_block3_child_state<A, O, D>(
     parent_upper_bound: O,
 ) -> (O, O, O)
 where
-    A: AxisUnified<Coord = A>,
-    O: AxisUnified<Coord = O>,
+    A: Axis<Coord = A>,
+    O: Axis<Coord = O>,
     D: crate::dist::DistanceMetricCore<A, Output = O>,
 {
     let (lower_offset, upper_offset) = child_interval_bounds_block3(child_idx as usize);
@@ -356,8 +355,8 @@ fn selected_block3_child_state_and_rd<A, O, D>(
     rd: O,
 ) -> (O, O, O, O)
 where
-    A: AxisUnified<Coord = A>,
-    O: AxisUnified<Coord = O>,
+    A: Axis<Coord = A>,
+    O: Axis<Coord = O>,
     D: crate::dist::DistanceMetricCore<A, Output = O>,
 {
     let (new_off, effective_lower, effective_upper) = selected_block3_child_state::<A, O, D>(
@@ -391,8 +390,8 @@ fn fill_block4_backtrack_values_and_bounds<A, O, D, const K2: usize>(
     upper_bounds: &mut [O; 16],
 ) -> u16
 where
-    A: AxisUnified<Coord = A>,
-    O: AxisUnified<Coord = O>,
+    A: Axis<Coord = A>,
+    O: Axis<Coord = O>,
     D: crate::dist::DistanceMetricCore<A, Output = O>,
 {
     let old_dist1 = D::dist1(old_off, O::zero());
@@ -721,7 +720,7 @@ where
         self.core.child_indices()
     }
 
-    fn get_leaf_idx<A: AxisUnified, const K2: usize>(
+    fn get_leaf_idx<A: Axis, const K2: usize>(
         stems: &[A],
         query: &[A; K2],
         max_stem_level: i32,
@@ -779,8 +778,8 @@ where
     ) -> bool
     where
         Self: Sized,
-        A: AxisUnified<Coord = A>,
-        O: AxisUnified<Coord = O> + SimdSelectBestChildBlock3 + BacktrackBlock3 + BacktrackBlock4,
+        A: Axis<Coord = A>,
+        O: Axis<Coord = O> + SimdSelectBestChildBlock3 + BacktrackBlock3 + BacktrackBlock4,
         D: crate::dist::DistanceMetricCore<A, Output = O>
             + crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::DistanceMetricSimdBlock3<
                 A,
@@ -1006,18 +1005,18 @@ where
         Self: Sized,
         Tree: crate::kd_tree::KdTreeAccessor<A, T, Self, LS, K2, B>
             + crate::kd_tree::KdTreeQueryOps<A, T, Self, LS, K2, B>,
-        A: crate::traits_unified_2::AxisUnified<Coord = A>,
-        T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
-        O: crate::traits_unified_2::AxisUnified<Coord = O>
-            + crate::stem_strategy::SimdPrune
+        A: Axis<Coord = A>,
+        T: Basics,
+        O: Axis<Coord = O>
+            + SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
         D: crate::dist::KdTreeDistanceMetric<A, K2, Output = O>
-            + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>
-            + crate::stem_strategy::DistanceMetricSimdBlock4<A, K2, O>,
-        QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
-        LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
+            + DistanceMetricSimdBlock3<A, K2, O>
+            + DistanceMetricSimdBlock4<A, K2, O>,
+        QC: crate::kd_tree::query_context::QueryContext<A, O, K2>,
+        LS: LeafStrategy<A, T, Self, K2, B>,
     {
         tree.backtracking_query_with_block3_simd_stack_impl::<QC, O, D>(
             query_ctx,
@@ -1052,8 +1051,8 @@ where
         best_dist: O,
     ) -> u8
     where
-        A: AxisUnified<Coord = A>,
-        O: AxisUnified<Coord = O>,
+        A: Axis<Coord = A>,
+        O: Axis<Coord = O>,
         D: crate::dist::DistanceMetricCore<A, Output = O>
             + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>,
     {
@@ -1081,8 +1080,8 @@ where
         rd: O,
     ) -> (O, O, O, O)
     where
-        A: AxisUnified<Coord = A>,
-        O: AxisUnified<Coord = O>,
+        A: Axis<Coord = A>,
+        O: Axis<Coord = O>,
         D: crate::dist::DistanceMetricCore<A, Output = O>,
     {
         selected_block3_child_state_and_rd::<A, O, D>(
@@ -1113,8 +1112,8 @@ where
         upper_bounds: &mut [O; 8],
     ) -> u8
     where
-        A: AxisUnified<Coord = A>,
-        O: AxisUnified<Coord = O>,
+        A: Axis<Coord = A>,
+        O: Axis<Coord = O>,
         D: crate::dist::DistanceMetricCore<A, Output = O>
             + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>,
     {
@@ -1210,7 +1209,7 @@ where
         self.core.child_indices()
     }
 
-    fn get_leaf_idx<A: AxisUnified, const K2: usize>(
+    fn get_leaf_idx<A: Axis, const K2: usize>(
         stems: &[A],
         query: &[A; K2],
         max_stem_level: i32,
@@ -1274,8 +1273,8 @@ where
     ) -> bool
     where
         Self: Sized,
-        A: AxisUnified<Coord = A>,
-        O: AxisUnified<Coord = O> + BacktrackBlock4,
+        A: Axis<Coord = A>,
+        O: Axis<Coord = O> + BacktrackBlock4,
         D: crate::dist::DistanceMetricCore<A, Output = O>
             + crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::DistanceMetricSimdBlock4<
                 A,
@@ -1476,18 +1475,18 @@ where
         Self: Sized,
         Tree: crate::kd_tree::KdTreeAccessor<A, T, Self, LS, K2, B>
             + crate::kd_tree::KdTreeQueryOps<A, T, Self, LS, K2, B>,
-        A: crate::traits_unified_2::AxisUnified<Coord = A>,
-        T: crate::traits_unified_2::Basics + Copy + Default + PartialOrd + PartialEq,
-        O: crate::traits_unified_2::AxisUnified<Coord = O>
-            + crate::stem_strategy::SimdPrune
+        A: Axis<Coord = A>,
+        T: Basics,
+        O: Axis<Coord = O>
+            + SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
         D: crate::dist::KdTreeDistanceMetric<A, K2, Output = O>
-            + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>
-            + crate::stem_strategy::DistanceMetricSimdBlock4<A, K2, O>,
-        QC: crate::kd_tree::traits::QueryContext<A, O, K2>,
-        LS: crate::traits_unified_2::LeafStrategy<A, T, Self, K2, B>,
+            + DistanceMetricSimdBlock3<A, K2, O>
+            + DistanceMetricSimdBlock4<A, K2, O>,
+        QC: crate::kd_tree::query_context::QueryContext<A, O, K2>,
+        LS: LeafStrategy<A, T, Self, K2, B>,
     {
         tree.backtracking_query_with_simd_stack_impl::<QC, O, D>(query_ctx, stack, process_leaf);
     }

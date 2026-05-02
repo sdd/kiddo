@@ -4,11 +4,9 @@
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
-use crate::traits_unified_2::AxisUnified;
-use crate::StemStrategy;
-
 use crate::stem_strategy::donnelly_core::DonnellyCore;
 use crate::stem_strategy::{Block3, Block4, Block5, Block6, Block7, BlockSizeMarker};
+use crate::{Axis, StemStrategy};
 
 /// Donnelly Strategy
 ///
@@ -119,7 +117,7 @@ macro_rules! impl_donnelly_stem_strategy {
 
             fn block_size() -> usize { $size }
 
-            fn get_leaf_idx<A: AxisUnified, const K2: usize>(
+            fn get_leaf_idx<A: Axis, const K2: usize>(
                 stems: &[A],
                 query: &[A; K2],
                 max_stem_level: i32,
@@ -234,7 +232,7 @@ macro_rules! impl_donnelly_stem_strategy {
                 $size
             }
 
-            fn get_leaf_idx<A: AxisUnified, const K2: usize>(
+            fn get_leaf_idx<A: Axis, const K2: usize>(
                 stems: &[A],
                 query: &[A; K2],
                 max_stem_level: i32,

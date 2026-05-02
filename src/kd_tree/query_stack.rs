@@ -1,6 +1,6 @@
-use crate::traits_unified_2::AxisUnified;
-use crate::StemStrategy;
 use std::mem::MaybeUninit;
+
+use crate::{Axis, StemStrategy};
 
 const INLINE_QUERY_STACK_CAPACITY: usize = 50;
 
@@ -114,7 +114,7 @@ impl<A, SS: StemStrategy> Drop for QueryStack<A, SS> {
     }
 }
 
-impl<A: AxisUnified<Coord = A>, S> QueryStackContext<A, S> {
+impl<A: Axis<Coord = A>, S> QueryStackContext<A, S> {
     pub fn new(stem_state: S) -> Self {
         Self {
             stem_state,

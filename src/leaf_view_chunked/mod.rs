@@ -1,11 +1,14 @@
 pub(crate) mod best_n_within;
 pub(crate) mod nearest_n_within;
 pub(crate) mod nearest_one;
+
+use std::mem::MaybeUninit;
+
+use array_init::array_init;
+
 use crate::dist::DistanceMetricUnified;
 use crate::leaf_view::{try_identity_widen_axis, LeafView};
-use crate::traits_unified_2::{AxisUnified, Basics};
-use array_init::array_init;
-use std::mem::MaybeUninit;
+use crate::{Axis, Basics};
 
 const CHUNK_SIZE: usize = 32;
 
@@ -28,10 +31,10 @@ pub(crate) fn try_nearest_one_with_query_wide<AX, T, D, const K: usize, const B:
     best_item: &mut T,
 ) -> bool
 where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics,
     D: DistanceMetricUnified<AX>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
 {
     let points = leaf.points();
     let widened_points = points.map(|axis| try_identity_widen_axis::<AX, D::Output>(axis));
@@ -139,10 +142,10 @@ pub(crate) fn try_nearest_one_with_query_wide_v3<AX, T, D, const K: usize, const
     best_item: &mut T,
 ) -> bool
 where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics,
     D: DistanceMetricUnified<AX>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
 {
     nearest_one::nearest_one_with_query_wide_fallback::<AX, T, D, K, B>(
         leaf, query_wide, best_dist, best_item,
@@ -157,7 +160,7 @@ fn update_nearest_dist_chunk<O, T, const C: usize>(
     best_dist: &mut O,
     best_item: &mut T,
 ) where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
     T: Basics,
 {
     let mut candidate_idx = 0usize;

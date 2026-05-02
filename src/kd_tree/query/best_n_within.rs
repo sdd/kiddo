@@ -1,7 +1,9 @@
+use std::collections::BinaryHeap;
+use std::num::NonZero;
+
 use crate::dist::KdTreeDistanceMetric;
+use crate::kd_tree::query_context::QueryContext;
 use crate::kd_tree::query_stack::StackTrait;
-use crate::kd_tree::traits::QueryContext;
-use crate::kd_tree::KdTree;
 use crate::kd_tree::KdTreeQueryOps;
 use crate::leaf_view::TlsLeafScratch;
 use crate::leaf_view_chunked::best_n_within::{
@@ -17,14 +19,12 @@ use crate::results::result_collection::{
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
-use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
-use crate::{BestNeighbour, StemStrategy};
-use std::collections::BinaryHeap;
-use std::num::NonZero;
+use crate::traits::leaf_strategy::LeafProjection;
+use crate::{Axis, Basics, BestNeighbour, KdTree, LeafStrategy, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A> + 'static,
+    A: Axis<Coord = A> + 'static,
     T: Basics + PartialOrd,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
@@ -38,7 +38,7 @@ where
         results: &mut R,
     ) where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
+        D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
         R: BestNeighbourResultCollection<D::Output, T>,
     {
         #[cfg(feature = "result_collection_stats")]
@@ -198,7 +198,7 @@ pub mod cargo_asm {
 #[derive(Debug)]
 struct BestNWithinReqCtx<'a, A, O, R, const K: usize>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     query: &'a [A; K],
     max_dist: O,
@@ -207,7 +207,7 @@ where
 
 impl<'a, A, O, R, const K: usize> QueryContext<A, O, K> for BestNWithinReqCtx<'a, A, O, R, K>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     fn query(&self) -> &[A; K] {
         self.query

@@ -1,20 +1,19 @@
 use crate::dist::KdTreeDistanceMetric;
+use crate::kd_tree::query_context::QueryContext;
 use crate::kd_tree::query_stack::StackTrait;
-use crate::kd_tree::traits::QueryContext;
-use crate::kd_tree::KdTree;
 use crate::kd_tree::KdTreeQueryOps;
 use crate::leaf_view::TlsLeafScratch;
 use crate::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
-use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
-use crate::StemStrategy;
+use crate::traits::leaf_strategy::LeafProjection;
+use crate::{Axis, Basics, KdTree, LeafStrategy, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A> + 'static,
-    T: Basics + Copy + Default + PartialOrd + PartialEq,
+    A: Axis<Coord = A> + 'static,
+    T: Basics,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
@@ -27,7 +26,7 @@ where
         best_item: &mut T,
     ) where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: AxisUnified<Coord = D::Output> + 'static,
+        D::Output: Axis<Coord = D::Output> + 'static,
     {
         #[cfg(feature = "test_utils")]
         crate::test_utils::exact_query_stats::record_leaf_visit();
@@ -311,7 +310,7 @@ pub mod cargo_asm {
 
 pub(crate) struct NearestOneReqCtx<'a, A, T, O, const K: usize>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     query: &'a [A; K],
     best_dist: O,
@@ -320,7 +319,7 @@ where
 
 impl<A, T, O, const K: usize> QueryContext<A, O, K> for NearestOneReqCtx<'_, A, T, O, K>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     fn query(&self) -> &[A; K] {
         self.query
@@ -348,8 +347,8 @@ mod tests {
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::stem_strategy::Donnelly;
+    use crate::Axis;
     use crate::{Eytzinger, NearestNeighbour};
-    use crate::traits_unified_2::AxisUnified;
 
     const REL_EPS_F32: f32 = 1.0e-6;
     const REL_EPS_F64: f64 = 1.0e-12;
@@ -641,7 +640,7 @@ mod tests {
         query_point: &[A; K],
     ) -> NearestNeighbour<A, usize>
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
         SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
     {
         let mut best_dist: A = A::max_value();
@@ -663,7 +662,7 @@ mod tests {
 
     fn squared_euclidean_dist<A, const K: usize>(a: &[A; K], b: &[A; K]) -> A
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
         SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
     {
         let aw = (*a).map(|coord| {

@@ -7,7 +7,7 @@ use array_init::array_init;
 
 use crate::dist::distance_metric_avx512::{Avx512F32LeafOps, Avx512F64LeafOps};
 use crate::leaf_view::LeafView;
-use crate::traits_unified_2::{AxisUnified, Basics};
+use crate::{Axis, Basics};
 
 const CHUNK_SIZE: usize = 32;
 const LINE_SIZE: usize = 8;
@@ -169,7 +169,7 @@ macro_rules! impl_leaf_kernel_k {
             mut best_item: T,
         ) -> BestResult<T>
         where
-            AX: AxisUnified<Coord = AX>,
+            AX: Axis<Coord = AX>,
             L: Avx512F64LeafOps,
             T: Basics,
         {
@@ -344,7 +344,7 @@ macro_rules! impl_leaf_arena_kernel_k {
             best_item: &mut T,
         )
         where
-            AX: AxisUnified<Coord = AX>,
+            AX: Axis<Coord = AX>,
             L: Avx512F64LeafOps,
             T: Basics,
         {
@@ -511,7 +511,7 @@ unsafe fn scalar_fallback_dynamic<AX, L, T>(
     mut best_item: T,
 ) -> BestResult<T>
 where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     L: Avx512F64LeafOps,
     T: Basics,
 {
@@ -549,7 +549,7 @@ unsafe fn scalar_fallback_arena_dynamic<AX, L, T>(
     best_dist: &mut f64,
     best_item: &mut T,
 ) where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     L: Avx512F64LeafOps,
     T: Basics,
 {
@@ -585,7 +585,7 @@ unsafe fn leaf_nearest_one_chunked_nozero_f64_selector<AX, L, T>(
     best_item_in: T,
 ) -> BestResult<T>
 where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     L: Avx512F64LeafOps,
     T: Basics,
 {
@@ -675,7 +675,7 @@ unsafe fn leaf_nearest_one_arena_nozero_f64_selector<AX, L, T>(
     best_dist: &mut f64,
     best_item: &mut T,
 ) where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     L: Avx512F64LeafOps,
     T: Basics,
 {
@@ -707,7 +707,7 @@ pub(crate) unsafe fn nearest_one_avx512_raw_unchecked<AX, L, T, const K: usize>(
     best_dist: &mut AX,
     best_item: &mut T,
 ) where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     L: Avx512F64LeafOps,
     T: Basics,
 {
@@ -741,7 +741,7 @@ pub(crate) unsafe fn nearest_one_avx512_arena_unchecked<AX, L, T, const K: usize
     best_dist: &mut f64,
     best_item: &mut T,
 ) where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     L: Avx512F64LeafOps,
     T: Basics,
 {
@@ -757,7 +757,7 @@ pub(crate) unsafe fn nearest_one_avx512_unchecked<AX, L, T, const K: usize, cons
     best_dist: &mut AX,
     best_item: &mut T,
 ) where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     L: Avx512F64LeafOps,
     T: Basics,
 {

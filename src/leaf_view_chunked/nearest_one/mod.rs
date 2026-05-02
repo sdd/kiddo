@@ -5,8 +5,7 @@ pub(crate) mod avx512;
 
 use crate::dist::KdTreeDistanceMetric;
 use crate::leaf_view::{LeafArena, LeafView};
-use crate::traits_unified_2::{AxisUnified, Basics};
-
+use crate::{Axis, Basics};
 // #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 // pub(crate) use avx512::nearest_one_avx512_unchecked;
 
@@ -21,10 +20,10 @@ pub(crate) fn nearest_one_with_query_wide_arena<AX, T, D, const K: usize>(
     best_dist: &mut D::Output,
     best_item: &mut T,
 ) where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
 {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
     if unsafe {
@@ -45,10 +44,10 @@ pub(crate) fn nearest_one_with_query_wide<AX, T, D, const K: usize, const B: usi
     best_dist: &mut D::Output,
     best_item: &mut T,
 ) where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
 {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
     if unsafe { try_nearest_one_avx512::<AX, T, D, K, B>(leaf, query_wide, best_dist, best_item) } {
@@ -67,10 +66,10 @@ unsafe fn try_nearest_one_avx512<AX, T, D, const K: usize, const B: usize>(
     best_item: &mut T,
 ) -> bool
 where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
 {
     D::try_nearest_one_leaf_avx512(leaf, query_wide, best_dist, best_item)
 }
@@ -84,10 +83,10 @@ unsafe fn try_nearest_one_arena_avx512<AX, T, D, const K: usize>(
     best_item: &mut T,
 ) -> bool
 where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
 {
     D::try_nearest_one_arena_avx512(arena, query_wide, best_dist, best_item)
 }

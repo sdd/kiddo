@@ -1,8 +1,6 @@
-#![allow(clippy::missing_safety_doc)]
-
 use crate::dist::distance_metric_avx512::{Avx512F32LeafOps, Avx512F64LeafOps};
 use crate::leaf_view::LeafView;
-use crate::traits_unified_2::Basics;
+use crate::Basics;
 
 #[target_feature(enable = "avx512f,avx512vl,fma")]
 pub(crate) unsafe fn best_n_within_avx512_unchecked<L, T, F, const K: usize, const B: usize>(

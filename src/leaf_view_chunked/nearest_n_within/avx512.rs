@@ -6,7 +6,7 @@ use array_init::array_init;
 
 use crate::dist::distance_metric_avx512::{Avx512F32LeafOps, Avx512F64LeafOps};
 use crate::leaf_view::LeafView;
-use crate::traits_unified_2::Basics;
+use crate::Basics;
 
 const CHUNK_SIZE: usize = 32;
 const LINE_SIZE: usize = 8;

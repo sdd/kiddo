@@ -9,7 +9,7 @@
 use std::ptr::NonNull;
 
 use crate::dist::{DistanceMetricCore, DotProduct, Manhattan, SquaredEuclidean};
-use crate::traits_unified_2::AxisUnified;
+use crate::Axis;
 
 mod sealed {
     pub trait Sealed {}
@@ -21,7 +21,7 @@ mod sealed {
 /// are optional and default to the baseline.
 pub trait DistanceMetricSimdBlock3<A: Copy, const K: usize, O>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     /// Autovec/scalar baseline implementation for Block3 backtracking mask generation.
     fn backtrack_block3_autovec(
@@ -50,7 +50,7 @@ where
         upper_bounds: &mut [O; 8],
     ) -> u8
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
         Self: DistanceMetricCore<A, Output = O> + Sized,
     {
         autovec_fill_block3_values_and_bounds::<A, O, Self, K>(
@@ -82,7 +82,7 @@ where
         best_dist: O,
     ) -> u8
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
         Self: DistanceMetricCore<A, Output = O> + Sized,
     {
         autovec_backtrack_block3_with_bounds::<A, O, Self, K>(
@@ -111,7 +111,7 @@ where
         best_dist: O,
     ) -> u8
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
         Self: DistanceMetricCore<A, Output = O> + Sized,
     {
         Self::backtrack_block3_with_bounds_autovec(
@@ -140,7 +140,7 @@ where
         best_dist: O,
     ) -> u8
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
         Self: DistanceMetricCore<A, Output = O> + Sized,
     {
         Self::backtrack_block3_with_bounds_autovec(
@@ -169,7 +169,7 @@ where
         best_dist: O,
     ) -> u8
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
         Self: DistanceMetricCore<A, Output = O> + Sized,
     {
         Self::backtrack_block3_with_bounds_autovec(
@@ -197,7 +197,7 @@ where
         best_dist: O,
     ) -> u8
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
         Self: DistanceMetricCore<A, Output = O> + Sized,
     {
         #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
@@ -416,7 +416,7 @@ where
 /// Metric-provided SIMD backtrack contract for Block4.
 pub trait DistanceMetricSimdBlock4<A: Copy, const K: usize, O>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     /// Autovec/scalar baseline implementation for Block4 backtracking mask generation.
     fn backtrack_block4_autovec(
@@ -582,7 +582,7 @@ where
 /// potential to contain closer points than the current best distance.
 ///
 /// Default implementation panics - types must provide actual implementations.
-pub trait BacktrackBlock3: AxisUnified<Coord = Self> + sealed::Sealed {
+pub trait BacktrackBlock3: Axis<Coord = Self> + sealed::Sealed {
     /// Compute backtrack mask for Block3 using SIMD or autovec.
     ///
     /// # Arguments
@@ -615,7 +615,7 @@ pub trait BacktrackBlock3: AxisUnified<Coord = Self> + sealed::Sealed {
 /// Trait for computing SIMD backtrack masks for Block4 (16 children).
 ///
 /// Similar to BacktrackBlock3, but returns u16 mask for 16 children.
-pub trait BacktrackBlock4: AxisUnified<Coord = Self> + sealed::Sealed {
+pub trait BacktrackBlock4: Axis<Coord = Self> + sealed::Sealed {
     /// Compute backtrack mask for Block4 using SIMD or autovec.
     ///
     /// # Arguments
@@ -657,7 +657,7 @@ fn autovec_backtrack_block3<A, I, D, const K: usize>(
     best_dist: A,
 ) -> u8
 where
-    A: AxisUnified<Coord = A> + std::ops::Add<Output = A> + std::ops::Sub<Output = A>,
+    A: Axis<Coord = A> + std::ops::Add<Output = A> + std::ops::Sub<Output = A>,
     I: Copy,
     D: DistanceMetricCore<I, Output = A>,
 {
@@ -720,8 +720,8 @@ fn autovec_fill_block3_values_and_bounds<A, O, D, const K: usize>(
     upper_bounds: &mut [O; 8],
 ) -> u8
 where
-    A: AxisUnified<Coord = A>,
-    O: AxisUnified<Coord = O>,
+    A: Axis<Coord = A>,
+    O: Axis<Coord = O>,
     D: DistanceMetricCore<A, Output = O>,
 {
     use super::{child_interval_bounds_block3, coord_min, interval_distance_1d};
@@ -788,8 +788,8 @@ fn autovec_backtrack_block3_with_bounds<A, O, D, const K: usize>(
     best_dist: O,
 ) -> u8
 where
-    A: AxisUnified<Coord = A>,
-    O: AxisUnified<Coord = O>,
+    A: Axis<Coord = A>,
+    O: Axis<Coord = O>,
     D: DistanceMetricCore<A, Output = O>,
 {
     use super::{child_interval_bounds_block3, coord_min, interval_distance_1d};
@@ -847,7 +847,7 @@ fn autovec_backtrack_block4<A, I, D, const K: usize>(
     best_dist: A,
 ) -> u16
 where
-    A: AxisUnified<Coord = A> + std::ops::Add<Output = A> + std::ops::Sub<Output = A>,
+    A: Axis<Coord = A> + std::ops::Add<Output = A> + std::ops::Sub<Output = A>,
     I: Copy,
     D: DistanceMetricCore<I, Output = A>,
 {
@@ -938,7 +938,7 @@ where
         upper_bounds: &mut [f64; 8],
     ) -> u8
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
         Self: DistanceMetricCore<A, Output = f64> + Sized,
     {
         #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
@@ -989,7 +989,7 @@ where
         best_dist: f64,
     ) -> u8
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
         Self: DistanceMetricCore<A, Output = f64> + Sized,
     {
         simd_backtrack_block3_f64_avx512_squared_euclidean_with_bounds(

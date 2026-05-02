@@ -1,14 +1,13 @@
 use crate::dist::KdTreeDistanceMetric;
-use crate::kd_tree::traits::QueryContext;
-use crate::kd_tree::KdTree;
+use crate::kd_tree::query_context::QueryContext;
 use crate::kd_tree::KdTreeQueryOps;
 use crate::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
-use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
-use crate::StemStrategy;
+use crate::traits::leaf_strategy::LeafProjection;
+use crate::{Axis, Basics, KdTree, LeafStrategy, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A> + 'static,
+    A: Axis<Coord = A> + 'static,
     T: Basics + Copy + Default + PartialOrd + PartialEq,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,

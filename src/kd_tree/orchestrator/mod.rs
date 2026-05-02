@@ -1,19 +1,19 @@
-use crate::dist::KdTreeDistanceMetric;
-use crate::kd_tree::query_stack::{ScalarStackContext, StackTrait};
-use crate::kd_tree::traits::QueryContext;
-use crate::kd_tree::{KdTreeAccessor, StemLeafResolution};
-use crate::stem_strategy::{
-    donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4},
-    DistanceMetricSimdBlock3, DistanceMetricSimdBlock4, SimdPrune, SimdSelectBestChildBlock3,
-};
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
-use crate::StemStrategy;
+mod simd;
+
 use std::any::{Any, TypeId};
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::ptr::NonNull;
 
-mod simd;
+use crate::dist::KdTreeDistanceMetric;
+use crate::kd_tree::query_context::QueryContext;
+use crate::kd_tree::query_stack::{ScalarStackContext, StackTrait};
+use crate::kd_tree::{KdTreeAccessor, StemLeafResolution};
+use crate::stem_strategy::{
+    donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4},
+    DistanceMetricSimdBlock3, DistanceMetricSimdBlock4, SimdPrune, SimdSelectBestChildBlock3,
+};
+use crate::{Axis, Basics, LeafStrategy, StemStrategy};
 
 thread_local! {
     static QUERY_STACKS: UnsafeCell<HashMap<TypeId, Box<dyn Any>>> =
@@ -52,7 +52,7 @@ fn select_block3_pending_child<O>(
     candidate_mask: u8,
 ) -> Option<Block3PendingSelection<O>>
 where
-    O: AxisUnified<Coord = O> + SimdSelectBestChildBlock3,
+    O: Axis<Coord = O> + SimdSelectBestChildBlock3,
 {
     if candidate_mask == 0 {
         return None;
@@ -79,7 +79,7 @@ fn rebuild_interval_offs<O, const K: usize>(
     upper: &[O; K],
 ) -> [O; K]
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     let mut off = [O::zero(); K];
     for dim in 0..K {
@@ -135,8 +135,8 @@ pub mod cargo_asm {
 impl<Tree, A, T, SS, LS, const K: usize, const B: usize> KdTreeQueryOps<A, T, SS, LS, K, B> for Tree
 where
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
-    A: AxisUnified<Coord = A>,
-    T: Basics + Copy + Default + PartialOrd + PartialEq,
+    A: Axis<Coord = A>,
+    T: Basics,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
 {
@@ -146,8 +146,8 @@ where
 pub trait KdTreeQueryOps<A, T, SS, LS, const K: usize, const B: usize>:
     KdTreeAccessor<A, T, SS, LS, K, B> + Sized
 where
-    A: AxisUnified<Coord = A>,
-    T: Basics + Copy + Default + PartialOrd + PartialEq,
+    A: Axis<Coord = A>,
+    T: Basics,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
 {
@@ -232,7 +232,7 @@ where
         process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
-        O: AxisUnified<Coord = O>
+        O: Axis<Coord = O>
             + SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -262,7 +262,7 @@ where
         process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
-        O: AxisUnified<Coord = O>
+        O: Axis<Coord = O>
             + SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -296,7 +296,7 @@ where
         mut process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
-        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
+        O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
         D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
@@ -381,7 +381,7 @@ where
         process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
-        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
+        O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
         D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
@@ -401,7 +401,7 @@ where
         process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
-        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
+        O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
         D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
@@ -426,7 +426,7 @@ where
         mut process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
-        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
+        O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
         D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
@@ -539,7 +539,7 @@ where
         stack: &mut SS::Stack<O>,
     ) -> Option<usize>
     where
-        O: AxisUnified<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
+        O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
         D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
@@ -603,7 +603,7 @@ where
         mut process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
-        O: AxisUnified<Coord = O>
+        O: Axis<Coord = O>
             + SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -975,7 +975,7 @@ where
         mut process_leaf: impl FnMut(usize, &[O; K], &mut QC),
     ) where
         QC: QueryContext<A, O, K>,
-        O: AxisUnified<Coord = O>
+        O: Axis<Coord = O>
             + SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -1351,7 +1351,7 @@ where
         stack: &mut SS::Stack<O>,
     ) -> Option<usize>
     where
-        O: AxisUnified<Coord = O> + SimdSelectBestChildBlock3 + BacktrackBlock3 + BacktrackBlock4,
+        O: Axis<Coord = O> + SimdSelectBestChildBlock3 + BacktrackBlock3 + BacktrackBlock4,
         D: KdTreeDistanceMetric<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,

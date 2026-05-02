@@ -1,12 +1,10 @@
-#![allow(clippy::missing_safety_doc)]
-
 use std::arch::aarch64::*;
 
 use array_init::array_init;
 
 use crate::dist::distance_metric_neon::{NeonF32LeafOps, NeonF64LeafOps};
 use crate::leaf_view::LeafView;
-use crate::traits_unified_2::Basics;
+use crate::Basics;
 
 #[inline(always)]
 unsafe fn emit_results_neon_f64<T, F>(

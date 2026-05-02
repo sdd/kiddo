@@ -25,7 +25,6 @@
 //! - **integer / fixed point support** via the [`fixed`](https://docs.rs/fixed/latest/fixed/) crate;
 //! - **`f16` support** via the [`half`](https://docs.rs/half/latest/half/) crate;
 //! - **instant zero-copy deserialization** and serialisation via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
-
 //!
 //! Kiddo is ideal for superfast spatial / geospatial lookups and nearest-neighbour / KNN
 //! queries for low-ish numbers of dimensions, where you want to ask questions such as:
@@ -85,7 +84,7 @@
 //!
 //! See the [examples documentation](https://github.com/sdd/kiddo/tree/master/examples) for some more in-depth examples.
 //! ## Optional Features
-
+//!
 //! The Kiddo crate exposes the following features. Any labelled as **(NIGHTLY)** are not available on `stable` Rust as they require some unstable features. You'll need to build with `nightly` in order to user them.
 //! * **serde** - serialization / deserialization via [`Serde`](https://docs.rs/serde/latest/serde/)
 //! * **rkyv_08** - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.8.x
@@ -94,28 +93,32 @@
 //!
 //! **NOTE**: Support for rkyv 0.7 was removed in Kiddo v6.
 
-extern crate core;
-extern crate doc_comment;
-
 // #[doc(hidden)]
 // #[cfg(feature = "serde")]
 // #[doc(hidden)]
 // mod custom_serde;
 
+/// Distance metrics
+pub mod dist;
+
+pub use crate::dist::{DotProduct, Manhattan, SquaredEuclidean};
+
 pub mod huge_pages;
 
-mod mirror_select_nth_unstable_by;
+pub mod kd_tree;
+pub use kd_tree::{KdTree, WithinUnsortedIter};
 
-#[cfg(feature = "rkyv_08")]
-mod rkyv;
+/// Convenience type alias for recommended default params for an immutable KdTree
+pub type ImmutableKdTree<AX, const K: usize> =
+    KdTree<AX, u32, Eytzinger<K>, VecOfArenas<AX, u32, K, 32>, K, 32>;
 
-#[doc(hidden)]
-#[cfg(feature = "test_utils")]
-pub mod test_utils;
-pub mod traits;
+/// Convenience type alias for recommended default params for a mutable KdTree
+pub type MutableKdTree<AX, const K: usize> =
+    KdTree<AX, u32, Eytzinger<K>, VecOfArrays<AX, u32, K, 32>, K, 32>;
 
 /// Leaf storage strategies for the kd-tree
 pub mod leaf_strategy;
+pub use leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
 
 /// Leaf view abstraction for accessing leaf data
 pub mod leaf_view;
@@ -123,23 +126,25 @@ pub mod leaf_view;
 /// Chunked Leaf view abstraction for accessing leaf data
 pub(crate) mod leaf_view_chunked;
 
-/// Stem Orderings
-pub mod stem_strategy;
-pub use traits::StemStrategy;
-
-/// Distance metrics
-pub mod dist;
-pub mod kd_tree;
+mod mirror_select_nth_unstable_by;
 
 /// Structs that are returned as query results
 pub mod results;
+pub use results::{best_neighbour::BestNeighbour, nearest_neighbour::NearestNeighbour};
 
-pub mod traits_unified_2;
+#[cfg(feature = "rkyv_08")]
+mod rkyv;
 
-pub use crate::dist::{DotProduct, Manhattan, SquaredEuclidean};
-pub use crate::kd_tree::KdTree;
-pub use crate::kd_tree::WithinUnsortedIter;
-pub use results::best_neighbour::BestNeighbour;
-pub use results::nearest_neighbour::NearestNeighbour;
+/// Stem Orderings
+pub mod stem_strategy;
+pub use stem_strategy::{Donnelly, DonnellyMarkerPf, DonnellyMarkerSimd, Eytzinger, EytzingerPf};
 
-pub use crate::stem_strategy::Eytzinger;
+#[doc(hidden)]
+#[cfg(feature = "test_utils")]
+pub mod test_utils;
+
+pub mod traits;
+pub use traits::{
+    axis::Axis, basics::Basics, distance_metric::DistanceMetric, leaf_strategy::LeafStrategy,
+    stem_strategy::StemStrategy,
+};

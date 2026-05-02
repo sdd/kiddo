@@ -1,9 +1,8 @@
 use crate::leaf_view::LeafView;
-use crate::traits_unified_2::{
-    AxisUnified, Basics, BucketLimitType, ConstructibleLeafStrategy, Immutable, LeafProjection,
-    LeafStrategy,
+use crate::traits::leaf_strategy::{
+    BucketLimitType, ConstructibleLeafStrategy, Immutable, LeafProjection,
 };
-use crate::StemStrategy;
+use crate::{Axis, Basics, LeafStrategy, StemStrategy};
 
 /// A dummy leaf strategy used for testing.
 ///
@@ -14,7 +13,7 @@ pub struct DummyLeafStrategy {}
 
 impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B> for DummyLeafStrategy
 where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     T: Basics,
     SS: StemStrategy,
 {
@@ -44,7 +43,7 @@ where
 impl<AX, T, SS, const K: usize, const B: usize> ConstructibleLeafStrategy<AX, T, SS, K, B>
     for DummyLeafStrategy
 where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     T: Basics,
     SS: StemStrategy,
 {

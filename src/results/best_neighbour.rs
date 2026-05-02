@@ -1,7 +1,7 @@
 //! A result item returned by a query
 use std::cmp::Ordering;
 
-use crate::traits_unified_2::Basics;
+use crate::Basics;
 
 /// Represents an entry in the results of a "best" query, with `distance` being the distance of this
 /// particular item from the query point, and `item` being the stored item index that was found

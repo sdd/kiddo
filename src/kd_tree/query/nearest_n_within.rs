@@ -1,7 +1,8 @@
+use std::num::NonZeroUsize;
+
 use crate::dist::KdTreeDistanceMetric;
+use crate::kd_tree::query_context::QueryContext;
 use crate::kd_tree::query_stack::StackTrait;
-use crate::kd_tree::traits::QueryContext;
-use crate::kd_tree::KdTree;
 use crate::kd_tree::KdTreeQueryOps;
 use crate::leaf_view::TlsLeafScratch;
 use crate::leaf_view_chunked::nearest_n_within::{
@@ -17,16 +18,15 @@ use crate::results::result_collection::{
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
-use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
-use crate::{NearestNeighbour, StemStrategy};
-use std::num::NonZeroUsize;
+use crate::traits::leaf_strategy::LeafProjection;
+use crate::{Axis, Basics, KdTree, LeafStrategy, NearestNeighbour, StemStrategy};
 
 #[cfg(not(feature = "small_n_result_collectors"))]
 const MAX_VEC_RESULT_SIZE: usize = 20;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A> + 'static,
+    A: Axis<Coord = A> + 'static,
     T: Basics + PartialOrd,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
@@ -40,7 +40,7 @@ where
         results: &mut R,
     ) where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
+        D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
         R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
     {
         #[cfg(feature = "result_collection_stats")]
@@ -220,7 +220,7 @@ pub mod cargo_asm {
 #[allow(unused)]
 struct NearestNWithinReqCtx<'a, A, T, O, R, const K: usize>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     query: &'a [A; K],
     max_dist: O,
@@ -230,7 +230,7 @@ where
 
 impl<A, T, O, R, const K: usize> QueryContext<A, O, K> for NearestNWithinReqCtx<'_, A, T, O, R, K>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
     R: ResultCollection<O, NearestNeighbour<O, T>>,
 {
     fn query(&self) -> &[A; K] {
@@ -264,8 +264,8 @@ mod tests {
     use crate::results::result_collection_stats::{reset, snapshot};
     #[cfg(all(feature = "result_collection_stats", feature = "simd"))]
     use crate::stem_strategy::{Block3, DonnellyMarkerSimd};
+    use crate::Axis;
     use crate::Eytzinger;
-    use crate::traits_unified_2::AxisUnified;
 
     const RNG_SEED: u64 = 42;
 
@@ -550,7 +550,7 @@ mod tests {
         radius: A,
     ) -> Vec<(A, u32)>
     where
-        A: AxisUnified<Coord = A> + 'static,
+        A: Axis<Coord = A> + 'static,
         SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
     {
         let mut matching_items = vec![];
@@ -569,28 +569,22 @@ mod tests {
 
     fn squared_euclidean_dist<A, const K: usize>(a: &[A; K], b: &[A; K]) -> A
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
         SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
     {
         let aw = (*a).map(|coord| {
-            <SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(
-                coord,
-            )
+            <SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(coord)
         });
         let bw = (*b).map(|coord| {
-            <SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(
-                coord,
-            )
+            <SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(coord)
         });
 
-        <SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::dist::<K>(
-            &aw, &bw,
-        )
+        <SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::dist::<K>(&aw, &bw)
     }
 
     fn stabilize_sort<A>(matching_items: &mut [(A, u32)])
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
     {
         matching_items.sort_unstable_by(|a, b| {
             let dist_cmp = a.0.partial_cmp(&b.0).unwrap();

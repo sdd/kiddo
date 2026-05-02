@@ -1,6 +1,6 @@
-use core::cmp::Ordering;
+use std::cmp::Ordering;
 
-use crate::traits_unified_2::AxisUnified;
+use crate::Axis;
 
 /// Core distance metric behavior independent of architecture-specific SIMD.
 ///
@@ -11,7 +11,7 @@ use crate::traits_unified_2::AxisUnified;
 /// to carry `K` on the metric type itself.
 pub trait DistanceMetricCore<A: Copy> {
     /// Accumulator / distance scalar type.
-    type Output: AxisUnified<Coord = Self::Output>;
+    type Output: Axis<Coord = Self::Output>;
 
     /// Desired ordering semantics for this metric.
     /// - `Less`: smaller value is better (distance metrics)

@@ -1,6 +1,6 @@
 use crate::dist::DistanceMetricUnified;
 use crate::leaf_view::LeafView;
-use crate::traits_unified_2::{AxisUnified, Basics};
+use crate::{AxisUnified, Basics};
 use super::LeafViewChunked;
 
 

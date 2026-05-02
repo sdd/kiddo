@@ -13,9 +13,9 @@ use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
 use kiddo::results::nearest_neighbour::NearestNeighbour;
 use kiddo::stem_strategy::{Donnelly, Eytzinger};
-use kiddo::traits_unified_2::{AxisUnified, ConstructibleLeafStrategy, LeafStrategy};
-use kiddo::StemStrategy;
+use kiddo::traits::leaf_strategy::ConstructibleLeafStrategy;
 use kiddo::{dist::DistanceMetricCore, Manhattan, SquaredEuclidean};
+use kiddo::{Axis, LeafStrategy, StemStrategy};
 
 #[cfg(feature = "simd")]
 use kiddo::stem_strategy::{Block3, Block4, DonnellyMarkerSimd};
@@ -234,7 +234,7 @@ fn random_radius_f64<const K: usize>(rng: &mut StdRng) -> f64 {
     rng.random_range(0.0f64..(0.5f64 * K as f64))
 }
 
-fn sort_by_distance_then_index<A: AxisUnified<Coord = A> + PartialOrd>(items: &mut [(A, usize)]) {
+fn sort_by_distance_then_index<A: Axis<Coord = A> + PartialOrd>(items: &mut [(A, usize)]) {
     items.sort_by(|a, b| {
         a.0.partial_cmp(&b.0)
             .expect("NaN distance in sort")
@@ -271,7 +271,7 @@ fn distance_lt_for_fuzz<A: Copy + PartialOrd + PartialEq + 'static>(lhs: A, rhs:
 }
 
 fn compare_nearest_n_sorted<
-    A: AxisUnified<Coord = A> + PartialOrd + PartialEq + std::fmt::Debug + 'static,
+    A: Axis<Coord = A> + PartialOrd + PartialEq + std::fmt::Debug + 'static,
 >(
     expected: &[(A, usize)],
     got: &[(A, usize)],
@@ -341,7 +341,7 @@ fn compare_nearest_n_sorted<
 }
 
 fn compare_item_sorted_results<
-    A: AxisUnified<Coord = A> + PartialEq + std::fmt::Debug + std::fmt::Display + 'static,
+    A: Axis<Coord = A> + PartialEq + std::fmt::Debug + std::fmt::Display + 'static,
 >(
     expected: &[(A, usize)],
     got: &[(A, usize)],
@@ -378,7 +378,7 @@ fn within_boundary_matches_for_fuzz<A: Copy + PartialEq + 'static>(dist: A, radi
 }
 
 fn compare_within_results<
-    A: AxisUnified<Coord = A> + PartialEq + std::fmt::Debug + std::fmt::Display + 'static,
+    A: Axis<Coord = A> + PartialEq + std::fmt::Debug + std::fmt::Display + 'static,
 >(
     expected: &mut [(A, usize)],
     got: &mut [(A, usize)],
@@ -478,7 +478,7 @@ fn format_item_delta<A>(expected: &[(A, usize)], got: &[(A, usize)]) -> String {
 }
 
 fn format_missing_leaf_sample<
-    A: AxisUnified<Coord = A>,
+    A: Axis<Coord = A>,
     SS: StemStrategy,
     LS: LeafStrategy<A, usize, SS, K, B>,
     const K: usize,
@@ -569,7 +569,7 @@ fn log_mismatch<A: std::fmt::Display>(
     log_and_panic(format!("repro={repro} {context} {detail}"));
 }
 
-struct MetricState<A: AxisUnified<Coord = A> + PartialOrd> {
+struct MetricState<A: Axis<Coord = A> + PartialOrd> {
     best_dist: A,
     best_items: Vec<usize>,
     heap: BinaryHeap<NearestNeighbour<A, usize>>,
@@ -578,7 +578,7 @@ struct MetricState<A: AxisUnified<Coord = A> + PartialOrd> {
     radius: A,
 }
 
-impl<A: AxisUnified<Coord = A> + PartialOrd> MetricState<A> {
+impl<A: Axis<Coord = A> + PartialOrd> MetricState<A> {
     fn new(max_qty: usize, radius: A) -> Self {
         Self {
             best_dist: A::max_value(),
@@ -678,7 +678,7 @@ fn brute_states_f64<const K: usize>(
     (sq, man)
 }
 
-fn assert_nearest_one<A: AxisUnified<Coord = A> + PartialEq + std::fmt::Display + 'static>(
+fn assert_nearest_one<A: Axis<Coord = A> + PartialEq + std::fmt::Display + 'static>(
     meta: ReproMeta,
     label: &str,
     metric: &str,
@@ -851,7 +851,7 @@ fn assert_approx_nearest_one_f64<D, const K: usize>(
 }
 
 fn assert_nearest_n_unsorted_contains_top_k<
-    A: AxisUnified<Coord = A> + PartialOrd + std::fmt::Display + 'static,
+    A: Axis<Coord = A> + PartialOrd + std::fmt::Display + 'static,
 >(
     meta: ReproMeta,
     label: &str,

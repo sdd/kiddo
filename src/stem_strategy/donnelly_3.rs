@@ -1,14 +1,14 @@
 //! V3 Donnelly Stem Strategy
 
-use crate::StemStrategy;
-use aligned_vec::AVec;
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0, _MM_HINT_T1};
+use std::ptr::NonNull;
 
-use crate::traits_unified_2::AxisUnified;
+use aligned_vec::AVec;
 #[cfg(feature = "rkyv_08")]
 use rkyv_08::util::AlignedVec;
-use std::ptr::NonNull;
+
+use crate::{Axis, StemStrategy};
 
 /// Donnelly Strategy
 ///
@@ -217,7 +217,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
     fn stem_node_padding_factor() -> usize {
         50
     }
-    fn trim_unneeded_stems<A: AxisUnified<Coord = A>>(stems: &mut AVec<A>, max_stem_level: usize) {
+    fn trim_unneeded_stems<A: Axis<Coord = A>>(stems: &mut AVec<A>, max_stem_level: usize) {
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         if !stems.is_empty() {
             let mut so = Self::new(stems_ptr);

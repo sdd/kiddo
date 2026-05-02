@@ -1,6 +1,9 @@
+use std::collections::BinaryHeap;
+use std::num::NonZeroUsize;
+
 use crate::dist::KdTreeDistanceMetric;
+use crate::kd_tree::query_context::QueryContext;
 use crate::kd_tree::query_stack::StackTrait;
-use crate::kd_tree::traits::QueryContext;
 use crate::kd_tree::KdTreeQueryOps;
 use crate::kd_tree::{ArchivedKdTree, KdTreeAccessor};
 use crate::leaf_view::TlsLeafScratch;
@@ -16,15 +19,12 @@ use crate::results::result_collection::{
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
-// use crate::traits::Content;
-use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
-use crate::{BestNeighbour, NearestNeighbour, StemStrategy};
-use std::collections::BinaryHeap;
-use std::num::NonZeroUsize;
+use crate::traits::leaf_strategy::LeafProjection;
+use crate::{Axis, Basics, BestNeighbour, LeafStrategy, NearestNeighbour, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> ArchivedKdTree<A, T, SS, LS, K, B>
 where
-    A: rkyv_08::Archive + AxisUnified<Coord = A> + 'static,
+    A: rkyv_08::Archive + Axis<Coord = A> + 'static,
     T: Basics + Copy + Default + PartialOrd + PartialEq,
     SS: StemStrategy,
     LS: rkyv_08::Archive,
@@ -39,7 +39,7 @@ where
         best_item: &mut T,
     ) where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: AxisUnified<Coord = D::Output> + 'static,
+        D::Output: Axis<Coord = D::Output> + 'static,
     {
         match <rkyv_08::Archived<LS> as LeafStrategy<A, T, SS, K, B>>::LEAF_PROJECTION {
             LeafProjection::LeafArena => {
@@ -113,7 +113,7 @@ where
 
 impl<A, T, SS, LS, const K: usize, const B: usize> ArchivedKdTree<A, T, SS, LS, K, B>
 where
-    A: rkyv_08::Archive + AxisUnified<Coord = A> + 'static,
+    A: rkyv_08::Archive + Axis<Coord = A> + 'static,
     T: Basics + PartialOrd,
     SS: StemStrategy,
     LS: rkyv_08::Archive,
@@ -128,7 +128,7 @@ where
         results: &mut R,
     ) where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
+        D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
         R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
     {
         match <rkyv_08::Archived<LS> as LeafStrategy<A, T, SS, K, B>>::LEAF_PROJECTION {
@@ -344,7 +344,7 @@ where
 
 impl<A, T, SS, LS, const K: usize, const B: usize> ArchivedKdTree<A, T, SS, LS, K, B>
 where
-    A: rkyv_08::Archive + AxisUnified<Coord = A> + 'static,
+    A: rkyv_08::Archive + Axis<Coord = A> + 'static,
     T: Basics + PartialOrd,
     SS: StemStrategy,
     LS: rkyv_08::Archive,
@@ -359,7 +359,7 @@ where
         results: &mut R,
     ) where
         D: KdTreeDistanceMetric<A, K>,
-        D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
+        D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
         R: BestNeighbourResultCollection<D::Output, T>,
     {
         let threshold_item = results.threshold_item();
@@ -443,7 +443,7 @@ impl<A, O, const K: usize> QueryContext<A, O, K> for ArchivedApproxNearestOneReq
 
 struct ArchivedNearestOneReqCtx<'a, A, T, O, const K: usize>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     query: &'a [A; K],
     best_dist: O,
@@ -452,7 +452,7 @@ where
 
 impl<A, T, O, const K: usize> QueryContext<A, O, K> for ArchivedNearestOneReqCtx<'_, A, T, O, K>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     fn query(&self) -> &[A; K] {
         self.query
@@ -470,7 +470,7 @@ where
 
 struct ArchivedNearestNWithinReqCtx<'a, A, T, O, R, const K: usize>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     query: &'a [A; K],
     max_dist: O,
@@ -480,7 +480,7 @@ where
 
 struct ArchivedWithinUnsortedVisitReqCtx<'a, A, O, const K: usize>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     query: &'a [A; K],
     max_dist: O,
@@ -489,7 +489,7 @@ where
 
 impl<A, O, const K: usize> QueryContext<A, O, K> for ArchivedWithinUnsortedVisitReqCtx<'_, A, O, K>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     fn query(&self) -> &[A; K] {
         self.query
@@ -503,7 +503,7 @@ where
 impl<A, T, O, R, const K: usize> QueryContext<A, O, K>
     for ArchivedNearestNWithinReqCtx<'_, A, T, O, R, K>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
     R: ResultCollection<O, NearestNeighbour<O, T>>,
 {
     fn query(&self) -> &[A; K] {
@@ -522,7 +522,7 @@ where
 
 struct ArchivedBestNWithinReqCtx<'a, A, O, R, const K: usize>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     query: &'a [A; K],
     max_dist: O,
@@ -531,7 +531,7 @@ where
 
 impl<A, O, R, const K: usize> QueryContext<A, O, K> for ArchivedBestNWithinReqCtx<'_, A, O, R, K>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     fn query(&self) -> &[A; K] {
         self.query

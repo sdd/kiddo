@@ -1,18 +1,18 @@
-use crate::kd_tree::KdTreeQueryOps;
-use crate::kd_tree::{KdTree, OwnedStemLeafResolution};
-use crate::traits_unified_2::{
-    AxisUnified, Basics, BucketLimitType, ConstructibleLeafStrategy, Mutability,
-    MutableLeafStrategy,
-};
-use crate::StemStrategy;
+use std::ptr::NonNull;
+
 use aligned_vec::{avec, AVec, ConstAlign, CACHELINE_ALIGN};
 use az::{Az, Cast};
 use nonmax::NonMaxUsize;
-use std::ptr::NonNull;
+
+use crate::kd_tree::{KdTreeQueryOps, OwnedStemLeafResolution};
+use crate::traits::leaf_strategy::{
+    BucketLimitType, ConstructibleLeafStrategy, Mutability, MutableLeafStrategy,
+};
+use crate::{Axis, Basics, KdTree, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A>,
+    A: Axis<Coord = A>,
     T: Basics + Copy + Default + PartialOrd + PartialEq,
     SS: StemStrategy,
     LS: MutableLeafStrategy<A, T, SS, K, B>,
@@ -205,7 +205,7 @@ where
 // Shared construction implementation (works for both Immutable and Mutable)
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A>,
+    A: Axis<Coord = A>,
     T: Basics,
     SS: StemStrategy,
     LS: ConstructibleLeafStrategy<A, T, SS, K, B>,
@@ -382,7 +382,7 @@ where
 
 impl<A, SS, LS, const K: usize, const B: usize> KdTree<A, (), SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A>,
+    A: Axis<Coord = A>,
     SS: StemStrategy,
     LS: ConstructibleLeafStrategy<A, (), SS, K, B>,
 {
@@ -401,7 +401,7 @@ where
 // Shared utility methods for construction (available to both Immutable and Mutable)
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A>,
+    A: Axis<Coord = A>,
     T: Basics,
     SS: StemStrategy,
     LS: ConstructibleLeafStrategy<A, T, SS, K, B>,

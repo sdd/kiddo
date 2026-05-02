@@ -3,7 +3,7 @@
 //! This module defines the `SimdPrune` trait which provides type-specific
 //! implementations for comparing distance values during backtracking traversal.
 
-use crate::traits_unified_2::AxisUnified;
+use crate::Axis;
 
 mod sealed {
     pub trait Sealed {}
@@ -16,7 +16,7 @@ mod sealed {
 ///
 /// The trait provides block-level pruning for Block3 (8 children).
 /// TODO: block-level pruning for Block4 & 5
-pub trait SimdPrune: AxisUnified<Coord = Self> + sealed::Sealed {
+pub trait SimdPrune: Axis<Coord = Self> + sealed::Sealed {
     /// Compare 8 rd_values against max_dist and return a bitmask.
     ///
     /// Returns a u8 bitmask where bit i is set if rd_values[i] <= max_dist.
@@ -33,7 +33,7 @@ pub trait SimdPrune: AxisUnified<Coord = Self> + sealed::Sealed {
 /// Select the child with the smallest lower-bound distance among the live Block3 lanes.
 ///
 /// `candidate_mask` marks the currently viable children. Returns `None` if no children remain.
-pub trait SimdSelectBestChildBlock3: AxisUnified<Coord = Self> + sealed::Sealed {
+pub trait SimdSelectBestChildBlock3: Axis<Coord = Self> + sealed::Sealed {
     /// Returns the lowest-index live child whose lower-bound distance is minimal.
     fn simd_select_best_child_block3(rd_values: &[Self; 8], candidate_mask: u8) -> Option<u8>;
 }
@@ -41,7 +41,7 @@ pub trait SimdSelectBestChildBlock3: AxisUnified<Coord = Self> + sealed::Sealed 
 #[inline(always)]
 fn scalar_select_best_child_block3<O>(rd_values: &[O; 8], candidate_mask: u8) -> Option<u8>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
 {
     if candidate_mask == 0 {
         return None;
@@ -498,7 +498,7 @@ mod fixed_impls {
         };
     }
 
-    // Generate implementations for the fixed-point types used in traits_unified_2.rs
+    // Generate implementations for the fixed-point types used in utils
     use fixed::types::extra::{U0, U16, U8};
 
     impl_simd_prune_fixed_i32!(U0);

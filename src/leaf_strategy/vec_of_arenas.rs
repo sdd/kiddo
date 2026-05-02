@@ -1,11 +1,10 @@
-use crate::leaf_view::LeafArena;
-use crate::leaf_view::LeafView;
-use crate::traits_unified_2::{
-    AxisUnified, Basics, BucketLimitType, ConstructibleLeafStrategy, Immutable, LeafProjection,
-    LeafStrategy,
-};
-use crate::StemStrategy;
 use aligned_vec::{AVec, CACHELINE_ALIGN};
+
+use crate::leaf_view::{LeafArena, LeafView};
+use crate::traits::leaf_strategy::{
+    BucketLimitType, ConstructibleLeafStrategy, Immutable, LeafProjection,
+};
+use crate::{Axis, Basics, LeafStrategy, StemStrategy};
 
 /// Immutable leaf storage using chunk-tiled arenas encoded into a single byte buffer.
 #[cfg_attr(
@@ -51,7 +50,7 @@ where
 impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B>
     for ArchivedVecOfArenas<AX, T, K, B>
 where
-    AX: rkyv_08::Archive + AxisUnified<Coord = AX>,
+    AX: rkyv_08::Archive + Axis<Coord = AX>,
     T: rkyv_08::Archive + Basics,
     SS: StemStrategy,
 {
@@ -122,7 +121,7 @@ fn align_up(value: usize, align: usize) -> usize {
 impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B>
     for VecOfArenas<AX, T, K, B>
 where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     T: Basics,
     SS: StemStrategy,
 {
@@ -177,7 +176,7 @@ where
 impl<AX, T, SS, const K: usize, const B: usize> ConstructibleLeafStrategy<AX, T, SS, K, B>
     for VecOfArenas<AX, T, K, B>
 where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     T: Basics,
     SS: StemStrategy,
 {
@@ -241,8 +240,8 @@ mod tests {
     use super::VecOfArenas;
     use crate::leaf_strategy::vec_of_arenas::extend_bytes_from_slice;
     use crate::leaf_view::LeafArena;
-    use crate::traits_unified_2::{ConstructibleLeafStrategy, LeafStrategy};
-    use crate::Eytzinger;
+    use crate::traits::leaf_strategy::ConstructibleLeafStrategy;
+    use crate::{Eytzinger, LeafStrategy};
 
     #[test]
     fn vec_of_arenas_appends_leafs_with_expected_extents() {
