@@ -368,3 +368,37 @@ mod f16_impls {
         }
     }
 }
+
+/// Macro to implement CompareBlock traits for uint types.
+///
+/// Currently uses autovec for all architectures. Future work could add
+/// integer SIMD intrinsics (e.g., _mm256_cmpgt_epi32 for comparisons).
+macro_rules! impl_compare_uint {
+    ($uint_ty:ty) => {
+        impl CompareBlock3 for $uint_ty {
+            #[inline(always)]
+            fn compare_block3_impl(
+                stems_ptr: NonNull<u8>,
+                query_val: Self,
+                block_base_idx: usize,
+            ) -> u8 {
+                autovec_compare_block!(7, $uint_ty, stems_ptr, block_base_idx, query_val)
+            }
+        }
+
+        impl CompareBlock4 for $uint_ty {
+            #[inline(always)]
+            fn compare_block4_impl(
+                stems_ptr: NonNull<u8>,
+                query_val: Self,
+                block_base_idx: usize,
+            ) -> u8 {
+                autovec_compare_block!(15, $uint_ty, stems_ptr, block_base_idx, query_val)
+            }
+        }
+    };
+}
+
+impl_compare_uint!(u8);
+impl_compare_uint!(u16);
+impl_compare_uint!(u32);

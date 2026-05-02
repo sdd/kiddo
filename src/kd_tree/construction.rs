@@ -227,6 +227,10 @@ where
     /// assert_eq!(tree.size(), 1);
     /// ```
     #[cfg_attr(not(feature = "no_inline"), inline)]
+    // TODO: Add checked, Result-returning ingress APIs (`new_from_slice`,
+    // `new_from_slice_no_items`, and mutable `add`) that reject coordinates
+    // equal to `A::max_value()`, and rename the current behavior to
+    // `*_unchecked`.
     pub fn new_from_slice(source: &[[A; K]]) -> Self
     where
         usize: Cast<T>,

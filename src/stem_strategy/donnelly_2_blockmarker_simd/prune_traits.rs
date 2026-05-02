@@ -19,7 +19,7 @@ mod sealed {
 pub trait SimdPrune: Axis<Coord = Self> + sealed::Sealed {
     /// Compare 8 rd_values against max_dist and return a bitmask.
     ///
-    /// Returns a u8 bitmask where bit i is set if rd_values[i] <= max_dist.
+    /// Returns a u8 bitmask where bit i is set if rd_values\[i\] <= max_dist.
     /// The result is ANDed with sibling_mask to exclude siblings that are
     /// already pruned by other criteria.
     ///

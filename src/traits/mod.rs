@@ -1,4 +1,4 @@
-//! Definitions and implementations for some traits that are common between the [`float`](crate::mutable::float), [`immutable`](crate::immutable) and [`fixed`](crate::mutable::fixed)  modules
+//! Traits used by [`KdTree`](crate::KdTree).
 
 /// Trait for coordinate/axis types
 pub mod axis;
@@ -15,4 +15,5 @@ pub mod leaf_strategy;
 mod query_context;
 ///Trait implemented by stem strategie (determines tree stem ordering and traversal)
 pub mod stem_strategy;
+
 // pub mod traits_unified_2;
