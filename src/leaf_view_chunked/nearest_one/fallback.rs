@@ -1,6 +1,6 @@
 use crate::dist::DistanceMetricUnified;
 use crate::leaf_view::{try_identity_widen_axis, LeafArena, LeafView};
-use crate::traits_unified_2::{AxisUnified, Basics};
+use crate::{Axis, Basics};
 
 #[inline(always)]
 pub(crate) fn nearest_one_with_query_wide_fallback<AX, T, D, const K: usize, const B: usize>(
@@ -9,10 +9,10 @@ pub(crate) fn nearest_one_with_query_wide_fallback<AX, T, D, const K: usize, con
     best_dist: &mut D::Output,
     best_item: &mut T,
 ) where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics,
     D: DistanceMetricUnified<AX>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
 {
     let points = leaf.points();
     let items = leaf.items();
@@ -66,10 +66,10 @@ pub(crate) fn nearest_one_with_query_wide_arena_fallback<AX, T, D, const K: usiz
     best_dist: &mut D::Output,
     best_item: &mut T,
 ) where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics,
     D: DistanceMetricUnified<AX>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
 {
     if arena.is_empty() {
         return;

@@ -1,13 +1,14 @@
+use std::mem::MaybeUninit;
+use std::ptr::NonNull;
+
 use crate::dist::KdTreeDistanceMetric;
 use crate::leaf_view::TlsLeafScratch;
 use crate::leaf_view_chunked::nearest_n_within::{
     nearest_n_within_with_query_wide, nearest_n_within_with_query_wide_arena,
 };
 use crate::results::result_collection::ResultCollection;
-use crate::traits_unified_2::{AxisUnified, Basics, LeafProjection, LeafStrategy};
-use crate::{NearestNeighbour, StemStrategy};
-use std::mem::MaybeUninit;
-use std::ptr::NonNull;
+use crate::traits::leaf_strategy::LeafProjection;
+use crate::{Axis, Basics, LeafStrategy, NearestNeighbour, StemStrategy};
 
 use super::{KdTreeAccessor, StemLeafResolution};
 
@@ -17,7 +18,7 @@ const WITHIN_UNSORTED_ITER_INLINE_RESULT_CAPACITY: usize = 64;
 /// Iterator over all point/item pairs in a kd-tree.
 pub struct KdTreeIter<'a, Tree, A, T, SS, LS, const K: usize, const B: usize>
 where
-    A: AxisUnified<Coord = A>,
+    A: Axis<Coord = A>,
     T: Basics,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
@@ -33,7 +34,7 @@ where
 impl<'a, Tree, A, T, SS, LS, const K: usize, const B: usize>
     KdTreeIter<'a, Tree, A, T, SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A>,
+    A: Axis<Coord = A>,
     T: Basics,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
@@ -54,7 +55,7 @@ where
 impl<Tree, A, T, SS, LS, const K: usize, const B: usize> Iterator
     for KdTreeIter<'_, Tree, A, T, SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A>,
+    A: Axis<Coord = A>,
     T: Basics,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
@@ -93,7 +94,7 @@ where
 impl<Tree, A, T, SS, LS, const K: usize, const B: usize> ExactSizeIterator
     for KdTreeIter<'_, Tree, A, T, SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A>,
+    A: Axis<Coord = A>,
     T: Basics,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
@@ -234,7 +235,7 @@ impl<E, const N: usize> Drop for InlineResultBuffer<E, N> {
 
 impl<O, E, const N: usize> ResultCollection<O, E> for InlineResultBuffer<E, N>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
     E: Copy + Ord,
 {
     #[inline(always)]
@@ -296,12 +297,12 @@ impl<E: Copy, const N: usize> InlineResultBuffer<E, N> {
 /// capacities.
 pub struct WithinUnsortedIter<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize>
 where
-    A: AxisUnified<Coord = A> + 'static,
+    A: Axis<Coord = A> + 'static,
     T: Basics + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     D: KdTreeDistanceMetric<A, K>,
-    D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
+    D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
 {
     tree: &'a Tree,
@@ -321,12 +322,12 @@ where
 impl<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize>
     WithinUnsortedIter<'a, Tree, A, T, SS, LS, D, K, B>
 where
-    A: AxisUnified<Coord = A> + 'static,
+    A: Axis<Coord = A> + 'static,
     T: Basics + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     D: KdTreeDistanceMetric<A, K>,
-    D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
+    D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
 {
     #[inline]
@@ -470,12 +471,12 @@ where
 impl<Tree, A, T, SS, LS, D, const K: usize, const B: usize> Iterator
     for WithinUnsortedIter<'_, Tree, A, T, SS, LS, D, K, B>
 where
-    A: AxisUnified<Coord = A> + 'static,
+    A: Axis<Coord = A> + 'static,
     T: Basics + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     D: KdTreeDistanceMetric<A, K>,
-    D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
+    D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
 {
     type Item = NearestNeighbour<D::Output, T>;

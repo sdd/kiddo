@@ -35,7 +35,7 @@ use std::any::TypeId;
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     DistanceMetricSimdBlock3, DistanceMetricSimdBlock4,
 };
-use crate::traits_unified_2::{AxisUnified, Basics};
+use crate::Axis;
 #[cfg(any(
     all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
     all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"),
@@ -119,9 +119,9 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
         best_item: &mut T,
     ) -> bool
     where
-        A: AxisUnified<Coord = A> + 'static,
-        T: crate::traits_unified_2::Basics,
-        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        A: Axis<Coord = A> + 'static,
+        T: crate::Basics,
+        Self::Output: Axis<Coord = Self::Output> + 'static,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
             && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
@@ -177,9 +177,9 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
         best_item: &mut T,
     ) -> bool
     where
-        A: AxisUnified<Coord = A> + 'static,
-        T: crate::traits_unified_2::Basics,
-        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        A: Axis<Coord = A> + 'static,
+        T: crate::Basics,
+        Self::Output: Axis<Coord = Self::Output> + 'static,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
             && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
@@ -249,9 +249,9 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
         results: &mut R,
     ) -> bool
     where
-        A: AxisUnified<Coord = A> + 'static,
-        T: crate::traits_unified_2::Basics + Ord,
-        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        A: Axis<Coord = A> + 'static,
+        T: crate::Basics + Ord,
+        Self::Output: Axis<Coord = Self::Output> + 'static,
         R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
@@ -311,9 +311,9 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
         results: &mut R,
     ) -> bool
     where
-        A: AxisUnified<Coord = A> + 'static,
-        T: crate::traits_unified_2::Basics,
-        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        A: Axis<Coord = A> + 'static,
+        T: crate::Basics,
+        Self::Output: Axis<Coord = Self::Output> + 'static,
         R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
@@ -388,9 +388,9 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
         results: &mut R,
     ) -> bool
     where
-        A: AxisUnified<Coord = A> + 'static,
-        T: crate::traits_unified_2::Basics + Ord,
-        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        A: Axis<Coord = A> + 'static,
+        T: crate::Basics + Ord,
+        Self::Output: Axis<Coord = Self::Output> + 'static,
         R: BestNeighbourResultCollection<Self::Output, T>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
@@ -451,9 +451,9 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
         results: &mut R,
     ) -> bool
     where
-        A: AxisUnified<Coord = A> + 'static,
-        T: crate::traits_unified_2::Basics + Ord,
-        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        A: Axis<Coord = A> + 'static,
+        T: crate::Basics + Ord,
+        Self::Output: Axis<Coord = Self::Output> + 'static,
         R: BestNeighbourResultCollection<Self::Output, T>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
@@ -541,9 +541,9 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
         results: &mut R,
     ) -> bool
     where
-        A: AxisUnified<Coord = A> + 'static,
-        T: crate::traits_unified_2::Basics + Ord,
-        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        A: Axis<Coord = A> + 'static,
+        T: crate::Basics + Ord,
+        Self::Output: Axis<Coord = Self::Output> + 'static,
         R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
@@ -603,9 +603,9 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
         results: &mut R,
     ) -> bool
     where
-        A: AxisUnified<Coord = A> + 'static,
-        T: crate::traits_unified_2::Basics,
-        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        A: Axis<Coord = A> + 'static,
+        T: crate::Basics,
+        Self::Output: Axis<Coord = Self::Output> + 'static,
         R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
@@ -680,9 +680,9 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
         results: &mut R,
     ) -> bool
     where
-        A: AxisUnified<Coord = A> + 'static,
-        T: crate::traits_unified_2::Basics + Ord,
-        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        A: Axis<Coord = A> + 'static,
+        T: crate::Basics + Ord,
+        Self::Output: Axis<Coord = Self::Output> + 'static,
         R: BestNeighbourResultCollection<Self::Output, T>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
@@ -743,9 +743,9 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
         results: &mut R,
     ) -> bool
     where
-        A: AxisUnified<Coord = A> + 'static,
-        T: crate::traits_unified_2::Basics + Ord,
-        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        A: Axis<Coord = A> + 'static,
+        T: crate::Basics + Ord,
+        Self::Output: Axis<Coord = Self::Output> + 'static,
         R: BestNeighbourResultCollection<Self::Output, T>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
@@ -833,9 +833,9 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
         results: &mut R,
     ) -> bool
     where
-        A: AxisUnified<Coord = A> + 'static,
-        T: Basics,
-        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        A: Axis<Coord = A> + 'static,
+        T: crate::Basics,
+        Self::Output: Axis<Coord = Self::Output> + 'static,
         R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
@@ -895,9 +895,9 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
         results: &mut R,
     ) -> bool
     where
-        A: AxisUnified<Coord = A> + 'static,
-        T: crate::traits_unified_2::Basics,
-        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        A: Axis<Coord = A> + 'static,
+        T: crate::Basics,
+        Self::Output: Axis<Coord = Self::Output> + 'static,
         R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
@@ -972,9 +972,9 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
         results: &mut R,
     ) -> bool
     where
-        A: AxisUnified<Coord = A> + 'static,
-        T: Basics + PartialOrd,
-        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        A: Axis<Coord = A> + 'static,
+        T: crate::Basics + PartialOrd,
+        Self::Output: Axis<Coord = Self::Output> + 'static,
         R: BestNeighbourResultCollection<Self::Output, T>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
@@ -1035,9 +1035,9 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
         results: &mut R,
     ) -> bool
     where
-        A: AxisUnified<Coord = A> + 'static,
-        T: crate::traits_unified_2::Basics + PartialOrd,
-        Self::Output: AxisUnified<Coord = Self::Output> + 'static,
+        A: Axis<Coord = A> + 'static,
+        T: crate::Basics + PartialOrd,
+        Self::Output: Axis<Coord = Self::Output> + 'static,
         R: BestNeighbourResultCollection<Self::Output, T>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
@@ -1135,7 +1135,7 @@ where
     T: DistanceMetricUnified<A>
         + DistanceMetricSimdBlock3<A, K, <T as DistanceMetricCore<A>>::Output>
         + DistanceMetricSimdBlock4<A, K, <T as DistanceMetricCore<A>>::Output>,
-    <T as DistanceMetricCore<A>>::Output: AxisUnified<Coord = <T as DistanceMetricCore<A>>::Output>,
+    <T as DistanceMetricCore<A>>::Output: Axis<Coord = <T as DistanceMetricCore<A>>::Output>,
 {
 }
 

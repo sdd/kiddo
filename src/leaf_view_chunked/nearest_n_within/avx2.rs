@@ -6,7 +6,7 @@ use array_init::array_init;
 
 use crate::dist::distance_metric_avx2::{Avx2F32LeafOps, Avx2F64LeafOps};
 use crate::leaf_view::LeafView;
-use crate::traits_unified_2::Basics;
+use crate::Basics;
 
 #[inline(always)]
 unsafe fn emit_results_avx2_f64<T, F>(

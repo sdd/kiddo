@@ -1,10 +1,11 @@
 //! V2 Donnelly Stem Strategy with Prefetch
 
-use crate::stem_strategy::prefetch::{prefetch_t0, prefetch_t1};
-use crate::traits_unified_2::AxisUnified;
-use crate::StemStrategy;
-use aligned_vec::AVec;
 use std::ptr::NonNull;
+
+use aligned_vec::AVec;
+
+use crate::stem_strategy::prefetch::{prefetch_t0, prefetch_t1};
+use crate::{Axis, StemStrategy};
 
 /// Donnelly Strategy
 ///
@@ -233,7 +234,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
     fn stem_node_padding_factor() -> usize {
         50
     }
-    fn trim_unneeded_stems<A: AxisUnified<Coord = A>>(stems: &mut AVec<A>, max_stem_level: usize) {
+    fn trim_unneeded_stems<A: Axis<Coord = A>>(stems: &mut AVec<A>, max_stem_level: usize) {
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         if !stems.is_empty() {
             let mut so = Self::new(stems_ptr);

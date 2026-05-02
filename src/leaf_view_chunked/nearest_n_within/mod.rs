@@ -12,8 +12,7 @@ pub(crate) mod neon;
 use crate::dist::KdTreeDistanceMetric;
 use crate::leaf_view::{LeafArena, LeafView, TlsLeafScratch};
 use crate::results::result_collection::ResultCollection;
-use crate::traits_unified_2::{AxisUnified, Basics};
-use crate::NearestNeighbour;
+use crate::{Axis, Basics, NearestNeighbour};
 
 pub(crate) use fallback::{
     nearest_n_within_with_query_wide_arena_fallback, nearest_n_within_with_query_wide_fallback,
@@ -26,10 +25,10 @@ pub(crate) fn nearest_n_within_with_query_wide_arena<AX, T, D, R, const K: usize
     dist: D::Output,
     results: &mut R,
 ) where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
 {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
@@ -65,10 +64,10 @@ pub(crate) fn nearest_n_within_with_query_wide<AX, T, D, R, const K: usize, cons
     dist: D::Output,
     results: &mut R,
 ) where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
+    D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
 {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
@@ -99,10 +98,10 @@ unsafe fn try_nearest_n_within_avx512<AX, T, D, R, const K: usize, const B: usiz
     results: &mut R,
 ) -> bool
 where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
 {
     D::try_nearest_n_within_leaf_avx512(leaf, query_wide, dist, results)
@@ -117,10 +116,10 @@ unsafe fn try_nearest_n_within_arena_avx512<AX, T, D, R, const K: usize>(
     results: &mut R,
 ) -> bool
 where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
 {
     D::try_nearest_n_within_arena_avx512(arena, query_wide, dist, results)
@@ -135,10 +134,10 @@ unsafe fn try_nearest_n_within_avx2<AX, T, D, R, const K: usize, const B: usize>
     results: &mut R,
 ) -> bool
 where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
 {
     D::try_nearest_n_within_leaf_avx2(leaf, query_wide, dist, results)
@@ -153,10 +152,10 @@ unsafe fn try_nearest_n_within_arena_avx2<AX, T, D, R, const K: usize>(
     results: &mut R,
 ) -> bool
 where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
 {
     D::try_nearest_n_within_arena_avx2(arena, query_wide, dist, results)
@@ -171,10 +170,10 @@ unsafe fn try_nearest_n_within_neon<AX, T, D, R, const K: usize, const B: usize>
     results: &mut R,
 ) -> bool
 where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
 {
     D::try_nearest_n_within_leaf_neon(leaf, query_wide, dist, results)
@@ -189,10 +188,10 @@ unsafe fn try_nearest_n_within_arena_neon<AX, T, D, R, const K: usize>(
     results: &mut R,
 ) -> bool
 where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
 {
     D::try_nearest_n_within_arena_neon(arena, query_wide, dist, results)

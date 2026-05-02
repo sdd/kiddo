@@ -1,10 +1,10 @@
-use crate::dist::DistanceMetricUnified;
-use crate::results::result_collection::{BestNeighbourResultCollection, ResultCollection};
-use crate::traits_unified_2::{AxisUnified, Basics};
-use crate::{BestNeighbour, NearestNeighbour};
 use std::any::TypeId;
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
+
+use crate::dist::DistanceMetricUnified;
+use crate::results::result_collection::{BestNeighbourResultCollection, ResultCollection};
+use crate::{Axis, Basics, BestNeighbour, NearestNeighbour};
 
 use fixed::{
     types::extra::{U0, U16, U8},
@@ -74,7 +74,7 @@ unsafe fn leaf_scratch_slice_mut<O>(
 }
 
 #[doc(hidden)]
-pub trait TlsLeafScratch: AxisUnified<Coord = Self> + 'static {
+pub trait TlsLeafScratch: Axis<Coord = Self> + 'static {
     fn with_tls_leaf_scratch<R>(len: usize, f: impl FnOnce(&mut [Self], &mut [Self]) -> R) -> R;
 
     fn assert_tls_leaf_scratch_capacity(len: usize);
@@ -145,7 +145,7 @@ pub struct LeafArenaTile<'a, AX, T, const K: usize> {
     _phantom: PhantomData<(&'a AX, &'a T)>,
 }
 
-impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
+impl<'a, AX: Axis<Coord = AX>, T: Basics, const K: usize, const B: usize>
     LeafView<'a, AX, T, K, B>
 {
     pub(crate) fn new(points: [&'a [AX]; K], items: &'a [T]) -> Self {
@@ -334,7 +334,7 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
         best_dist: &mut O,
         best_item: &mut T,
     ) where
-        O: AxisUnified<Coord = O>,
+        O: Axis<Coord = O>,
     {
         let (leaf_best_item, leaf_best_dist) = dists
             .iter()
@@ -351,7 +351,7 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics, const K: usize, const B: usize>
     #[cfg_attr(not(feature = "no_inline"), inline)]
     pub(crate) fn update_nearest_dists<O, R>(dists: &[O], items: &[T], dist: O, results: &mut R)
     where
-        O: AxisUnified<Coord = O>,
+        O: Axis<Coord = O>,
         R: ResultCollection<O, NearestNeighbour<O, T>>,
     {
         dists.iter().zip(items).for_each(|(&d, &i)| {
@@ -509,7 +509,7 @@ pub(crate) fn try_identity_widen_axis<AX: 'static, O: 'static>(axis: &[AX]) -> O
     }
 }
 
-impl<'a, AX: AxisUnified<Coord = AX>, T: Basics + PartialOrd, const K: usize, const B: usize>
+impl<'a, AX: Axis<Coord = AX>, T: Basics + PartialOrd, const K: usize, const B: usize>
     LeafView<'a, AX, T, K, B>
 {
     #[cfg_attr(not(feature = "no_inline"), inline)]
@@ -520,7 +520,7 @@ impl<'a, AX: AxisUnified<Coord = AX>, T: Basics + PartialOrd, const K: usize, co
         threshold_item: Option<T>,
         results: &mut R,
     ) where
-        O: AxisUnified<Coord = O>,
+        O: Axis<Coord = O>,
         R: BestNeighbourResultCollection<O, T>,
     {
         dists.iter().zip(items).for_each(|(&d, &item)| {

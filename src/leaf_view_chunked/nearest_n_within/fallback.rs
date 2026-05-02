@@ -1,8 +1,7 @@
 use crate::dist::KdTreeDistanceMetric;
 use crate::leaf_view::{LeafArena, LeafView, TlsLeafScratch};
 use crate::results::result_collection::ResultCollection;
-use crate::traits_unified_2::{AxisUnified, Basics};
-use crate::NearestNeighbour;
+use crate::{Axis, Basics, NearestNeighbour};
 
 #[inline(always)]
 pub(crate) fn nearest_n_within_with_query_wide_fallback<
@@ -18,10 +17,10 @@ pub(crate) fn nearest_n_within_with_query_wide_fallback<
     dist: D::Output,
     results: &mut R,
 ) where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
+    D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
 {
     leaf.with_dists_for_slice_wide::<D, _>(query_wide, |dists| {
@@ -36,10 +35,10 @@ pub(crate) fn nearest_n_within_with_query_wide_arena_fallback<AX, T, D, R, const
     dist: D::Output,
     results: &mut R,
 ) where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
 {
     if arena.is_empty() {

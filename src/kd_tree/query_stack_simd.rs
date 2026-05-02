@@ -1,7 +1,7 @@
-use crate::kd_tree::query_stack::{ScalarStackContext, StackTrait};
-use crate::traits_unified_2::AxisUnified;
-use crate::StemStrategy;
 use std::mem::MaybeUninit;
+
+use crate::kd_tree::query_stack::{ScalarStackContext, StackTrait};
+use crate::{Axis, StemStrategy};
 
 const DEFAULT_INLINE_SIMD_QUERY_STACK_CAPACITY: usize = 50;
 // Block3 exact traversal pushes at most one pending context per 3-level block.
@@ -63,7 +63,7 @@ pub enum Block3ExactStackContextState<A, SS, const K: usize> {
 pub trait Block3ExactStackContext<A, SS: StemStrategy, const K: usize>: Sized {
     fn new_single(stem_strat: SS) -> Self
     where
-        A: AxisUnified<Coord = A>;
+        A: Axis<Coord = A>;
 
     fn new_block3_pending_from_state<const K2: usize>(
         base: SS,
@@ -73,7 +73,7 @@ pub trait Block3ExactStackContext<A, SS: StemStrategy, const K: usize>: Sized {
         upper: &[A; K2],
     ) -> Self
     where
-        A: AxisUnified<Coord = A>;
+        A: Axis<Coord = A>;
 
     fn into_block3_exact_state(self) -> Block3ExactStackContextState<A, SS, K>;
 }
@@ -169,7 +169,7 @@ pub enum Block3SimdQueryStackContext<A, SS, const K: usize> {
 #[inline(always)]
 fn copy_state_array<A, const SRC: usize, const DST: usize>(src: &[A; SRC]) -> [A; DST]
 where
-    A: AxisUnified<Coord = A>,
+    A: Axis<Coord = A>,
 {
     assert_eq!(
         SRC, DST,
@@ -333,7 +333,7 @@ impl<
     }
 }
 
-impl<A: AxisUnified<Coord = A>, SS: StemStrategy> SimdQueryStackContext<A, SS> {
+impl<A: Axis<Coord = A>, SS: StemStrategy> SimdQueryStackContext<A, SS> {
     pub fn new_single(stem_strat: SS) -> Self {
         Self::Single {
             dim: stem_strat.dim(),
@@ -466,9 +466,7 @@ where
     }
 }
 
-impl<A: AxisUnified<Coord = A>, SS: StemStrategy, const K: usize>
-    Block3SimdQueryStackContext<A, SS, K>
-{
+impl<A: Axis<Coord = A>, SS: StemStrategy, const K: usize> Block3SimdQueryStackContext<A, SS, K> {
     pub fn new_single(stem_strat: SS) -> Self {
         Self::Single {
             dim: stem_strat.dim(),
@@ -514,13 +512,13 @@ impl<A: AxisUnified<Coord = A>, SS: StemStrategy, const K: usize>
 impl<A, SS, const KCTX: usize, const K: usize> Block3ExactStackContext<A, SS, K>
     for Block3SimdQueryStackContext<A, SS, KCTX>
 where
-    A: AxisUnified<Coord = A>,
+    A: Axis<Coord = A>,
     SS: StemStrategy,
 {
     #[inline(always)]
     fn new_single(stem_strat: SS) -> Self
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
     {
         Block3SimdQueryStackContext::new_single(stem_strat)
     }
@@ -534,7 +532,7 @@ where
         upper: &[A; K2],
     ) -> Self
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
     {
         Block3SimdQueryStackContext::new_block3_pending(
             base,

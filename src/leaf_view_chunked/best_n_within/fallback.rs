@@ -1,8 +1,7 @@
 use crate::dist::KdTreeDistanceMetric;
 use crate::leaf_view::{LeafArena, LeafView, TlsLeafScratch};
 use crate::results::result_collection::BestNeighbourResultCollection;
-use crate::traits_unified_2::{AxisUnified, Basics};
-use crate::BestNeighbour;
+use crate::{Axis, Basics, BestNeighbour};
 
 #[inline(always)]
 pub(crate) fn best_n_within_with_query_wide_fallback<AX, T, D, R, const K: usize, const B: usize>(
@@ -12,10 +11,10 @@ pub(crate) fn best_n_within_with_query_wide_fallback<AX, T, D, R, const K: usize
     threshold_item: Option<T>,
     results: &mut R,
 ) where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + TlsLeafScratch + 'static,
+    D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
     leaf.with_dists_for_slice_wide::<D, _>(query_wide, |dists| {
@@ -37,10 +36,10 @@ pub(crate) fn best_n_within_with_query_wide_arena_fallback<AX, T, D, R, const K:
     threshold_item: Option<T>,
     results: &mut R,
 ) where
-    AX: AxisUnified<Coord = AX> + 'static,
+    AX: Axis<Coord = AX> + 'static,
     T: Basics + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
-    D::Output: AxisUnified<Coord = D::Output> + 'static,
+    D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
     if arena.is_empty() {

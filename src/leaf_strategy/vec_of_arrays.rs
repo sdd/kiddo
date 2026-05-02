@@ -1,10 +1,9 @@
 use crate::leaf_view::LeafView;
 use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
-use crate::traits_unified_2::{
-    AxisUnified, Basics, BucketLimitType, ConstructibleLeafStrategy, LeafProjection, LeafStrategy,
-    Mutable, MutableLeafStrategy,
+use crate::traits::leaf_strategy::{
+    BucketLimitType, ConstructibleLeafStrategy, LeafProjection, Mutable, MutableLeafStrategy,
 };
-use crate::StemStrategy;
+use crate::{Axis, Basics, LeafStrategy, StemStrategy};
 
 /// A leaf storage strategy using vectors of fixed-size arrays.
 ///
@@ -41,7 +40,7 @@ pub struct LeafNode<A, T, const K: usize, const B: usize> {
 impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B>
     for VecOfArrays<AX, T, K, B>
 where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     T: Basics,
     SS: StemStrategy,
 {
@@ -78,7 +77,7 @@ where
 impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B>
     for ArchivedVecOfArrays<AX, T, K, B>
 where
-    AX: rkyv_08::Archive + AxisUnified<Coord = AX>,
+    AX: rkyv_08::Archive + Axis<Coord = AX>,
     T: rkyv_08::Archive + Basics,
     SS: StemStrategy,
 {
@@ -120,7 +119,7 @@ where
 impl<AX, T, SS, const K: usize, const B: usize> ConstructibleLeafStrategy<AX, T, SS, K, B>
     for VecOfArrays<AX, T, K, B>
 where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     T: Basics,
     SS: StemStrategy,
 {
@@ -178,7 +177,7 @@ where
 
 impl<AX, T, const K: usize, const B: usize> VecOfArrays<AX, T, K, B>
 where
-    AX: AxisUnified,
+    AX: Axis,
     T: Copy + PartialEq,
 {
     fn should_remove(
@@ -203,7 +202,7 @@ where
 
 impl<AX, T, const K: usize, const B: usize> VecOfArrays<AX, T, K, B>
 where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     T: Basics + PartialEq,
 {
     fn copy_split_data_to_new_leaf(
@@ -257,7 +256,7 @@ where
 impl<AX, T, SS, const K: usize, const B: usize> MutableLeafStrategy<AX, T, SS, K, B>
     for VecOfArrays<AX, T, K, B>
 where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     T: Basics + PartialEq,
     SS: StemStrategy,
 {
@@ -484,7 +483,7 @@ mod test {
     use crate::dist::SquaredEuclidean;
     use crate::kd_tree::KdTreeAccessor;
     use crate::leaf_strategy::vec_of_arrays::VecOfArrays;
-    use crate::traits_unified_2::LeafStrategy;
+    use crate::LeafStrategy;
     use crate::{kd_tree, Eytzinger};
 
     #[test]

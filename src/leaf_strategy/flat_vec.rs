@@ -1,9 +1,8 @@
 use crate::leaf_view::LeafView;
-use crate::traits_unified_2::{
-    AxisUnified, Basics, BucketLimitType, ConstructibleLeafStrategy, Immutable, LeafProjection,
-    LeafStrategy,
+use crate::traits::leaf_strategy::{
+    BucketLimitType, ConstructibleLeafStrategy, Immutable, LeafProjection,
 };
-use crate::StemStrategy;
+use crate::{Axis, Basics, LeafStrategy, StemStrategy};
 
 /// A leaf storage strategy using flat vectors for coordinates.
 ///
@@ -23,7 +22,7 @@ pub struct FlatVec<A, T, const K: usize, const B: usize> {
 impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B>
     for FlatVec<AX, T, K, B>
 where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     T: Basics,
     SS: StemStrategy,
 {
@@ -65,7 +64,7 @@ where
 impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B>
     for ArchivedFlatVec<AX, T, K, B>
 where
-    AX: rkyv_08::Archive + AxisUnified<Coord = AX>,
+    AX: rkyv_08::Archive + Axis<Coord = AX>,
     T: rkyv_08::Archive + Basics,
     SS: StemStrategy,
 {
@@ -115,7 +114,7 @@ where
 impl<AX, T, SS, const K: usize, const B: usize> ConstructibleLeafStrategy<AX, T, SS, K, B>
     for FlatVec<AX, T, K, B>
 where
-    AX: AxisUnified<Coord = AX>,
+    AX: Axis<Coord = AX>,
     T: Basics,
     SS: StemStrategy,
 {
@@ -162,7 +161,7 @@ mod test {
     use crate::dist::SquaredEuclidean;
     use crate::kd_tree::KdTreeAccessor;
     use crate::leaf_strategy::flat_vec::FlatVec;
-    use crate::traits_unified_2::LeafStrategy;
+    use crate::LeafStrategy;
     use crate::{kd_tree, Eytzinger};
 
     #[test]

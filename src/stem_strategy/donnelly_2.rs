@@ -1,12 +1,12 @@
 //! V2 Donnelly stem strategy
 
-use crate::stem_strategy::prefetch::prefetch_t0;
-use crate::traits_unified_2::AxisUnified;
-use crate::StemStrategy;
 use aligned_vec::AVec;
 #[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
+use std::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
 use std::ptr::NonNull;
+
+use crate::stem_strategy::prefetch::prefetch_t0;
+use crate::{Axis, StemStrategy};
 
 /// Donnelly Strategy
 ///
@@ -247,7 +247,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         50
     }
 
-    fn trim_unneeded_stems<A: AxisUnified<Coord = A>>(stems: &mut AVec<A>, max_stem_level: usize) {
+    fn trim_unneeded_stems<A: Axis<Coord = A>>(stems: &mut AVec<A>, max_stem_level: usize) {
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         if !stems.is_empty() {
             let mut so = Self::new(stems_ptr);

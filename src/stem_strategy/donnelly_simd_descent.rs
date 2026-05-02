@@ -4,17 +4,18 @@
 //! backtracking are handled with scalar sibling materialization on the normal
 //! scalar query stack.
 
+use std::marker::PhantomData;
+use std::ptr::NonNull;
+
+use aligned_vec::AVec;
+
 use crate::kd_tree::query_stack::{QueryStack, ScalarStackContext};
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     child_interval_bounds_block3, compare_block3, interval_distance_1d,
 };
 use crate::stem_strategy::donnelly_core::DonnellyCore;
 use crate::stem_strategy::Block3;
-use crate::traits_unified_2::AxisUnified;
-use crate::StemStrategy;
-use aligned_vec::AVec;
-use std::marker::PhantomData;
-use std::ptr::NonNull;
+use crate::{Axis, StemStrategy};
 
 /// Scalar stack context for block-at-once scalar backtracking.
 ///
@@ -107,8 +108,8 @@ impl<const CL: u32, const VB: u32, const K: usize> DonnellySimdDescent<CL, VB, K
         query_wide_val: O,
     ) -> O
     where
-        A: AxisUnified<Coord = A>,
-        O: AxisUnified<Coord = O>,
+        A: Axis<Coord = A>,
+        O: Axis<Coord = O>,
         D: crate::dist::DistanceMetricCore<A, Output = O>,
     {
         let (lower_offset, upper_offset) = child_interval_bounds_block3(child_idx);
@@ -214,7 +215,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
         50
     }
 
-    fn trim_unneeded_stems<A: AxisUnified<Coord = A>>(stems: &mut AVec<A>, max_stem_level: usize) {
+    fn trim_unneeded_stems<A: Axis<Coord = A>>(stems: &mut AVec<A>, max_stem_level: usize) {
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         if !stems.is_empty() {
             let mut so = Self::new(stems_ptr);
@@ -238,7 +239,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
         }
     }
 
-    fn get_leaf_idx<A: AxisUnified, const K2: usize>(
+    fn get_leaf_idx<A: Axis, const K2: usize>(
         stems: &[A],
         query: &[A; K2],
         max_stem_level: i32,
@@ -287,8 +288,8 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
     ) -> bool
     where
         Self: Sized,
-        A: AxisUnified<Coord = A>,
-        O: AxisUnified<Coord = O> + crate::stem_strategy::donnelly_2_blockmarker_simd::BacktrackBlock3,
+        A: Axis<Coord = A>,
+        O: Axis<Coord = O> + crate::stem_strategy::donnelly_2_blockmarker_simd::BacktrackBlock3,
         D: crate::dist::DistanceMetricCore<A, Output = O>
             + crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::DistanceMetricSimdBlock3<
                 A,

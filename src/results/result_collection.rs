@@ -8,8 +8,7 @@ use smallvec::SmallVec;
 use sorted_vec::SortedVec;
 
 use super::nearest_neighbour::NearestNeighbour;
-use crate::traits_unified_2::{AxisUnified, Basics};
-use crate::BestNeighbour;
+use crate::{Axis, Basics, BestNeighbour};
 
 #[cfg(feature = "small_n_result_collectors")]
 pub(crate) const SMALL_RESULT_COLLECTION_MAX_QTY: usize = 32;
@@ -22,7 +21,7 @@ pub(crate) const BUFFERED_RESULT_COLLECTION_INLINE_CAPACITY: usize = 64;
 #[allow(dead_code)]
 pub(crate) type ResultBuffer<E> = SmallVec<[E; BUFFERED_RESULT_COLLECTION_INLINE_CAPACITY]>;
 
-pub trait ResultCollection<O: AxisUnified<Coord = O>, E>: Sized {
+pub trait ResultCollection<O: Axis<Coord = O>, E>: Sized {
     fn with_max_qty(max_qty: usize) -> Self;
     fn max_qty(&self) -> usize;
     fn len(&self) -> usize;
@@ -62,7 +61,7 @@ pub trait ResultCollection<O: AxisUnified<Coord = O>, E>: Sized {
 
 pub(crate) struct VisitorResultCollection<'a, O, E, F>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
     F: FnMut(E),
 {
     visitor: &'a mut F,
@@ -72,7 +71,7 @@ where
 
 impl<'a, O, E, F> VisitorResultCollection<'a, O, E, F>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
     F: FnMut(E),
 {
     #[inline(always)]
@@ -87,7 +86,7 @@ where
 
 impl<O, E, F> ResultCollection<O, E> for VisitorResultCollection<'_, O, E, F>
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
     F: FnMut(E),
 {
     #[inline(always)]
@@ -128,7 +127,7 @@ where
 }
 
 #[doc(hidden)]
-pub trait BestNeighbourResultCollection<O: AxisUnified<Coord = O>, T: Basics + PartialOrd>:
+pub trait BestNeighbourResultCollection<O: Axis<Coord = O>, T: Basics + PartialOrd>:
     ResultCollection<O, BestNeighbour<O, T>>
 {
     fn threshold_item(&self) -> Option<T>;
@@ -260,7 +259,7 @@ fn small_sorted_insert<E: Ord>(
 #[inline(always)]
 pub(crate) fn flush_result_buffer<O, E, R>(results: &mut R, buffer: &mut ResultBuffer<E>)
 where
-    O: AxisUnified<Coord = O>,
+    O: Axis<Coord = O>,
     R: ResultCollection<O, E>,
 {
     #[cfg(feature = "result_collection_stats")]
@@ -271,7 +270,7 @@ where
     }
 }
 
-impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
+impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     for BinaryHeapResultCollection<NearestNeighbour<O, T>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
@@ -369,7 +368,7 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     }
 }
 
-impl<O: AxisUnified<Coord = O>, T: Basics + PartialOrd> ResultCollection<O, BestNeighbour<O, T>>
+impl<O: Axis<Coord = O>, T: Basics + PartialOrd> ResultCollection<O, BestNeighbour<O, T>>
     for BinaryHeapResultCollection<BestNeighbour<O, T>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
@@ -456,7 +455,7 @@ impl<O: AxisUnified<Coord = O>, T: Basics + PartialOrd> ResultCollection<O, Best
     }
 }
 
-impl<O: AxisUnified<Coord = O>, T: Basics + PartialOrd> BestNeighbourResultCollection<O, T>
+impl<O: Axis<Coord = O>, T: Basics + PartialOrd> BestNeighbourResultCollection<O, T>
     for BinaryHeapResultCollection<BestNeighbour<O, T>>
 {
     #[inline(always)]
@@ -469,7 +468,7 @@ impl<O: AxisUnified<Coord = O>, T: Basics + PartialOrd> BestNeighbourResultColle
     }
 }
 
-impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
+impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     for SortedVecResultCollection<NearestNeighbour<O, T>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
@@ -573,7 +572,7 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
 }
 
 #[cfg(feature = "small_n_result_collectors")]
-impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
+impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     for SmallBinaryHeapResultCollection<NearestNeighbour<O, T>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
@@ -676,7 +675,7 @@ impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
 }
 
 #[cfg(feature = "small_n_result_collectors")]
-impl<O: AxisUnified<Coord = O>, T: Basics + PartialOrd> ResultCollection<O, BestNeighbour<O, T>>
+impl<O: Axis<Coord = O>, T: Basics + PartialOrd> ResultCollection<O, BestNeighbour<O, T>>
     for SmallBinaryHeapResultCollection<BestNeighbour<O, T>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
@@ -768,7 +767,7 @@ impl<O: AxisUnified<Coord = O>, T: Basics + PartialOrd> ResultCollection<O, Best
 }
 
 #[cfg(feature = "small_n_result_collectors")]
-impl<O: AxisUnified<Coord = O>, T: Basics + PartialOrd> BestNeighbourResultCollection<O, T>
+impl<O: Axis<Coord = O>, T: Basics + PartialOrd> BestNeighbourResultCollection<O, T>
     for SmallBinaryHeapResultCollection<BestNeighbour<O, T>>
 {
     #[inline(always)]
@@ -782,7 +781,7 @@ impl<O: AxisUnified<Coord = O>, T: Basics + PartialOrd> BestNeighbourResultColle
 }
 
 #[cfg(feature = "small_n_result_collectors")]
-impl<O: AxisUnified<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
+impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     for SmallSortedVecResultCollection<NearestNeighbour<O, T>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
@@ -1123,7 +1122,7 @@ pub mod cargo_asm {
     }
 }
 
-impl<O: AxisUnified<Coord = O>, E: Ord> ResultCollection<O, E> for Vec<E> {
+impl<O: Axis<Coord = O>, E: Ord> ResultCollection<O, E> for Vec<E> {
     fn with_max_qty(max_qty: usize) -> Self {
         if max_qty == usize::MAX {
             Vec::new()

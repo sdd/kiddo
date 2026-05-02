@@ -1,17 +1,16 @@
+use std::num::NonZeroUsize;
+
 use crate::dist::KdTreeDistanceMetric;
 use crate::kd_tree::query_stack::StackTrait;
-use crate::kd_tree::KdTree;
 use crate::leaf_view::TlsLeafScratch;
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
-use crate::traits_unified_2::{AxisUnified, Basics, LeafStrategy};
-use crate::{NearestNeighbour, StemStrategy};
-use std::num::NonZeroUsize;
+use crate::{Axis, Basics, KdTree, LeafStrategy, NearestNeighbour, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
-    A: AxisUnified<Coord = A> + 'static,
+    A: Axis<Coord = A> + 'static,
     T: Basics + PartialOrd,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
@@ -48,8 +47,8 @@ mod tests {
     use crate::dist::Manhattan;
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
+    use crate::Axis;
     use crate::Eytzinger;
-    use crate::traits_unified_2::AxisUnified;
 
     const RNG_SEED: u64 = 42;
     const TILE_BOUNDARY_CASES: [usize; 7] = [1, 2, 4, 8, 32, 33, 47];
@@ -239,7 +238,7 @@ mod tests {
         radius: A,
     ) -> Vec<(A, u32)>
     where
-        A: AxisUnified<Coord = A> + 'static,
+        A: Axis<Coord = A> + 'static,
         Manhattan<A>: crate::dist::DistanceMetricCore<A, Output = A>,
     {
         let mut matching_items = vec![];
@@ -258,22 +257,20 @@ mod tests {
 
     fn manhattan_dist<A, const K: usize>(a: &[A; K], b: &[A; K]) -> A
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
         Manhattan<A>: crate::dist::DistanceMetricCore<A, Output = A>,
     {
-        let aw = (*a).map(|coord| {
-            <Manhattan<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(coord)
-        });
-        let bw = (*b).map(|coord| {
-            <Manhattan<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(coord)
-        });
+        let aw = (*a)
+            .map(|coord| <Manhattan<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(coord));
+        let bw = (*b)
+            .map(|coord| <Manhattan<A> as crate::dist::DistanceMetricCore<A>>::widen_coord(coord));
 
         <Manhattan<A> as crate::dist::DistanceMetricCore<A>>::dist::<K>(&aw, &bw)
     }
 
     fn stabilize_sort<A>(matching_items: &mut [(A, u32)])
     where
-        A: AxisUnified<Coord = A>,
+        A: Axis<Coord = A>,
     {
         matching_items.sort_unstable_by(|a, b| {
             let dist_cmp = a.0.partial_cmp(&b.0).unwrap();
