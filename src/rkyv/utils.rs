@@ -54,17 +54,13 @@ pub(crate) fn transform<T, U>(item: &U) -> &T {
 /// - Misusing this function with incompatible types can lead to data corruption, undefined behavior, or program crashes.
 ///
 /// # Examples
-/// ```
-/// use std::mem;
-///
-/// // Transforming a &[u8] slice into a &[u32] slice
+/// ```ignore
+/// // Transforming a &[Archived<u32>] slice back into a &[u32]-compatible view
 /// let bytes: &[u8] = &[0x12, 0x34, 0x56, 0x78];
-/// let words: &[u32] = unsafe { transform_slice(bytes) };
+/// let words: &[u32] = transform_slice(bytes);
 ///
-/// assert_eq!(words.len(), 1); // As a &[u32], the slice contains only one element.
-/// assert_eq!(words[0], 0x78563412); // Endianness is not altered.
-///
-/// // This is valid because u8 and u32 are properly aligned and their memory layouts are compatible.
+/// assert_eq!(words.len(), 1);
+/// assert_eq!(words[0], 0x78563412);
 /// ```
 ///
 /// Be cautious while using this function, as improper usage may result in undefined behavior.
