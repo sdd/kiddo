@@ -8,7 +8,7 @@ use crate::leaf_view_chunked::nearest_n_within::{
 };
 use crate::results::result_collection::ResultCollection;
 use crate::traits::leaf_strategy::LeafProjection;
-use crate::{Axis, Basics, LeafStrategy, NearestNeighbour, StemStrategy};
+use crate::{Axis, Content, LeafStrategy, NearestNeighbour, StemStrategy};
 
 use super::{KdTreeAccessor, StemLeafResolution};
 
@@ -19,7 +19,7 @@ const WITHIN_UNSORTED_ITER_INLINE_RESULT_CAPACITY: usize = 64;
 pub struct KdTreeIter<'a, Tree, A, T, SS, LS, const K: usize, const B: usize>
 where
     A: Axis<Coord = A>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
@@ -35,7 +35,7 @@ impl<'a, Tree, A, T, SS, LS, const K: usize, const B: usize>
     KdTreeIter<'a, Tree, A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
@@ -56,7 +56,7 @@ impl<Tree, A, T, SS, LS, const K: usize, const B: usize> Iterator
     for KdTreeIter<'_, Tree, A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
@@ -95,7 +95,7 @@ impl<Tree, A, T, SS, LS, const K: usize, const B: usize> ExactSizeIterator
     for KdTreeIter<'_, Tree, A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
@@ -298,7 +298,7 @@ impl<E: Copy, const N: usize> InlineResultBuffer<E, N> {
 pub struct WithinUnsortedIter<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize>
 where
     A: Axis<Coord = A> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     D: KdTreeDistanceMetric<A, K>,
@@ -323,7 +323,7 @@ impl<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize>
     WithinUnsortedIter<'a, Tree, A, T, SS, LS, D, K, B>
 where
     A: Axis<Coord = A> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     D: KdTreeDistanceMetric<A, K>,
@@ -472,7 +472,7 @@ impl<Tree, A, T, SS, LS, D, const K: usize, const B: usize> Iterator
     for WithinUnsortedIter<'_, Tree, A, T, SS, LS, D, K, B>
 where
     A: Axis<Coord = A> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     D: KdTreeDistanceMetric<A, K>,

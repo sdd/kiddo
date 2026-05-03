@@ -13,7 +13,7 @@ use crate::stem_strategy::{
     donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4},
     DistanceMetricSimdBlock3, DistanceMetricSimdBlock4, SimdPrune, SimdSelectBestChildBlock3,
 };
-use crate::{Axis, Basics, LeafStrategy, StemStrategy};
+use crate::{Axis, Content, LeafStrategy, StemStrategy};
 
 thread_local! {
     static QUERY_STACKS: UnsafeCell<HashMap<TypeId, Box<dyn Any>>> =
@@ -136,7 +136,7 @@ impl<Tree, A, T, SS, LS, const K: usize, const B: usize> KdTreeQueryOps<A, T, SS
 where
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
     A: Axis<Coord = A>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
 {
@@ -147,7 +147,7 @@ pub trait KdTreeQueryOps<A, T, SS, LS, const K: usize, const B: usize>:
     KdTreeAccessor<A, T, SS, LS, K, B> + Sized
 where
     A: Axis<Coord = A>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
 {

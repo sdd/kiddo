@@ -8,7 +8,7 @@ use std::ptr::NonNull;
 
 use crate::stem_strategy::donnelly_core::DonnellyCore;
 use crate::stem_strategy::{Block3, Block4, BlockSizeMarker};
-use crate::{Axis, Basics, LeafStrategy, StemStrategy};
+use crate::{Axis, Content, LeafStrategy, StemStrategy};
 
 // Compile-time gate for valid 64-byte-line Donnelly SIMD block/VB pairings.
 trait ValidBlock3Config64 {}
@@ -1006,7 +1006,7 @@ where
         Tree: crate::kd_tree::KdTreeAccessor<A, T, Self, LS, K2, B>
             + crate::kd_tree::KdTreeQueryOps<A, T, Self, LS, K2, B>,
         A: Axis<Coord = A>,
-        T: Basics,
+        T: Content,
         O: Axis<Coord = O>
             + SimdPrune
             + SimdSelectBestChildBlock3
@@ -1476,7 +1476,7 @@ where
         Tree: crate::kd_tree::KdTreeAccessor<A, T, Self, LS, K2, B>
             + crate::kd_tree::KdTreeQueryOps<A, T, Self, LS, K2, B>,
         A: Axis<Coord = A>,
-        T: Basics,
+        T: Content,
         O: Axis<Coord = O>
             + SimdPrune
             + SimdSelectBestChildBlock3

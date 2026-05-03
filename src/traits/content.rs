@@ -16,5 +16,5 @@ use std::fmt::Debug;
 /// since you can use it directly without a cast to index into a [`Vec`] containing more detail
 /// on your tree items. If you want to experiment to get better performance or a smaller memory footprint,
 /// try switching to a smaller type such as [`u32`].
-pub trait Basics: Copy + Debug + Default + Send + Sync + 'static {}
-impl<T> Basics for T where T: Copy + Debug + Default + Send + Sync + 'static {}
+pub trait Content: Copy + Debug + Default + Send + Sync + 'static {}
+impl<T> Content for T where T: Copy + Debug + Default + Send + Sync + 'static {}

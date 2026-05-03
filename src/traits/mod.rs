@@ -4,7 +4,7 @@
 pub mod axis;
 
 /// Trait required for items stored in the tree
-pub mod basics;
+pub mod content;
 
 /// Trait for distance metrics
 pub mod distance_metric;

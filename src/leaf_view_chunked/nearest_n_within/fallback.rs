@@ -1,7 +1,7 @@
 use crate::dist::KdTreeDistanceMetric;
 use crate::leaf_view::{LeafArena, LeafView, TlsLeafScratch};
 use crate::results::result_collection::ResultCollection;
-use crate::{Axis, Basics, NearestNeighbour};
+use crate::{Axis, Content, NearestNeighbour};
 
 #[inline(always)]
 pub(crate) fn nearest_n_within_with_query_wide_fallback<
@@ -18,7 +18,7 @@ pub(crate) fn nearest_n_within_with_query_wide_fallback<
     results: &mut R,
 ) where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
@@ -36,7 +36,7 @@ pub(crate) fn nearest_n_within_with_query_wide_arena_fallback<AX, T, D, R, const
     results: &mut R,
 ) where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics,
+    T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,

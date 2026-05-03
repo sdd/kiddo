@@ -1,7 +1,7 @@
 //! A result item returned by a query
 use std::cmp::Ordering;
 
-use crate::Basics;
+use crate::Content;
 
 /// Represents an entry in the results of a "best" query, with `distance` being the distance of this
 /// particular item from the query point, and `item` being the stored item index that was found
@@ -14,7 +14,7 @@ pub struct BestNeighbour<A, T> {
     pub item: T,
 }
 
-impl<A: PartialOrd, T: Basics + PartialOrd> Ord for BestNeighbour<A, T> {
+impl<A: PartialOrd, T: Content + PartialOrd> Ord for BestNeighbour<A, T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap_or(Ordering::Equal)
     }
@@ -24,21 +24,21 @@ impl<A: PartialOrd, T: Basics + PartialOrd> Ord for BestNeighbour<A, T> {
 #[allow(unknown_lints)]
 #[allow(clippy::incorrect_partial_ord_impl_on_ord_type)]
 #[allow(clippy::non_canonical_partial_ord_impl)]
-impl<A: PartialOrd, T: Basics + PartialOrd> PartialOrd for BestNeighbour<A, T> {
+impl<A: PartialOrd, T: Content + PartialOrd> PartialOrd for BestNeighbour<A, T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.item.partial_cmp(&other.item)
     }
 }
 
-impl<A: PartialEq, T: Basics + PartialOrd> Eq for BestNeighbour<A, T> {}
+impl<A: PartialEq, T: Content + PartialOrd> Eq for BestNeighbour<A, T> {}
 
-impl<A: PartialEq, T: Basics + PartialOrd> PartialEq for BestNeighbour<A, T> {
+impl<A: PartialEq, T: Content + PartialOrd> PartialEq for BestNeighbour<A, T> {
     fn eq(&self, other: &Self) -> bool {
         self.distance == other.distance && self.item == other.item
     }
 }
 
-impl<A, T: Basics + PartialOrd> From<BestNeighbour<A, T>> for (A, T) {
+impl<A, T: Content + PartialOrd> From<BestNeighbour<A, T>> for (A, T) {
     fn from(elem: BestNeighbour<A, T>) -> Self {
         (elem.distance, elem.item)
     }

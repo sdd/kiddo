@@ -6,7 +6,7 @@ use array_init::array_init;
 
 use crate::dist::distance_metric_avx512::{Avx512F32LeafOps, Avx512F64LeafOps};
 use crate::leaf_view::LeafView;
-use crate::Basics;
+use crate::Content;
 
 const CHUNK_SIZE: usize = 32;
 const LINE_SIZE: usize = 8;
@@ -24,7 +24,7 @@ unsafe fn emit_results_avx512<T, F>(
     max_dist: f64,
     emit: &mut F,
 ) where
-    T: Basics,
+    T: Content,
     F: FnMut(f64, T),
 {
     let mask = _mm512_cmp_pd_mask(dists, _mm512_set1_pd(max_dist), _CMP_LE_OQ) as u32;
@@ -54,7 +54,7 @@ unsafe fn emit_results_avx2<T, F>(
     max_dist: f64,
     emit: &mut F,
 ) where
-    T: Basics,
+    T: Content,
     F: FnMut(f64, T),
 {
     let mask =
@@ -85,7 +85,7 @@ unsafe fn emit_results_avx128<T, F>(
     max_dist: f64,
     emit: &mut F,
 ) where
-    T: Basics,
+    T: Content,
     F: FnMut(f64, T),
 {
     let mask = _mm_movemask_pd(_mm_cmple_pd(dists, _mm_set1_pd(max_dist))) as u32;
@@ -199,7 +199,7 @@ unsafe fn nearest_n_within_avx512_raw<L, T, F, const K: usize>(
     emit: &mut F,
 ) where
     L: Avx512F64LeafOps,
-    T: Basics,
+    T: Content,
     F: FnMut(f64, T),
 {
     if len == 0 {
@@ -262,7 +262,7 @@ pub(crate) unsafe fn nearest_n_within_avx512_unchecked<L, T, F, const K: usize, 
     emit: &mut F,
 ) where
     L: Avx512F64LeafOps,
-    T: Basics,
+    T: Content,
     F: FnMut(f64, T),
 {
     let points = leaf.points();
@@ -286,7 +286,7 @@ pub(crate) unsafe fn nearest_n_within_avx512_arena_unchecked<L, T, F, const K: u
     emit: &mut F,
 ) where
     L: Avx512F64LeafOps,
-    T: Basics,
+    T: Content,
     F: FnMut(f64, T),
 {
     let point_base = tile_base as *const f64;
@@ -304,7 +304,7 @@ unsafe fn emit_results_avx512_f32<T, F>(
     max_dist: f32,
     emit: &mut F,
 ) where
-    T: Basics,
+    T: Content,
     F: FnMut(f32, T),
 {
     let mask = _mm512_cmp_ps_mask(dists, _mm512_set1_ps(max_dist), _CMP_LE_OQ) as u32;
@@ -334,7 +334,7 @@ unsafe fn emit_results_avx2_f32<T, F>(
     max_dist: f32,
     emit: &mut F,
 ) where
-    T: Basics,
+    T: Content,
     F: FnMut(f32, T),
 {
     let mask =
@@ -365,7 +365,7 @@ unsafe fn emit_results_avx128_f32<T, F>(
     max_dist: f32,
     emit: &mut F,
 ) where
-    T: Basics,
+    T: Content,
     F: FnMut(f32, T),
 {
     let mask = _mm_movemask_ps(_mm_cmp_ps(dists, _mm_set1_ps(max_dist), _CMP_LE_OQ)) as u32;
@@ -479,7 +479,7 @@ unsafe fn nearest_n_within_avx512_raw_f32<L, T, F, const K: usize>(
     emit: &mut F,
 ) where
     L: Avx512F32LeafOps,
-    T: Basics,
+    T: Content,
     F: FnMut(f32, T),
 {
     if len == 0 {
@@ -547,7 +547,7 @@ pub(crate) unsafe fn nearest_n_within_avx512_unchecked_f32<
     emit: &mut F,
 ) where
     L: Avx512F32LeafOps,
-    T: Basics,
+    T: Content,
     F: FnMut(f32, T),
 {
     let points = leaf.points();
@@ -571,7 +571,7 @@ pub(crate) unsafe fn nearest_n_within_avx512_arena_unchecked_f32<L, T, F, const 
     emit: &mut F,
 ) where
     L: Avx512F32LeafOps,
-    T: Basics,
+    T: Content,
     F: FnMut(f32, T),
 {
     let point_base = tile_base as *const f32;

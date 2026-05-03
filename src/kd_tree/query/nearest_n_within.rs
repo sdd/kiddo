@@ -19,7 +19,7 @@ use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits::leaf_strategy::LeafProjection;
-use crate::{Axis, Basics, KdTree, LeafStrategy, NearestNeighbour, StemStrategy};
+use crate::{Axis, Content, KdTree, LeafStrategy, NearestNeighbour, StemStrategy};
 
 #[cfg(not(feature = "small_n_result_collectors"))]
 const MAX_VEC_RESULT_SIZE: usize = 20;
@@ -27,7 +27,7 @@ const MAX_VEC_RESULT_SIZE: usize = 20;
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {

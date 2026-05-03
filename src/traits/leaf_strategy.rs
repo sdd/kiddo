@@ -1,7 +1,7 @@
 use nonmax::NonMaxUsize;
 
 use crate::leaf_view::{LeafArena, LeafView};
-use crate::{Axis, Basics, StemStrategy};
+use crate::{Axis, Content, StemStrategy};
 
 mod sealed {
     pub trait Sealed {}
@@ -142,7 +142,7 @@ pub enum LeafProjection {
 pub trait LeafStrategy<AX, T, SS, const K: usize, const B: usize>
 where
     AX: Axis<Coord = AX>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
 {
     /// Coordinate scalar type.
@@ -209,7 +209,7 @@ pub trait ConstructibleLeafStrategy<AX, T, SS, const K: usize, const B: usize>:
     LeafStrategy<AX, T, SS, K, B>
 where
     AX: Axis<Coord = AX>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
 {
     /// Create a builder with an intended capacity (in points).
@@ -227,7 +227,7 @@ pub trait MutableLeafStrategy<AX, T, SS, const K: usize, const B: usize>:
     ConstructibleLeafStrategy<AX, T, SS, K, B>
 where
     AX: Axis<Coord = AX>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
 {
     /// Add an item to a leaf.

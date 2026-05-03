@@ -16,7 +16,7 @@ pub use orchestrator::KdTreeQueryOps;
 pub use stem_leaf_resolution::OwnedStemLeafResolution;
 
 use crate::traits::leaf_strategy::{BucketLimitType, ConstructibleLeafStrategy, Mutability};
-use crate::{Axis, Basics, LeafStrategy, StemStrategy};
+use crate::{Axis, Content, LeafStrategy, StemStrategy};
 
 /// Query-facing interface for resolving stem indices to leaf indices during traversal.
 pub trait StemLeafResolution {
@@ -112,7 +112,7 @@ pub struct KdTree<
 pub trait KdTreeAccessor<A, T, SS, LS, const K: usize, const B: usize>
 where
     A: Axis<Coord = A>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
 {
@@ -145,7 +145,7 @@ impl<A, T, SS, LS, const K: usize, const B: usize> KdTreeAccessor<A, T, SS, LS, 
     for KdTree<A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
 {
@@ -184,7 +184,7 @@ where
 impl<A, T, SS, LS, const K: usize, const B: usize> ArchivedKdTree<A, T, SS, LS, K, B>
 where
     A: rkyv_08::Archive + Axis<Coord = A>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
     LS: rkyv_08::Archive,
     rkyv_08::Archived<LS>: LeafStrategy<A, T, SS, K, B>,
@@ -236,7 +236,7 @@ impl<A, T, SS, LS, const K: usize, const B: usize>
     KdTreeAccessor<A, T, SS, rkyv_08::Archived<LS>, K, B> for ArchivedKdTree<A, T, SS, LS, K, B>
 where
     A: rkyv_08::Archive + Axis<Coord = A>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
     LS: rkyv_08::Archive,
     rkyv_08::Archived<LS>: LeafStrategy<A, T, SS, K, B>,
@@ -275,7 +275,7 @@ where
 impl<A, T, SS, LS, const K: usize, const B: usize> Default for KdTree<A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A>,
-    T: Basics,
+    T: Content,
     LS: ConstructibleLeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
@@ -327,7 +327,7 @@ where
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A>,
-    T: Basics,
+    T: Content,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
@@ -407,7 +407,7 @@ impl<A, T, SS, LS, const K: usize, const B: usize> FromIterator<(usize, [A; K])>
     for KdTree<A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A>,
-    T: Basics,
+    T: Content,
     LS: ConstructibleLeafStrategy<A, T, SS, K, B> + Default,
     SS: StemStrategy,
 {
@@ -421,7 +421,7 @@ where
 impl<A, T, SS, LS, const K: usize, const B: usize> std::fmt::Display for KdTree<A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A> + std::fmt::Display,
-    T: Basics + std::fmt::Display,
+    T: Content + std::fmt::Display,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {

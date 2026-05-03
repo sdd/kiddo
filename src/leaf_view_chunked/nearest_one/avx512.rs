@@ -7,7 +7,7 @@ use array_init::array_init;
 
 use crate::dist::distance_metric_avx512::{Avx512F32LeafOps, Avx512F64LeafOps};
 use crate::leaf_view::LeafView;
-use crate::{Axis, Basics};
+use crate::{Axis, Content};
 
 const CHUNK_SIZE: usize = 32;
 const LINE_SIZE: usize = 8;
@@ -15,7 +15,7 @@ const AVX2_LINE_SIZE: usize = 4;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-struct BestResult<T: Basics> {
+struct BestResult<T: Content> {
     dist: f64,
     item: T,
 }
@@ -27,7 +27,7 @@ unsafe fn prefetch_nta(ptr: *const u8) {
 }
 
 #[inline(always)]
-unsafe fn update_best_chunk_avx512_raw<T: Basics>(
+unsafe fn update_best_chunk_avx512_raw<T: Content>(
     d0: __m512d,
     d1: __m512d,
     d2: __m512d,
@@ -77,7 +77,7 @@ unsafe fn update_best_chunk_avx512_raw<T: Basics>(
 }
 
 #[inline(always)]
-unsafe fn update_best_line_avx512_raw<T: Basics>(
+unsafe fn update_best_line_avx512_raw<T: Content>(
     d0: __m512d,
     items: *const T,
     base: usize,
@@ -113,7 +113,7 @@ unsafe fn update_best_line_avx512_raw<T: Basics>(
 }
 
 #[inline(always)]
-unsafe fn update_best_line_avx512_masked_raw<T: Basics>(
+unsafe fn update_best_line_avx512_masked_raw<T: Content>(
     d0: __m512d,
     valid_mask: __mmask8,
     items: *const T,
@@ -127,7 +127,7 @@ unsafe fn update_best_line_avx512_masked_raw<T: Basics>(
 }
 
 #[inline(always)]
-unsafe fn update_best_line_avx2_raw<T: Basics>(
+unsafe fn update_best_line_avx2_raw<T: Content>(
     d0: __m256d,
     items: *const T,
     base: usize,
@@ -171,7 +171,7 @@ macro_rules! impl_leaf_kernel_k {
         where
             AX: Axis<Coord = AX>,
             L: Avx512F64LeafOps,
-            T: Basics,
+            T: Content,
         {
             let p0 = *points.add(0);
             let q0s = *query.add(0);
@@ -346,7 +346,7 @@ macro_rules! impl_leaf_arena_kernel_k {
         where
             AX: Axis<Coord = AX>,
             L: Avx512F64LeafOps,
-            T: Basics,
+            T: Content,
         {
             if len == 0 {
                 return;
@@ -513,7 +513,7 @@ unsafe fn scalar_fallback_dynamic<AX, L, T>(
 where
     AX: Axis<Coord = AX>,
     L: Avx512F64LeafOps,
-    T: Basics,
+    T: Content,
 {
     let points = std::slice::from_raw_parts(points, k);
     let items = std::slice::from_raw_parts(items, len);
@@ -551,7 +551,7 @@ unsafe fn scalar_fallback_arena_dynamic<AX, L, T>(
 ) where
     AX: Axis<Coord = AX>,
     L: Avx512F64LeafOps,
-    T: Basics,
+    T: Content,
 {
     let points = tile_base as *const f64;
     let items = tile_base.add(k * len * std::mem::size_of::<f64>()) as *const T;
@@ -587,7 +587,7 @@ unsafe fn leaf_nearest_one_chunked_nozero_f64_selector<AX, L, T>(
 where
     AX: Axis<Coord = AX>,
     L: Avx512F64LeafOps,
-    T: Basics,
+    T: Content,
 {
     match k {
         1 => leaf_nearest_one_chunked_nozero_f64_k1::<AX, L, T>(
@@ -677,7 +677,7 @@ unsafe fn leaf_nearest_one_arena_nozero_f64_selector<AX, L, T>(
 ) where
     AX: Axis<Coord = AX>,
     L: Avx512F64LeafOps,
-    T: Basics,
+    T: Content,
 {
     match k {
         1 => leaf_nearest_one_arena_nozero_f64_k1::<AX, L, T>(
@@ -709,7 +709,7 @@ pub(crate) unsafe fn nearest_one_avx512_raw_unchecked<AX, L, T, const K: usize>(
 ) where
     AX: Axis<Coord = AX>,
     L: Avx512F64LeafOps,
-    T: Basics,
+    T: Content,
 {
     if len == 0 {
         return;
@@ -743,7 +743,7 @@ pub(crate) unsafe fn nearest_one_avx512_arena_unchecked<AX, L, T, const K: usize
 ) where
     AX: Axis<Coord = AX>,
     L: Avx512F64LeafOps,
-    T: Basics,
+    T: Content,
 {
     leaf_nearest_one_arena_nozero_f64_selector::<AX, L, T>(
         K, tile_base, len, query, best_dist, best_item,
@@ -759,7 +759,7 @@ pub(crate) unsafe fn nearest_one_avx512_unchecked<AX, L, T, const K: usize, cons
 ) where
     AX: Axis<Coord = AX>,
     L: Avx512F64LeafOps,
-    T: Basics,
+    T: Content,
 {
     let points = leaf.points();
     let point_ptrs = std::array::from_fn(|dim| points[dim].as_ptr());
@@ -801,7 +801,7 @@ const AVX2_LINE_SIZE_F32: usize = 8;
 const SSE_LINE_SIZE_F32: usize = 4;
 
 #[inline(always)]
-unsafe fn scan_best_values_f32<T: Basics>(
+unsafe fn scan_best_values_f32<T: Content>(
     dist_values: &[f32],
     items: *const T,
     base: usize,
@@ -817,7 +817,7 @@ unsafe fn scan_best_values_f32<T: Basics>(
 }
 
 #[inline(always)]
-unsafe fn update_best_chunk_avx512_raw_f32<T: Basics>(
+unsafe fn update_best_chunk_avx512_raw_f32<T: Content>(
     d0: __m512,
     d1: __m512,
     d2: __m512,
@@ -854,7 +854,7 @@ unsafe fn update_best_chunk_avx512_raw_f32<T: Basics>(
 }
 
 #[inline(always)]
-unsafe fn update_best_line_avx512_raw_f32<T: Basics>(
+unsafe fn update_best_line_avx512_raw_f32<T: Content>(
     d0: __m512,
     items: *const T,
     base: usize,
@@ -867,7 +867,7 @@ unsafe fn update_best_line_avx512_raw_f32<T: Basics>(
 }
 
 #[inline(always)]
-unsafe fn update_best_line_avx2_raw_f32<T: Basics>(
+unsafe fn update_best_line_avx2_raw_f32<T: Content>(
     d0: __m256,
     items: *const T,
     base: usize,
@@ -880,7 +880,7 @@ unsafe fn update_best_line_avx2_raw_f32<T: Basics>(
 }
 
 #[inline(always)]
-unsafe fn update_best_line_avx128_raw_f32<T: Basics>(
+unsafe fn update_best_line_avx128_raw_f32<T: Content>(
     d0: __m128,
     items: *const T,
     base: usize,
@@ -984,7 +984,7 @@ unsafe fn nearest_one_avx512_raw_unchecked_f32<L, T, const K: usize>(
     best_item: &mut T,
 ) where
     L: Avx512F32LeafOps,
-    T: Basics,
+    T: Content,
 {
     if len == 0 {
         return;
@@ -1043,7 +1043,7 @@ pub(crate) unsafe fn nearest_one_avx512_arena_unchecked_f32<L, T, const K: usize
     best_item: &mut T,
 ) where
     L: Avx512F32LeafOps,
-    T: Basics,
+    T: Content,
 {
     let point_base = tile_base as *const f32;
     let point_ptrs = std::array::from_fn(|dim| point_base.add(dim * len));
@@ -1063,7 +1063,7 @@ pub(crate) unsafe fn nearest_one_avx512_unchecked_f32<L, T, const K: usize, cons
     best_item: &mut T,
 ) where
     L: Avx512F32LeafOps,
-    T: Basics,
+    T: Content,
 {
     let points = leaf.points();
     let point_ptrs = std::array::from_fn(|dim| points[dim].as_ptr());

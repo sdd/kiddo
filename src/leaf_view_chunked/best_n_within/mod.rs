@@ -12,7 +12,7 @@ pub(crate) mod neon;
 use crate::dist::KdTreeDistanceMetric;
 use crate::leaf_view::{LeafArena, LeafView, TlsLeafScratch};
 use crate::results::result_collection::BestNeighbourResultCollection;
-use crate::{Axis, Basics};
+use crate::{Axis, Content};
 
 pub(crate) use fallback::{
     best_n_within_with_query_wide_arena_fallback, best_n_within_with_query_wide_fallback,
@@ -27,7 +27,7 @@ pub(crate) fn best_n_within_with_query_wide_arena<AX, T, D, R, const K: usize>(
     results: &mut R,
 ) where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
@@ -89,7 +89,7 @@ pub(crate) fn best_n_within_with_query_wide<AX, T, D, R, const K: usize, const B
     results: &mut R,
 ) where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
@@ -141,7 +141,7 @@ unsafe fn try_best_n_within_avx512<AX, T, D, R, const K: usize, const B: usize>(
 ) -> bool
 where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
@@ -160,7 +160,7 @@ unsafe fn try_best_n_within_arena_avx512<AX, T, D, R, const K: usize>(
 ) -> bool
 where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
@@ -179,7 +179,7 @@ unsafe fn try_best_n_within_avx2<AX, T, D, R, const K: usize, const B: usize>(
 ) -> bool
 where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
@@ -198,7 +198,7 @@ unsafe fn try_best_n_within_arena_avx2<AX, T, D, R, const K: usize>(
 ) -> bool
 where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
@@ -217,7 +217,7 @@ unsafe fn try_best_n_within_neon<AX, T, D, R, const K: usize, const B: usize>(
 ) -> bool
 where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
@@ -236,7 +236,7 @@ unsafe fn try_best_n_within_arena_neon<AX, T, D, R, const K: usize>(
 ) -> bool
 where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,

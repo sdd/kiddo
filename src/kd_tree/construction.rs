@@ -8,12 +8,12 @@ use crate::kd_tree::{KdTreeQueryOps, OwnedStemLeafResolution};
 use crate::traits::leaf_strategy::{
     BucketLimitType, ConstructibleLeafStrategy, Mutability, MutableLeafStrategy,
 };
-use crate::{Axis, Basics, KdTree, StemStrategy};
+use crate::{Axis, Content, KdTree, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A>,
-    T: Basics + Copy + Default + PartialOrd + PartialEq,
+    T: Content + Copy + Default + PartialOrd + PartialEq,
     SS: StemStrategy,
     LS: MutableLeafStrategy<A, T, SS, K, B>,
 {
@@ -206,7 +206,7 @@ where
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
     LS: ConstructibleLeafStrategy<A, T, SS, K, B>,
 {
@@ -406,7 +406,7 @@ where
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
     LS: ConstructibleLeafStrategy<A, T, SS, K, B>,
 {

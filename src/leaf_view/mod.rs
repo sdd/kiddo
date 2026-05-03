@@ -4,7 +4,7 @@ use std::mem::MaybeUninit;
 
 use crate::dist::DistanceMetricUnified;
 use crate::results::result_collection::{BestNeighbourResultCollection, ResultCollection};
-use crate::{Axis, Basics, BestNeighbour, NearestNeighbour};
+use crate::{Axis, Content, BestNeighbour, NearestNeighbour};
 
 use fixed::{
     types::extra::{U0, U16, U8},
@@ -145,7 +145,7 @@ pub struct LeafArenaTile<'a, AX, T, const K: usize> {
     _phantom: PhantomData<(&'a AX, &'a T)>,
 }
 
-impl<'a, AX: Axis<Coord = AX>, T: Basics, const K: usize, const B: usize>
+impl<'a, AX: Axis<Coord = AX>, T: Content, const K: usize, const B: usize>
     LeafView<'a, AX, T, K, B>
 {
     pub(crate) fn new(points: [&'a [AX]; K], items: &'a [T]) -> Self {
@@ -509,7 +509,7 @@ pub(crate) fn try_identity_widen_axis<AX: 'static, O: 'static>(axis: &[AX]) -> O
     }
 }
 
-impl<'a, AX: Axis<Coord = AX>, T: Basics + PartialOrd, const K: usize, const B: usize>
+impl<'a, AX: Axis<Coord = AX>, T: Content + PartialOrd, const K: usize, const B: usize>
     LeafView<'a, AX, T, K, B>
 {
     #[cfg_attr(not(feature = "no_inline"), inline)]

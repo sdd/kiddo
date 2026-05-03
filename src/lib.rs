@@ -237,6 +237,6 @@ pub mod test_utils;
 
 pub mod traits;
 pub use traits::{
-    axis::Axis, basics::Basics, distance_metric::DistanceMetric, leaf_strategy::LeafStrategy,
+    axis::Axis, content::Content, distance_metric::DistanceMetric, leaf_strategy::LeafStrategy,
     stem_strategy::StemStrategy,
 };

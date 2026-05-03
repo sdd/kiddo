@@ -8,7 +8,7 @@ use array_init::array_init;
 
 use crate::dist::DistanceMetricUnified;
 use crate::leaf_view::{try_identity_widen_axis, LeafView};
-use crate::{Axis, Basics};
+use crate::{Axis, Content};
 
 const CHUNK_SIZE: usize = 32;
 
@@ -32,7 +32,7 @@ pub(crate) fn try_nearest_one_with_query_wide<AX, T, D, const K: usize, const B:
 ) -> bool
 where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics,
+    T: Content,
     D: DistanceMetricUnified<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
 {
@@ -143,7 +143,7 @@ pub(crate) fn try_nearest_one_with_query_wide_v3<AX, T, D, const K: usize, const
 ) -> bool
 where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics,
+    T: Content,
     D: DistanceMetricUnified<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
 {
@@ -161,7 +161,7 @@ fn update_nearest_dist_chunk<O, T, const C: usize>(
     best_item: &mut T,
 ) where
     O: Axis<Coord = O>,
-    T: Basics,
+    T: Content,
 {
     let mut candidate_idx = 0usize;
     let mut candidate_dist = *best_dist;

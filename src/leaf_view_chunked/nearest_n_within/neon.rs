@@ -4,7 +4,7 @@ use array_init::array_init;
 
 use crate::dist::distance_metric_neon::{NeonF32LeafOps, NeonF64LeafOps};
 use crate::leaf_view::LeafView;
-use crate::Basics;
+use crate::Content;
 
 #[inline(always)]
 unsafe fn emit_results_neon_f64<T, F>(
@@ -14,7 +14,7 @@ unsafe fn emit_results_neon_f64<T, F>(
     max_dist: f64,
     emit: &mut F,
 ) where
-    T: Basics,
+    T: Content,
     F: FnMut(f64, T),
 {
     let mask = vcleq_f64(dists, vdupq_n_f64(max_dist));
@@ -84,7 +84,7 @@ pub(crate) unsafe fn nearest_n_within_neon_unchecked_f64<L, T, F, const K: usize
     emit: &mut F,
 ) where
     L: NeonF64LeafOps,
-    T: Basics,
+    T: Content,
     F: FnMut(f64, T),
 {
     let points = leaf.points();
@@ -108,7 +108,7 @@ pub(crate) unsafe fn nearest_n_within_neon_arena_unchecked_f64<L, T, F, const K:
     emit: &mut F,
 ) where
     L: NeonF64LeafOps,
-    T: Basics,
+    T: Content,
     F: FnMut(f64, T),
 {
     let point_base = tile_base as *const f64;
@@ -128,7 +128,7 @@ unsafe fn nearest_n_within_neon_raw_f64<L, T, F, const K: usize>(
     emit: &mut F,
 ) where
     L: NeonF64LeafOps,
-    T: Basics,
+    T: Content,
     F: FnMut(f64, T),
 {
     if len == 0 {
@@ -160,7 +160,7 @@ unsafe fn emit_results_neon_f32<T, F>(
     max_dist: f32,
     emit: &mut F,
 ) where
-    T: Basics,
+    T: Content,
     F: FnMut(f32, T),
 {
     let mask = vcleq_f32(dists, vdupq_n_f32(max_dist));
@@ -244,7 +244,7 @@ pub(crate) unsafe fn nearest_n_within_neon_unchecked_f32<L, T, F, const K: usize
     emit: &mut F,
 ) where
     L: NeonF32LeafOps,
-    T: Basics,
+    T: Content,
     F: FnMut(f32, T),
 {
     let points = leaf.points();
@@ -268,7 +268,7 @@ pub(crate) unsafe fn nearest_n_within_neon_arena_unchecked_f32<L, T, F, const K:
     emit: &mut F,
 ) where
     L: NeonF32LeafOps,
-    T: Basics,
+    T: Content,
     F: FnMut(f32, T),
 {
     let point_base = tile_base as *const f32;
@@ -288,7 +288,7 @@ unsafe fn nearest_n_within_neon_raw_f32<L, T, F, const K: usize>(
     emit: &mut F,
 ) where
     L: NeonF32LeafOps,
-    T: Basics,
+    T: Content,
     F: FnMut(f32, T),
 {
     if len == 0 {

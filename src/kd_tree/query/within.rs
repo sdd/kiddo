@@ -6,12 +6,12 @@ use crate::leaf_view::TlsLeafScratch;
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
-use crate::{Axis, Basics, KdTree, LeafStrategy, NearestNeighbour, StemStrategy};
+use crate::{Axis, Content, KdTree, LeafStrategy, NearestNeighbour, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {

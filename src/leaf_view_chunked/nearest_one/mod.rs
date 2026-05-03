@@ -5,7 +5,7 @@ pub(crate) mod avx512;
 
 use crate::dist::KdTreeDistanceMetric;
 use crate::leaf_view::{LeafArena, LeafView};
-use crate::{Axis, Basics};
+use crate::{Axis, Content};
 // #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 // pub(crate) use avx512::nearest_one_avx512_unchecked;
 
@@ -21,7 +21,7 @@ pub(crate) fn nearest_one_with_query_wide_arena<AX, T, D, const K: usize>(
     best_item: &mut T,
 ) where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics,
+    T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
 {
@@ -45,7 +45,7 @@ pub(crate) fn nearest_one_with_query_wide<AX, T, D, const K: usize, const B: usi
     best_item: &mut T,
 ) where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics,
+    T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
 {
@@ -67,7 +67,7 @@ unsafe fn try_nearest_one_avx512<AX, T, D, const K: usize, const B: usize>(
 ) -> bool
 where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics,
+    T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
 {
@@ -84,7 +84,7 @@ unsafe fn try_nearest_one_arena_avx512<AX, T, D, const K: usize>(
 ) -> bool
 where
     AX: Axis<Coord = AX> + 'static,
-    T: Basics,
+    T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
 {
