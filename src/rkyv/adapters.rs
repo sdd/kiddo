@@ -162,7 +162,23 @@ where
     }
 }
 
-/// Archives `Option<NonMaxUsize>` as a plain archived usize using `usize::MAX` as the sentinel.
+/// Archives `Option<NonMaxUsize>` as a plain archived usize using the maximum archived
+/// pointer-width value as the sentinel.
+#[inline(always)]
+pub(crate) fn archived_usize_none_sentinel() -> usize {
+    match core::mem::size_of::<ArchivedUsize>() {
+        2 => u16::MAX as usize,
+        4 => u32::MAX as usize,
+        8 => usize::MAX,
+        width => panic!("unsupported ArchivedUsize width: {width}"),
+    }
+}
+
+#[inline(always)]
+pub(crate) fn archived_option_nonmax_usize_is_some(value: usize) -> bool {
+    value != archived_usize_none_sentinel()
+}
+
 pub struct OptionNonMaxUsizeAsUsize;
 
 impl ArchiveWith<Option<NonMaxUsize>> for OptionNonMaxUsizeAsUsize {
@@ -171,7 +187,7 @@ impl ArchiveWith<Option<NonMaxUsize>> for OptionNonMaxUsizeAsUsize {
 
     #[inline(always)]
     fn resolve_with(field: &Option<NonMaxUsize>, _: Self::Resolver, out: Place<Self::Archived>) {
-        let value = field.map_or(usize::MAX, |n| n.get());
+        let value = field.map_or_else(archived_usize_none_sentinel, |n| n.get());
         usize::resolve(&value, (), out);
     }
 }
@@ -195,8 +211,8 @@ impl<D: Fallible + ?Sized> DeserializeWith<ArchivedUsize, Option<NonMaxUsize>, D
         _deserializer: &mut D,
     ) -> Result<Option<NonMaxUsize>, D::Error> {
         let value = field.to_native() as usize;
-        Ok((value != usize::MAX).then(|| {
-            NonMaxUsize::new(value).expect("archived nonmax leaf idx used usize::MAX sentinel")
+        Ok(archived_option_nonmax_usize_is_some(value).then(|| {
+            NonMaxUsize::new(value).expect("archived nonmax leaf idx used reserved sentinel")
         }))
     }
 }
