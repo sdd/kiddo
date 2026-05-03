@@ -99,7 +99,7 @@ unsafe fn try_nearest_n_within_avx512<AX, T, D, R, const K: usize, const B: usiz
 ) -> bool
 where
     AX: Axis<Coord = AX> + 'static,
-    T: Content + PartialOrd,
+    T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
@@ -135,7 +135,7 @@ unsafe fn try_nearest_n_within_avx2<AX, T, D, R, const K: usize, const B: usize>
 ) -> bool
 where
     AX: Axis<Coord = AX> + 'static,
-    T: Content + PartialOrd,
+    T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
@@ -171,7 +171,7 @@ unsafe fn try_nearest_n_within_neon<AX, T, D, R, const K: usize, const B: usize>
 ) -> bool
 where
     AX: Axis<Coord = AX> + 'static,
-    T: Content + PartialOrd,
+    T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,

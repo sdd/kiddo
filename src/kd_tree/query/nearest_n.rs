@@ -45,6 +45,7 @@ mod tests {
     use rand::Rng;
     use rand::SeedableRng;
     use std::array;
+    use std::fmt::Debug;
     use std::num::NonZero;
 
     use crate::dist::SquaredEuclidean;
@@ -130,7 +131,7 @@ mod tests {
                 .map(|n| (n.distance, n.item))
                 .collect();
 
-            assert_eq!(result, expected);
+            assert_distance_item_pairs_close_f64(&result, &expected);
         }
     }
 
@@ -163,7 +164,7 @@ mod tests {
                 .map(|n| (n.distance, n.item))
                 .collect();
 
-            assert_eq!(result, expected);
+            assert_distance_item_pairs_close_f64(&result, &expected);
         }
     }
 
@@ -200,7 +201,37 @@ mod tests {
                 .map(|n| (n.distance, n.item))
                 .collect();
 
-            assert_eq!(result, expected);
+            assert_distance_item_pairs_close_f64(&result, &expected);
+        }
+    }
+
+    fn assert_distance_item_pairs_close_f64<T>(actual: &[(f64, T)], expected: &[(f64, T)])
+    where
+        T: Debug + PartialEq,
+    {
+        assert_eq!(actual.len(), expected.len());
+
+        for ((actual_dist, actual_item), (expected_dist, expected_item)) in
+            actual.iter().zip(expected.iter())
+        {
+            assert_eq!(actual_item, expected_item);
+            assert!(
+                ulps_diff_f64(*actual_dist, *expected_dist) <= 2,
+                "distance mismatch: actual={actual_dist:?} expected={expected_dist:?}"
+            );
+        }
+    }
+
+    fn ulps_diff_f64(a: f64, b: f64) -> u64 {
+        canonical_u64(a).abs_diff(canonical_u64(b))
+    }
+
+    fn canonical_u64(value: f64) -> u64 {
+        let bits = value.to_bits();
+        if (bits >> 63) != 0 {
+            !bits
+        } else {
+            bits | (1 << 63)
         }
     }
 

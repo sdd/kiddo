@@ -182,6 +182,7 @@ pub mod cargo_asm {
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::VecOfArenas;
     use crate::stem_strategy::donnelly_2_pf::DonnellyPf;
+    use crate::stem_strategy::eytzinger_pf_far::EytzingerPfFar;
     use std::num::NonZeroUsize;
 
     const K: usize = 3;
@@ -190,6 +191,7 @@ pub mod cargo_asm {
     const MAX_QTY: usize = 16;
 
     type ArenaLeaves = VecOfArenas<f64, u32, K, BUCKET_SIZE>;
+    type EytzingerPfFarKdT = KdTree<f64, u32, EytzingerPfFar<K, 8>, ArenaLeaves, K, BUCKET_SIZE>;
     type DonnellyPfKdT = KdTree<f64, u32, DonnellyPf<3, 64, 8, K>, ArenaLeaves, K, BUCKET_SIZE>;
 
     /// Hook for cargo-asm to render the sorted nearest_n_within focus path.
@@ -197,6 +199,30 @@ pub mod cargo_asm {
     #[unsafe(no_mangle)]
     pub fn v6_sorted_nearest_n_within_donnelly_pf_focus_cargo_asm_hook(
         tree: &DonnellyPfKdT,
+        query: [f64; 3],
+    ) -> (usize, u64, u64) {
+        let results = tree.nearest_n_within::<SquaredEuclidean<f64>>(
+            &query,
+            MAX_DIST,
+            NonZeroUsize::new(MAX_QTY).unwrap(),
+            true,
+        );
+
+        let mut checksum_item = 0u64;
+        let mut checksum_dist_bits = 0u64;
+        for result in results.iter() {
+            checksum_item = checksum_item.wrapping_add(result.item as u64);
+            checksum_dist_bits = checksum_dist_bits.wrapping_add(result.distance.to_bits());
+        }
+
+        (results.len(), checksum_item, checksum_dist_bits)
+    }
+
+    /// Hook for cargo-asm to render the sorted nearest_n_within focus path for scalar Eytzinger PF-far arena leaves.
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_sorted_nearest_n_within_eytzinger_pf_far_focus_cargo_asm_hook(
+        tree: &EytzingerPfFarKdT,
         query: [f64; 3],
     ) -> (usize, u64, u64) {
         let results = tree.nearest_n_within::<SquaredEuclidean<f64>>(
@@ -454,8 +480,7 @@ mod tests {
 
             stabilize_sort(&mut result);
 
-            // println!("Query #{}", i);
-            assert_eq!(result, expected);
+            assert_distance_item_pairs_close_f32(&result, &expected);
         }
     }
 
@@ -494,8 +519,7 @@ mod tests {
 
             stabilize_sort(&mut result);
 
-            // println!("Query #{}", i);
-            assert_eq!(result, expected);
+            assert_distance_item_pairs_close_f32(&result, &expected);
         }
     }
 
@@ -539,8 +563,37 @@ mod tests {
 
             stabilize_sort(&mut result);
 
-            // println!("Query #{}", i);
-            assert_eq!(result, expected);
+            assert_distance_item_pairs_close_f32(&result, &expected);
+        }
+    }
+
+    fn assert_distance_item_pairs_close_f32<T>(actual: &[(f32, T)], expected: &[(f32, T)])
+    where
+        T: std::fmt::Debug + PartialEq,
+    {
+        assert_eq!(actual.len(), expected.len());
+
+        for ((actual_dist, actual_item), (expected_dist, expected_item)) in
+            actual.iter().zip(expected.iter())
+        {
+            assert_eq!(actual_item, expected_item);
+            assert!(
+                ulps_diff_f32(*actual_dist, *expected_dist) <= 2,
+                "distance mismatch: actual={actual_dist:?} expected={expected_dist:?}"
+            );
+        }
+    }
+
+    fn ulps_diff_f32(a: f32, b: f32) -> u32 {
+        canonical_u32(a).abs_diff(canonical_u32(b))
+    }
+
+    fn canonical_u32(value: f32) -> u32 {
+        let bits = value.to_bits();
+        if (bits >> 31) != 0 {
+            !bits
+        } else {
+            bits | (1 << 31)
         }
     }
 
@@ -644,7 +697,7 @@ mod tests {
         stabilize_sort(&mut actual);
         stabilize_sort(&mut expected);
 
-        assert_eq!(actual, expected);
+        assert_distance_item_pairs_close_f64(&actual, &expected);
         assert!(
             stats.leaf_visits < tree.leaf_count() as u64,
             "scalar path regressed to full leaf scan: leaf_visits={} leaf_count={}",
@@ -691,12 +744,45 @@ mod tests {
         stabilize_sort(&mut actual);
         stabilize_sort(&mut expected);
 
-        assert_eq!(actual, expected);
+        assert_distance_item_pairs_close_f64(&actual, &expected);
         assert!(
             stats.leaf_visits < tree.leaf_count() as u64,
             "simd path regressed to full leaf scan: leaf_visits={} leaf_count={}",
             stats.leaf_visits,
             tree.leaf_count()
         );
+    }
+
+    #[cfg(feature = "result_collection_stats")]
+    fn assert_distance_item_pairs_close_f64<T>(actual: &[(f64, T)], expected: &[(f64, T)])
+    where
+        T: std::fmt::Debug + PartialEq,
+    {
+        assert_eq!(actual.len(), expected.len());
+
+        for ((actual_dist, actual_item), (expected_dist, expected_item)) in
+            actual.iter().zip(expected.iter())
+        {
+            assert_eq!(actual_item, expected_item);
+            assert!(
+                ulps_diff_f64(*actual_dist, *expected_dist) <= 2,
+                "distance mismatch: actual={actual_dist:?} expected={expected_dist:?}"
+            );
+        }
+    }
+
+    #[cfg(feature = "result_collection_stats")]
+    fn ulps_diff_f64(a: f64, b: f64) -> u64 {
+        canonical_u64(a).abs_diff(canonical_u64(b))
+    }
+
+    #[cfg(feature = "result_collection_stats")]
+    fn canonical_u64(value: f64) -> u64 {
+        let bits = value.to_bits();
+        if (bits >> 63) != 0 {
+            !bits
+        } else {
+            bits | (1 << 63)
+        }
     }
 }

@@ -20,7 +20,7 @@ use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits::leaf_strategy::LeafProjection;
-use crate::{Axis, Content, BestNeighbour, LeafStrategy, NearestNeighbour, StemStrategy};
+use crate::{Axis, BestNeighbour, Content, LeafStrategy, NearestNeighbour, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> ArchivedKdTree<A, T, SS, LS, K, B>
 where

@@ -18,7 +18,7 @@ pub(crate) fn nearest_n_within_with_query_wide_fallback<
     results: &mut R,
 ) where
     AX: Axis<Coord = AX> + 'static,
-    T: Content + PartialOrd,
+    T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,

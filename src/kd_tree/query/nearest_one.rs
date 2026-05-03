@@ -250,6 +250,7 @@ pub mod cargo_asm {
     use crate::kd_tree::query_stack::QueryStack;
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::{FlatVec, VecOfArenas};
+    use crate::stem_strategy::eytzinger_pf_far::EytzingerPfFar;
     use crate::stem_strategy::{Block3, Donnelly, DonnellyMarkerSimd};
     use crate::Eytzinger;
 
@@ -259,6 +260,8 @@ pub mod cargo_asm {
     type KdT =
         KdTree<f64, usize, Eytzinger<K>, FlatVec<f64, usize, K, BUCKET_SIZE>, K, BUCKET_SIZE>;
     type ArenaLeaves = VecOfArenas<f64, usize, K, BUCKET_SIZE>;
+    type EytzingerPfFarArenaKdT =
+        KdTree<f64, usize, EytzingerPfFar<K, 8>, ArenaLeaves, K, BUCKET_SIZE>;
     type DonnellyKdT = KdTree<f64, usize, Donnelly<3, 64, 8, K>, ArenaLeaves, K, BUCKET_SIZE>;
     type DonnellySimdKdT =
         KdTree<f64, usize, DonnellyMarkerSimd<Block3, 64, 8, K>, ArenaLeaves, K, BUCKET_SIZE>;
@@ -283,6 +286,17 @@ pub mod cargo_asm {
         stack: &mut QueryStack<f64, Eytzinger<3>>,
     ) -> (f64, usize) {
         tree.nearest_one_arithmetic_with_stack::<SquaredEuclidean<f64>>(&query, stack)
+    }
+
+    /// Hook for cargo-asm to render the exact nearest-one path for scalar Eytzinger PF-far arena leaves.
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_nearest_one_eytzinger_pf_far_vec_of_arenas_cargo_asm_hook(
+        tree: &EytzingerPfFarArenaKdT,
+        query: [f64; 3],
+        stack: &mut QueryStack<f64, EytzingerPfFar<3, 8>>,
+    ) -> (f64, usize) {
+        tree.nearest_one_with_stack::<SquaredEuclidean<f64>>(&query, stack)
     }
 
     /// Hook for cargo-asm to render the exact nearest-one path for scalar Donnelly.

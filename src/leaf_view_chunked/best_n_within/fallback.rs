@@ -1,7 +1,7 @@
 use crate::dist::KdTreeDistanceMetric;
 use crate::leaf_view::{LeafArena, LeafView, TlsLeafScratch};
 use crate::results::result_collection::BestNeighbourResultCollection;
-use crate::{Axis, Content, BestNeighbour};
+use crate::{Axis, BestNeighbour, Content};
 
 #[inline(always)]
 pub(crate) fn best_n_within_with_query_wide_fallback<AX, T, D, R, const K: usize, const B: usize>(

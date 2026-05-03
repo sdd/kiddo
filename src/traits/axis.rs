@@ -131,7 +131,6 @@ macro_rules! impl_axis_float {
 impl_axis_float!(f32);
 impl_axis_float!(f64);
 
-
 #[cfg(feature = "fixed")]
 /// Macro to implement AxisUnified for fixed-point types.
 macro_rules! impl_axis_fixed {

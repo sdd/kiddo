@@ -158,7 +158,8 @@ impl StemLeafResolution for ArchivedStemLeafResolution {
                 leaf_idx_map.len(),
                 |map_idx| {
                     let value = leaf_idx_map.get(map_idx)?.to_native() as usize;
-                    (value != usize::MAX).then_some(value)
+                    crate::rkyv::adapters::archived_option_nonmax_usize_is_some(value)
+                        .then_some(value)
                 },
             ),
             Self::Arithmetic {
@@ -187,9 +188,11 @@ impl StemLeafResolution for ArchivedStemLeafResolution {
                 let min_stem_leaf_idx = min_stem_leaf_idx.to_native() as usize;
                 if stem_idx >= min_stem_leaf_idx {
                     let map_idx = stem_idx - min_stem_leaf_idx;
-                    leaf_idx_map
-                        .get(map_idx)
-                        .is_some_and(|value| value.to_native() as usize != usize::MAX)
+                    leaf_idx_map.get(map_idx).is_some_and(|value| {
+                        crate::rkyv::adapters::archived_option_nonmax_usize_is_some(
+                            value.to_native() as usize,
+                        )
+                    })
                 } else {
                     false
                 }

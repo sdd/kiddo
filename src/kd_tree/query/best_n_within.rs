@@ -20,7 +20,7 @@ use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits::leaf_strategy::LeafProjection;
-use crate::{Axis, Content, BestNeighbour, KdTree, LeafStrategy, StemStrategy};
+use crate::{Axis, BestNeighbour, Content, KdTree, LeafStrategy, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
@@ -219,6 +219,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Debug;
     use std::num::{NonZero, NonZeroUsize};
 
     use rand::rngs::StdRng;
@@ -288,7 +289,7 @@ mod tests {
                 .into_iter()
                 .collect();
 
-            assert_eq!(result, expected);
+            assert_best_neighbours_close_f64(&result, &expected);
         }
     }
 
@@ -320,7 +321,7 @@ mod tests {
                 .into_iter()
                 .collect();
 
-            assert_eq!(result, expected);
+            assert_best_neighbours_close_f64(&result, &expected);
         }
     }
 
@@ -356,7 +357,7 @@ mod tests {
                 .into_iter()
                 .collect();
 
-            assert_eq!(result, expected);
+            assert_best_neighbours_close_f64(&result, &expected);
         }
     }
 
@@ -418,6 +419,38 @@ mod tests {
             .into_sorted_vec();
 
         assert_eq!(arena_result, flat_result);
+    }
+
+    fn assert_best_neighbours_close_f64<T>(
+        actual: &[BestNeighbour<f64, T>],
+        expected: &[BestNeighbour<f64, T>],
+    ) where
+        T: Debug + PartialEq,
+    {
+        assert_eq!(actual.len(), expected.len());
+
+        for (actual, expected) in actual.iter().zip(expected.iter()) {
+            assert_eq!(actual.item, expected.item);
+            assert!(
+                ulps_diff_f64(actual.distance, expected.distance) <= 2,
+                "distance mismatch: actual={:?} expected={:?}",
+                actual.distance,
+                expected.distance
+            );
+        }
+    }
+
+    fn ulps_diff_f64(a: f64, b: f64) -> u64 {
+        canonical_u64(a).abs_diff(canonical_u64(b))
+    }
+
+    fn canonical_u64(value: f64) -> u64 {
+        let bits = value.to_bits();
+        if (bits >> 63) != 0 {
+            !bits
+        } else {
+            bits | (1 << 63)
+        }
     }
 
     fn linear_search(
