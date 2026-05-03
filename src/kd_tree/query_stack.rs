@@ -3,6 +3,8 @@ use std::mem::MaybeUninit;
 use crate::{Axis, StemStrategy};
 
 const INLINE_QUERY_STACK_CAPACITY: usize = 50;
+#[allow(dead_code)]
+const INLINE_SCALAR_CONTINUATION_STACK_CAPACITY: usize = 64;
 
 pub trait ScalarStackContext<A, S>: Sized {
     fn from_parts(stem_state: S, old_off: A, rd: A) -> Self;
@@ -27,6 +29,61 @@ pub trait StackTrait<A, SS: StemStrategy> {
     fn clear(&mut self);
 }
 
+#[allow(dead_code)]
+#[derive(Debug)]
+pub(crate) struct ScalarContinuationFar<A, S> {
+    pub stem_state: S,
+    pub far_off: A,
+    pub rd: A,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ScalarContinuationRestore<A> {
+    pub old_off: A,
+    pub has_far: bool,
+}
+
+#[allow(dead_code)]
+impl<A> ScalarContinuationRestore<A> {
+    #[inline(always)]
+    pub fn restore_only(old_off: A) -> Self {
+        Self {
+            old_off,
+            has_far: false,
+        }
+    }
+
+    #[inline(always)]
+    pub fn with_far(old_off: A) -> Self {
+        Self {
+            old_off,
+            has_far: true,
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Debug)]
+pub(crate) struct ScalarContinuationRestoreStack<
+    A,
+    const INLINE_CAPACITY: usize = INLINE_SCALAR_CONTINUATION_STACK_CAPACITY,
+> {
+    stack: [MaybeUninit<ScalarContinuationRestore<A>>; INLINE_CAPACITY],
+    len: usize,
+}
+
+#[allow(dead_code)]
+#[derive(Debug)]
+pub(crate) struct ScalarContinuationFarStack<
+    A,
+    S,
+    const INLINE_CAPACITY: usize = INLINE_SCALAR_CONTINUATION_STACK_CAPACITY,
+> {
+    stack: [MaybeUninit<ScalarContinuationFar<A, S>>; INLINE_CAPACITY],
+    len: usize,
+}
+
 #[derive(Debug)]
 pub struct QueryStack<A, SS: StemStrategy> {
     stack: [MaybeUninit<SS::StackContext<A>>; INLINE_QUERY_STACK_CAPACITY],
@@ -35,6 +92,24 @@ pub struct QueryStack<A, SS: StemStrategy> {
 }
 
 impl<A, SS: StemStrategy> Default for QueryStack<A, SS> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[allow(dead_code)]
+impl<A, const INLINE_CAPACITY: usize> Default
+    for ScalarContinuationRestoreStack<A, INLINE_CAPACITY>
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[allow(dead_code)]
+impl<A, S, const INLINE_CAPACITY: usize> Default
+    for ScalarContinuationFarStack<A, S, INLINE_CAPACITY>
+{
     fn default() -> Self {
         Self::new()
     }
@@ -109,6 +184,94 @@ impl<A, SS: StemStrategy> QueryStack<A, SS> {
 }
 
 impl<A, SS: StemStrategy> Drop for QueryStack<A, SS> {
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
+#[allow(dead_code)]
+impl<A, const INLINE_CAPACITY: usize> ScalarContinuationRestoreStack<A, INLINE_CAPACITY> {
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            stack: [const { MaybeUninit::uninit() }; INLINE_CAPACITY],
+            len: 0,
+        }
+    }
+
+    #[inline]
+    pub fn push_unchecked_inline(&mut self, item: ScalarContinuationRestore<A>) {
+        debug_assert!(self.len < INLINE_CAPACITY);
+        unsafe { self.stack.get_unchecked_mut(self.len) }.write(item);
+        self.len += 1;
+    }
+
+    #[inline]
+    pub fn pop(&mut self) -> Option<ScalarContinuationRestore<A>> {
+        if self.len == 0 {
+            None
+        } else {
+            self.len -= 1;
+            Some(unsafe { self.stack.get_unchecked(self.len).assume_init_read() })
+        }
+    }
+
+    #[inline]
+    pub fn clear(&mut self) {
+        while self.len > 0 {
+            self.len -= 1;
+            unsafe { self.stack.get_unchecked_mut(self.len).assume_init_drop() };
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl<A, S, const INLINE_CAPACITY: usize> ScalarContinuationFarStack<A, S, INLINE_CAPACITY> {
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            stack: [const { MaybeUninit::uninit() }; INLINE_CAPACITY],
+            len: 0,
+        }
+    }
+
+    #[inline]
+    pub fn push_unchecked_inline(&mut self, item: ScalarContinuationFar<A, S>) {
+        debug_assert!(self.len < INLINE_CAPACITY);
+        unsafe { self.stack.get_unchecked_mut(self.len) }.write(item);
+        self.len += 1;
+    }
+
+    #[inline]
+    pub fn pop(&mut self) -> Option<ScalarContinuationFar<A, S>> {
+        if self.len == 0 {
+            None
+        } else {
+            self.len -= 1;
+            Some(unsafe { self.stack.get_unchecked(self.len).assume_init_read() })
+        }
+    }
+
+    #[inline]
+    pub fn clear(&mut self) {
+        while self.len > 0 {
+            self.len -= 1;
+            unsafe { self.stack.get_unchecked_mut(self.len).assume_init_drop() };
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl<A, const INLINE_CAPACITY: usize> Drop for ScalarContinuationRestoreStack<A, INLINE_CAPACITY> {
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
+#[allow(dead_code)]
+impl<A, S, const INLINE_CAPACITY: usize> Drop
+    for ScalarContinuationFarStack<A, S, INLINE_CAPACITY>
+{
     fn drop(&mut self) {
         self.clear();
     }

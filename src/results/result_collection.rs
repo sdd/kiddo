@@ -8,7 +8,7 @@ use smallvec::SmallVec;
 use sorted_vec::SortedVec;
 
 use super::nearest_neighbour::NearestNeighbour;
-use crate::{Axis, Content, BestNeighbour};
+use crate::{Axis, BestNeighbour, Content};
 
 #[cfg(feature = "small_n_result_collectors")]
 pub(crate) const SMALL_RESULT_COLLECTION_MAX_QTY: usize = 32;

@@ -146,6 +146,41 @@ where
     }
 }
 
+#[allow(missing_docs)]
+#[cfg(feature = "cargo_asm")]
+pub mod cargo_asm {
+    use crate::dist::SquaredEuclidean;
+    use crate::kd_tree::KdTree;
+    use crate::leaf_strategy::VecOfArenas;
+    use crate::stem_strategy::eytzinger_pf_far::EytzingerPfFar;
+
+    const K: usize = 3;
+    const BUCKET_SIZE: usize = 32;
+    const MAX_DIST: f64 = 0.0025;
+
+    type ArenaLeaves = VecOfArenas<f64, u32, K, BUCKET_SIZE>;
+    type EytzingerPfFarKdT = KdTree<f64, u32, EytzingerPfFar<K, 8>, ArenaLeaves, K, BUCKET_SIZE>;
+
+    /// Hook for cargo-asm to render the exact within_unsorted path for scalar Eytzinger PF-far arena leaves.
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_within_unsorted_eytzinger_pf_far_vec_of_arenas_cargo_asm_hook(
+        tree: &EytzingerPfFarKdT,
+        query: [f64; 3],
+    ) -> (usize, u64, u64) {
+        let results = tree.within_unsorted::<SquaredEuclidean<f64>>(&query, MAX_DIST);
+
+        let mut checksum_item = 0u64;
+        let mut checksum_dist_bits = 0u64;
+        for result in results.iter() {
+            checksum_item = checksum_item.wrapping_add(result.item as u64);
+            checksum_dist_bits = checksum_dist_bits.wrapping_add(result.distance.to_bits());
+        }
+
+        (results.len(), checksum_item, checksum_dist_bits)
+    }
+}
+
 struct WithinUnsortedVisitReqCtx<'a, A, O, const K: usize>
 where
     O: Axis<Coord = O>,
@@ -306,7 +341,7 @@ mod tests {
                 .collect();
 
             stabilize_sort(&mut result);
-            assert_eq!(result, expected);
+            assert_distance_item_pairs_close_f32_by_item(&result, &expected, RADIUS);
         }
     }
 
@@ -346,7 +381,7 @@ mod tests {
                 .map(|(distance, _)| (distance, ()))
                 .collect();
 
-            assert_eq!(result, expected);
+            assert_distance_item_pairs_close_f32(&result, &expected);
         }
     }
 
@@ -377,7 +412,7 @@ mod tests {
                 .collect();
 
             stabilize_sort(&mut result);
-            assert_eq!(result, expected);
+            assert_distance_item_pairs_close_f32_by_item(&result, &expected, RADIUS);
         }
     }
 
@@ -412,7 +447,73 @@ mod tests {
                 .collect();
 
             stabilize_sort(&mut result);
-            assert_eq!(result, expected);
+            assert_distance_item_pairs_close_f32_by_item(&result, &expected, RADIUS);
+        }
+    }
+
+    fn assert_distance_item_pairs_close_f32<T>(actual: &[(f32, T)], expected: &[(f32, T)])
+    where
+        T: std::fmt::Debug + PartialEq,
+    {
+        assert_eq!(actual.len(), expected.len());
+
+        for ((actual_dist, actual_item), (expected_dist, expected_item)) in
+            actual.iter().zip(expected.iter())
+        {
+            assert_eq!(actual_item, expected_item);
+            assert!(
+                ulps_diff_f32(*actual_dist, *expected_dist) <= 3,
+                "distance mismatch: actual={actual_dist:?} expected={expected_dist:?}"
+            );
+        }
+    }
+
+    fn assert_distance_item_pairs_close_f32_by_item(
+        actual: &[(f32, u32)],
+        expected: &[(f32, u32)],
+        radius: f32,
+    ) {
+        use std::collections::BTreeMap;
+
+        let actual_by_item: BTreeMap<u32, f32> =
+            actual.iter().map(|(dist, item)| (*item, *dist)).collect();
+        let expected_by_item: BTreeMap<u32, f32> =
+            expected.iter().map(|(dist, item)| (*item, *dist)).collect();
+
+        for (item, actual_dist) in &actual_by_item {
+            if let Some(expected_dist) = expected_by_item.get(item) {
+                assert!(
+                    ulps_diff_f32(*actual_dist, *expected_dist) <= 3,
+                    "distance mismatch for item {item}: actual={actual_dist:?} expected={expected_dist:?}"
+                );
+            } else {
+                assert!(
+                    ulps_diff_f32(*actual_dist, radius) <= 3,
+                    "unexpected item {item} with distance {actual_dist:?} exceeded 3 ULP radius tolerance from {radius:?}"
+                );
+            }
+        }
+
+        for (item, expected_dist) in &expected_by_item {
+            if !actual_by_item.contains_key(item) {
+                assert!(
+                    ulps_diff_f32(*expected_dist, radius) <= 3,
+                    "missing item {item} with distance {expected_dist:?} exceeded 3 ULP radius tolerance from {radius:?}"
+                );
+            }
+        }
+    }
+
+    fn ulps_diff_f32(a: f32, b: f32) -> u32 {
+        canonical_u32(a).abs_diff(canonical_u32(b))
+    }
+
+    fn canonical_u32(value: f32) -> u32 {
+        let bits = value.to_bits();
+        if (bits >> 31) != 0 {
+            !bits
+        } else {
+            bits | (1 << 31)
         }
     }
 

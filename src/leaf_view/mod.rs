@@ -4,7 +4,7 @@ use std::mem::MaybeUninit;
 
 use crate::dist::DistanceMetricUnified;
 use crate::results::result_collection::{BestNeighbourResultCollection, ResultCollection};
-use crate::{Axis, Content, BestNeighbour, NearestNeighbour};
+use crate::{Axis, BestNeighbour, Content, NearestNeighbour};
 
 use fixed::{
     types::extra::{U0, U16, U8},
