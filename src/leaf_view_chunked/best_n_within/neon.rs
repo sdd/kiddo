@@ -1,6 +1,6 @@
 use crate::dist::distance_metric_neon::{NeonF32LeafOps, NeonF64LeafOps};
 use crate::leaf_view::LeafView;
-use crate::Basics;
+use crate::Content;
 
 #[target_feature(enable = "neon")]
 pub(crate) unsafe fn best_n_within_neon_unchecked_f64<L, T, F, const K: usize, const B: usize>(
@@ -10,7 +10,7 @@ pub(crate) unsafe fn best_n_within_neon_unchecked_f64<L, T, F, const K: usize, c
     emit: &mut F,
 ) where
     L: NeonF64LeafOps,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     F: FnMut(f64, T),
 {
     crate::leaf_view_chunked::nearest_n_within::neon::nearest_n_within_neon_unchecked_f64::<
@@ -31,7 +31,7 @@ pub(crate) unsafe fn best_n_within_neon_arena_unchecked_f64<L, T, F, const K: us
     emit: &mut F,
 ) where
     L: NeonF64LeafOps,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     F: FnMut(f64, T),
 {
     crate::leaf_view_chunked::nearest_n_within::neon::nearest_n_within_neon_arena_unchecked_f64::<
@@ -50,7 +50,7 @@ pub(crate) unsafe fn best_n_within_neon_unchecked_f32<L, T, F, const K: usize, c
     emit: &mut F,
 ) where
     L: NeonF32LeafOps,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     F: FnMut(f32, T),
 {
     crate::leaf_view_chunked::nearest_n_within::neon::nearest_n_within_neon_unchecked_f32::<
@@ -71,7 +71,7 @@ pub(crate) unsafe fn best_n_within_neon_arena_unchecked_f32<L, T, F, const K: us
     emit: &mut F,
 ) where
     L: NeonF32LeafOps,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     F: FnMut(f32, T),
 {
     crate::leaf_view_chunked::nearest_n_within::neon::nearest_n_within_neon_arena_unchecked_f32::<

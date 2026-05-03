@@ -120,7 +120,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: Axis<Coord = A> + 'static,
-        T: crate::Basics,
+        T: crate::Content,
         Self::Output: Axis<Coord = Self::Output> + 'static,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
@@ -178,7 +178,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: Axis<Coord = A> + 'static,
-        T: crate::Basics,
+        T: crate::Content,
         Self::Output: Axis<Coord = Self::Output> + 'static,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
@@ -250,7 +250,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: Axis<Coord = A> + 'static,
-        T: crate::Basics + Ord,
+        T: crate::Content + Ord,
         Self::Output: Axis<Coord = Self::Output> + 'static,
         R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
     {
@@ -312,7 +312,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: Axis<Coord = A> + 'static,
-        T: crate::Basics,
+        T: crate::Content,
         Self::Output: Axis<Coord = Self::Output> + 'static,
         R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
     {
@@ -389,7 +389,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: Axis<Coord = A> + 'static,
-        T: crate::Basics + Ord,
+        T: crate::Content + Ord,
         Self::Output: Axis<Coord = Self::Output> + 'static,
         R: BestNeighbourResultCollection<Self::Output, T>,
     {
@@ -452,7 +452,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: Axis<Coord = A> + 'static,
-        T: crate::Basics + Ord,
+        T: crate::Content + Ord,
         Self::Output: Axis<Coord = Self::Output> + 'static,
         R: BestNeighbourResultCollection<Self::Output, T>,
     {
@@ -542,7 +542,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: Axis<Coord = A> + 'static,
-        T: crate::Basics + Ord,
+        T: crate::Content + Ord,
         Self::Output: Axis<Coord = Self::Output> + 'static,
         R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
     {
@@ -604,7 +604,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: Axis<Coord = A> + 'static,
-        T: crate::Basics,
+        T: crate::Content,
         Self::Output: Axis<Coord = Self::Output> + 'static,
         R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
     {
@@ -681,7 +681,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: Axis<Coord = A> + 'static,
-        T: crate::Basics + Ord,
+        T: crate::Content + Ord,
         Self::Output: Axis<Coord = Self::Output> + 'static,
         R: BestNeighbourResultCollection<Self::Output, T>,
     {
@@ -744,7 +744,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: Axis<Coord = A> + 'static,
-        T: crate::Basics + Ord,
+        T: crate::Content + Ord,
         Self::Output: Axis<Coord = Self::Output> + 'static,
         R: BestNeighbourResultCollection<Self::Output, T>,
     {
@@ -834,7 +834,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: Axis<Coord = A> + 'static,
-        T: crate::Basics,
+        T: crate::Content,
         Self::Output: Axis<Coord = Self::Output> + 'static,
         R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
     {
@@ -896,7 +896,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: Axis<Coord = A> + 'static,
-        T: crate::Basics,
+        T: crate::Content,
         Self::Output: Axis<Coord = Self::Output> + 'static,
         R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
     {
@@ -973,7 +973,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: Axis<Coord = A> + 'static,
-        T: crate::Basics + PartialOrd,
+        T: crate::Content + PartialOrd,
         Self::Output: Axis<Coord = Self::Output> + 'static,
         R: BestNeighbourResultCollection<Self::Output, T>,
     {
@@ -1036,7 +1036,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     ) -> bool
     where
         A: Axis<Coord = A> + 'static,
-        T: crate::Basics + PartialOrd,
+        T: crate::Content + PartialOrd,
         Self::Output: Axis<Coord = Self::Output> + 'static,
         R: BestNeighbourResultCollection<Self::Output, T>,
     {

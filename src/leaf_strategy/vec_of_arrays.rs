@@ -3,7 +3,7 @@ use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
 use crate::traits::leaf_strategy::{
     BucketLimitType, ConstructibleLeafStrategy, LeafProjection, Mutable, MutableLeafStrategy,
 };
-use crate::{Axis, Basics, LeafStrategy, StemStrategy};
+use crate::{Axis, Content, LeafStrategy, StemStrategy};
 
 /// A leaf storage strategy using vectors of fixed-size arrays.
 ///
@@ -41,7 +41,7 @@ impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B>
     for VecOfArrays<AX, T, K, B>
 where
     AX: Axis<Coord = AX>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
 {
     type Num = AX;
@@ -78,7 +78,7 @@ impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B>
     for ArchivedVecOfArrays<AX, T, K, B>
 where
     AX: rkyv_08::Archive + Axis<Coord = AX>,
-    T: rkyv_08::Archive + Basics,
+    T: rkyv_08::Archive + Content,
     SS: StemStrategy,
 {
     type Num = AX;
@@ -120,7 +120,7 @@ impl<AX, T, SS, const K: usize, const B: usize> ConstructibleLeafStrategy<AX, T,
     for VecOfArrays<AX, T, K, B>
 where
     AX: Axis<Coord = AX>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
 {
     fn new_with_capacity(capacity: usize) -> Self {
@@ -203,7 +203,7 @@ where
 impl<AX, T, const K: usize, const B: usize> VecOfArrays<AX, T, K, B>
 where
     AX: Axis<Coord = AX>,
-    T: Basics + PartialEq,
+    T: Content + PartialEq,
 {
     fn copy_split_data_to_new_leaf(
         &mut self,
@@ -257,7 +257,7 @@ impl<AX, T, SS, const K: usize, const B: usize> MutableLeafStrategy<AX, T, SS, K
     for VecOfArrays<AX, T, K, B>
 where
     AX: Axis<Coord = AX>,
-    T: Basics + PartialEq,
+    T: Content + PartialEq,
     SS: StemStrategy,
 {
     fn add_to_leaf(&mut self, leaf_idx: usize, point: &[AX; K], item: T) {

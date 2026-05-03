@@ -8,7 +8,7 @@ use smallvec::SmallVec;
 use sorted_vec::SortedVec;
 
 use super::nearest_neighbour::NearestNeighbour;
-use crate::{Axis, Basics, BestNeighbour};
+use crate::{Axis, Content, BestNeighbour};
 
 #[cfg(feature = "small_n_result_collectors")]
 pub(crate) const SMALL_RESULT_COLLECTION_MAX_QTY: usize = 32;
@@ -127,7 +127,7 @@ where
 }
 
 #[doc(hidden)]
-pub trait BestNeighbourResultCollection<O: Axis<Coord = O>, T: Basics + PartialOrd>:
+pub trait BestNeighbourResultCollection<O: Axis<Coord = O>, T: Content + PartialOrd>:
     ResultCollection<O, BestNeighbour<O, T>>
 {
     fn threshold_item(&self) -> Option<T>;
@@ -368,7 +368,7 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     }
 }
 
-impl<O: Axis<Coord = O>, T: Basics + PartialOrd> ResultCollection<O, BestNeighbour<O, T>>
+impl<O: Axis<Coord = O>, T: Content + PartialOrd> ResultCollection<O, BestNeighbour<O, T>>
     for BinaryHeapResultCollection<BestNeighbour<O, T>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
@@ -455,7 +455,7 @@ impl<O: Axis<Coord = O>, T: Basics + PartialOrd> ResultCollection<O, BestNeighbo
     }
 }
 
-impl<O: Axis<Coord = O>, T: Basics + PartialOrd> BestNeighbourResultCollection<O, T>
+impl<O: Axis<Coord = O>, T: Content + PartialOrd> BestNeighbourResultCollection<O, T>
     for BinaryHeapResultCollection<BestNeighbour<O, T>>
 {
     #[inline(always)]
@@ -675,7 +675,7 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
 }
 
 #[cfg(feature = "small_n_result_collectors")]
-impl<O: Axis<Coord = O>, T: Basics + PartialOrd> ResultCollection<O, BestNeighbour<O, T>>
+impl<O: Axis<Coord = O>, T: Content + PartialOrd> ResultCollection<O, BestNeighbour<O, T>>
     for SmallBinaryHeapResultCollection<BestNeighbour<O, T>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
@@ -767,7 +767,7 @@ impl<O: Axis<Coord = O>, T: Basics + PartialOrd> ResultCollection<O, BestNeighbo
 }
 
 #[cfg(feature = "small_n_result_collectors")]
-impl<O: Axis<Coord = O>, T: Basics + PartialOrd> BestNeighbourResultCollection<O, T>
+impl<O: Axis<Coord = O>, T: Content + PartialOrd> BestNeighbourResultCollection<O, T>
     for SmallBinaryHeapResultCollection<BestNeighbour<O, T>>
 {
     #[inline(always)]

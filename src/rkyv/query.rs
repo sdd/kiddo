@@ -20,12 +20,12 @@ use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits::leaf_strategy::LeafProjection;
-use crate::{Axis, Basics, BestNeighbour, LeafStrategy, NearestNeighbour, StemStrategy};
+use crate::{Axis, Content, BestNeighbour, LeafStrategy, NearestNeighbour, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> ArchivedKdTree<A, T, SS, LS, K, B>
 where
     A: rkyv_08::Archive + Axis<Coord = A> + 'static,
-    T: Basics + Copy + Default + PartialOrd + PartialEq,
+    T: Content + Copy + Default + PartialOrd + PartialEq,
     SS: StemStrategy,
     LS: rkyv_08::Archive,
     rkyv_08::Archived<LS>: LeafStrategy<A, T, SS, K, B>,
@@ -114,7 +114,7 @@ where
 impl<A, T, SS, LS, const K: usize, const B: usize> ArchivedKdTree<A, T, SS, LS, K, B>
 where
     A: rkyv_08::Archive + Axis<Coord = A> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     SS: StemStrategy,
     LS: rkyv_08::Archive,
     rkyv_08::Archived<LS>: LeafStrategy<A, T, SS, K, B>,
@@ -345,7 +345,7 @@ where
 impl<A, T, SS, LS, const K: usize, const B: usize> ArchivedKdTree<A, T, SS, LS, K, B>
 where
     A: rkyv_08::Archive + Axis<Coord = A> + 'static,
-    T: Basics + PartialOrd,
+    T: Content + PartialOrd,
     SS: StemStrategy,
     LS: rkyv_08::Archive,
     rkyv_08::Archived<LS>: LeafStrategy<A, T, SS, K, B>,

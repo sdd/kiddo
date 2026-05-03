@@ -8,12 +8,12 @@ use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits::leaf_strategy::LeafProjection;
-use crate::{Axis, Basics, KdTree, LeafStrategy, StemStrategy};
+use crate::{Axis, Content, KdTree, LeafStrategy, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A> + 'static,
-    T: Basics,
+    T: Content,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {

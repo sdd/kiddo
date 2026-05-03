@@ -2,7 +2,7 @@ use crate::leaf_view::LeafView;
 use crate::traits::leaf_strategy::{
     BucketLimitType, ConstructibleLeafStrategy, Immutable, LeafProjection,
 };
-use crate::{Axis, Basics, LeafStrategy, StemStrategy};
+use crate::{Axis, Content, LeafStrategy, StemStrategy};
 
 /// A leaf storage strategy using flat vectors for coordinates.
 ///
@@ -23,7 +23,7 @@ impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B>
     for FlatVec<AX, T, K, B>
 where
     AX: Axis<Coord = AX>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
 {
     type Num = AX;
@@ -65,7 +65,7 @@ impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B>
     for ArchivedFlatVec<AX, T, K, B>
 where
     AX: rkyv_08::Archive + Axis<Coord = AX>,
-    T: rkyv_08::Archive + Basics,
+    T: rkyv_08::Archive + Content,
     SS: StemStrategy,
 {
     type Num = AX;
@@ -115,7 +115,7 @@ impl<AX, T, SS, const K: usize, const B: usize> ConstructibleLeafStrategy<AX, T,
     for FlatVec<AX, T, K, B>
 where
     AX: Axis<Coord = AX>,
-    T: Basics,
+    T: Content,
     SS: StemStrategy,
 {
     fn new_with_capacity(capacity: usize) -> Self {

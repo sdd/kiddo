@@ -3,12 +3,12 @@ use crate::kd_tree::query_context::QueryContext;
 use crate::kd_tree::KdTreeQueryOps;
 use crate::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
 use crate::traits::leaf_strategy::LeafProjection;
-use crate::{Axis, Basics, KdTree, LeafStrategy, StemStrategy};
+use crate::{Axis, Content, KdTree, LeafStrategy, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A> + 'static,
-    T: Basics + Copy + Default + PartialOrd + PartialEq,
+    T: Content + Copy + Default + PartialOrd + PartialEq,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {

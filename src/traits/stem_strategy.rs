@@ -3,7 +3,7 @@ use std::ptr::NonNull;
 
 use crate::kd_tree::query_stack::{ScalarStackContext, StackTrait};
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4};
-use crate::{Axis, Basics};
+use crate::{Axis, Content};
 
 /// Trait that needs to be implemented by any potential stem ordering
 /// algorithm used by a KdTree.
@@ -367,7 +367,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
         Tree: crate::kd_tree::KdTreeAccessor<A, T, Self, LS, K2, B>
             + crate::kd_tree::KdTreeQueryOps<A, T, Self, LS, K2, B>,
         A: Axis<Coord = A>,
-        T: Basics,
+        T: Content,
         O: Axis<Coord = O>
             + crate::stem_strategy::SimdPrune
             + crate::stem_strategy::SimdSelectBestChildBlock3
@@ -399,7 +399,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
         Tree: crate::kd_tree::KdTreeAccessor<A, T, Self, LS, K2, B>
             + crate::kd_tree::KdTreeQueryOps<A, T, Self, LS, K2, B>,
         A: Axis<Coord = A>,
-        T: Basics,
+        T: Content,
         O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
         D: crate::dist::KdTreeDistanceMetric<A, K2, Output = O>
             + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>
