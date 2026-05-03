@@ -231,7 +231,8 @@ impl StemLeafResolution for ArchivedStemLeafResolution {
                 leaf_idx_map.len(),
                 |map_idx| {
                     let value = leaf_idx_map.get(map_idx)?.to_native() as usize;
-                    (value != usize::MAX).then_some(value)
+                    crate::rkyv_08_impl::archived_option_nonmax_usize_is_some(value)
+                        .then_some(value)
                 },
             ),
             Self::Arithmetic {
@@ -260,9 +261,11 @@ impl StemLeafResolution for ArchivedStemLeafResolution {
                 let min_stem_leaf_idx = min_stem_leaf_idx.to_native() as usize;
                 if stem_idx >= min_stem_leaf_idx {
                     let map_idx = stem_idx - min_stem_leaf_idx;
-                    leaf_idx_map
-                        .get(map_idx)
-                        .is_some_and(|value| value.to_native() as usize != usize::MAX)
+                    leaf_idx_map.get(map_idx).is_some_and(|value| {
+                        crate::rkyv_08_impl::archived_option_nonmax_usize_is_some(
+                            value.to_native() as usize
+                        )
+                    })
                 } else {
                     false
                 }
@@ -736,6 +739,8 @@ mod tests {
     use crate::stem_strategies::Donnelly;
     #[cfg(feature = "rkyv_08")]
     use crate::stem_strategies::EytzingerPf;
+    #[cfg(all(feature = "rkyv_08", feature = "simd", target_arch = "x86_64"))]
+    use crate::stem_strategies::{Block4, DonnellyMarkerSimd};
     use crate::Eytzinger;
     #[cfg(feature = "rkyv_08")]
     use crate::SquaredEuclidean;
@@ -895,6 +900,56 @@ mod tests {
             roundtrip.nearest_one::<SquaredEuclidean<f64>>(&query),
             expected
         );
+    }
+
+    #[cfg(all(feature = "rkyv_08", feature = "simd", target_arch = "x86_64"))]
+    #[test]
+    fn rkyv_archived_donnelly_block4_vec_of_arenas_within_matches_owned() {
+        type Tree = KdTree<
+            f32,
+            u32,
+            DonnellyMarkerSimd<Block4, 64, 4, 4>,
+            VecOfArenas<f32, u32, 4, 32>,
+            4,
+            32,
+        >;
+        type ArchivedTree = ArchivedKdTree<
+            f32,
+            u32,
+            DonnellyMarkerSimd<Block4, 64, 4, 4>,
+            VecOfArenas<f32, u32, 4, 32>,
+            4,
+            32,
+        >;
+
+        let points: Vec<[f32; 4]> = (0..4096)
+            .map(|i| {
+                let x = i as f32 / 4096.0;
+                [
+                    x,
+                    ((i * 3) % 257) as f32 / 257.0,
+                    ((i * 5) % 263) as f32 / 263.0,
+                    ((i * 7) % 269) as f32 / 269.0,
+                ]
+            })
+            .collect();
+
+        let tree = Tree::new_from_slice(&points);
+        let query = [0.33, 0.27, 0.41, 0.59];
+        let max_dist = 0.55f32;
+        let expected = tree.within::<crate::Manhattan<f32>>(&query, max_dist);
+
+        let bytes = rkyv_08::api::high::to_bytes_in::<_, rkyv_08::rancor::Error>(
+            &tree,
+            rkyv_08::util::AlignedVec::<128>::new(),
+        )
+        .unwrap();
+
+        let archived =
+            rkyv_08::access::<ArchivedTree, rkyv_08::rancor::Error>(bytes.as_slice()).unwrap();
+        let actual = archived.within::<crate::Manhattan<f32>>(&query, max_dist);
+
+        assert_eq!(actual, expected);
     }
 
     #[cfg(feature = "rkyv_08")]
