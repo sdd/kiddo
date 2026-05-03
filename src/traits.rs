@@ -370,6 +370,21 @@ pub trait StemStrategy: Clone + Sync + Send {
             return false;
         }
 
+        #[cfg(feature = "result_collection_stats")]
+        crate::result_collection_stats::record_query_scalar_traverse_step();
+
+        #[cfg(feature = "result_collection_stats")]
+        {
+            let mut rd_from_off = O::zero();
+            for off_val in off.iter().copied() {
+                rd_from_off = O::saturating_add(rd_from_off, D::dist1(off_val, O::zero()));
+            }
+            crate::result_collection_stats::record_query_scalar_rd_off_check(O::cmp(
+                rd_from_off,
+                rd,
+            ));
+        }
+
         let pivot = *unsafe { stems.get_unchecked(self.stem_idx()) };
 
         if pivot < A::max_value() {
@@ -439,6 +454,11 @@ pub trait StemStrategy: Clone + Sync + Send {
                     new_off,
                     rd_far,
                 ));
+                #[cfg(feature = "result_collection_stats")]
+                crate::result_collection_stats::record_query_scalar_far_child_push();
+            } else {
+                #[cfg(feature = "result_collection_stats")]
+                crate::result_collection_stats::record_query_scalar_far_child_reject();
             }
         } else {
             self.traverse(false);

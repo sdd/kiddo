@@ -182,6 +182,7 @@ pub mod cargo_asm {
     use crate::kd_tree::leaf_strategies::VecOfArenas;
     use crate::kd_tree::KdTree;
     use crate::stem_strategies::donnelly_2_pf::DonnellyPf;
+    use crate::stem_strategies::eytzinger_pf_far::EytzingerPfFar;
     use std::num::NonZeroUsize;
 
     const K: usize = 3;
@@ -190,6 +191,7 @@ pub mod cargo_asm {
     const MAX_QTY: usize = 16;
 
     type ArenaLeaves = VecOfArenas<f64, u32, K, BUCKET_SIZE>;
+    type EytzingerPfFarKdT = KdTree<f64, u32, EytzingerPfFar<K, 8>, ArenaLeaves, K, BUCKET_SIZE>;
     type DonnellyPfKdT = KdTree<f64, u32, DonnellyPf<3, 64, 8, K>, ArenaLeaves, K, BUCKET_SIZE>;
 
     /// Hook for cargo-asm to render the sorted nearest_n_within focus path.
@@ -197,6 +199,30 @@ pub mod cargo_asm {
     #[unsafe(no_mangle)]
     pub fn v6_sorted_nearest_n_within_donnelly_pf_focus_cargo_asm_hook(
         tree: &DonnellyPfKdT,
+        query: [f64; 3],
+    ) -> (usize, u64, u64) {
+        let results = tree.nearest_n_within::<SquaredEuclidean<f64>>(
+            &query,
+            MAX_DIST,
+            NonZeroUsize::new(MAX_QTY).unwrap(),
+            true,
+        );
+
+        let mut checksum_item = 0u64;
+        let mut checksum_dist_bits = 0u64;
+        for result in results.iter() {
+            checksum_item = checksum_item.wrapping_add(result.item as u64);
+            checksum_dist_bits = checksum_dist_bits.wrapping_add(result.distance.to_bits());
+        }
+
+        (results.len(), checksum_item, checksum_dist_bits)
+    }
+
+    /// Hook for cargo-asm to render the sorted nearest_n_within focus path for scalar Eytzinger PF-far arena leaves.
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_sorted_nearest_n_within_eytzinger_pf_far_focus_cargo_asm_hook(
+        tree: &EytzingerPfFarKdT,
         query: [f64; 3],
     ) -> (usize, u64, u64) {
         let results = tree.nearest_n_within::<SquaredEuclidean<f64>>(

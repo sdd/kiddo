@@ -146,6 +146,41 @@ where
     }
 }
 
+#[allow(missing_docs)]
+#[cfg(feature = "cargo_asm")]
+pub mod cargo_asm {
+    use crate::dist::SquaredEuclidean;
+    use crate::kd_tree::leaf_strategies::VecOfArenas;
+    use crate::kd_tree::KdTree;
+    use crate::stem_strategies::eytzinger_pf_far::EytzingerPfFar;
+
+    const K: usize = 3;
+    const BUCKET_SIZE: usize = 32;
+    const MAX_DIST: f64 = 0.0025;
+
+    type ArenaLeaves = VecOfArenas<f64, u32, K, BUCKET_SIZE>;
+    type EytzingerPfFarKdT = KdTree<f64, u32, EytzingerPfFar<K, 8>, ArenaLeaves, K, BUCKET_SIZE>;
+
+    /// Hook for cargo-asm to render the exact within_unsorted path for scalar Eytzinger PF-far arena leaves.
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_within_unsorted_eytzinger_pf_far_vec_of_arenas_cargo_asm_hook(
+        tree: &EytzingerPfFarKdT,
+        query: [f64; 3],
+    ) -> (usize, u64, u64) {
+        let results = tree.within_unsorted::<SquaredEuclidean<f64>>(&query, MAX_DIST);
+
+        let mut checksum_item = 0u64;
+        let mut checksum_dist_bits = 0u64;
+        for result in results.iter() {
+            checksum_item = checksum_item.wrapping_add(result.item as u64);
+            checksum_dist_bits = checksum_dist_bits.wrapping_add(result.distance.to_bits());
+        }
+
+        (results.len(), checksum_item, checksum_dist_bits)
+    }
+}
+
 struct WithinUnsortedVisitReqCtx<'a, A, O, const K: usize>
 where
     O: AxisUnified<Coord = O>,

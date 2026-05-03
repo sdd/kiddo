@@ -137,14 +137,116 @@ bench-v6-result-collection-focus FEATURES='simd,test_utils,logging_off' POINTS='
 asm-v6-sorted-nearest-n-within-donnelly-pf-focus-clean FEATURES='simd,cargo_asm,logging_off' SUFFIX='baseline':
     RUSTC_WRAPPER= cargo asm --simplify --features {{FEATURES}} --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "v6_sorted_nearest_n_within_donnelly_pf_focus_cargo_asm_hook" | python3 scripts/clean_cargo_asm.py > v6_sorted_nearest_n_within_donnelly_pf_focus_{{SUFFIX}}_clean.asm
 
+asm-v6-query-hook-clean HOOK FEATURES='simd,cargo_asm,logging_off' SUFFIX='baseline':
+    RUSTC_WRAPPER= cargo asm --simplify --features {{FEATURES}} --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "{{HOOK}}" | python3 scripts/clean_cargo_asm.py > {{HOOK}}_{{SUFFIX}}_clean.asm
+
 asm-v6-best-n-within-donnelly-pf-focus-clean FEATURES='simd,cargo_asm,logging_off' SUFFIX='baseline':
     RUSTC_WRAPPER= cargo asm --simplify --features {{FEATURES}} --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "v6_best_n_within_donnelly_pf_focus_cargo_asm_hook" | python3 scripts/clean_cargo_asm.py > v6_best_n_within_donnelly_pf_focus_{{SUFFIX}}_clean.asm
 
 asm-v6-result-collection-hook-clean HOOK FEATURES='simd,cargo_asm,logging_off' SUFFIX='baseline':
     RUSTC_WRAPPER= cargo asm --simplify --features {{FEATURES}} --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "{{HOOK}}" | python3 scripts/clean_cargo_asm.py > {{HOOK}}_{{SUFFIX}}_clean.asm
 
+mca-v6-query-hook ASM_FILE OUT_FILE:
+    llvm-mca -march=x86-64 -mcpu=znver5 -x86-asm-syntax=intel -skip-unsupported-instructions=parse-failure --instruction-info --summary-view {{ASM_FILE}} > {{OUT_FILE}} 2>&1
+
 mca-v6-result-collection-focus ASM_FILE OUT_FILE:
     llvm-mca -march=x86-64 -mcpu=znver5 -x86-asm-syntax=intel -skip-unsupported-instructions=parse-failure --instruction-info --summary-view {{ASM_FILE}} > {{OUT_FILE}} 2>&1
+
+asm-v6-nearest-one-epf-var-clean FEATURES='simd,cargo_asm,logging_off' SUFFIX='baseline':
+    just asm-v6-query-hook-clean v6_nearest_one_eytzinger_pf_far_vec_of_arenas_cargo_asm_hook "{{FEATURES}}" "{{SUFFIX}}"
+
+asm-v6-within-unsorted-epf-var-clean FEATURES='simd,cargo_asm,logging_off' SUFFIX='baseline':
+    just asm-v6-query-hook-clean v6_within_unsorted_eytzinger_pf_far_vec_of_arenas_cargo_asm_hook "{{FEATURES}}" "{{SUFFIX}}"
+
+asm-v6-nnws-epf-var-clean FEATURES='simd,cargo_asm,logging_off' SUFFIX='baseline':
+    just asm-v6-query-hook-clean v6_sorted_nearest_n_within_eytzinger_pf_far_focus_cargo_asm_hook "{{FEATURES}}" "{{SUFFIX}}"
+
+build-v6-query-focus-archives FEATURES='rkyv_08,test_utils,logging_off' POINTS='33554432' QUERIES='100000' PREFIX='./target/kiddo-query-focus-v6':
+    RUSTC_WRAPPER= \
+    KIDDO_PROFILE_POINTS={{POINTS}} \
+    KIDDO_PROFILE_QUERIES={{QUERIES}} \
+    KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo run --release --bin build_v6_query_focus_archives --features {{FEATURES}}
+
+build-profile-v6-archived-query-focus FEATURES='rkyv_08,huge_pages,simd,logging_off':
+    RUSTC_WRAPPER= \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo build --release --bin profile_v6_archived_query_focus --features {{FEATURES}}
+
+profile-v6-archived-query-focus FEATURES='rkyv_08,huge_pages,simd,logging_off' LOAD='mmap' HUGE='off' QUERY='nearest-one' REPEATS='100' MAX_DIST='0.01' MAX_QTY='1000' PREFIX='./target/kiddo-query-focus-v6' START_DELAY_MS='0':
+    RUSTC_WRAPPER= \
+    KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
+    KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
+    KIDDO_PROFILE_HUGE_PAGES={{HUGE}} \
+    KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
+    KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
+    KIDDO_PROFILE_MAX_DIST={{MAX_DIST}} \
+    KIDDO_PROFILE_MAX_QTY={{MAX_QTY}} \
+    KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo run --release --bin profile_v6_archived_query_focus --features {{FEATURES}}
+
+perf-v6-archived-query-focus-core FEATURES='rkyv_08,huge_pages,simd,logging_off' LOAD='mmap' HUGE='off' QUERY='nearest-one' REPEATS='100' MAX_DIST='0.01' MAX_QTY='1000' PREFIX='./target/kiddo-query-focus-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
+    RUSTC_WRAPPER= \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo build --release --bin profile_v6_archived_query_focus --features {{FEATURES}}
+    KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
+    KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
+    KIDDO_PROFILE_HUGE_PAGES={{HUGE}} \
+    KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
+    KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
+    KIDDO_PROFILE_MAX_DIST={{MAX_DIST}} \
+    KIDDO_PROFILE_MAX_QTY={{MAX_QTY}} \
+    KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
+    perf stat -D {{PERF_DELAY_MS}} \
+        -e cycles,instructions,branches,branch-misses \
+        ./target/release/profile_v6_archived_query_focus
+
+perf-v6-archived-query-focus-cache FEATURES='rkyv_08,huge_pages,simd,logging_off' LOAD='mmap' HUGE='off' QUERY='nearest-one' REPEATS='100' MAX_DIST='0.01' MAX_QTY='1000' PREFIX='./target/kiddo-query-focus-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
+    RUSTC_WRAPPER= \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo build --release --bin profile_v6_archived_query_focus --features {{FEATURES}}
+    KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
+    KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
+    KIDDO_PROFILE_HUGE_PAGES={{HUGE}} \
+    KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
+    KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
+    KIDDO_PROFILE_MAX_DIST={{MAX_DIST}} \
+    KIDDO_PROFILE_MAX_QTY={{MAX_QTY}} \
+    KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
+    perf stat -D {{PERF_DELAY_MS}} \
+        -e cache-references,cache-misses,L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses \
+        ./target/release/profile_v6_archived_query_focus
+
+perf-v6-archived-query-focus-tlb FEATURES='rkyv_08,huge_pages,simd,logging_off' LOAD='mmap' HUGE='off' QUERY='nearest-one' REPEATS='100' MAX_DIST='0.01' MAX_QTY='1000' PREFIX='./target/kiddo-query-focus-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
+    RUSTC_WRAPPER= \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo build --release --bin profile_v6_archived_query_focus --features {{FEATURES}}
+    KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
+    KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
+    KIDDO_PROFILE_HUGE_PAGES={{HUGE}} \
+    KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
+    KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
+    KIDDO_PROFILE_MAX_DIST={{MAX_DIST}} \
+    KIDDO_PROFILE_MAX_QTY={{MAX_QTY}} \
+    KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
+    perf stat -D {{PERF_DELAY_MS}} \
+        -e dTLB-loads,dTLB-load-misses,page-faults,minor-faults,major-faults \
+        ./target/release/profile_v6_archived_query_focus
+
+profile-v6-archived-query-focus-samply FEATURES='rkyv_08,huge_pages,simd,logging_off' LOAD='mmap' HUGE='off' QUERY='nearest-one' REPEATS='100' MAX_DIST='0.01' MAX_QTY='1000' PREFIX='./target/kiddo-query-focus-v6':
+    RUSTC_WRAPPER= \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo build --release --bin profile_v6_archived_query_focus --features {{FEATURES}}
+    KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
+    KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
+    KIDDO_PROFILE_HUGE_PAGES={{HUGE}} \
+    KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
+    KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
+    KIDDO_PROFILE_MAX_DIST={{MAX_DIST}} \
+    KIDDO_PROFILE_MAX_QTY={{MAX_QTY}} \
+    samply record ./target/release/profile_v6_archived_query_focus
 
 profile-v6-stem-exact-stats FEATURES='simd,test_utils,logging_off' POINTS='4194304' QUERIES='10000' REPEATS='1':
     RUSTC_WRAPPER= \

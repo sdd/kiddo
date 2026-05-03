@@ -43,6 +43,17 @@ pub struct ResultCollectionStats {
     pub query_stack_pushes: u64,
     pub query_stack_pops: u64,
     pub query_prunes: u64,
+    pub query_scalar_traverse_steps: u64,
+    pub query_scalar_far_child_pushes: u64,
+    pub query_scalar_far_child_rejects: u64,
+    pub query_scalar_rd_off_checks: u64,
+    pub query_scalar_rd_off_mismatch_lt: u64,
+    pub query_scalar_rd_off_mismatch_gt: u64,
+    pub query_scalar_continuation_frame_pushes: u64,
+    pub query_scalar_continuation_frame_pops: u64,
+    pub query_scalar_continuation_far_rechecks: u64,
+    pub query_scalar_continuation_far_enters: u64,
+    pub query_scalar_continuation_far_rejects_after_near: u64,
 }
 
 thread_local! {
@@ -200,4 +211,70 @@ pub fn record_query_stack_pop() {
 #[inline]
 pub fn record_query_prune() {
     update(|stats| stats.query_prunes += 1);
+}
+
+#[inline]
+pub fn record_query_scalar_traverse_step() {
+    update(|stats| stats.query_scalar_traverse_steps += 1);
+}
+
+#[inline]
+pub fn record_query_scalar_far_child_push() {
+    update(|stats| {
+        stats.query_scalar_far_child_pushes += 1;
+        stats.query_stack_pushes += 1;
+    });
+}
+
+#[inline]
+pub fn record_query_scalar_far_child_candidate() {
+    update(|stats| stats.query_scalar_far_child_pushes += 1);
+}
+
+#[inline]
+pub fn record_query_scalar_far_child_reject() {
+    update(|stats| stats.query_scalar_far_child_rejects += 1);
+}
+
+#[inline]
+pub fn record_query_scalar_rd_off_check(ordering: std::cmp::Ordering) {
+    update(|stats| {
+        stats.query_scalar_rd_off_checks += 1;
+        match ordering {
+            std::cmp::Ordering::Less => stats.query_scalar_rd_off_mismatch_lt += 1,
+            std::cmp::Ordering::Greater => stats.query_scalar_rd_off_mismatch_gt += 1,
+            std::cmp::Ordering::Equal => {}
+        }
+    });
+}
+
+#[inline]
+pub fn record_query_scalar_continuation_frame_push() {
+    update(|stats| {
+        stats.query_scalar_continuation_frame_pushes += 1;
+        stats.query_stack_pushes += 1;
+    });
+}
+
+#[inline]
+pub fn record_query_scalar_continuation_frame_pop() {
+    update(|stats| {
+        stats.query_scalar_continuation_frame_pops += 1;
+        stats.query_stack_pops += 1;
+    });
+}
+
+#[inline]
+pub fn record_query_scalar_continuation_far_recheck() {
+    update(|stats| stats.query_scalar_continuation_far_rechecks += 1);
+}
+
+#[inline]
+pub fn record_query_scalar_continuation_far_enter() {
+    update(|stats| stats.query_scalar_continuation_far_enters += 1);
+}
+
+#[inline]
+pub fn record_query_scalar_continuation_far_reject_after_near() {
+    update(|stats| stats.query_scalar_continuation_far_rejects_after_near += 1);
 }

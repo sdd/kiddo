@@ -590,8 +590,18 @@ path = "src/bin/build_v6_hugepage_archives.rs"
 required-features = ["rkyv_08", "test_utils"]
 
 [[bin]]
+name = "build_v6_query_focus_archives"
+path = "src/bin/build_v6_query_focus_archives.rs"
+required-features = ["rkyv_08", "test_utils"]
+
+[[bin]]
 name = "profile_v6_archived_huge_pages"
 path = "src/bin/profile_v6_archived_huge_pages.rs"
+required-features = ["rkyv_08", "huge_pages"]
+
+[[bin]]
+name = "profile_v6_archived_query_focus"
+path = "src/bin/profile_v6_archived_query_focus.rs"
 required-features = ["rkyv_08", "huge_pages"]
 
 [[test]]
