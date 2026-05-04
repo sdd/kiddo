@@ -7,7 +7,10 @@ use std::ptr::NonNull;
 
 use crate::dist::KdTreeDistanceMetric;
 use crate::kd_tree::query_context::QueryContext;
-use crate::kd_tree::query_stack::{ScalarStackContext, StackTrait};
+use crate::kd_tree::query_stack::{
+    ScalarContinuationFar, ScalarContinuationFarStack, ScalarContinuationRestore,
+    ScalarContinuationRestoreStack, ScalarStackContext, StackTrait,
+};
 use crate::kd_tree::{KdTreeAccessor, StemLeafResolution};
 use crate::stem_strategy::{
     donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4},
@@ -447,38 +450,36 @@ where
 
         let mut off = [O::zero(); K];
         stack.clear();
-        stack.push(SS::StackContext::<O>::from_parts(
-            stem_strat.deferred_state(),
-            O::zero(),
-            O::zero(),
-        ));
-        #[cfg(feature = "result_collection_stats")]
-        crate::results::result_collection_stats::record_query_stack_push();
+        let max_query_depth = self.max_stem_level() + 1;
+        debug_assert!(
+            max_query_depth <= 64,
+            "scalar continuation stack capacity exceeded: depth={} capacity=64",
+            max_query_depth
+        );
+        let mut restore_stack = ScalarContinuationRestoreStack::<O>::default();
+        let mut far_stack = ScalarContinuationFarStack::<O, SS::DeferredState>::default();
 
-        while let Some(stack_ctx) = stack.pop() {
-            #[cfg(feature = "result_collection_stats")]
-            crate::results::result_collection_stats::record_query_stack_pop();
-            let (stem_state, restore_dim, old_off, rd) =
-                SS::StackContext::<O>::into_parts_with_restore_dim(stack_ctx);
-            stem_strat.rehydrate_deferred_state(stem_state);
-            let mut dim = stem_strat.dim();
-            let restore_dim = restore_dim.unwrap_or(dim);
+        let mut rd = O::zero();
+        let mut dim = stem_strat.dim();
 
-            let rd_vs_max = O::cmp(rd, query_ctx.max_dist());
-            let should_prune = rd_vs_max == std::cmp::Ordering::Greater
-                || (query_ctx.prune_on_equal_max_dist() && rd_vs_max == std::cmp::Ordering::Equal);
-            if should_prune {
-                #[cfg(feature = "result_collection_stats")]
-                crate::results::result_collection_stats::record_query_prune();
-                continue;
-            }
-
-            unsafe { *off.get_unchecked_mut(restore_dim) = old_off };
-            let best_dist = query_ctx.max_dist();
-
+        'query: loop {
             loop {
                 if stem_strat.level() > self.max_stem_level() {
                     break;
+                }
+
+                #[cfg(feature = "result_collection_stats")]
+                crate::results::result_collection_stats::record_query_scalar_traverse_step();
+
+                #[cfg(feature = "result_collection_stats")]
+                {
+                    let mut rd_from_off = O::zero();
+                    for off_val in off.iter().copied() {
+                        rd_from_off = O::saturating_add(rd_from_off, D::dist1(off_val, O::zero()));
+                    }
+                    crate::results::result_collection_stats::record_query_scalar_rd_off_check(
+                        O::cmp(rd_from_off, rd),
+                    );
                 }
 
                 let pivot = unsafe { *self.stems().get_unchecked(stem_strat.stem_idx()) };
@@ -496,17 +497,31 @@ where
                     let old_dist1 = D::dist1(old_off, O::zero());
                     let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
 
-                    if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
-                        stack.push(SS::StackContext::<O>::from_parts_with_restore_dim(
-                            far_ctx.deferred_state(),
-                            dim,
-                            new_off,
-                            rd_far,
-                        ));
+                    if O::cmp(rd_far, query_ctx.max_dist()) != std::cmp::Ordering::Greater {
                         #[cfg(feature = "result_collection_stats")]
-                        crate::results::result_collection_stats::record_query_stack_push();
+                        crate::results::result_collection_stats::record_query_scalar_far_child_candidate();
+                        restore_stack
+                            .push_unchecked_inline(ScalarContinuationRestore::with_far(old_off));
+                        far_stack.push_unchecked_inline(ScalarContinuationFar {
+                            stem_state: far_ctx.deferred_state(),
+                            far_off: new_off,
+                            rd: rd_far,
+                        });
+                    } else {
+                        #[cfg(feature = "result_collection_stats")]
+                        crate::results::result_collection_stats::record_query_scalar_far_child_reject();
+                        restore_stack.push_unchecked_inline(
+                            ScalarContinuationRestore::restore_only(old_off),
+                        );
                     }
+                    #[cfg(feature = "result_collection_stats")]
+                    crate::results::result_collection_stats::record_query_scalar_continuation_frame_push();
                 } else {
+                    let old_off = unsafe { *off.get_unchecked(dim) };
+                    restore_stack
+                        .push_unchecked_inline(ScalarContinuationRestore::restore_only(old_off));
+                    #[cfg(feature = "result_collection_stats")]
+                    crate::results::result_collection_stats::record_query_scalar_continuation_frame_push();
                     stem_strat.traverse(false);
                 }
 
@@ -522,6 +537,59 @@ where
             );
 
             process_leaf(leaf_idx, &query_wide, query_ctx);
+
+            while let Some(frame) = restore_stack.pop() {
+                #[cfg(feature = "result_collection_stats")]
+                crate::results::result_collection_stats::record_query_scalar_continuation_frame_pop(
+                );
+
+                let restore_dim = if dim == 0 { K - 1 } else { dim - 1 };
+                let old_off = frame.old_off;
+                unsafe { *off.get_unchecked_mut(restore_dim) = old_off };
+                dim = restore_dim;
+
+                if !frame.has_far {
+                    continue;
+                }
+
+                let far = far_stack
+                    .pop()
+                    .expect("scalar continuation far stack underflow");
+
+                #[cfg(feature = "result_collection_stats")]
+                crate::results::result_collection_stats::record_query_scalar_continuation_far_recheck();
+
+                let rd_vs_max = O::cmp(far.rd, query_ctx.max_dist());
+                let should_prune = rd_vs_max == std::cmp::Ordering::Greater
+                    || (query_ctx.prune_on_equal_max_dist()
+                        && rd_vs_max == std::cmp::Ordering::Equal);
+                if should_prune {
+                    #[cfg(feature = "result_collection_stats")]
+                    {
+                        crate::results::result_collection_stats::record_query_prune();
+                        crate::results::result_collection_stats::record_query_scalar_continuation_far_reject_after_near();
+                    }
+                    continue;
+                }
+
+                restore_stack
+                    .push_unchecked_inline(ScalarContinuationRestore::restore_only(old_off));
+                #[cfg(feature = "result_collection_stats")]
+                crate::results::result_collection_stats::record_query_scalar_continuation_frame_push();
+
+                unsafe { *off.get_unchecked_mut(restore_dim) = far.far_off };
+                stem_strat.rehydrate_deferred_state(far.stem_state);
+                rd = far.rd;
+                dim = stem_strat.dim();
+
+                #[cfg(feature = "result_collection_stats")]
+                crate::results::result_collection_stats::record_query_scalar_continuation_far_enter(
+                );
+
+                continue 'query;
+            }
+
+            break;
         }
     }
 
