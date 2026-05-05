@@ -102,6 +102,7 @@ optional = true
 [dependencies.kiddo_v5]
 package = "kiddo"
 path = "../kiddo-v5"
+version = "5"
 optional = true
 
 [dependencies.rand]
