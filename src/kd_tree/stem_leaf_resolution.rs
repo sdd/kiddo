@@ -106,13 +106,9 @@ impl StemLeafResolution for OwnedStemLeafResolution {
             Self::Mapped {
                 min_stem_leaf_idx,
                 leaf_idx_map,
-            } => {
-                if stem_idx >= *min_stem_leaf_idx {
-                    let map_idx = stem_idx - *min_stem_leaf_idx;
-                    leaf_idx_map.get(map_idx).is_some_and(Option::is_some)
-                } else {
-                    false
-                }
+            } if stem_idx >= *min_stem_leaf_idx => {
+                let map_idx = stem_idx - *min_stem_leaf_idx;
+                leaf_idx_map.get(map_idx).is_some_and(Option::is_some)
             }
             _ => false,
         }

@@ -213,7 +213,10 @@ fn sift_down_max_heap<E: Ord>(heap: &mut [E], mut idx: usize) {
     }
 }
 
-#[cfg(feature = "small_n_result_collectors")]
+#[cfg(all(
+    feature = "small_n_result_collectors",
+    feature = "buffered_result_collection"
+))]
 #[inline(always)]
 fn heapify_max_heap<E: Ord>(heap: &mut [E]) {
     if heap.len() <= 1 {
@@ -613,6 +616,7 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     }
 
     #[allow(unreachable_code)]
+    #[cfg(feature = "buffered_result_collection")]
     fn add_all<I>(&mut self, entries: I)
     where
         I: IntoIterator<Item = NearestNeighbour<O, T>>,
@@ -716,6 +720,7 @@ impl<O: Axis<Coord = O>, T: Content + PartialOrd> ResultCollection<O, BestNeighb
     }
 
     #[allow(unreachable_code)]
+    #[cfg(feature = "buffered_result_collection")]
     fn add_all<I>(&mut self, entries: I)
     where
         I: IntoIterator<Item = BestNeighbour<O, T>>,
@@ -807,6 +812,7 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     }
 
     #[allow(unreachable_code)]
+    #[cfg(feature = "buffered_result_collection")]
     fn add_all<I>(&mut self, entries: I)
     where
         I: IntoIterator<Item = NearestNeighbour<O, T>>,

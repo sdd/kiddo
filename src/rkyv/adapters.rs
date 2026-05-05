@@ -100,7 +100,7 @@ where
         let result = align_writer_to(serializer, CACHELINE_ALIGN)?;
 
         serializer.align_for::<Archived<T>>()?;
-        for (value, resolver) in self.tail.iter().zip(resolvers.into_iter()) {
+        for (value, resolver) in self.tail.iter().zip(resolvers) {
             unsafe {
                 serializer.resolve_aligned(value, resolver)?;
             }

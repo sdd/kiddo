@@ -92,6 +92,8 @@ jobs:
   lint-unstable:
     name: Lint (Nightly)
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-C target-cpu=native"
 
     steps:
       - uses: actions/checkout@v6
@@ -162,6 +164,8 @@ jobs:
   check-unstable:
     name: Cargo Check (Nightly)
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-C target-cpu=native"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -229,6 +233,8 @@ jobs:
   test-all-features:
     name: Run Tests (Nightly, all features enabled)
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-C target-cpu=native"
     steps:
       - uses: actions/checkout@v6
         with:
