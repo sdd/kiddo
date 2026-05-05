@@ -1,6 +1,8 @@
 # Kiddo
 
-> A high-performance, flexible, ergonomic [k-d tree](https://en.wikipedia.org/wiki/K-d_tree) library. Possibly the fastest k-d tree library in the world? [See for yourself](https://sdd.github.io/kd-tree-comparison-webapp/).
+A high-performance [k-d tree](https://en.wikipedia.org/wiki/K-d_tree) library for exact and approximate nearest-neighbour queries in low-dimensional spaces.
+
+Built with an aggressive focus on query performance, including cache-aware layouts and optional SIMD-accelerated code paths. See the [companion benchmarking site](https://sdd.github.io/kd-tree-comparison-webapp/) to compare Kiddo against other k-d tree implementations across a range of workloads.
 
 * [Crate](https://crates.io/crates/kiddo)
 * [Documentation](https://docs.rs/kiddo)
@@ -10,29 +12,53 @@
 * [Change Log](https://github.com/sdd/kiddo/blob/master/CHANGELOG.md)
 * [License](#license)
 
-Kiddo is ideal for superfast spatial / geospatial lookups and nearest-neighbour / KNN queries for low-ish numbers of dimensions, where you want to ask questions such as:
- - Find the [nearest_n](https://docs.rs/kiddo/latest/kiddo/float/kdtree/struct.KdTree.html#method.nearest_n) item(s) to a query point, ordered by distance;
- - Find all items [within](https://docs.rs/kiddo/latest/kiddo/float/kdtree/struct.KdTree.html#method.within) a specified radius of a query point;
- - Find the ["best" n item(s) within](https://docs.rs/kiddo/latest/kiddo/float/kdtree/struct.KdTree.html#method.best_n_within) a specified distance of a query point, for some definition of "best".
+Kiddo v6 provides a single generic [`KdTree`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html) that supports floating-point (`f64`, `f32`, `f16`), selected fixed-point (via the `fixed` crate), and unsigned-integer (`u8`, `u16`, `u32`) types as coordinates, along with both mutable and immutable usage patterns.
 
-Kiddo provides:
- - Its standard floating point k-d tree, exposed as [`kiddo::KdTree`](`crate::KdTree`)
- - An [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) with space and performance advantages over the standard
-   k-d tree, for situations where the tree does not need to be modified after creation
- - **Integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) crate;
- - **`f16` support** via the [`half`](https://docs.rs/half/latest/half/) crate;
- - **Instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
+Kiddo is designed for low-dimensional search problems, especially 2D, 3D, and 4D workloads. Typical use cases include point-cloud analysis, astronomical catalogue crossmatching, colour quantization and palette lookup, local neighbourhood queries in simulations, and other nearest-neighbour and radius-search tasks. Kiddo has been used for diverse geographical and scientific workloads including geocoding, astronomy, cosmology, computer-aided drug discovery, crystallography, and computational neuroscience.
+
+If your points are known up front and the tree will be built once and then queried, start with [`ImmutableKdTree`](https://docs.rs/kiddo/latest/kiddo/type.ImmutableKdTree.html). It offers the best query performance and pairs well with `rkyv` for zero-copy loading of prebuilt trees from disk; when used with memory-mapped files, loading can be effectively instant.
+
+If you need to add or remove points after construction, start with [`MutableKdTree`](https://docs.rs/kiddo/latest/kiddo/type.MutableKdTree.html). Mutable trees remain a good fit for many dynamic workloads, but they do not currently perform dynamic rebalancing, so workloads with substantial growth or heavy churn may benefit from periodic rebuilds.
+
+[`ImmutableKdTree`](https://docs.rs/kiddo/latest/kiddo/type.ImmutableKdTree.html) and [`MutableKdTree`](https://docs.rs/kiddo/latest/kiddo/type.MutableKdTree.html) are convenience aliases for [`KdTree`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html) with sensible defaults for these common read-heavy and mutable workloads.
+
+Kiddo is not intended as a library for high-dimensional vector search or feature matching over hundreds or thousands of dimensions, where plain k-d trees are usually the wrong data structure and other approaches are more appropriate. The API does not impose a hard dimensional limit, but Kiddo is primarily intended for low-dimensional workloads.
+
+Kiddo supports the following query types:
+
+- [`KdTree::nearest_one`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.nearest_one) finds the single nearest item to a query point.
+  Useful for tasks like finding the nearest airport to a given location, or finding the nearest catalogued star to a sky position.
+
+- [`KdTree::best_n_within`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.best_n_within) finds the "best" `n` items within a specified distance of a query point, for some definition of "best".
+  For example, "give me the 5 largest settlements within 50km of a given point, ordered by descending population", or "the 5 brightest stars within a degree of a point on the sky, ordered brightest first".
+
+- [`KdTree::approx_nearest_one`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.approx_nearest_one) performs approximate nearest-neighbour (ANN) search, returning a good approximate nearest item, often much faster than exact nearest-neighbour search.
+  Useful for latency-sensitive workloads like interactive point-cloud picking, or mapping image pixels to a palette colour during colour quantization.
+
+- [`KdTree::nearest_n`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.nearest_n) performs k-nearest-neighbour (k-NN) search, finding the `n` nearest items to a query point ordered by distance.
+  Useful for finding the nearest weather stations or sensors to a location, or generating candidate correspondences for point-cloud registration.
+
+- [`KdTree::nearest_n_within`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.nearest_n_within) finds up to `n` nearest items within a specified radius of a query point, ordered by distance.
+  Useful when you want the closest local neighbours inside a meaningful cutoff, such as the nearest shops within 5 miles, or nearby atoms within an interaction radius.
+
+- [`KdTree::within`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.within) finds all items within a specified radius of a query point, ordered by distance.
+  Useful for radial catalogue searches in astronomy, or collision and proximity queries where the full neighbourhood is needed in sorted order.
+
+- [`KdTree::within_unsorted`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.within_unsorted) finds all items within a specified radius of a query point without sorting the results.
+  This is often faster than [`KdTree::within`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.within) when result order does not matter, such as finding all customers within 5 miles of a store, or collecting point-cloud neighbourhoods for clustering or normal estimation.
 
 ## Usage
 Add `kiddo` to `Cargo.toml`
 ```toml
 [dependencies]
-kiddo = "5.3.0"
+kiddo = "6.0.0-alpha.1"
 ```
 
 Add points to k-d tree and query nearest n points with distance function
 ```rust
-use kiddo::{KdTree, SquaredEuclidean};
+use std::num::NonZero;
+
+use kiddo::{ImmutableKdTree, NearestNeighbour, SquaredEuclidean};
 
 let entries = vec![
     [0f64, 0f64],
@@ -41,40 +67,65 @@ let entries = vec![
     [3f64, 3f64]
 ];
 
-// use the kiddo::KdTree type to get up and running quickly with default settings
-let mut tree: KdTree<_, 2> = (&entries).into();
+let kdtree = ImmutableKdTree::new_from_slice(&entries);
 
 // How many items are in tree?
-assert_eq!(tree.size(), 4);
+assert_eq!(kdtree.size(), 4);
 
 // find the nearest item to [0f64, 0f64].
-// returns an instance of kiddo::NearestNeighbour
-let nearest = tree.nearest_one::<SquaredEuclidean>(&[0f64, 0f64]);
-assert_eq!(nearest.distance, 0f64);
-assert_eq!(nearest.item, 0);
-
-
-// find the nearest 3 items to [0f64, 0f64]
-// returns a Vec of kiddo::NearestNeighbour
-let nearest_n: Vec<_> = tree.nearest_n::<SquaredEuclidean>(&[0f64, 0f64], 3);
+// returns a tuple of (dist, index)
 assert_eq!(
-    nearest_n.iter().map(|x|(x.distance, x.item)).collect::<Vec<_>>(),
-    vec![(0f64, 0), (2f64, 1), (8f64, 2)]
+    kdtree.nearest_one::<SquaredEuclidean<f64>>(&[0f64, 0f64]),
+    (0f64, 0)
+);
+
+assert_eq!(
+    kdtree.nearest_n::<SquaredEuclidean<f64>>(
+        &[0f64, 0f64],
+        NonZero::new(3usize).unwrap(),
+        true
+    ),
+    vec![
+        NearestNeighbour {
+            distance: 0f64,
+            item: 0
+        },
+        NearestNeighbour {
+            distance: 2f64,
+            item: 1
+        },
+        NearestNeighbour {
+            distance: 8f64,
+            item: 2
+        }
+    ]
 );
 ```
 See the [examples documentation](https://github.com/sdd/kiddo/tree/master/examples) for some more detailed examples.
 
 ## Optional Features
 
-The Kiddo crate exposes the following features. Any labelled as **(NIGHTLY)** are not available on `stable` Rust as they require some unstable features. You'll need to build with `nightly` in order to user them.
-* `fixed`: enables the fixed module, which provides a version of KdTree that supports fixed-point types via the [`fixed`](https://docs.rs/fixed/latest/fixed) crate
-* `rkyv` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.7.
-* `rkyv_08` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.8.
-* `serde` - serialization / deserialization via [`Serde`](https://docs.rs/serde/latest/serde/)
-* `simd` **(NIGHTLY)** - enables some handwritten SIMD intrinsic code within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) that may improve performance (currently only on the nearest_one method when using `f64`)
-* `tracing` feature is enabled by default and adds some tracing output.
-* `modified_van_emde_boas`: disabled by default. Enabling will switch the stem node ordering from Eytzinger to a modified Van Emde Boas ordering that may in some circumstances be slightly faster.
-* The `f16`, `csv` and `las` features are only required for building some of the examples and are not required to support any features by consumers of this crate
+Kiddo exposes a number of optional crate features:
+
+- `fixed` enables support for fixed-point coordinate types from the [`fixed`](https://docs.rs/fixed/latest/fixed) crate.
+
+- `tracing` **(enabled by default)** enables tracing-based instrumentation and logging.
+
+- `f16` enables support for half-precision floating-point coordinates via the [`half`](https://docs.rs/half/latest/half) crate.
+
+- `serde` enables serialization and deserialization via [`Serde`](https://docs.rs/serde/latest/serde/).
+
+- `rkyv_08` enables zero-copy serialization and deserialization via [`rkyv`](https://docs.rs/rkyv/latest/rkyv/) 0.8.x. This is particularly useful for prebuilt immutable trees that you want to load very quickly, especially in conjunction with memory-mapped files.
+
+- `simd` **(NIGHTLY)** enables handwritten SIMD and prefetch intrinsics for additional performance where available. This requires a nightly Rust toolchain.
+
+- `huge_pages` enables Linux-specific huge-page advice helpers for owned and archived tree storage.
+
+- `leaf_nta_prefetch` enables additional non-temporal leaf prefetch hints in some query paths. This is an advanced tuning feature and is only useful in specific workloads.
+
+Kiddo also contains a number of additional feature flags used for internal experimentation, benchmarking, simulation, and specialized tuning. Most users will not need them.
+
+**NOTE**: Support for rkyv 0.7 was removed in Kiddo v6.
 
 
 ## v5.x
