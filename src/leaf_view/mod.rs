@@ -573,6 +573,7 @@ mod tests {
         assert_eq!(leaf_arena_tile_len(31), 8);
         assert_eq!(leaf_arena_tile_len(32), 32);
         assert_eq!(leaf_arena_tile_len(47), 32);
+        assert_eq!(leaf_arena_tile_len(100), 32);
     }
 
     #[test]

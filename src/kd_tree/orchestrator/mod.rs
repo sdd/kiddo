@@ -1575,3 +1575,33 @@ where
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_select_block3_pending_child() {
+        let rd_values = [1.0, 2.0, 0.5, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let new_off_values = [0.1, 0.2, 0.05, 0.4, 0.5, 0.6, 0.7, 0.8];
+        let candidate_mask = 0b111; // 0, 1, 2
+
+        let selection =
+            select_block3_pending_child::<f64>(&rd_values, &new_off_values, candidate_mask)
+                .unwrap();
+        assert_eq!(selection.child_idx, 2);
+        assert_eq!(selection.child_rd, 0.5);
+        assert_eq!(selection.remaining_mask, 0b011);
+    }
+
+    #[test]
+    fn test_rebuild_interval_offs() {
+        let query = [5.0, 5.0];
+        let lower = [0.0, 6.0];
+        let upper = [4.0, 10.0];
+        let off = rebuild_interval_offs::<f64, 2>(&query, &lower, &upper);
+
+        assert_eq!(off[0], 1.0);
+        assert_eq!(off[1], 1.0);
+    }
+}

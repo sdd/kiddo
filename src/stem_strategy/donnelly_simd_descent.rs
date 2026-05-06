@@ -404,7 +404,26 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
         self.core
             .traverse_block(child_idx as u8, Self::BLOCK_SIZE as u32);
         *dim = self.dim();
-
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_donnelly_simd_descent_basics() {
+        let stems = vec![10.0f64; 100];
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let mut strat = DonnellySimdDescent::<64, 8, 3>::new(stems_ptr);
+
+        assert_eq!(strat.stem_idx(), 0);
+        assert_eq!(strat.level(), 0);
+        assert_eq!(strat.dim(), 0);
+
+        strat.traverse(true);
+        assert!(strat.stem_idx() > 0);
+        assert_eq!(strat.level(), 1);
     }
 }
