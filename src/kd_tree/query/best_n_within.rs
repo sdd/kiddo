@@ -421,6 +421,68 @@ mod tests {
         assert_eq!(arena_result, flat_result);
     }
 
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[test]
+    fn best_n_within_vec_of_arenas_matches_flat_vec_f32_simd() {
+        let points: Vec<[f32; 3]> = (0..40)
+            .map(|idx| {
+                [
+                    idx as f32 / 40.0,
+                    ((idx * 7) % 40) as f32 / 40.0,
+                    ((idx * 13) % 40) as f32 / 40.0,
+                ]
+            })
+            .collect();
+        let query = [0.42f32, 0.53, 0.61];
+        let max_qty = NonZero::new(5).unwrap();
+        let max_dist = 0.2f32;
+
+        let flat_tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+        let arena_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+
+        let flat_result = flat_tree
+            .best_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty)
+            .into_sorted_vec();
+        let arena_result = arena_tree
+            .best_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty)
+            .into_sorted_vec();
+
+        assert_eq!(arena_result, flat_result);
+    }
+
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+    #[test]
+    fn best_n_within_vec_of_arenas_matches_flat_vec_f64_manhattan_simd() {
+        let points: Vec<[f64; 3]> = (0..40)
+            .map(|idx| {
+                [
+                    idx as f64 / 40.0,
+                    ((idx * 7) % 40) as f64 / 40.0,
+                    ((idx * 13) % 40) as f64 / 40.0,
+                ]
+            })
+            .collect();
+        let query = [0.42f64, 0.53, 0.61];
+        let max_qty = NonZero::new(5).unwrap();
+        let max_dist = 0.4f64;
+
+        let flat_tree: KdTree<f64, u32, Eytzinger<3>, FlatVec<f64, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+        let arena_tree: KdTree<f64, u32, Eytzinger<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+
+        let flat_result = flat_tree
+            .best_n_within::<crate::dist::Manhattan<f64>>(&query, max_dist, max_qty)
+            .into_sorted_vec();
+        let arena_result = arena_tree
+            .best_n_within::<crate::dist::Manhattan<f64>>(&query, max_dist, max_qty)
+            .into_sorted_vec();
+
+        assert_eq!(arena_result, flat_result);
+    }
+
     fn assert_best_neighbours_close_f64<T>(
         actual: &[BestNeighbour<f64, T>],
         expected: &[BestNeighbour<f64, T>],

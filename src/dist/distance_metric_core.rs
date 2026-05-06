@@ -81,3 +81,61 @@ pub trait DistanceMetricCore<A: Copy> {
         a.partial_cmp(&b).unwrap_or(Ordering::Equal)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::DistanceMetricCore;
+    use std::cmp::Ordering;
+
+    struct DummyLessMetric;
+    struct DummyGreaterMetric;
+
+    impl DistanceMetricCore<i16> for DummyLessMetric {
+        type Output = f64;
+        const ORDERING: Ordering = Ordering::Less;
+
+        fn widen_coord(a: i16) -> Self::Output {
+            a as f64
+        }
+
+        fn dist1(a: Self::Output, b: Self::Output) -> Self::Output {
+            (a - b).abs()
+        }
+    }
+
+    impl DistanceMetricCore<i16> for DummyGreaterMetric {
+        type Output = f64;
+        const ORDERING: Ordering = Ordering::Greater;
+
+        fn widen_coord(a: i16) -> Self::Output {
+            a as f64
+        }
+
+        fn dist1(a: Self::Output, b: Self::Output) -> Self::Output {
+            a - b
+        }
+    }
+
+    #[test]
+    fn default_widen_axis_bulk_widens() {
+        let axis = [1i16, -2, 7];
+        let mut out = [0.0f64; 3];
+        DummyLessMetric::widen_axis(&axis, &mut out);
+        assert_eq!(out, [1.0, -2.0, 7.0]);
+    }
+
+    #[test]
+    fn default_better_respects_ordering() {
+        assert!(DummyLessMetric::better(2.0, 5.0));
+        assert!(!DummyLessMetric::better(5.0, 2.0));
+        assert!(DummyGreaterMetric::better(5.0, 2.0));
+        assert!(!DummyGreaterMetric::better(2.0, 5.0));
+    }
+
+    #[test]
+    fn default_cmp_uses_partial_cmp() {
+        assert_eq!(DummyLessMetric::cmp(2.0, 5.0), Ordering::Less);
+        assert_eq!(DummyLessMetric::cmp(5.0, 2.0), Ordering::Greater);
+        assert_eq!(DummyLessMetric::cmp(3.0, 3.0), Ordering::Equal);
+    }
+}

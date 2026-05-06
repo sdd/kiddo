@@ -113,3 +113,67 @@ impl Avx2F32LeafOps for UnsupportedAvx2F32LeafOps {
         panic!("AVX2 f32 leaf ops are not implemented for this metric")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        Avx2F32LeafOps, Avx2F64LeafOps, UnsupportedAvx2F32LeafOps, UnsupportedAvx2F64LeafOps,
+    };
+    use core::arch::x86_64::{_mm256_set1_pd, _mm256_set1_ps, _mm_set1_pd, _mm_set1_ps};
+
+    #[test]
+    fn unsupported_avx2_f64_leaf_ops_panic() {
+        assert!(std::panic::catch_unwind(|| unsafe {
+            let _ = UnsupportedAvx2F64LeafOps::dist_k0_f64x4(_mm256_set1_pd(1.0));
+        })
+        .is_err());
+        assert!(std::panic::catch_unwind(|| unsafe {
+            let _ =
+                UnsupportedAvx2F64LeafOps::dist_kn_f64x4(_mm256_set1_pd(1.0), _mm256_set1_pd(2.0));
+        })
+        .is_err());
+        assert!(std::panic::catch_unwind(|| unsafe {
+            let _ = UnsupportedAvx2F64LeafOps::dist_k0_f64x2(_mm_set1_pd(1.0));
+        })
+        .is_err());
+        assert!(std::panic::catch_unwind(|| unsafe {
+            let _ = UnsupportedAvx2F64LeafOps::dist_kn_f64x2(_mm_set1_pd(1.0), _mm_set1_pd(2.0));
+        })
+        .is_err());
+        assert!(
+            std::panic::catch_unwind(|| UnsupportedAvx2F64LeafOps::dist_k0_f64x1(1.0)).is_err()
+        );
+        assert!(
+            std::panic::catch_unwind(|| UnsupportedAvx2F64LeafOps::dist_kn_f64x1(1.0, 2.0))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn unsupported_avx2_f32_leaf_ops_panic() {
+        assert!(std::panic::catch_unwind(|| unsafe {
+            let _ = UnsupportedAvx2F32LeafOps::dist_k0_f32x8(_mm256_set1_ps(1.0));
+        })
+        .is_err());
+        assert!(std::panic::catch_unwind(|| unsafe {
+            let _ =
+                UnsupportedAvx2F32LeafOps::dist_kn_f32x8(_mm256_set1_ps(1.0), _mm256_set1_ps(2.0));
+        })
+        .is_err());
+        assert!(std::panic::catch_unwind(|| unsafe {
+            let _ = UnsupportedAvx2F32LeafOps::dist_k0_f32x4(_mm_set1_ps(1.0));
+        })
+        .is_err());
+        assert!(std::panic::catch_unwind(|| unsafe {
+            let _ = UnsupportedAvx2F32LeafOps::dist_kn_f32x4(_mm_set1_ps(1.0), _mm_set1_ps(2.0));
+        })
+        .is_err());
+        assert!(
+            std::panic::catch_unwind(|| UnsupportedAvx2F32LeafOps::dist_k0_f32x1(1.0)).is_err()
+        );
+        assert!(
+            std::panic::catch_unwind(|| UnsupportedAvx2F32LeafOps::dist_kn_f32x1(1.0, 2.0))
+                .is_err()
+        );
+    }
+}
