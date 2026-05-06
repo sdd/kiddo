@@ -3763,6 +3763,11 @@ mod tests {
     use crate::stem_strategy::donnelly_2_blockmarker_simd::{
         child_interval_bounds_block3, child_interval_bounds_block4, interval_distance_1d,
     };
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    fn is_invalid_f64_sentinel(value: f64) -> bool {
+        value == <f64 as crate::Axis>::max_value() || value.is_infinite()
+    }
 
     #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
     struct Lcg {
@@ -4208,6 +4213,141 @@ mod tests {
                 "query={query}, old_off={old_off}, rd={rd}, best_dist={best_dist}"
             );
         }
+    }
+
+    #[test]
+    fn test_fill_block3_values_and_bounds_matches_with_bounds_mask_f64_squared_euclidean() {
+        let mut pivots = build_block3_pivots_f64();
+        let stems_ptr = NonNull::new(pivots.as_mut_ptr() as *mut u8).unwrap();
+        let mut new_off_values = [0.0; 8];
+        let mut rd_values = [0.0; 8];
+        let mut lower_bounds = [0.0; 8];
+        let mut upper_bounds = [0.0; 8];
+
+        let mask = <SquaredEuclidean<f64> as DistanceMetricSimdBlock3<f64, 3, f64>>::fill_block3_values_and_bounds(
+            4.5,
+            stems_ptr,
+            0,
+            2.5,
+            6.5,
+            0.5,
+            1.0,
+            5.0,
+            &mut new_off_values,
+            &mut rd_values,
+            &mut lower_bounds,
+            &mut upper_bounds,
+        );
+
+        let expected_mask = <SquaredEuclidean<f64> as DistanceMetricSimdBlock3<f64, 3, f64>>::backtrack_block3_with_bounds(
+            4.5, stems_ptr, 0, 2.5, 6.5, 0.5, 1.0, 5.0,
+        );
+        assert_eq!(mask, expected_mask);
+
+        for child_idx in 0..8usize {
+            let (lower_offset, upper_offset) = child_interval_bounds_block3(child_idx);
+            let raw_lower = if lower_offset == 255 {
+                <f64 as crate::Axis>::min_value()
+            } else {
+                pivots[lower_offset as usize]
+            };
+            let raw_upper = if upper_offset == 255 {
+                <f64 as crate::Axis>::max_value()
+            } else {
+                pivots[upper_offset as usize]
+            };
+            let effective_lower = f64::max(2.5, raw_lower);
+            let effective_upper = f64::min(6.5, raw_upper);
+            assert_eq!(lower_bounds[child_idx], effective_lower);
+            assert_eq!(upper_bounds[child_idx], effective_upper);
+            if effective_lower.partial_cmp(&effective_upper) != Some(std::cmp::Ordering::Less) {
+                assert!(is_invalid_f64_sentinel(new_off_values[child_idx]));
+                assert!(is_invalid_f64_sentinel(rd_values[child_idx]));
+            } else {
+                let new_off = interval_distance_1d(4.5, effective_lower, effective_upper);
+                let old_dist1 = <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist1(0.5, 0.0);
+                let new_dist1 =
+                    <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist1(new_off, 0.0);
+                assert_eq!(new_off_values[child_idx], new_off);
+                assert_eq!(rd_values[child_idx], 1.0 - old_dist1 + new_dist1);
+            }
+        }
+    }
+
+    #[test]
+    fn test_fill_block3_values_and_bounds_matches_with_bounds_mask_f32_manhattan() {
+        let mut pivots = build_block3_pivots_f32();
+        let stems_ptr = NonNull::new(pivots.as_mut_ptr() as *mut u8).unwrap();
+        let mut new_off_values = [0.0; 8];
+        let mut rd_values = [0.0; 8];
+        let mut lower_bounds = [0.0; 8];
+        let mut upper_bounds = [0.0; 8];
+
+        let mask = <Manhattan<f32> as DistanceMetricSimdBlock3<f32, 3, f32>>::fill_block3_values_and_bounds(
+            4.5,
+            stems_ptr,
+            0,
+            2.5,
+            6.5,
+            0.5,
+            1.0,
+            5.0,
+            &mut new_off_values,
+            &mut rd_values,
+            &mut lower_bounds,
+            &mut upper_bounds,
+        );
+
+        let expected_mask =
+            <Manhattan<f32> as DistanceMetricSimdBlock3<f32, 3, f32>>::backtrack_block3_with_bounds(
+                4.5, stems_ptr, 0, 2.5, 6.5, 0.5, 1.0, 5.0,
+            );
+        assert_eq!(mask, expected_mask);
+        assert!(lower_bounds
+            .iter()
+            .zip(upper_bounds.iter())
+            .enumerate()
+            .all(|(child_idx, (l, u))| {
+                if l.partial_cmp(u) != Some(std::cmp::Ordering::Less) {
+                    new_off_values[child_idx] == <f32 as crate::Axis>::max_value()
+                        && rd_values[child_idx] == <f32 as crate::Axis>::max_value()
+                } else {
+                    true
+                }
+            }));
+    }
+
+    #[test]
+    fn test_backtrack_block4_dispatch_matches_direct_metric_dispatch_f64_manhattan() {
+        let mut pivots = build_block4_pivots_f64();
+        let stems_ptr = NonNull::new(pivots.as_mut_ptr() as *mut u8).unwrap();
+        let via_axis =
+            f64::backtrack_block4::<f64, Manhattan<f64>, 3>(4.5, stems_ptr, 0, 0.5, 1.0, 6.0);
+        let via_metric =
+            <Manhattan<f64> as DistanceMetricSimdBlock4<f64, 3, f64>>::backtrack_block4(
+                4.5, stems_ptr, 0, 0.5, 1.0, 6.0,
+            );
+        assert_eq!(via_axis, via_metric);
+    }
+
+    #[test]
+    fn test_dot_product_block3_and_block4_dispatch_panics() {
+        let mut block3 = build_block3_pivots_f64();
+        let mut block4 = build_block4_pivots_f32();
+        let block3_ptr = NonNull::new(block3.as_mut_ptr() as *mut u8).unwrap();
+        let block4_ptr = NonNull::new(block4.as_mut_ptr() as *mut u8).unwrap();
+
+        assert!(catch_unwind(AssertUnwindSafe(|| {
+            let _ =
+                f64::backtrack_block3::<f64, DotProduct<f64>, 3>(4.5, block3_ptr, 0, 0.5, 1.0, 6.0);
+        }))
+        .is_err());
+
+        assert!(catch_unwind(AssertUnwindSafe(|| {
+            let _ =
+                f32::backtrack_block4::<f32, DotProduct<f32>, 3>(4.5, block4_ptr, 0, 0.5, 1.0, 6.0);
+        }))
+        .is_err());
     }
 
     #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]

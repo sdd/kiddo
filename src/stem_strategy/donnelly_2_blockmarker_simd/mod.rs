@@ -1509,6 +1509,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dist::{Manhattan, SquaredEuclidean};
+    use crate::kd_tree::query_stack_simd::{Block3ExactStackContext, Block3ExactStackContextState};
+    use crate::StemStrategy;
+    use std::panic::{catch_unwind, AssertUnwindSafe};
 
     fn build_test_block3_pivots_f64() -> [f64; 8] {
         [0.2, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f64::INFINITY]
@@ -1763,6 +1767,507 @@ mod tests {
                 upper_offset
             );
         }
+    }
+
+    #[test]
+    fn test_block3_deferred_block_helpers_match_free_functions() {
+        type Strat = DonnellyMarkerSimd<Block3, 64, 8, 3>;
+
+        let pivots = build_test_block3_pivots_f64();
+        let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
+        let strat = Strat::new(stems_ptr);
+
+        let expected_mask = backtrack_block3_with_bounds::<f64, f64, SquaredEuclidean<f64>, 3>(
+            &pivots,
+            0,
+            0.45,
+            f64::NEG_INFINITY,
+            f64::INFINITY,
+            0.0,
+            0.0,
+            0.2,
+        );
+        let actual_mask = strat
+            .backtrack_block3_pending_mask::<f64, f64, SquaredEuclidean<f64>, 3>(
+                &pivots,
+                0.45,
+                f64::NEG_INFINITY,
+                f64::INFINITY,
+                0.0,
+                0.0,
+                0.2,
+            );
+        assert_eq!(actual_mask, expected_mask);
+
+        let expected_state = selected_block3_child_state_and_rd::<f64, f64, SquaredEuclidean<f64>>(
+            &pivots,
+            0,
+            3,
+            0.45,
+            f64::NEG_INFINITY,
+            f64::INFINITY,
+            0.0,
+            0.0,
+        );
+        let actual_state = strat
+            .selected_block3_pending_child_state::<f64, f64, SquaredEuclidean<f64>>(
+                &pivots,
+                3,
+                0.45,
+                f64::NEG_INFINITY,
+                f64::INFINITY,
+                0.0,
+                0.0,
+            );
+        assert_eq!(actual_state, expected_state);
+
+        let mut new_off_values = [0.0; 8];
+        let mut rd_values = [0.0; 8];
+        let mut lower_bounds = [0.0; 8];
+        let mut upper_bounds = [0.0; 8];
+        let filled_mask = strat.fill_block3_pending_values::<f64, f64, SquaredEuclidean<f64>, 3>(
+            &pivots,
+            0.45,
+            f64::NEG_INFINITY,
+            f64::INFINITY,
+            0.0,
+            0.0,
+            0.2,
+            &mut new_off_values,
+            &mut rd_values,
+            &mut lower_bounds,
+            &mut upper_bounds,
+        );
+        assert_eq!(filled_mask, expected_mask);
+
+        let child = strat.block_child(5);
+        let mut expected_child = strat;
+        expected_child.core.traverse_block(5, 3);
+        assert_eq!(child.stem_idx(), expected_child.stem_idx());
+        assert_eq!(child.level(), expected_child.level());
+    }
+
+    #[test]
+    fn test_block4_deferred_block_helpers_default_to_panic() {
+        type Strat = DonnellyMarkerSimd<Block4, 64, 4, 3>;
+
+        let pivots = build_test_block4_pivots_f32();
+        let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
+        let strat = Strat::new(stems_ptr);
+
+        assert!(catch_unwind(AssertUnwindSafe(|| {
+            let _ = strat.backtrack_block3_pending_mask::<f32, f32, SquaredEuclidean<f32>, 3>(
+                &pivots,
+                0.55,
+                f32::NEG_INFINITY,
+                f32::INFINITY,
+                0.0,
+                0.0,
+                0.5,
+            );
+        }))
+        .is_err());
+
+        assert!(catch_unwind(AssertUnwindSafe(|| {
+            let _ = strat.selected_block3_pending_child_state::<f32, f32, SquaredEuclidean<f32>>(
+                &pivots,
+                0,
+                0.55,
+                f32::NEG_INFINITY,
+                f32::INFINITY,
+                0.0,
+                0.0,
+            );
+        }))
+        .is_err());
+
+        assert!(catch_unwind(AssertUnwindSafe(|| {
+            let mut new_off_values = [0.0; 8];
+            let mut rd_values = [0.0; 8];
+            let mut lower_bounds = [0.0; 8];
+            let mut upper_bounds = [0.0; 8];
+            let _ = strat.fill_block3_pending_values::<f32, f32, SquaredEuclidean<f32>, 3>(
+                &pivots,
+                0.55,
+                f32::NEG_INFINITY,
+                f32::INFINITY,
+                0.0,
+                0.0,
+                0.5,
+                &mut new_off_values,
+                &mut rd_values,
+                &mut lower_bounds,
+                &mut upper_bounds,
+            );
+        }))
+        .is_err());
+    }
+
+    #[test]
+    fn test_block4_block_child_matches_manual_traversal() {
+        type Strat = DonnellyMarkerSimd<Block4, 64, 4, 3>;
+
+        let pivots = build_test_block4_pivots_f32();
+        let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
+        let strat = Strat::new(stems_ptr);
+        let child = strat.block_child(9);
+
+        let mut expected = strat;
+        expected.core.traverse_block(9, 4);
+
+        assert_eq!(child.stem_idx(), expected.stem_idx());
+        assert_eq!(child.level(), expected.level());
+    }
+
+    #[test]
+    fn test_fill_block4_backtrack_values_and_bounds_matches_mask_and_bounds() {
+        let pivots = build_test_block4_pivots_f32();
+        let mut new_off_values = [0.0; 16];
+        let mut rd_values = [0.0; 16];
+        let mut lower_bounds = [0.0; 16];
+        let mut upper_bounds = [0.0; 16];
+
+        let mask = fill_block4_backtrack_values_and_bounds::<f32, f32, Manhattan<f32>, 3>(
+            &pivots,
+            0,
+            0.55,
+            0.15,
+            1.05,
+            0.0,
+            0.0,
+            0.5,
+            &mut new_off_values,
+            &mut rd_values,
+            &mut lower_bounds,
+            &mut upper_bounds,
+        );
+
+        for child_idx in 0..16usize {
+            let (lower_offset, upper_offset) = child_interval_bounds_block4(child_idx);
+            let raw_lower = if lower_offset == 255 {
+                <f32 as crate::Axis>::min_value()
+            } else {
+                pivots[lower_offset as usize]
+            };
+            let raw_upper = if upper_offset == 255 {
+                <f32 as crate::Axis>::max_value()
+            } else {
+                pivots[upper_offset as usize]
+            };
+            let effective_lower = f32::max(0.15, raw_lower);
+            let effective_upper = f32::min(1.05, raw_upper);
+            assert_eq!(lower_bounds[child_idx], effective_lower);
+            assert_eq!(upper_bounds[child_idx], effective_upper);
+            if effective_lower.partial_cmp(&effective_upper) != Some(std::cmp::Ordering::Less) {
+                assert_eq!(new_off_values[child_idx], <f32 as crate::Axis>::max_value());
+                assert_eq!(rd_values[child_idx], <f32 as crate::Axis>::max_value());
+                assert_eq!(mask & (1u16 << child_idx), 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_block3_get_leaf_idx_matches_manual_traversal() {
+        type Strat = DonnellyMarkerSimd<Block3, 64, 8, 3>;
+
+        let pivots = build_test_block3_pivots_f64();
+        let query = [0.45, 0.0, 0.0];
+        let leaf_idx = Strat::get_leaf_idx::<f64, 3>(&pivots, &query, 2);
+
+        let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
+        let mut manual = Strat::new(stems_ptr);
+        let child_idx = compare_block3(&pivots, query[0], 0);
+        manual.core.traverse_block(child_idx, 3);
+
+        assert_eq!(leaf_idx, manual.leaf_idx());
+    }
+
+    #[test]
+    fn test_block4_get_leaf_idx_matches_manual_traversal() {
+        type Strat = DonnellyMarkerSimd<Block4, 64, 4, 3>;
+
+        let pivots = build_test_block4_pivots_f32();
+        let query = [0.55, 0.0, 0.0];
+        let leaf_idx = Strat::get_leaf_idx::<f32, 3>(&pivots, &query, 3);
+
+        let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
+        let mut manual = Strat::new(stems_ptr);
+        let child_idx = compare_block4(&pivots, query[0], 0);
+        manual.core.traverse_block(child_idx, 4);
+
+        assert_eq!(leaf_idx, manual.leaf_idx());
+    }
+
+    #[test]
+    fn test_block3_backtracking_step_full_block_updates_state_and_pushes_pending() {
+        type Strat = DonnellyMarkerSimd<Block3, 64, 8, 3>;
+
+        let pivots = build_test_block3_pivots_f64();
+        let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
+        let mut strat = Strat::new(stems_ptr);
+        let query = [0.45, 0.0, 0.0];
+        let query_wide = [0.45, 0.0, 0.0];
+        let mut lower = [f64::NEG_INFINITY; 3];
+        let mut upper = [f64::INFINITY; 3];
+        let mut off = [0.0; 3];
+        let mut dim = 0usize;
+        let mut stack = <Strat as StemStrategy>::Stack::<f64>::default();
+
+        let child_idx = compare_block3(&pivots, query[0], 0);
+        let expected_mask = backtrack_block3_with_bounds::<f64, f64, SquaredEuclidean<f64>, 3>(
+            &pivots,
+            0,
+            query_wide[0],
+            lower[0],
+            upper[0],
+            off[0],
+            0.0,
+            0.2,
+        ) & !(1u8 << child_idx);
+        let (expected_off, expected_lower, expected_upper) =
+            selected_block3_child_state::<f64, f64, SquaredEuclidean<f64>>(
+                &pivots,
+                0,
+                child_idx,
+                query_wide[0],
+                lower[0],
+                upper[0],
+            );
+
+        let stepped = strat
+            .backtracking_traverse_step_with_bounds::<f64, f64, SquaredEuclidean<f64>, 3>(
+                &pivots,
+                &query,
+                &query_wide,
+                &mut lower,
+                &mut upper,
+                &mut off,
+                &mut dim,
+                0.0,
+                2,
+                0.2,
+                &mut stack,
+            );
+
+        assert!(stepped);
+        assert_eq!(off[0], expected_off);
+        assert_eq!(lower[0], expected_lower);
+        assert_eq!(upper[0], expected_upper);
+        assert_eq!(dim, strat.dim());
+
+        let popped = stack.pop().expect("pending block3 context");
+        type Block3Ctx = <Strat as StemStrategy>::StackContext<f64>;
+        let state =
+            <Block3Ctx as Block3ExactStackContext<f64, Strat, 3>>::into_block3_exact_state(popped);
+        match state {
+            Block3ExactStackContextState::Block3Pending { pending_mask, .. } => {
+                assert_eq!(pending_mask, expected_mask);
+            }
+            _ => panic!("expected Block3Pending context"),
+        }
+    }
+
+    #[test]
+    fn test_block3_backtracking_step_scalar_fallback_pushes_single() {
+        type Strat = DonnellyMarkerSimd<Block3, 64, 8, 3>;
+
+        let pivots = build_test_block3_pivots_f64();
+        let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
+        let mut strat = Strat::new(stems_ptr);
+        let query = [0.45, 0.0, 0.0];
+        let query_wide = [0.45, 0.0, 0.0];
+        let mut lower = [f64::NEG_INFINITY; 3];
+        let mut upper = [f64::INFINITY; 3];
+        let mut off = [0.0; 3];
+        let mut dim = 0usize;
+        let mut stack = <Strat as StemStrategy>::Stack::<f64>::default();
+
+        let stepped = strat
+            .backtracking_traverse_step_with_bounds::<f64, f64, SquaredEuclidean<f64>, 3>(
+                &pivots,
+                &query,
+                &query_wide,
+                &mut lower,
+                &mut upper,
+                &mut off,
+                &mut dim,
+                0.0,
+                0,
+                0.2,
+                &mut stack,
+            );
+
+        assert!(stepped);
+        let popped = stack.pop().expect("single fallback context");
+        type Block3Ctx = <Strat as StemStrategy>::StackContext<f64>;
+        let state =
+            <Block3Ctx as Block3ExactStackContext<f64, Strat, 3>>::into_block3_exact_state(popped);
+        match state {
+            Block3ExactStackContextState::Single {
+                dim: pushed_dim, ..
+            } => {
+                assert_eq!(pushed_dim, 0);
+            }
+            _ => panic!("expected single fallback context"),
+        }
+    }
+
+    #[test]
+    fn test_block4_backtracking_step_full_block_pushes_deferred_blocks() {
+        type Strat = DonnellyMarkerSimd<Block4, 64, 4, 3>;
+
+        let pivots = build_test_block4_pivots_f32();
+        let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
+        let mut strat = Strat::new(stems_ptr);
+        let query = [0.55, 0.0, 0.0];
+        let query_wide = [0.55, 0.0, 0.0];
+        let mut lower = [f32::NEG_INFINITY; 3];
+        let mut upper = [f32::INFINITY; 3];
+        let mut off = [0.0; 3];
+        let mut dim = 0usize;
+        let mut stack = <Strat as StemStrategy>::Stack::<f32>::default();
+
+        let child_idx = compare_block4(&pivots, query[0], 0);
+        let mut expected_off_values = [0.0; 16];
+        let mut expected_rd_values = [0.0; 16];
+        let mut expected_lower_bounds = [0.0; 16];
+        let mut expected_upper_bounds = [0.0; 16];
+        let expected_mask =
+            fill_block4_backtrack_values_and_bounds::<f32, f32, SquaredEuclidean<f32>, 3>(
+                &pivots,
+                0,
+                query_wide[0],
+                lower[0],
+                upper[0],
+                off[0],
+                0.0,
+                0.5,
+                &mut expected_off_values,
+                &mut expected_rd_values,
+                &mut expected_lower_bounds,
+                &mut expected_upper_bounds,
+            ) & !(1u16 << child_idx);
+
+        let stepped = strat
+            .backtracking_traverse_step_with_bounds::<f32, f32, SquaredEuclidean<f32>, 3>(
+                &pivots,
+                &query,
+                &query_wide,
+                &mut lower,
+                &mut upper,
+                &mut off,
+                &mut dim,
+                0.0,
+                3,
+                0.5,
+                &mut stack,
+            );
+
+        assert!(stepped);
+        assert_eq!(off[0], expected_off_values[child_idx as usize]);
+        assert_eq!(lower[0], expected_lower_bounds[child_idx as usize]);
+        assert_eq!(upper[0], expected_upper_bounds[child_idx as usize]);
+
+        let mut popped_masks = Vec::new();
+        while let Some(ctx) = stack.pop() {
+            match ctx {
+                crate::kd_tree::query_stack_simd::SimdQueryStackContext::DeferredBlock {
+                    child_base,
+                    sibling_mask,
+                    ..
+                } => popped_masks.push((child_base, sibling_mask)),
+                other => panic!("expected deferred block context, got {other:?}"),
+            }
+        }
+
+        if expected_mask & 0x00FF != 0 {
+            assert!(popped_masks.contains(&(0, expected_mask as u8)));
+        }
+        if expected_mask & 0xFF00 != 0 {
+            assert!(popped_masks.contains(&(8, (expected_mask >> 8) as u8)));
+        }
+    }
+
+    #[test]
+    fn test_block4_backtracking_step_scalar_fallback_pushes_single() {
+        type Strat = DonnellyMarkerSimd<Block4, 64, 4, 3>;
+
+        let pivots = build_test_block4_pivots_f32();
+        let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
+        let mut strat = Strat::new(stems_ptr);
+        let query = [0.55, 0.0, 0.0];
+        let query_wide = [0.55, 0.0, 0.0];
+        let mut lower = [f32::NEG_INFINITY; 3];
+        let mut upper = [f32::INFINITY; 3];
+        let mut off = [0.0; 3];
+        let mut dim = 0usize;
+        let mut stack = <Strat as StemStrategy>::Stack::<f32>::default();
+
+        let stepped = strat
+            .backtracking_traverse_step_with_bounds::<f32, f32, SquaredEuclidean<f32>, 3>(
+                &pivots,
+                &query,
+                &query_wide,
+                &mut lower,
+                &mut upper,
+                &mut off,
+                &mut dim,
+                0.0,
+                0,
+                0.5,
+                &mut stack,
+            );
+
+        assert!(stepped);
+        let popped = stack.pop().expect("single fallback context");
+        match popped {
+            crate::kd_tree::query_stack_simd::SimdQueryStackContext::Single {
+                dim: pushed_dim,
+                ..
+            } => assert_eq!(pushed_dim, 0),
+            other => panic!("expected single fallback context, got {other:?}"),
+        }
+    }
+
+    #[cfg(feature = "test_utils")]
+    #[test]
+    fn test_block3_backtracking_step_emits_exact_query_trace_event() {
+        type Strat = DonnellyMarkerSimd<Block3, 64, 8, 3>;
+
+        let pivots = build_test_block3_pivots_f64();
+        let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
+        let mut strat = Strat::new(stems_ptr);
+        let query = [0.45, 0.0, 0.0];
+        let query_wide = [0.45, 0.0, 0.0];
+        let mut lower = [f64::NEG_INFINITY; 3];
+        let mut upper = [f64::INFINITY; 3];
+        let mut off = [0.0; 3];
+        let mut dim = 0usize;
+        let mut stack = <Strat as StemStrategy>::Stack::<f64>::default();
+
+        crate::test_utils::exact_query_trace::set_enabled(true);
+        let stepped = strat
+            .backtracking_traverse_step_with_bounds::<f64, f64, SquaredEuclidean<f64>, 3>(
+                &pivots,
+                &query,
+                &query_wide,
+                &mut lower,
+                &mut upper,
+                &mut off,
+                &mut dim,
+                0.0,
+                2,
+                0.2,
+                &mut stack,
+            );
+        let events = crate::test_utils::exact_query_trace::snapshot();
+        crate::test_utils::exact_query_trace::set_enabled(false);
+
+        assert!(stepped);
+        assert!(events.iter().any(|event| matches!(
+            event,
+            crate::test_utils::exact_query_trace::ExactQueryTraceEvent::Block3FullStep { .. }
+        )));
     }
 
     #[test]
