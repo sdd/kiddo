@@ -1,3 +1,6 @@
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+#![cfg_attr(coverage_nightly, coverage(off))]
+
 #[cfg(target_os = "linux")]
 mod linux {
     use kiddo::dist::SquaredEuclidean;

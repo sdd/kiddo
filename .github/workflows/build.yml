@@ -93,7 +93,7 @@ jobs:
     name: Lint (Nightly)
     runs-on: ubuntu-latest
     env:
-      RUSTFLAGS: "-C target-cpu=native"
+      RUSTFLAGS: "-C target-feature=+avx2"
 
     steps:
       - uses: actions/checkout@v6
@@ -165,7 +165,7 @@ jobs:
     name: Cargo Check (Nightly)
     runs-on: ubuntu-latest
     env:
-      RUSTFLAGS: "-C target-cpu=native"
+      RUSTFLAGS: "-C target-feature=+avx2"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -234,7 +234,7 @@ jobs:
     name: Run Tests (Nightly, all features enabled)
     runs-on: ubuntu-latest
     env:
-      RUSTFLAGS: "-C target-cpu=native"
+      RUSTFLAGS: "-C target-feature=+avx2"
     steps:
       - uses: actions/checkout@v6
         with:

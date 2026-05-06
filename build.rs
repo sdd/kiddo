@@ -9,6 +9,20 @@ mod ultimate_f64_avx512_nearest_one_sq_euc_kernel;
 fn main() {
     // Register the custom cfg to avoid warnings
     println!("cargo::rustc-check-cfg=cfg(cache_line_128)");
+    println!("cargo::rustc-check-cfg=cfg(kiddo_nightly)");
+    println!("cargo::rustc-check-cfg=cfg(coverage_nightly)");
+
+    let rustc = std::env::var("RUSTC").unwrap_or_else(|_| "rustc".to_string());
+    let rustc_version = std::process::Command::new(rustc)
+        .arg("--version")
+        .output()
+        .ok()
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .unwrap_or_default();
+
+    if rustc_version.contains("nightly") {
+        println!("cargo:rustc-cfg=kiddo_nightly");
+    }
 
     let emit_warnings = std::env::var("KIDDO_CACHELINE_WARN")
         .map(|val| val == "1")
@@ -50,14 +64,12 @@ fn main() {
                 }
             }
         }
-    } else {
-        if emit_warnings {
-            println!(
-                "cargo:warning=Cross-compiling (host: {}, target: {}). \
-                 Assuming 64-byte cache lines. Override with RUSTFLAGS='--cfg cache_line_128' if needed.",
-                host, target
-            );
-        }
+    } else if emit_warnings {
+        println!(
+            "cargo:warning=Cross-compiling (host: {}, target: {}). \
+             Assuming 64-byte cache lines. Override with RUSTFLAGS='--cfg cache_line_128' if needed.",
+            host, target
+        );
     }
 
     println!("cargo:rerun-if-changed=build.rs");

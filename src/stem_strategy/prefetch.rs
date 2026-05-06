@@ -1,6 +1,6 @@
 //! Prefetch helper functions
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", kiddo_nightly))]
 #[inline(always)]
 pub(crate) unsafe fn prefetch_t0(ptr: *const u8) {
     use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY3, _PREFETCH_READ};
@@ -14,7 +14,11 @@ pub(crate) unsafe fn prefetch_t0(ptr: *const u8) {
     _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY3>(ptr as *const i8);
 }
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", not(kiddo_nightly)))]
+#[inline(always)]
+pub(crate) unsafe fn prefetch_t0(_ptr: *const u8) {}
+
+#[cfg(all(target_arch = "aarch64", kiddo_nightly))]
 #[inline(always)]
 pub(crate) unsafe fn prefetch_t1(ptr: *const u8) {
     use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY2, _PREFETCH_READ};
@@ -27,6 +31,10 @@ pub(crate) unsafe fn prefetch_t1(ptr: *const u8) {
 
     _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr as *const i8);
 }
+
+#[cfg(all(target_arch = "aarch64", not(kiddo_nightly)))]
+#[inline(always)]
+pub(crate) unsafe fn prefetch_t1(_ptr: *const u8) {}
 
 #[cfg(target_arch = "x86_64")]
 #[inline(always)]

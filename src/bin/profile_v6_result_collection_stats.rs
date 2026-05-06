@@ -1,3 +1,6 @@
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+#![cfg_attr(coverage_nightly, coverage(off))]
+
 use kiddo::dist::SquaredEuclidean;
 use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::results::result_collection_stats::{reset, snapshot, ResultCollectionStats};

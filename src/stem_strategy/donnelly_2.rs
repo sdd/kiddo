@@ -415,11 +415,11 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL,
 
     #[allow(dead_code)]
     #[inline(always)]
-    fn prefetch_next_base(stems_ptr: NonNull<u8>, next_base: u32) {
+    fn prefetch_next_base(_stems_ptr: NonNull<u8>, _next_base: u32) {
         #[cfg(target_arch = "x86_64")]
         unsafe {
             const BYTES_PER_LINE: usize = 64;
-            let base_ptr = stems_ptr.as_ptr().add((next_base as usize) * VB as usize);
+            let base_ptr = _stems_ptr.as_ptr().add((_next_base as usize) * VB as usize);
 
             let ptr_1 = base_ptr.add(BYTES_PER_LINE);
             let ptr_2 = base_ptr.add(2 * BYTES_PER_LINE);
@@ -442,12 +442,12 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> Donnelly<L, CL,
             _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_7 as *const i8);
         }
 
-        #[cfg(target_arch = "aarch64")]
+        #[cfg(all(target_arch = "aarch64", kiddo_nightly))]
         unsafe {
             use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY2, _PREFETCH_READ};
 
             const BYTES_PER_LINE: usize = 64; // 64 for most ARM, 128 for Apple M-series
-            let base_ptr = stems_ptr.as_ptr().add((next_base as usize) * VB as usize);
+            let base_ptr = _stems_ptr.as_ptr().add((_next_base as usize) * VB as usize);
 
             let ptr_1 = base_ptr.add(BYTES_PER_LINE);
             let ptr_2 = base_ptr.add(2 * BYTES_PER_LINE);

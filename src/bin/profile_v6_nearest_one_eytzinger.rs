@@ -1,3 +1,6 @@
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+#![cfg_attr(coverage_nightly, coverage(off))]
+
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::FlatVec;
 use kiddo::Eytzinger;

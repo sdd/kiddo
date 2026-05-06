@@ -1,3 +1,6 @@
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+#![cfg_attr(coverage_nightly, coverage(off))]
+
 use kiddo_v5::immutable::float::kdtree::ImmutableKdTree;
 use kiddo_v5::SquaredEuclidean;
 use rand::Rng;

@@ -377,7 +377,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> DonnellySwPre<L
             _mm_prefetch::<{ _MM_HINT_T0 }>(ptr_7 as *const i8);
         }
 
-        #[cfg(target_arch = "aarch64")]
+        #[cfg(all(target_arch = "aarch64", kiddo_nightly))]
         unsafe {
             use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY2, _PREFETCH_READ};
 
@@ -488,7 +488,7 @@ pub fn test_traverse_hook(is_right_child: bool, stems: AlignedVec) -> usize {
     stem_strat.stem_idx()
 }
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", kiddo_nightly))]
 #[inline(always)]
 unsafe fn prefetch_t0(ptr: *const u8) {
     use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY3, _PREFETCH_READ};
@@ -496,12 +496,22 @@ unsafe fn prefetch_t0(ptr: *const u8) {
 }
 
 #[allow(unused)]
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", not(kiddo_nightly)))]
+#[inline(always)]
+unsafe fn prefetch_t0(_ptr: *const u8) {}
+
+#[allow(unused)]
+#[cfg(all(target_arch = "aarch64", kiddo_nightly))]
 #[inline(always)]
 unsafe fn prefetch_t1(ptr: *const u8) {
     use core::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY2, _PREFETCH_READ};
     _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY2>(ptr as *const i8);
 }
+
+#[allow(unused)]
+#[cfg(all(target_arch = "aarch64", not(kiddo_nightly)))]
+#[inline(always)]
+unsafe fn prefetch_t1(_ptr: *const u8) {}
 
 #[cfg(target_arch = "x86_64")]
 #[inline(always)]
