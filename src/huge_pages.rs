@@ -519,11 +519,84 @@ pub(crate) fn maybe_collapse_slice_huge_pages<T>(ptr: *const T, len: usize) {
 
 #[cfg(test)]
 mod tests {
+    use super::{HugePageError, HugePageMappingReport};
+    use std::error::Error;
 
+    #[cfg(not(all(feature = "huge_pages", target_os = "linux")))]
+    use super::{
+        advise_huge_pages, collapse_huge_pages, no_huge_pages, prepare_archived_bytes, HugePageMode,
+    };
     #[cfg(target_os = "linux")]
-    use super::parse_smaps_for_range;
+    use super::{mapping_report_for_slice, parse_smaps_for_range};
     #[cfg(target_os = "linux")]
-    use super::HugePageMappingReport;
+    use super::{parse_kb_field, parse_smaps_header, push_unique};
+
+    #[test]
+    fn huge_page_mapping_report_total_huge_kb_sums_components() {
+        let report = HugePageMappingReport {
+            anon_huge_pages_kb: 1,
+            file_pmd_mapped_kb: 2,
+            shmem_pmd_mapped_kb: 3,
+            ..HugePageMappingReport::default()
+        };
+        assert_eq!(report.total_huge_kb(), 6);
+    }
+
+    #[test]
+    fn huge_page_error_display_and_source_are_wired() {
+        let err = HugePageError::Unsupported;
+        assert_eq!(
+            err.to_string(),
+            "huge-page advice is unsupported for this build"
+        );
+        assert!(err.source().is_none());
+
+        let io = std::io::Error::other("boom");
+        let err = HugePageError::Smaps(io);
+        assert!(err.to_string().contains("could not read /proc/self/smaps"));
+        assert!(err.source().is_some());
+    }
+
+    #[test]
+    fn huge_page_public_helpers_cover_non_feature_paths() {
+        #[cfg(not(all(feature = "huge_pages", target_os = "linux")))]
+        {
+            let bytes = [0u8; 16];
+
+            assert!(matches!(
+                no_huge_pages(&bytes),
+                Err(HugePageError::Unsupported)
+            ));
+            assert!(matches!(
+                advise_huge_pages(&bytes),
+                Err(HugePageError::Unsupported)
+            ));
+            assert!(matches!(
+                collapse_huge_pages(&bytes),
+                Err(HugePageError::Unsupported)
+            ));
+            assert!(matches!(
+                prepare_archived_bytes(&bytes, HugePageMode::NoHuge),
+                Err(HugePageError::Unsupported)
+            ));
+            assert!(matches!(
+                prepare_archived_bytes(&bytes, HugePageMode::Advise),
+                Err(HugePageError::Unsupported)
+            ));
+            assert!(matches!(
+                prepare_archived_bytes(&bytes, HugePageMode::Collapse),
+                Err(HugePageError::Unsupported)
+            ));
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            assert_eq!(
+                mapping_report_for_slice(&[]).unwrap(),
+                HugePageMappingReport::default()
+            );
+        }
+    }
 
     #[test]
     #[cfg(target_os = "linux")]
@@ -559,5 +632,26 @@ ShmemPmdMapped:        0 kB
                 mmu_page_size_kb: vec![4, 2048],
             }
         );
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn smaps_parser_helpers_parse_and_deduplicate() {
+        assert_eq!(
+            parse_smaps_header("1000-2000 r--p 00000000 00:00 0"),
+            Some((0x1000, 0x2000))
+        );
+        assert_eq!(parse_smaps_header("not-a-header"), None);
+
+        assert_eq!(
+            parse_kb_field("Size:                 16 kB", "Size:"),
+            Some(16)
+        );
+        assert_eq!(parse_kb_field("AnonHugePages:      2048 kB", "Size:"), None);
+
+        let mut values = vec![4, 2048];
+        push_unique(&mut values, 2048);
+        push_unique(&mut values, 64);
+        assert_eq!(values, vec![4, 2048, 64]);
     }
 }

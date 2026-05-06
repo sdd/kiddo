@@ -332,3 +332,57 @@ macro_rules! impl_axis_uint {
 impl_axis_uint!(u8);
 impl_axis_uint!(u16);
 impl_axis_uint!(u32);
+
+#[cfg(test)]
+mod tests {
+    use super::Axis;
+
+    #[test]
+    fn float_axis_helpers_behave_as_expected() {
+        assert_eq!(<f32 as Axis>::zero(), 0.0);
+        assert!(<f32 as Axis>::is_max_value(<f32 as Axis>::max_value()));
+        assert_eq!(<f32 as Axis>::cmp(1.0, 2.0), std::cmp::Ordering::Less);
+        assert_eq!(<f32 as Axis>::cmp(2.0, 1.0), std::cmp::Ordering::Greater);
+        assert_eq!(<f32 as Axis>::cmp(2.0, 2.0), std::cmp::Ordering::Equal);
+        assert_eq!(<f32 as Axis>::saturating_dist(5.0, 2.5), 2.5);
+        assert_eq!(<f32 as Axis>::saturating_add(1.5, 2.0), 3.5);
+        assert_eq!(<f32 as Axis>::max(3.0, 4.0), 4.0);
+
+        assert_eq!(<f64 as Axis>::zero(), 0.0);
+        assert!(!<f64 as Axis>::is_max_value(<f64 as Axis>::min_value()));
+        assert_eq!(<f64 as Axis>::saturating_dist(2.0, 5.5), 3.5);
+    }
+
+    #[test]
+    fn unsigned_axis_helpers_behave_as_expected() {
+        assert_eq!(<u8 as Axis>::zero(), 0);
+        assert_eq!(<u8 as Axis>::min_value(), 0);
+        assert_eq!(<u8 as Axis>::max_value(), u8::MAX);
+        assert!(<u8 as Axis>::is_max_value(u8::MAX));
+        assert_eq!(<u8 as Axis>::cmp(1, 2), std::cmp::Ordering::Less);
+        assert_eq!(<u8 as Axis>::saturating_dist(2, 5), 3);
+        assert_eq!(<u8 as Axis>::saturating_add(250, 10), u8::MAX);
+        assert_eq!(<u8 as Axis>::max(3, 4), 4);
+
+        assert_eq!(<u16 as Axis>::saturating_dist(9, 4), 5);
+        assert_eq!(<u32 as Axis>::saturating_add(u32::MAX, 1), u32::MAX);
+    }
+
+    #[cfg(feature = "fixed")]
+    #[test]
+    fn fixed_axis_helpers_behave_as_expected() {
+        let a = fixed::FixedI32::<fixed::types::extra::U16>::from_num(1.5);
+        let b = fixed::FixedI32::<fixed::types::extra::U16>::from_num(0.25);
+        assert_eq!(
+            <fixed::FixedI32<fixed::types::extra::U16> as Axis>::saturating_dist(a, b),
+            fixed::FixedI32::<fixed::types::extra::U16>::from_num(1.25)
+        );
+        assert_eq!(
+            <fixed::FixedU16<fixed::types::extra::U8> as Axis>::max(
+                fixed::FixedU16::<fixed::types::extra::U8>::from_num(2),
+                fixed::FixedU16::<fixed::types::extra::U8>::from_num(3)
+            ),
+            fixed::FixedU16::<fixed::types::extra::U8>::from_num(3)
+        );
+    }
+}

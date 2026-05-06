@@ -107,3 +107,76 @@ pub fn calc_dists(content_points: &[[f32; 64]; 3], acc: &mut [f32; 64], query: &
         });
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{calc_dists, DistanceMetric};
+    use std::cmp::Ordering;
+
+    struct DummyLess;
+    struct DummyGreater;
+
+    impl DistanceMetric<i16, 3> for DummyLess {
+        type Output = f64;
+        const ORDERING: Ordering = Ordering::Less;
+
+        fn widen_coord(a: i16) -> Self::Output {
+            a as f64
+        }
+
+        fn dist1(a: Self::Output, b: Self::Output) -> Self::Output {
+            (a - b).abs()
+        }
+    }
+
+    impl DistanceMetric<i16, 3> for DummyGreater {
+        type Output = f64;
+        const ORDERING: Ordering = Ordering::Greater;
+
+        fn widen_coord(a: i16) -> Self::Output {
+            a as f64
+        }
+
+        fn dist1(a: Self::Output, b: Self::Output) -> Self::Output {
+            a - b
+        }
+    }
+
+    #[test]
+    fn default_widen_axis_dist_closer_and_cmp_are_exercised() {
+        let axis = [1i16, -2, 7];
+        let mut out = [0.0f64; 3];
+        DummyLess::widen_axis(&axis, &mut out);
+        assert_eq!(out, [1.0, -2.0, 7.0]);
+
+        let a = [1.0f64, 2.0, 3.0];
+        let b = [4.0f64, 4.0, 9.0];
+        assert_eq!(DummyLess::dist(&a, &b), 11.0);
+
+        assert!(DummyLess::closer(2.0, 5.0));
+        assert!(!DummyLess::closer(5.0, 2.0));
+        assert!(DummyGreater::closer(5.0, 2.0));
+        assert_eq!(DummyLess::cmp(2.0, 5.0), Ordering::Less);
+        assert_eq!(DummyLess::cmp(5.0, 2.0), Ordering::Greater);
+        assert_eq!(DummyLess::cmp(3.0, 3.0), Ordering::Equal);
+    }
+
+    #[test]
+    fn calc_dists_accumulates_squared_euclidean_components() {
+        let mut content_points = [[0.0f32; 64]; 3];
+        for idx in 0..64 {
+            content_points[0][idx] = idx as f32;
+            content_points[1][idx] = idx as f32 + 1.0;
+            content_points[2][idx] = idx as f32 + 2.0;
+        }
+
+        let mut acc = [0.0f32; 64];
+        let query = [1.0f32, 2.0, 3.0];
+        calc_dists(&content_points, &mut acc, &query);
+
+        assert_eq!(acc[0], 3.0);
+        assert_eq!(acc[1], 0.0);
+        assert_eq!(acc[2], 3.0);
+        assert_eq!(acc[5], 48.0);
+    }
+}

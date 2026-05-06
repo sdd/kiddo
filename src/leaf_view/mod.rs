@@ -537,3 +537,155 @@ impl<'a, AX: Axis<Coord = AX>, T: Content + PartialOrd, const K: usize, const B:
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn encode_leaf_arena<const K: usize>(points: [&[f32]; K], items: &[u32]) -> Vec<u8> {
+        let len = items.len();
+        let mut bytes = Vec::with_capacity(LeafArena::<f32, u32, K>::encoded_len_bytes(len));
+
+        let mut base = 0usize;
+        for_each_leaf_arena_tile_len(len, |tile_len| {
+            for axis in points.iter().take(K) {
+                for value in &axis[base..base + tile_len] {
+                    bytes.extend_from_slice(&value.to_ne_bytes());
+                }
+            }
+            for item in &items[base..base + tile_len] {
+                bytes.extend_from_slice(&item.to_ne_bytes());
+            }
+            base += tile_len;
+        });
+
+        bytes
+    }
+
+    #[test]
+    fn leaf_arena_tile_len_prefers_largest_supported_tile() {
+        assert_eq!(leaf_arena_tile_len(1), 1);
+        assert_eq!(leaf_arena_tile_len(2), 2);
+        assert_eq!(leaf_arena_tile_len(3), 2);
+        assert_eq!(leaf_arena_tile_len(4), 4);
+        assert_eq!(leaf_arena_tile_len(7), 4);
+        assert_eq!(leaf_arena_tile_len(8), 8);
+        assert_eq!(leaf_arena_tile_len(31), 8);
+        assert_eq!(leaf_arena_tile_len(32), 32);
+        assert_eq!(leaf_arena_tile_len(47), 32);
+    }
+
+    #[test]
+    fn for_each_leaf_arena_tile_len_emits_expected_sequence() {
+        let mut widths = Vec::new();
+        for_each_leaf_arena_tile_len(47, |tile_len| widths.push(tile_len));
+        assert_eq!(widths, vec![32, 8, 4, 2, 1]);
+    }
+
+    #[test]
+    fn leaf_view_accessors_round_trip_points_and_items() {
+        let xs = [1.0f32, 2.0, 3.0];
+        let ys = [10.0f32, 20.0, 30.0];
+        let items = [7u32, 8, 9];
+        let view = LeafView::<f32, u32, 2, 8>::new([&xs, &ys], &items);
+
+        assert_eq!(view.len(), 3);
+        assert_eq!(view.points()[0], &xs);
+        assert_eq!(view.points()[1], &ys);
+        assert_eq!(view.items(), &items);
+        assert_eq!(view.point_item(1), ([2.0, 20.0], 8));
+
+        let (parts_points, parts_items) = view.into_parts();
+        assert_eq!(parts_points[0], &xs);
+        assert_eq!(parts_points[1], &ys);
+        assert_eq!(parts_items, &items);
+    }
+
+    #[test]
+    fn assert_leaf_scratch_capacity_panics_when_exceeded() {
+        assert!(std::panic::catch_unwind(|| assert_leaf_scratch_capacity(
+            LEAF_SCRATCH_CAPACITY + 1
+        ))
+        .is_err());
+    }
+
+    #[test]
+    fn try_identity_widen_axis_only_accepts_float_identity() {
+        let f32_axis = [1.0f32, 2.5, 9.0];
+        let f64_axis = [1.0f64, 2.5, 9.0];
+        let u32_axis = [1u32, 2, 3];
+
+        let widened_f32 = try_identity_widen_axis::<f32, f32>(&f32_axis).unwrap();
+        let widened_f64 = try_identity_widen_axis::<f64, f64>(&f64_axis).unwrap();
+
+        assert_eq!(widened_f32, &f32_axis);
+        assert_eq!(widened_f64, &f64_axis);
+        assert!(try_identity_widen_axis::<u32, u32>(&u32_axis).is_none());
+        assert!(try_identity_widen_axis::<f32, f64>(&f32_axis).is_none());
+    }
+
+    #[test]
+    fn leaf_arena_round_trips_encoded_tiles() {
+        let xs: Vec<f32> = (0..47).map(|idx| idx as f32 + 0.25).collect();
+        let ys: Vec<f32> = (0..47).map(|idx| 100.0 + idx as f32 + 0.5).collect();
+        let items: Vec<u32> = (0..47).map(|idx| idx as u32 + 10).collect();
+        let bytes = encode_leaf_arena::<2>([&xs, &ys], &items);
+
+        assert_eq!(
+            bytes.len(),
+            LeafArena::<f32, u32, 2>::encoded_len_bytes(items.len())
+        );
+
+        let arena = LeafArena::<f32, u32, 2>::new(bytes.as_ptr(), items.len());
+        assert!(!arena.is_empty());
+
+        #[cfg(any(
+            all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
+            all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"),
+            all(feature = "simd", target_arch = "aarch64", target_feature = "neon")
+        ))]
+        {
+            assert_eq!(arena.len(), items.len());
+            assert_eq!(arena.as_ptr(), bytes.as_ptr());
+        }
+
+        for idx in [0usize, 1, 31, 32, 40, 46] {
+            assert_eq!(arena.point_item(idx), ([xs[idx], ys[idx]], items[idx]));
+        }
+
+        let mut chunk_lens = Vec::new();
+        let mut first_chunk_values = None;
+        arena.for_each_tiled_chunk(|tile| {
+            chunk_lens.push(tile.len());
+            if first_chunk_values.is_none() {
+                first_chunk_values = Some(unsafe {
+                    (
+                        [tile.point_unaligned(0, 0), tile.point_unaligned(1, 0)],
+                        tile.item_unaligned(0),
+                    )
+                });
+            }
+        });
+
+        assert_eq!(chunk_lens, vec![32, 8, 4, 2, 1]);
+        assert_eq!(first_chunk_values, Some(([xs[0], ys[0]], items[0])));
+    }
+
+    #[test]
+    fn update_nearest_dist_replaces_best_when_smaller_distance_found() {
+        let dists = [4.0f32, 1.5, 2.0];
+        let items = [11u32, 22, 33];
+        let mut best_dist = 10.0f32;
+        let mut best_item = 0u32;
+
+        LeafView::<f32, u32, 2, 8>::update_nearest_dist(
+            &dists,
+            &items,
+            &mut best_dist,
+            &mut best_item,
+        );
+
+        assert_eq!(best_dist, 1.5);
+        assert_eq!(best_item, 22);
+    }
+}
