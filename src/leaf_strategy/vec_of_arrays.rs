@@ -482,7 +482,10 @@ mod test {
 
     use crate::dist::SquaredEuclidean;
     use crate::kd_tree::KdTreeAccessor;
+    #[cfg(feature = "rkyv_08")]
+    use crate::leaf_strategy::vec_of_arrays::ArchivedVecOfArrays;
     use crate::leaf_strategy::vec_of_arrays::VecOfArrays;
+    use crate::traits::leaf_strategy::{ConstructibleLeafStrategy, MutableLeafStrategy};
     use crate::LeafStrategy;
     use crate::{kd_tree, Eytzinger};
 
@@ -587,5 +590,222 @@ mod test {
         let query_point = [0.5, 0.5, 0.5];
 
         let _nearest = tree.nearest_one::<SquaredEuclidean<f32>>(&query_point);
+    }
+
+    #[test]
+    fn vec_of_arrays_size_and_leaf_len_track_contents() {
+        let mut leaves = <VecOfArrays<f32, u32, 2, 4> as ConstructibleLeafStrategy<
+            f32,
+            u32,
+            Eytzinger<2>,
+            2,
+            4,
+        >>::new_with_empty_leaf();
+
+        assert_eq!(
+            <VecOfArrays<f32, u32, 2, 4> as LeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::size(
+                &leaves
+            ),
+            0
+        );
+        assert_eq!(
+            <VecOfArrays<f32, u32, 2, 4> as LeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::leaf_len(
+                &leaves, 0
+            ),
+            0
+        );
+
+        <VecOfArrays<f32, u32, 2, 4> as MutableLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::add_to_leaf(&mut leaves, 0, &[1.0, 10.0], 7);
+        <VecOfArrays<f32, u32, 2, 4> as MutableLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::add_to_leaf(&mut leaves, 0, &[2.0, 20.0], 8);
+
+        let extra_points = [&[3.0f32, 4.0][..], &[30.0f32, 40.0][..]];
+        let extra_items = [9u32, 10];
+        <VecOfArrays<f32, u32, 2, 4> as ConstructibleLeafStrategy<
+            f32,
+            u32,
+            Eytzinger<2>,
+            2,
+            4,
+        >>::append_leaf(&mut leaves, &extra_points, &extra_items);
+
+        assert_eq!(
+            <VecOfArrays<f32, u32, 2, 4> as LeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::size(
+                &leaves
+            ),
+            4
+        );
+        assert_eq!(
+            <VecOfArrays<f32, u32, 2, 4> as LeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::leaf_len(
+                &leaves, 0
+            ),
+            2
+        );
+        assert_eq!(
+            <VecOfArrays<f32, u32, 2, 4> as LeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::leaf_len(
+                &leaves, 1
+            ),
+            2
+        );
+    }
+
+    #[cfg(feature = "rkyv_08")]
+    #[test]
+    fn archived_vec_of_arrays_accessors_round_trip() {
+        type Leaves = VecOfArrays<f32, u32, 2, 4>;
+        type ArchivedLeaves = ArchivedVecOfArrays<f32, u32, 2, 4>;
+
+        let mut leaves =
+            <Leaves as ConstructibleLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::new_with_empty_leaf();
+        <Leaves as MutableLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::add_to_leaf(
+            &mut leaves,
+            0,
+            &[1.0, 10.0],
+            7,
+        );
+        <Leaves as MutableLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::add_to_leaf(
+            &mut leaves,
+            0,
+            &[2.0, 20.0],
+            8,
+        );
+        let extra_points = [&[3.0f32][..], &[30.0f32][..]];
+        let extra_items = [9u32];
+        <Leaves as ConstructibleLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::append_leaf(
+            &mut leaves,
+            &extra_points,
+            &extra_items,
+        );
+
+        let bytes = rkyv_08::api::high::to_bytes_in::<_, rkyv_08::rancor::Error>(
+            &leaves,
+            rkyv_08::util::AlignedVec::<16>::new(),
+        )
+        .unwrap();
+        let archived =
+            rkyv_08::access::<ArchivedLeaves, rkyv_08::rancor::Error>(bytes.as_slice()).unwrap();
+
+        assert_eq!(
+            <ArchivedLeaves as LeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::size(archived),
+            3
+        );
+        assert_eq!(
+            <ArchivedLeaves as LeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::leaf_count(archived),
+            2
+        );
+        assert_eq!(
+            <ArchivedLeaves as LeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::leaf_len(archived, 0),
+            2
+        );
+        assert_eq!(
+            <ArchivedLeaves as LeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::leaf_len(archived, 1),
+            1
+        );
+
+        let view =
+            <ArchivedLeaves as LeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::leaf_view(archived, 0);
+        let (points, items) = view.into_parts();
+        assert_eq!(points[0], &[1.0, 2.0]);
+        assert_eq!(points[1], &[10.0, 20.0]);
+        assert_eq!(items, &[7, 8]);
+    }
+
+    #[test]
+    fn vec_of_arrays_should_remove_requires_exact_point_and_item_match() {
+        let leaf = super::LeafNode {
+            content_points: [[1.0f32, 2.0, 0.0, 0.0], [10.0f32, 20.0, 0.0, 0.0]],
+            content_items: [5u32, 6, 0, 0],
+            size: 2,
+        };
+
+        assert!(VecOfArrays::<f32, u32, 2, 4>::should_remove(
+            &leaf,
+            &[1.0, 10.0],
+            5,
+            0
+        ));
+        assert!(!VecOfArrays::<f32, u32, 2, 4>::should_remove(
+            &leaf,
+            &[1.0, 10.0],
+            99,
+            0
+        ));
+        assert!(!VecOfArrays::<f32, u32, 2, 4>::should_remove(
+            &leaf,
+            &[1.0, 99.0],
+            5,
+            0
+        ));
+    }
+
+    #[test]
+    fn vec_of_arrays_remove_from_leaf_removes_only_matching_entries_and_compacts() {
+        let mut leaves = <VecOfArrays<f32, u32, 2, 4> as ConstructibleLeafStrategy<
+            f32,
+            u32,
+            Eytzinger<2>,
+            2,
+            4,
+        >>::new_with_empty_leaf();
+        <VecOfArrays<f32, u32, 2, 4> as MutableLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::add_to_leaf(&mut leaves, 0, &[1.0, 10.0], 5);
+        <VecOfArrays<f32, u32, 2, 4> as MutableLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::add_to_leaf(&mut leaves, 0, &[2.0, 20.0], 6);
+        <VecOfArrays<f32, u32, 2, 4> as MutableLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::add_to_leaf(&mut leaves, 0, &[1.0, 10.0], 7);
+
+        <VecOfArrays<f32, u32, 2, 4> as MutableLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::remove_from_leaf(&mut leaves, 0, &[1.0, 10.0], 5);
+
+        assert_eq!(leaves.size, 2);
+        assert_eq!(leaves.leaves[0].size, 2);
+        assert_eq!(leaves.leaves[0].content_points[0][0], 2.0);
+        assert_eq!(leaves.leaves[0].content_points[1][0], 20.0);
+        assert_eq!(leaves.leaves[0].content_items[0], 6);
+        assert_eq!(leaves.leaves[0].content_points[0][1], 1.0);
+        assert_eq!(leaves.leaves[0].content_points[1][1], 10.0);
+        assert_eq!(leaves.leaves[0].content_items[1], 7);
+    }
+
+    #[test]
+    fn vec_of_arrays_split_leaf_handles_pivot_idx_zero_by_scanning_right() {
+        let mut leaves = <VecOfArrays<f32, u32, 2, 4> as ConstructibleLeafStrategy<
+            f32,
+            u32,
+            Eytzinger<2>,
+            2,
+            4,
+        >>::new_with_empty_leaf();
+        <VecOfArrays<f32, u32, 2, 4> as MutableLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::add_to_leaf(&mut leaves, 0, &[2.0, 200.0], 10);
+        <VecOfArrays<f32, u32, 2, 4> as MutableLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::add_to_leaf(&mut leaves, 0, &[2.0, 201.0], 11);
+        <VecOfArrays<f32, u32, 2, 4> as MutableLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::add_to_leaf(&mut leaves, 0, &[2.0, 202.0], 12);
+        <VecOfArrays<f32, u32, 2, 4> as MutableLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::add_to_leaf(&mut leaves, 0, &[4.0, 400.0], 13);
+
+        let (split_val, new_leaf_idx) = <VecOfArrays<f32, u32, 2, 4> as MutableLeafStrategy<
+            f32,
+            u32,
+            Eytzinger<2>,
+            2,
+            4,
+        >>::split_leaf(&mut leaves, 0, 0);
+
+        assert_eq!(split_val, 4.0);
+        assert_eq!(new_leaf_idx, 1);
+        assert_eq!(leaves.leaves[0].size, 3);
+        assert_eq!(leaves.leaves[1].size, 1);
+
+        let left_view =
+            <VecOfArrays<f32, u32, 2, 4> as LeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::leaf_view(
+                &leaves, 0,
+            );
+        let right_view =
+            <VecOfArrays<f32, u32, 2, 4> as LeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::leaf_view(
+                &leaves, 1,
+            );
+        let (left_points, left_items) = left_view.into_parts();
+        let (right_points, right_items) = right_view.into_parts();
+
+        assert_eq!(left_points[0], &[2.0, 2.0, 2.0]);
+        let mut left_items_sorted = left_items.to_vec();
+        left_items_sorted.sort_unstable();
+        assert_eq!(left_items_sorted, vec![10, 11, 12]);
+        assert_eq!(right_points[0], &[4.0]);
+        assert_eq!(right_points[1], &[400.0]);
+        assert_eq!(right_items, &[13]);
     }
 }
