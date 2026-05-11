@@ -541,6 +541,8 @@ impl<'a, AX: Axis<Coord = AX>, T: Content + PartialOrd, const K: usize, const B:
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dist::SquaredEuclidean;
+    use crate::results::result_collection::{BestNeighbourResultCollection, ResultCollection};
 
     fn encode_leaf_arena<const K: usize>(points: [&[f32]; K], items: &[u32]) -> Vec<u8> {
         let len = items.len();
@@ -560,6 +562,90 @@ mod tests {
         });
 
         bytes
+    }
+
+    #[derive(Default)]
+    struct TestNearestResults {
+        entries: Vec<NearestNeighbour<f32, u32>>,
+    }
+
+    impl ResultCollection<f32, NearestNeighbour<f32, u32>> for TestNearestResults {
+        fn with_max_qty(_max_qty: usize) -> Self {
+            Self::default()
+        }
+
+        fn max_qty(&self) -> usize {
+            usize::MAX
+        }
+
+        fn len(&self) -> usize {
+            self.entries.len()
+        }
+
+        fn add(&mut self, entry: NearestNeighbour<f32, u32>) {
+            self.entries.push(entry);
+        }
+
+        fn threshold_distance(&self) -> Option<f32> {
+            None
+        }
+
+        fn into_vec(self) -> Vec<NearestNeighbour<f32, u32>> {
+            self.entries
+        }
+
+        fn into_sorted_vec(mut self) -> Vec<NearestNeighbour<f32, u32>> {
+            self.entries
+                .sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
+            self.entries
+        }
+    }
+
+    #[derive(Default)]
+    struct TestBestResults {
+        entries: Vec<BestNeighbour<f32, u32>>,
+    }
+
+    impl ResultCollection<f32, BestNeighbour<f32, u32>> for TestBestResults {
+        fn with_max_qty(_max_qty: usize) -> Self {
+            Self::default()
+        }
+
+        fn max_qty(&self) -> usize {
+            usize::MAX
+        }
+
+        fn len(&self) -> usize {
+            self.entries.len()
+        }
+
+        fn add(&mut self, entry: BestNeighbour<f32, u32>) {
+            self.entries.push(entry);
+        }
+
+        fn threshold_distance(&self) -> Option<f32> {
+            None
+        }
+
+        fn into_vec(self) -> Vec<BestNeighbour<f32, u32>> {
+            self.entries
+        }
+
+        fn into_sorted_vec(mut self) -> Vec<BestNeighbour<f32, u32>> {
+            self.entries.sort_by(|a, b| {
+                a.item
+                    .partial_cmp(&b.item)
+                    .unwrap()
+                    .then(a.distance.partial_cmp(&b.distance).unwrap())
+            });
+            self.entries
+        }
+    }
+
+    impl BestNeighbourResultCollection<f32, u32> for TestBestResults {
+        fn threshold_item(&self) -> Option<u32> {
+            None
+        }
     }
 
     #[test]
@@ -688,5 +774,87 @@ mod tests {
 
         assert_eq!(best_dist, 1.5);
         assert_eq!(best_item, 22);
+    }
+
+    #[test]
+    fn leaf_view_nearest_one_finds_closest_item() {
+        let xs = [0.0f32, 2.0, 5.0];
+        let ys = [0.0f32, 2.0, 1.0];
+        let items = [10u32, 20, 30];
+        let view = LeafView::<f32, u32, 2, 8>::new([&xs, &ys], &items);
+        let mut best_dist = f32::INFINITY;
+        let mut best_item = 0u32;
+
+        view.nearest_one::<SquaredEuclidean<f32>>(&[1.5, 1.5], &mut best_dist, &mut best_item);
+
+        assert_eq!(best_dist, 0.5);
+        assert_eq!(best_item, 20);
+    }
+
+    #[test]
+    fn leaf_view_with_dists_for_slice_wide_returns_expected_distances() {
+        let xs = [0.0f32, 2.0, 5.0];
+        let ys = [0.0f32, 2.0, 1.0];
+        let items = [10u32, 20, 30];
+        let view = LeafView::<f32, u32, 2, 8>::new([&xs, &ys], &items);
+
+        let dists = view
+            .with_dists_for_slice_wide::<SquaredEuclidean<f32>, _>(&[1.0, 1.0], |dists| {
+                dists.to_vec()
+            });
+
+        assert_eq!(dists, vec![2.0, 2.0, 16.0]);
+    }
+
+    #[test]
+    fn update_nearest_dists_adds_only_items_within_threshold() {
+        let dists = [4.0f32, 1.5, 2.0, 5.0];
+        let items = [11u32, 22, 33, 44];
+        let mut results = TestNearestResults::default();
+
+        LeafView::<f32, u32, 2, 8>::update_nearest_dists(&dists, &items, 2.0, &mut results);
+
+        let entries = results.into_sorted_vec();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].distance, 1.5);
+        assert_eq!(entries[0].item, 22);
+        assert_eq!(entries[1].distance, 2.0);
+        assert_eq!(entries[1].item, 33);
+    }
+
+    #[test]
+    fn update_best_dists_honors_distance_and_threshold_item() {
+        let dists = [4.0f32, 1.5, 2.0, 1.0];
+        let items = [11u32, 22, 33, 44];
+        let mut results = TestBestResults::default();
+
+        LeafView::<f32, u32, 2, 8>::update_best_dists(&dists, &items, 2.0, Some(30), &mut results);
+
+        let entries = results.into_sorted_vec();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].distance, 1.5);
+        assert_eq!(entries[0].item, 22);
+    }
+
+    #[test]
+    fn leaf_scratch_slice_mut_returns_writable_prefix() {
+        let mut scratch = [const { MaybeUninit::<u32>::uninit() }; LEAF_SCRATCH_CAPACITY];
+
+        let slice = unsafe { leaf_scratch_slice_mut(&mut scratch, 3) };
+        slice.copy_from_slice(&[7, 8, 9]);
+
+        assert_eq!(slice, &[7, 8, 9]);
+    }
+
+    #[test]
+    fn tls_leaf_scratch_with_tls_leaf_scratch_provides_two_mutable_buffers() {
+        let result = <f32 as TlsLeafScratch>::with_tls_leaf_scratch(4, |acc, coord_wide| {
+            acc.copy_from_slice(&[1.0, 2.0, 3.0, 4.0]);
+            coord_wide.copy_from_slice(&[10.0, 20.0, 30.0, 40.0]);
+            (acc.to_vec(), coord_wide.to_vec())
+        });
+
+        assert_eq!(result.0, vec![1.0, 2.0, 3.0, 4.0]);
+        assert_eq!(result.1, vec![10.0, 20.0, 30.0, 40.0]);
     }
 }
