@@ -1579,6 +1579,14 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dist::SquaredEuclidean;
+    use crate::kd_tree::query_context::QueryContext;
+    use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
+    use crate::kd_tree::stem_leaf_resolution::OwnedStemLeafResolution;
+    use crate::leaf_strategy::DummyLeafStrategy;
+    use crate::stem_strategy::donnelly_2_blockmarker_simd::DeferredBlockTraversal;
+    use crate::stem_strategy::{Block4, DonnellyMarkerSimd};
+    use nonmax::NonMaxUsize;
 
     #[test]
     fn test_select_block3_pending_child() {
@@ -1603,5 +1611,206 @@ mod tests {
 
         assert_eq!(off[0], 1.0);
         assert_eq!(off[1], 1.0);
+    }
+
+    type TestStemStrategy = DonnellyMarkerSimd<Block4, 64, 4, 3>;
+    type TestLeafStrategy = DummyLeafStrategy;
+
+    struct TestQueryContext {
+        query: [f64; 3],
+        max_dist: f64,
+    }
+
+    impl QueryContext<f64, f64, 3> for TestQueryContext {
+        fn query(&self) -> &[f64; 3] {
+            &self.query
+        }
+
+        fn max_dist(&self) -> f64 {
+            self.max_dist
+        }
+    }
+
+    struct TestTree {
+        stems: Vec<f64>,
+        resolution: OwnedStemLeafResolution,
+    }
+
+    impl KdTreeAccessor<f64, u32, TestStemStrategy, TestLeafStrategy, 3, 16> for TestTree {
+        fn stems(&self) -> &[f64] {
+            &self.stems
+        }
+
+        fn leaves(&self) -> &TestLeafStrategy {
+            static DUMMY: TestLeafStrategy = DummyLeafStrategy {};
+            &DUMMY
+        }
+
+        fn stem_leaf_resolution(&self) -> &impl StemLeafResolution {
+            &self.resolution
+        }
+
+        fn size(&self) -> usize {
+            0
+        }
+
+        fn max_stem_level(&self) -> i32 {
+            0
+        }
+
+        fn max_leaf_len(&self) -> usize {
+            0
+        }
+    }
+
+    fn build_root_strat() -> TestStemStrategy {
+        TestStemStrategy::new(NonNull::dangling())
+    }
+
+    fn build_test_tree_with_terminal_stems(terminal_stems: &[(usize, usize)]) -> TestTree {
+        let max_stem_idx = terminal_stems
+            .iter()
+            .map(|(stem_idx, _)| *stem_idx)
+            .max()
+            .unwrap_or(0);
+        let mut leaf_idx_map = vec![None; max_stem_idx + 1];
+        for &(stem_idx, leaf_idx) in terminal_stems {
+            leaf_idx_map[stem_idx] = Some(NonMaxUsize::new(leaf_idx).expect("leaf_idx overflow"));
+        }
+
+        TestTree {
+            stems: Vec::new(),
+            resolution: OwnedStemLeafResolution::Mapped {
+                min_stem_leaf_idx: 0,
+                leaf_idx_map,
+            },
+        }
+    }
+
+    #[test]
+    fn test_backtracking_query_with_simd_stack_exercises_block3_pending_arm() {
+        let root = build_root_strat();
+        let child0 = root.block_child(0);
+        let child1 = root.block_child(1);
+        let child2 = root.block_child(2);
+        let tree = build_test_tree_with_terminal_stems(&[
+            (root.stem_idx(), 100),
+            (child0.stem_idx(), 200),
+            (child1.stem_idx(), 201),
+            (child2.stem_idx(), 202),
+        ]);
+
+        let mut stack = <TestStemStrategy as StemStrategy>::Stack::<f64>::default();
+        let rd_values = [3.0, 1.0, 2.0, 99.0, 99.0, 99.0, 99.0, 99.0];
+        let new_off_values = [0.3, 0.1, 0.2, 9.9, 9.9, 9.9, 9.9, 9.9];
+        let lower_bounds = [-3.0, -2.0, -1.0, -9.0, -9.0, -9.0, -9.0, -9.0];
+        let upper_bounds = [3.0, 2.0, 1.0, 9.0, 9.0, 9.0, 9.0, 9.0];
+
+        stack.push(SimdQueryStackContext::new_block3_pending(
+            root,
+            rd_values,
+            new_off_values,
+            lower_bounds,
+            upper_bounds,
+            0b0000_0111,
+            0,
+            0.0,
+            f64::NEG_INFINITY,
+            f64::INFINITY,
+        ));
+
+        let mut query_ctx = TestQueryContext {
+            query: [0.0, 0.0, 0.0],
+            max_dist: 10.0,
+        };
+        let mut visited = Vec::new();
+
+        tree.backtracking_query_with_simd_stack_impl::<_, f64, SquaredEuclidean<f64>>(
+            &mut query_ctx,
+            &mut stack,
+            |leaf_idx, _, _| visited.push(leaf_idx),
+        );
+
+        assert_eq!(visited, vec![100, 201, 202, 200]);
+    }
+
+    #[test]
+    fn test_backtracking_query_with_simd_stack_exercises_block_arm() {
+        let root = build_root_strat();
+        let siblings = std::array::from_fn(|idx| root.block_child(idx as u8));
+        let tree = build_test_tree_with_terminal_stems(&[
+            (root.stem_idx(), 100),
+            (siblings[0].stem_idx(), 300),
+            (siblings[2].stem_idx(), 302),
+        ]);
+
+        let mut stack = <TestStemStrategy as StemStrategy>::Stack::<f64>::default();
+        stack.push(SimdQueryStackContext::new_block(
+            siblings,
+            [0.1, 99.0, 0.2, 99.0, 99.0, 99.0, 99.0, 99.0],
+            [0.01, 9.9, 0.02, 9.9, 9.9, 9.9, 9.9, 9.9],
+            [-1.0, -9.0, -2.0, -9.0, -9.0, -9.0, -9.0, -9.0],
+            [1.0, 9.0, 2.0, 9.0, 9.0, 9.0, 9.0, 9.0],
+            0b0000_0101,
+            0,
+            0.0,
+            f64::NEG_INFINITY,
+            f64::INFINITY,
+        ));
+
+        let mut query_ctx = TestQueryContext {
+            query: [0.0, 0.0, 0.0],
+            max_dist: 1.0,
+        };
+        let mut visited = Vec::new();
+
+        tree.backtracking_query_with_simd_stack_impl::<_, f64, SquaredEuclidean<f64>>(
+            &mut query_ctx,
+            &mut stack,
+            |leaf_idx, _, _| visited.push(leaf_idx),
+        );
+
+        assert_eq!(visited, vec![100, 300, 302]);
+    }
+
+    #[test]
+    fn test_backtracking_query_with_simd_stack_exercises_deferred_block_arm() {
+        let root = build_root_strat();
+        let child0 = root.block_child(0);
+        let child2 = root.block_child(2);
+        let tree = build_test_tree_with_terminal_stems(&[
+            (root.stem_idx(), 100),
+            (child0.stem_idx(), 400),
+            (child2.stem_idx(), 402),
+        ]);
+
+        let mut stack = <TestStemStrategy as StemStrategy>::Stack::<f64>::default();
+        stack.push(SimdQueryStackContext::new_deferred_block(
+            root,
+            0,
+            [0.1, 99.0, 0.2, 99.0, 99.0, 99.0, 99.0, 99.0],
+            [0.01, 9.9, 0.02, 9.9, 9.9, 9.9, 9.9, 9.9],
+            [-1.0, -9.0, -2.0, -9.0, -9.0, -9.0, -9.0, -9.0],
+            [1.0, 9.0, 2.0, 9.0, 9.0, 9.0, 9.0, 9.0],
+            0b0000_0101,
+            0,
+            0.0,
+            f64::NEG_INFINITY,
+            f64::INFINITY,
+        ));
+
+        let mut query_ctx = TestQueryContext {
+            query: [0.0, 0.0, 0.0],
+            max_dist: 1.0,
+        };
+        let mut visited = Vec::new();
+
+        tree.backtracking_query_with_simd_stack_impl::<_, f64, SquaredEuclidean<f64>>(
+            &mut query_ctx,
+            &mut stack,
+            |leaf_idx, _, _| visited.push(leaf_idx),
+        );
+
+        assert_eq!(visited, vec![100, 400, 402]);
     }
 }
