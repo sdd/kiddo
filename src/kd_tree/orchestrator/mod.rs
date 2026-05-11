@@ -1585,7 +1585,7 @@ mod tests {
     use crate::kd_tree::stem_leaf_resolution::OwnedStemLeafResolution;
     use crate::leaf_strategy::DummyLeafStrategy;
     use crate::stem_strategy::donnelly_2_blockmarker_simd::DeferredBlockTraversal;
-    use crate::stem_strategy::{Block4, DonnellyMarkerSimd};
+    use crate::stem_strategy::{Block3, Block4, DonnellyMarkerSimd};
     use nonmax::NonMaxUsize;
 
     #[test]
@@ -1636,7 +1636,41 @@ mod tests {
         resolution: OwnedStemLeafResolution,
     }
 
+    struct Block3TestTree {
+        stems: Vec<f64>,
+        resolution: OwnedStemLeafResolution,
+    }
+
     impl KdTreeAccessor<f64, u32, TestStemStrategy, TestLeafStrategy, 3, 16> for TestTree {
+        fn stems(&self) -> &[f64] {
+            &self.stems
+        }
+
+        fn leaves(&self) -> &TestLeafStrategy {
+            static DUMMY: TestLeafStrategy = DummyLeafStrategy {};
+            &DUMMY
+        }
+
+        fn stem_leaf_resolution(&self) -> &impl StemLeafResolution {
+            &self.resolution
+        }
+
+        fn size(&self) -> usize {
+            0
+        }
+
+        fn max_stem_level(&self) -> i32 {
+            0
+        }
+
+        fn max_leaf_len(&self) -> usize {
+            0
+        }
+    }
+
+    impl KdTreeAccessor<f64, u32, DonnellyMarkerSimd<Block3, 64, 8, 3>, TestLeafStrategy, 3, 16>
+        for Block3TestTree
+    {
         fn stems(&self) -> &[f64] {
             &self.stems
         }
@@ -1812,5 +1846,133 @@ mod tests {
         );
 
         assert_eq!(visited, vec![100, 400, 402]);
+    }
+
+    #[cfg(feature = "test_utils")]
+    #[test]
+    fn test_backtracking_query_with_block3_simd_stack_emits_pending_selection_trace() {
+        use crate::kd_tree::query_stack_simd::Block3ExactStackContext;
+        use crate::stem_strategy::Block3;
+
+        type Block3StemStrategy = DonnellyMarkerSimd<Block3, 64, 8, 3>;
+        type Block3Tree = Block3TestTree;
+
+        let stems = vec![0.2f64, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f64::INFINITY];
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let base = Block3StemStrategy::new(stems_ptr);
+        let child0 = base.block_child(0);
+        let child1 = base.block_child(1);
+        let child2 = base.block_child(2);
+
+        let tree = Block3Tree {
+            stems,
+            resolution: OwnedStemLeafResolution::Mapped {
+                min_stem_leaf_idx: 0,
+                leaf_idx_map: {
+                    let mut map = vec![None; child2.stem_idx() + 1];
+                    map[base.stem_idx()] = Some(NonMaxUsize::new(100).unwrap());
+                    map[child0.stem_idx()] = Some(NonMaxUsize::new(200).unwrap());
+                    map[child1.stem_idx()] = Some(NonMaxUsize::new(201).unwrap());
+                    map[child2.stem_idx()] = Some(NonMaxUsize::new(202).unwrap());
+                    map
+                },
+            },
+        };
+
+        let mut stack = <Block3StemStrategy as StemStrategy>::Stack::<f64>::default();
+        stack.push(
+            <<Block3StemStrategy as StemStrategy>::StackContext<f64> as Block3ExactStackContext<
+                f64,
+                Block3StemStrategy,
+                3,
+            >>::new_block3_pending_from_state(
+                base,
+                0b0000_0111,
+                0.0,
+                &[f64::NEG_INFINITY; 3],
+                &[f64::INFINITY; 3],
+            ),
+        );
+
+        let mut query_ctx = TestQueryContext {
+            query: [0.45, 0.0, 0.0],
+            max_dist: 0.2,
+        };
+        let mut visited = Vec::new();
+
+        crate::test_utils::exact_query_trace::set_enabled(true);
+        crate::test_utils::exact_query_stats::reset();
+
+        tree.backtracking_query_with_block3_simd_stack_impl::<_, f64, SquaredEuclidean<f64>>(
+            &mut query_ctx,
+            &mut stack,
+            |leaf_idx, _, _| visited.push(leaf_idx),
+        );
+
+        let events = crate::test_utils::exact_query_trace::snapshot();
+        let stats = crate::test_utils::exact_query_stats::snapshot();
+        crate::test_utils::exact_query_trace::set_enabled(false);
+
+        assert!(visited.contains(&100));
+        assert!(visited
+            .iter()
+            .any(|&leaf_idx| matches!(leaf_idx, 200..=202)));
+        assert_eq!(stats.simd_single_pops, 1);
+        assert!(stats.block3_pending_pops >= 1);
+        assert!(stats.block3_candidate_mask_nonzero >= 1);
+
+        let pending_event = events.iter().find_map(|event| {
+            match event {
+            crate::test_utils::exact_query_trace::ExactQueryTraceEvent::Block3PendingSelection {
+                stem_idx,
+                level,
+                dim,
+                pending_mask,
+                candidate_mask,
+                selected_child_idx,
+                parent_lower_bound,
+                parent_upper_bound,
+                old_off,
+                rd,
+                ..
+            } => Some((
+                *stem_idx,
+                *level,
+                *dim,
+                *pending_mask,
+                *candidate_mask,
+                *selected_child_idx,
+                *parent_lower_bound,
+                *parent_upper_bound,
+                *old_off,
+                *rd,
+            )),
+            _ => None,
+        }
+        });
+
+        let (
+            stem_idx,
+            level,
+            dim,
+            pending_mask,
+            candidate_mask,
+            selected_child_idx,
+            parent_lower_bound,
+            parent_upper_bound,
+            old_off,
+            rd,
+        ) = pending_event.expect("expected Block3PendingSelection trace event");
+
+        assert_eq!(stem_idx, base.stem_idx());
+        assert_eq!(level, base.level());
+        assert_eq!(dim, 0);
+        assert_eq!(pending_mask, 0b0000_0111);
+        assert_ne!(candidate_mask, 0);
+        assert!(candidate_mask & (1u8 << selected_child_idx) != 0);
+        assert_eq!(parent_lower_bound, f64::NEG_INFINITY);
+        assert_eq!(parent_upper_bound, f64::INFINITY);
+        assert_eq!(old_off, 0.0);
+        assert_eq!(rd, 0.0);
     }
 }

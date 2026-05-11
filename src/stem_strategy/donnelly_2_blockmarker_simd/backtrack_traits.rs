@@ -4331,6 +4331,226 @@ mod tests {
     }
 
     #[test]
+    fn test_backtrack_block3_autovec_wrappers_match_direct_helper() {
+        let mut pivots_f64 = build_block3_pivots_f64();
+        let stems_ptr_f64 = NonNull::new(pivots_f64.as_mut_ptr() as *mut u8).unwrap();
+        let cases_f64 = [
+            (4.5, 0.0, 0.0, 4.0),
+            (1.2, 0.5, 1.0, 2.5),
+            (3.7, -1.25, 2.0, 6.0),
+        ];
+
+        for (query, old_off, rd, best_dist) in cases_f64 {
+            let squared =
+                <SquaredEuclidean<f64> as DistanceMetricSimdBlock3<f64, 3, f64>>::backtrack_block3_autovec(
+                    query, stems_ptr_f64, 0, old_off, rd, best_dist,
+                );
+            let squared_expected = autovec_backtrack_block3::<f64, f64, SquaredEuclidean<f64>, 3>(
+                query,
+                stems_ptr_f64,
+                0,
+                old_off,
+                rd,
+                best_dist,
+            );
+            assert_eq!(squared, squared_expected);
+
+            let manhattan =
+                <Manhattan<f64> as DistanceMetricSimdBlock3<f64, 3, f64>>::backtrack_block3_autovec(
+                    query,
+                    stems_ptr_f64,
+                    0,
+                    old_off,
+                    rd,
+                    best_dist,
+                );
+            let manhattan_expected = autovec_backtrack_block3::<f64, f64, Manhattan<f64>, 3>(
+                query,
+                stems_ptr_f64,
+                0,
+                old_off,
+                rd,
+                best_dist,
+            );
+            assert_eq!(manhattan, manhattan_expected);
+        }
+
+        let mut pivots_f32 = build_block3_pivots_f32();
+        let stems_ptr_f32 = NonNull::new(pivots_f32.as_mut_ptr() as *mut u8).unwrap();
+        let cases_f32 = [
+            (4.5f32, 0.0f32, 0.0f32, 4.0f32),
+            (1.2f32, 0.5f32, 1.0f32, 2.5f32),
+            (3.7f32, -1.25f32, 2.0f32, 6.0f32),
+        ];
+
+        for (query, old_off, rd, best_dist) in cases_f32 {
+            let squared =
+                <SquaredEuclidean<f32> as DistanceMetricSimdBlock3<f32, 3, f32>>::backtrack_block3_autovec(
+                    query, stems_ptr_f32, 0, old_off, rd, best_dist,
+                );
+            let squared_expected = autovec_backtrack_block3::<f32, f32, SquaredEuclidean<f32>, 3>(
+                query,
+                stems_ptr_f32,
+                0,
+                old_off,
+                rd,
+                best_dist,
+            );
+            assert_eq!(squared, squared_expected);
+
+            let manhattan =
+                <Manhattan<f32> as DistanceMetricSimdBlock3<f32, 3, f32>>::backtrack_block3_autovec(
+                    query,
+                    stems_ptr_f32,
+                    0,
+                    old_off,
+                    rd,
+                    best_dist,
+                );
+            let manhattan_expected = autovec_backtrack_block3::<f32, f32, Manhattan<f32>, 3>(
+                query,
+                stems_ptr_f32,
+                0,
+                old_off,
+                rd,
+                best_dist,
+            );
+            assert_eq!(manhattan, manhattan_expected);
+        }
+    }
+
+    #[test]
+    fn test_backtrack_block4_autovec_wrappers_match_direct_helper() {
+        let mut pivots_f64 = build_block4_pivots_f64();
+        let stems_ptr_f64 = NonNull::new(pivots_f64.as_mut_ptr() as *mut u8).unwrap();
+        let cases_f64 = [
+            (4.5, 0.0, 0.0, 4.0),
+            (9.2, 1.0, 2.0, 9.0),
+            (6.7, -0.75, 1.5, 4.0),
+        ];
+
+        for (query, old_off, rd, best_dist) in cases_f64 {
+            let squared =
+                <SquaredEuclidean<f64> as DistanceMetricSimdBlock4<f64, 3, f64>>::backtrack_block4_autovec(
+                    query, stems_ptr_f64, 0, old_off, rd, best_dist,
+                );
+            let squared_expected = autovec_backtrack_block4::<f64, f64, SquaredEuclidean<f64>, 3>(
+                query,
+                stems_ptr_f64,
+                0,
+                old_off,
+                rd,
+                best_dist,
+            );
+            assert_eq!(squared, squared_expected);
+
+            let manhattan =
+                <Manhattan<f64> as DistanceMetricSimdBlock4<f64, 3, f64>>::backtrack_block4_autovec(
+                    query,
+                    stems_ptr_f64,
+                    0,
+                    old_off,
+                    rd,
+                    best_dist,
+                );
+            let manhattan_expected = autovec_backtrack_block4::<f64, f64, Manhattan<f64>, 3>(
+                query,
+                stems_ptr_f64,
+                0,
+                old_off,
+                rd,
+                best_dist,
+            );
+            assert_eq!(manhattan, manhattan_expected);
+        }
+
+        let mut pivots_f32 = build_block4_pivots_f32();
+        let stems_ptr_f32 = NonNull::new(pivots_f32.as_mut_ptr() as *mut u8).unwrap();
+        let cases_f32 = [
+            (4.5f32, 0.0f32, 0.0f32, 4.0f32),
+            (9.2f32, 1.0f32, 2.0f32, 9.0f32),
+            (6.7f32, -0.75f32, 1.5f32, 4.0f32),
+        ];
+
+        for (query, old_off, rd, best_dist) in cases_f32 {
+            let squared =
+                <SquaredEuclidean<f32> as DistanceMetricSimdBlock4<f32, 3, f32>>::backtrack_block4_autovec(
+                    query, stems_ptr_f32, 0, old_off, rd, best_dist,
+                );
+            let squared_expected = autovec_backtrack_block4::<f32, f32, SquaredEuclidean<f32>, 3>(
+                query,
+                stems_ptr_f32,
+                0,
+                old_off,
+                rd,
+                best_dist,
+            );
+            assert_eq!(squared, squared_expected);
+
+            let manhattan =
+                <Manhattan<f32> as DistanceMetricSimdBlock4<f32, 3, f32>>::backtrack_block4_autovec(
+                    query,
+                    stems_ptr_f32,
+                    0,
+                    old_off,
+                    rd,
+                    best_dist,
+                );
+            let manhattan_expected = autovec_backtrack_block4::<f32, f32, Manhattan<f32>, 3>(
+                query,
+                stems_ptr_f32,
+                0,
+                old_off,
+                rd,
+                best_dist,
+            );
+            assert_eq!(manhattan, manhattan_expected);
+        }
+    }
+
+    #[test]
+    fn test_dot_product_block3_autovec_wrapper_panics() {
+        let mut block_f64 = build_block3_pivots_f64();
+        let stems_ptr_f64 = NonNull::new(block_f64.as_mut_ptr() as *mut u8).unwrap();
+        assert!(catch_unwind(AssertUnwindSafe(|| {
+            let _ = <DotProduct<f64> as DistanceMetricSimdBlock3<f64, 3, f64>>::backtrack_block3_autovec(
+                4.5, stems_ptr_f64, 0, 0.5, 1.0, 6.0,
+            );
+        }))
+        .is_err());
+
+        let mut block_f32 = build_block3_pivots_f32();
+        let stems_ptr_f32 = NonNull::new(block_f32.as_mut_ptr() as *mut u8).unwrap();
+        assert!(catch_unwind(AssertUnwindSafe(|| {
+            let _ = <DotProduct<f32> as DistanceMetricSimdBlock3<f32, 3, f32>>::backtrack_block3_autovec(
+                4.5, stems_ptr_f32, 0, 0.5, 1.0, 6.0,
+            );
+        }))
+        .is_err());
+    }
+
+    #[test]
+    fn test_dot_product_block4_autovec_wrapper_panics() {
+        let mut block_f64 = build_block4_pivots_f64();
+        let stems_ptr_f64 = NonNull::new(block_f64.as_mut_ptr() as *mut u8).unwrap();
+        assert!(catch_unwind(AssertUnwindSafe(|| {
+            let _ = <DotProduct<f64> as DistanceMetricSimdBlock4<f64, 3, f64>>::backtrack_block4_autovec(
+                4.5, stems_ptr_f64, 0, 0.5, 1.0, 6.0,
+            );
+        }))
+        .is_err());
+
+        let mut block_f32 = build_block4_pivots_f32();
+        let stems_ptr_f32 = NonNull::new(block_f32.as_mut_ptr() as *mut u8).unwrap();
+        assert!(catch_unwind(AssertUnwindSafe(|| {
+            let _ = <DotProduct<f32> as DistanceMetricSimdBlock4<f32, 3, f32>>::backtrack_block4_autovec(
+                4.5, stems_ptr_f32, 0, 0.5, 1.0, 6.0,
+            );
+        }))
+        .is_err());
+    }
+
+    #[test]
     fn test_dot_product_block3_and_block4_dispatch_panics() {
         let mut block3 = build_block3_pivots_f64();
         let mut block4 = build_block4_pivots_f32();

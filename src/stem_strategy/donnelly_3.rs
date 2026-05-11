@@ -571,6 +571,116 @@ mod tests {
     use aligned_vec::avec;
     use rstest::rstest;
 
+    #[test]
+    fn deferred_state_round_trip_and_getters_work() {
+        let stems = avec![f64::INFINITY; 256];
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+
+        let mut stem_strat = DonnellySwPre::<3, 64, 8, 3>::new(stems_ptr);
+        let initial = stem_strat.deferred_state();
+
+        assert_eq!(stem_strat.leaf_idx(), 0);
+        assert_eq!(stem_strat.dim(), 0);
+        assert_eq!(stem_strat.level(), 0);
+
+        stem_strat.traverse(true);
+        stem_strat.traverse(false);
+
+        assert_ne!(stem_strat.stem_idx(), initial.stem_idx());
+        assert_ne!(stem_strat.leaf_idx(), initial.leaf_idx());
+        assert_ne!(stem_strat.dim(), initial.dim());
+        assert_ne!(stem_strat.level(), initial.level());
+
+        stem_strat.rehydrate_deferred_state(initial);
+
+        assert_eq!(stem_strat.stem_idx(), 0);
+        assert_eq!(stem_strat.leaf_idx(), 0);
+        assert_eq!(stem_strat.dim(), 0);
+        assert_eq!(stem_strat.level(), 0);
+    }
+
+    #[test]
+    fn stem_count_padding_trim_and_child_indices_work() {
+        assert_eq!(
+            DonnellySwPre::<3, 64, 8, 3>::get_stem_node_count_from_leaf_node_count(0),
+            0
+        );
+        assert_eq!(
+            DonnellySwPre::<3, 64, 8, 3>::get_stem_node_count_from_leaf_node_count(1),
+            0
+        );
+        assert_eq!(
+            DonnellySwPre::<3, 64, 8, 3>::get_stem_node_count_from_leaf_node_count(2),
+            1
+        );
+        assert_eq!(
+            DonnellySwPre::<3, 64, 8, 3>::get_stem_node_count_from_leaf_node_count(5),
+            7
+        );
+        assert_eq!(DonnellySwPre::<3, 64, 8, 3>::stem_node_padding_factor(), 50);
+
+        let stems = avec![f64::INFINITY; 256];
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let mut stem_strat = DonnellySwPre::<3, 64, 8, 3>::new(stems_ptr);
+
+        assert_eq!(stem_strat.child_indices(), (1, 2));
+        stem_strat.traverse(false);
+        assert_eq!(stem_strat.child_indices(), (3, 4));
+
+        let mut trim_stems = avec![f64::INFINITY; 256];
+        trim_stems[0] = 1.0;
+        trim_stems[2] = 2.0;
+        trim_stems[6] = 3.0;
+        DonnellySwPre::<3, 64, 8, 3>::trim_unneeded_stems(&mut trim_stems, 3);
+        assert_eq!(trim_stems.len(), 65);
+
+        let mut empty: AVec<f64> = avec![];
+        DonnellySwPre::<3, 64, 8, 3>::trim_unneeded_stems(&mut empty, 4);
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn prefetch_helpers_and_hooks_execute() {
+        let stems_u8 = avec![0u8; 4096];
+        let stems_ptr = NonNull::new(stems_u8.as_ptr() as *mut u8).unwrap();
+        DonnellySwPre::<3, 64, 8, 3>::prefetch_next_base(stems_ptr, 4);
+
+        let stems_f32 = avec![0.0f32; 1024];
+        let stems_ptr_f32 = NonNull::new(stems_f32.as_ptr() as *mut u8).unwrap();
+        let mut stem_strat = DonnellySwPre::<3, 64, 4, 3>::new(stems_ptr_f32);
+
+        stem_strat.prefetch_next_minor_tri(stems_f32.as_ptr());
+        stem_strat.traverse(false);
+        stem_strat.prefetch_next_minor_tri(stems_f32.as_ptr());
+
+        let hook_step = calc_child_idx_hook(0, 0, true, stems_ptr);
+        let direct_step = DonnellySwPre::<3, 64, 8, 3>::step_pure(0, 0, true, stems_ptr);
+        assert_eq!(hook_step, direct_step);
+
+        let hook_children = both_children_pure_hook(3, 1);
+        let direct_children = DonnellySwPre::<3, 64, 8, 3>::both_children_pure(3, 1);
+        assert_eq!(hook_children, direct_children);
+    }
+
+    #[cfg(feature = "rkyv_08")]
+    #[test]
+    fn test_traverse_hook_matches_manual_traversal() {
+        let mut stems = AlignedVec::with_capacity(512);
+        stems.resize(512, 0);
+
+        let expected = {
+            let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+            let mut stem_strat = DonnellySwPre::<3, 64, 8, 3>::new(stems_ptr);
+            stem_strat.traverse(true);
+            stem_strat.traverse(false);
+            stem_strat.traverse(true);
+            stem_strat.stem_idx()
+        };
+
+        let actual = test_traverse_hook(true, stems);
+        assert_eq!(actual, expected);
+    }
+
     #[rstest]
     #[case(vec![], 0)]
     #[case(vec![false], 1)] // 1 Maj idx: 1
