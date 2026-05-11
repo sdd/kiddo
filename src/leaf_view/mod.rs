@@ -606,6 +606,7 @@ mod tests {
         entries: Vec<BestNeighbour<f32, u32>>,
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     impl ResultCollection<f32, BestNeighbour<f32, u32>> for TestBestResults {
         fn with_max_qty(_max_qty: usize) -> Self {
             Self::default()
@@ -642,6 +643,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     impl BestNeighbourResultCollection<f32, u32> for TestBestResults {
         fn threshold_item(&self) -> Option<u32> {
             None
@@ -789,6 +791,44 @@ mod tests {
 
         assert_eq!(best_dist, 0.5);
         assert_eq!(best_item, 20);
+    }
+
+    #[test]
+    fn leaf_view_nearest_one_with_query_wide_handles_empty_leaf() {
+        let xs: [f32; 0] = [];
+        let ys: [f32; 0] = [];
+        let items: [u32; 0] = [];
+        let view = LeafView::<f32, u32, 2, 8>::new([&xs, &ys], &items);
+        let mut best_dist = 7.5f32;
+        let mut best_item = 99u32;
+
+        view.nearest_one_with_query_wide::<SquaredEuclidean<f32>>(
+            &[1.0f32, 2.0f32],
+            &mut best_dist,
+            &mut best_item,
+        );
+
+        assert_eq!(best_dist, 7.5);
+        assert_eq!(best_item, 99);
+    }
+
+    #[test]
+    fn leaf_view_nearest_one_with_query_wide_keeps_existing_better_best() {
+        let xs = [0.0f32, 2.0, 5.0];
+        let ys = [0.0f32, 2.0, 1.0];
+        let items = [10u32, 20, 30];
+        let view = LeafView::<f32, u32, 2, 8>::new([&xs, &ys], &items);
+        let mut best_dist = 0.25f32;
+        let mut best_item = 77u32;
+
+        view.nearest_one_with_query_wide::<SquaredEuclidean<f32>>(
+            &[1.5f32, 1.5f32],
+            &mut best_dist,
+            &mut best_item,
+        );
+
+        assert_eq!(best_dist, 0.25);
+        assert_eq!(best_item, 77);
     }
 
     #[test]

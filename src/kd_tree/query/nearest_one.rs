@@ -358,6 +358,7 @@ mod tests {
     use test_log::test;
 
     use crate::dist::SquaredEuclidean;
+    use crate::kd_tree::query_stack::QueryStack;
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::stem_strategy::Donnelly;
@@ -435,6 +436,99 @@ mod tests {
 
         assert_float_relative_eq!(arena_result.0, flat_result.0, REL_EPS_F32);
         assert_eq!(arena_result.1, flat_result.1);
+    }
+
+    #[test]
+    fn nearest_one_arithmetic_with_stack_matches_expected_result() {
+        let points = vec![
+            [0.0f64, 0.0, 0.0],
+            [1.0, 1.0, 1.0],
+            [0.5, 0.5, 0.6],
+            [2.0, 2.0, 2.0],
+        ];
+
+        let tree: KdTree<f64, u32, Eytzinger<3>, FlatVec<f64, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+        let mut stack = QueryStack::<f64, Eytzinger<3>>::default();
+
+        let result = tree.nearest_one_arithmetic_with_stack::<SquaredEuclidean<f64>>(
+            &[0.45, 0.55, 0.65],
+            &mut stack,
+        );
+
+        assert_float_relative_eq!(result.0, 0.0075, REL_EPS_F64);
+        assert_eq!(result.1, 2);
+        assert!(stack.pop().is_none());
+    }
+
+    #[test]
+    fn nearest_one_with_stack_uses_arithmetic_route_when_available() {
+        let points = vec![
+            [0.0f64, 0.0, 0.0],
+            [1.0, 1.0, 1.0],
+            [0.5, 0.5, 0.6],
+            [2.0, 2.0, 2.0],
+        ];
+
+        let tree: KdTree<f64, u32, Eytzinger<3>, FlatVec<f64, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points);
+        let mut stack = QueryStack::<f64, Eytzinger<3>>::default();
+
+        let result =
+            tree.nearest_one_with_stack::<SquaredEuclidean<f64>>(&[0.45, 0.55, 0.65], &mut stack);
+
+        assert_float_relative_eq!(result.0, 0.0075, REL_EPS_F64);
+        assert_eq!(result.1, 2);
+        assert!(stack.pop().is_none());
+    }
+
+    #[test]
+    fn nearest_one_mapped_with_stack_matches_expected_result() {
+        let points = [
+            [0.0f32, 0.0],
+            [1.0, 1.0],
+            [0.4, 0.45],
+            [2.0, 2.0],
+            [0.6, 0.7],
+        ];
+
+        let mut tree: KdTree<f32, u32, Eytzinger<2>, VecOfArrays<f32, u32, 2, 2>, 2, 2> =
+            KdTree::default();
+        for (idx, point) in points.iter().enumerate() {
+            tree.add(point, idx as u32);
+        }
+
+        let mut stack = QueryStack::<f32, Eytzinger<2>>::default();
+        let result =
+            tree.nearest_one_mapped_with_stack::<SquaredEuclidean<f32>>(&[0.5, 0.5], &mut stack);
+
+        assert_float_relative_eq!(result.0, 0.0125, REL_EPS_F32);
+        assert_eq!(result.1, 2);
+        assert!(stack.pop().is_none());
+    }
+
+    #[test]
+    fn nearest_one_with_stack_uses_mapped_route_when_arithmetic_is_unavailable() {
+        let points = [
+            [0.0f32, 0.0],
+            [1.0, 1.0],
+            [0.4, 0.45],
+            [2.0, 2.0],
+            [0.6, 0.7],
+        ];
+
+        let mut tree: KdTree<f32, u32, Eytzinger<2>, VecOfArrays<f32, u32, 2, 2>, 2, 2> =
+            KdTree::default();
+        for (idx, point) in points.iter().enumerate() {
+            tree.add(point, idx as u32);
+        }
+
+        let mut stack = QueryStack::<f32, Eytzinger<2>>::default();
+        let result = tree.nearest_one_with_stack::<SquaredEuclidean<f32>>(&[0.5, 0.5], &mut stack);
+
+        assert_float_relative_eq!(result.0, 0.0125, REL_EPS_F32);
+        assert_eq!(result.1, 2);
+        assert!(stack.pop().is_none());
     }
 
     #[test]

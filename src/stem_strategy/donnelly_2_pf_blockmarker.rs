@@ -308,3 +308,104 @@ impl_donnelly_stem_strategy!(Block4, 4);
 impl_donnelly_stem_strategy!(Block5, 5);
 impl_donnelly_stem_strategy!(Block6, 6);
 impl_donnelly_stem_strategy!(Block7, 7);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    type Block3Scalar = DonnellyMarkerScalar<Block3, 64, 8, 3>;
+
+    #[test]
+    fn donnelly_marker_scalar_block3_basics_and_state_round_trip() {
+        let mut stems = [f64::INFINITY; 256];
+        let stems_ptr = NonNull::new(stems.as_mut_ptr() as *mut u8).unwrap();
+
+        let mut strat = Block3Scalar::new(stems_ptr);
+        assert_eq!(strat.stem_idx(), 0);
+        assert_eq!(strat.leaf_idx(), 0);
+        assert_eq!(strat.dim(), 0);
+        assert_eq!(strat.construction_dim(), 0);
+        assert_eq!(strat.level(), 0);
+        assert_eq!(Block3Scalar::block_size(), 3);
+
+        let saved = strat.deferred_state();
+        strat.traverse(true);
+        strat.traverse(false);
+        assert_ne!(strat.stem_idx(), saved.stem_idx());
+        assert_ne!(strat.leaf_idx(), saved.leaf_idx());
+
+        strat.rehydrate_deferred_state(saved);
+        assert_eq!(strat.stem_idx(), 0);
+        assert_eq!(strat.leaf_idx(), 0);
+        assert_eq!(strat.dim(), 0);
+        assert_eq!(strat.construction_dim(), 0);
+        assert_eq!(strat.level(), 0);
+    }
+
+    #[test]
+    fn donnelly_marker_scalar_block3_traversal_branch_and_children_match_core() {
+        let mut stems = [0.0f64; 256];
+        let stems_ptr = NonNull::new(stems.as_mut_ptr() as *mut u8).unwrap();
+
+        let mut wrapper = Block3Scalar::new(stems_ptr);
+        let mut core = DonnellyCore::<64, 8, 3>::new(stems_ptr);
+
+        wrapper.traverse_head(true);
+        core.traverse_head(true);
+        assert_eq!(wrapper.stem_idx(), core.stem_idx());
+        assert_eq!(wrapper.leaf_idx(), core.leaf_idx());
+        assert_eq!(wrapper.level(), core.level());
+        assert_eq!(wrapper.dim(), core.level() as usize / 3 % 3);
+        assert_eq!(wrapper.construction_dim(), core.level() as usize / 3 % 3);
+
+        wrapper.traverse_tail(false);
+        core.traverse_tail_with_block_size(false, 3);
+        assert_eq!(wrapper.stem_idx(), core.stem_idx());
+        assert_eq!(wrapper.leaf_idx(), core.leaf_idx());
+        assert_eq!(wrapper.level(), core.level());
+        assert_eq!(wrapper.child_indices(), core.child_indices());
+
+        let mut branched_wrapper = Block3Scalar::new(stems_ptr);
+        let mut branched_core = DonnellyCore::<64, 8, 3>::new(stems_ptr);
+        let right_wrapper = branched_wrapper.branch();
+        let right_core = branched_core.branch();
+
+        assert_eq!(branched_wrapper.stem_idx(), branched_core.stem_idx());
+        assert_eq!(branched_wrapper.leaf_idx(), branched_core.leaf_idx());
+        assert_eq!(right_wrapper.stem_idx(), right_core.stem_idx());
+        assert_eq!(right_wrapper.leaf_idx(), right_core.leaf_idx());
+        assert_eq!(right_wrapper.level(), right_core.level());
+        assert_eq!(right_wrapper.dim(), right_core.level() as usize / 3 % 3);
+    }
+
+    #[test]
+    fn donnelly_marker_scalar_block3_get_leaf_idx_uses_unrolled_and_scalar_paths() {
+        let stems = [0.0f64; 256];
+        let query = [1.0f64, 1.0, 1.0];
+
+        let leaf_idx = Block3Scalar::get_leaf_idx(&stems, &query, 4);
+
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let mut manual = Block3Scalar::new(stems_ptr);
+        while manual.level() <= 4 {
+            manual.traverse(true);
+        }
+
+        assert_eq!(leaf_idx, manual.leaf_idx());
+        assert_eq!(leaf_idx, 31);
+    }
+
+    #[test]
+    fn donnelly_marker_scalar_block3_unimplemented_metadata_helpers_panic() {
+        assert!(catch_unwind(AssertUnwindSafe(|| {
+            let _ = Block3Scalar::get_stem_node_count_from_leaf_node_count(8);
+        }))
+        .is_err());
+
+        assert!(catch_unwind(AssertUnwindSafe(|| {
+            let _ = Block3Scalar::stem_node_padding_factor();
+        }))
+        .is_err());
+    }
+}

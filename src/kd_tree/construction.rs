@@ -132,7 +132,7 @@ where
         (pivot_val, split_dim, new_leaf_idx)
     }
 
-    /// Transition from Pristine to Mapped state on first split
+    /*    /// Transition from Pristine to Mapped state on first split
     #[allow(unused)]
     fn taint_if_pristine(
         &mut self,
@@ -188,7 +188,7 @@ where
                 panic!("Cannot split leaves in immutable tree");
             }
         }
-    }
+    }*/
 
     /// Removes a point and associated item from the tree.
     ///
@@ -784,5 +784,33 @@ where
         }
 
         pivot
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::leaf_strategy::FlatVec;
+    use crate::Eytzinger;
+
+    #[test]
+    fn update_pivot_shifts_right_when_left_scan_hits_zero() {
+        type TestTree = KdTree<f32, u32, Eytzinger<2>, FlatVec<f32, u32, 2, 32>, 2, 32>;
+
+        let source = [
+            [1.0f32, 10.0],
+            [1.0, 20.0],
+            [1.0, 30.0],
+            [2.0, 40.0],
+            [3.0, 50.0],
+        ];
+        let mut sort_index = [0usize, 1, 2, 3, 4];
+
+        let pivot = TestTree::update_pivot(&source, &mut sort_index, 0, 1);
+
+        assert_eq!(pivot, 3);
+        assert_eq!(sort_index, [0, 1, 2, 3, 4]);
+        assert_eq!(source[sort_index[pivot - 1]][0], 1.0);
+        assert_eq!(source[sort_index[pivot]][0], 2.0);
     }
 }

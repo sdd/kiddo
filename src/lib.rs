@@ -6,6 +6,7 @@
     all(kiddo_nightly, feature = "simd"),
     feature(target_feature_inline_always)
 )]
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 #![warn(rustdoc::missing_crate_level_docs)]
 #![deny(rustdoc::invalid_codeblock_attributes)]
 #![warn(missing_docs)]

@@ -142,16 +142,19 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
     fn child_indices(&self) -> (usize, usize);
 
     /// Calculate the stem node count for a given leaf node count.
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn get_stem_node_count_from_leaf_node_count(_leaf_node_count: usize) -> usize {
         unimplemented!()
     }
 
     /// Factor by which to pad the stem node allocation.
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn stem_node_padding_factor() -> usize {
         1
     }
 
     /// Trim unneeded stem nodes.
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn trim_unneeded_stems<A: Axis<Coord = A>>(_stems: &mut AVec<A>, _max_stem_level: usize) {
         // Default: no-op
     }
@@ -429,5 +432,232 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
         Self::Stack<O>: StackTrait<O, Self>,
     {
         tree.arithmetic_query_with_stack_impl::<QC, O, D>(query_ctx, stack, process_leaf);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dist::SquaredEuclidean;
+    use crate::kd_tree::query_stack::{QueryStack, QueryStackContext};
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    struct TestStemState {
+        stem_idx: usize,
+        leaf_idx: usize,
+        dim: usize,
+        level: i32,
+    }
+
+    #[derive(Clone, Debug)]
+    struct TestStemStrategy {
+        state: TestStemState,
+        _stems_ptr: NonNull<u8>,
+    }
+
+    unsafe impl Send for TestStemStrategy {}
+    unsafe impl Sync for TestStemStrategy {}
+
+    impl StemStrategy for TestStemStrategy {
+        type DeferredState = TestStemState;
+        type StackContext<A>
+            = QueryStackContext<A, Self::DeferredState>
+        where
+            Self: Sized;
+        type Stack<A>
+            = QueryStack<A, Self>
+        where
+            Self: Sized;
+
+        fn new(stems_ptr: NonNull<u8>) -> Self {
+            Self {
+                state: TestStemState {
+                    stem_idx: 0,
+                    leaf_idx: 0,
+                    dim: 0,
+                    level: 0,
+                },
+                _stems_ptr: stems_ptr,
+            }
+        }
+
+        fn stem_idx(&self) -> usize {
+            self.state.stem_idx
+        }
+
+        fn deferred_state(&self) -> Self::DeferredState {
+            self.state
+        }
+
+        fn rehydrate_deferred_state(&mut self, state: Self::DeferredState) {
+            self.state = state;
+        }
+
+        fn leaf_idx(&self) -> usize {
+            self.state.leaf_idx
+        }
+
+        fn dim(&self) -> usize {
+            self.state.dim
+        }
+
+        fn level(&self) -> i32 {
+            self.state.level
+        }
+
+        fn traverse(&mut self, is_right: bool) {
+            self.state.stem_idx = self.state.stem_idx * 2 + 1 + usize::from(is_right);
+            self.state.leaf_idx = (self.state.leaf_idx << 1) | usize::from(is_right);
+            self.state.dim = (self.state.dim + 1) % 2;
+            self.state.level += 1;
+        }
+
+        fn branch(&mut self) -> Self {
+            let mut right = self.clone();
+            self.traverse(false);
+            right.traverse(true);
+            right
+        }
+
+        fn child_indices(&self) -> (usize, usize) {
+            (self.state.stem_idx * 2 + 1, self.state.stem_idx * 2 + 2)
+        }
+    }
+
+    #[test]
+    fn default_traverse_head_and_split_relative_follow_direction() {
+        let mut stems = [0.0f32; 8];
+        let stems_ptr = NonNull::new(stems.as_mut_ptr() as *mut u8).unwrap();
+
+        let mut head = TestStemStrategy::new(stems_ptr);
+        head.traverse_head(true);
+        assert_eq!(head.stem_idx(), 2);
+        assert_eq!(head.leaf_idx(), 1);
+        assert_eq!(head.dim(), 1);
+        assert_eq!(head.level(), 1);
+
+        let left_first = TestStemStrategy::new(stems_ptr).split_relative(false);
+        assert_eq!(left_first.0.stem_idx(), 1);
+        assert_eq!(left_first.1.stem_idx(), 2);
+        assert_eq!(left_first.0.leaf_idx(), 0);
+        assert_eq!(left_first.1.leaf_idx(), 1);
+
+        let right_first = TestStemStrategy::new(stems_ptr).split_relative(true);
+        assert_eq!(right_first.0.stem_idx(), 2);
+        assert_eq!(right_first.1.stem_idx(), 1);
+        assert_eq!(right_first.0.leaf_idx(), 1);
+        assert_eq!(right_first.1.leaf_idx(), 0);
+    }
+
+    #[test]
+    fn default_backtracking_traverse_step_with_bounds_delegates_to_scalar_step() {
+        let mut stems = [5.0f32, 0.0, 0.0, 0.0];
+        let mut strat = TestStemStrategy::new(NonNull::new(stems.as_mut_ptr() as *mut u8).unwrap());
+        let query = [7.0f32, 1.0f32];
+        let query_wide = [7.0f32, 1.0f32];
+        let mut lower = [f32::NEG_INFINITY; 2];
+        let mut upper = [f32::INFINITY; 2];
+        let mut off = [0.0f32; 2];
+        let mut dim = 0usize;
+        let mut stack = QueryStack::<f32, TestStemStrategy>::default();
+
+        let should_continue = strat
+            .backtracking_traverse_step_with_bounds::<f32, f32, SquaredEuclidean<f32>, 2>(
+                &stems,
+                &query,
+                &query_wide,
+                &mut lower,
+                &mut upper,
+                &mut off,
+                &mut dim,
+                0.0,
+                3,
+                100.0,
+                &mut stack,
+            );
+
+        assert!(should_continue);
+        assert_eq!(strat.stem_idx(), 2);
+        assert_eq!(strat.leaf_idx(), 1);
+        assert_eq!(strat.level(), 1);
+        assert_eq!(strat.dim(), 1);
+        assert_eq!(dim, 1);
+        assert_eq!(off, [0.0, 0.0]);
+        assert_eq!(lower, [f32::NEG_INFINITY, f32::NEG_INFINITY]);
+        assert_eq!(upper, [f32::INFINITY, f32::INFINITY]);
+
+        let ctx = stack.pop().expect("far child should be pushed");
+        let (stem_state, restore_dim, old_off, rd) = ctx.into_parts_with_restore_dim();
+        assert_eq!(stem_state.stem_idx, 1);
+        assert_eq!(stem_state.leaf_idx, 0);
+        assert_eq!(stem_state.level, 1);
+        assert_eq!(stem_state.dim, 1);
+        assert_eq!(restore_dim, Some(0));
+        assert_eq!(old_off, 2.0);
+        assert_eq!(rd, 4.0);
+    }
+
+    #[cfg(feature = "test_utils")]
+    #[test]
+    fn default_backtracking_traverse_step_emits_exact_query_trace_event() {
+        let mut stems = [5.0f64, 0.0, 0.0, 0.0];
+        let mut strat = TestStemStrategy::new(NonNull::new(stems.as_mut_ptr() as *mut u8).unwrap());
+        let query = [7.0f64, 1.0f64];
+        let query_wide = [7.0f64, 1.0f64];
+        let mut off = [0.0f64; 2];
+        let mut dim = 0usize;
+        let mut stack = QueryStack::<f64, TestStemStrategy>::default();
+
+        crate::test_utils::exact_query_trace::set_enabled(true);
+
+        let should_continue = strat
+            .backtracking_traverse_step::<f64, f64, SquaredEuclidean<f64>, 2>(
+                &stems,
+                &query,
+                &query_wide,
+                &mut off,
+                &mut dim,
+                0.0,
+                3,
+                100.0,
+                &mut stack,
+            );
+
+        let events = crate::test_utils::exact_query_trace::snapshot();
+        crate::test_utils::exact_query_trace::set_enabled(false);
+
+        assert!(should_continue);
+        assert_eq!(events.len(), 1);
+
+        match &events[0] {
+            crate::test_utils::exact_query_trace::ExactQueryTraceEvent::ScalarStep {
+                stem_idx,
+                level,
+                dim,
+                pivot,
+                query_elem,
+                is_right_child,
+                old_off,
+                new_off,
+                rd,
+                rd_far,
+                near_stem_idx,
+                far_stem_idx,
+            } => {
+                assert_eq!(*stem_idx, 0);
+                assert_eq!(*level, 0);
+                assert_eq!(*dim, 0);
+                assert_eq!(*pivot, 5.0);
+                assert_eq!(*query_elem, 7.0);
+                assert!(*is_right_child);
+                assert_eq!(*old_off, 0.0);
+                assert_eq!(*new_off, 2.0);
+                assert_eq!(*rd, 0.0);
+                assert_eq!(*rd_far, 4.0);
+                assert_eq!(*near_stem_idx, 2);
+                assert_eq!(*far_stem_idx, 1);
+            }
+            other => panic!("expected ScalarStep trace event, got {other:?}"),
+        }
     }
 }
