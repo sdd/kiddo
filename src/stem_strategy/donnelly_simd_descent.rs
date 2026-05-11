@@ -411,6 +411,9 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dist::SquaredEuclidean;
+    use crate::kd_tree::query_stack::ScalarStackContext;
+    use aligned_vec::avec;
 
     #[test]
     fn test_donnelly_simd_descent_basics() {
@@ -425,5 +428,298 @@ mod tests {
         strat.traverse(true);
         assert!(strat.stem_idx() > 0);
         assert_eq!(strat.level(), 1);
+    }
+
+    fn build_test_block3_pivots_f64() -> [f64; 8] {
+        [0.2, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f64::INFINITY]
+    }
+
+    #[test]
+    fn test_stack_context_round_trips_restore_dim() {
+        type Strat = DonnellySimdDescent<64, 8, 3>;
+
+        let stems = vec![f64::INFINITY; 8];
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let strat = Strat::new(stems_ptr);
+
+        let ctx = DonnellySimdDescentStackContext::new(strat, 2, 0.25f64, 1.5);
+        let (state, restore_dim, old_off, rd) =
+            <DonnellySimdDescentStackContext<f64, Strat> as ScalarStackContext<f64, Strat>>::into_parts_with_restore_dim(ctx);
+
+        assert_eq!(state.stem_idx(), strat.stem_idx());
+        assert_eq!(restore_dim, Some(2));
+        assert_eq!(old_off, 0.25);
+        assert_eq!(rd, 1.5);
+
+        let default_ctx = <DonnellySimdDescentStackContext<f64, Strat> as ScalarStackContext<
+            f64,
+            Strat,
+        >>::from_parts(strat, 0.125, 0.75);
+        let (_, restore_dim, old_off, rd) =
+            <DonnellySimdDescentStackContext<f64, Strat> as ScalarStackContext<f64, Strat>>::into_parts_with_restore_dim(default_ctx);
+
+        assert_eq!(restore_dim, None);
+        assert_eq!(old_off, 0.125);
+        assert_eq!(rd, 0.75);
+    }
+
+    #[test]
+    fn test_can_take_full_block_only_at_minor_triangle_boundary() {
+        type Strat = DonnellySimdDescent<64, 8, 3>;
+
+        let stems = build_test_block3_pivots_f64();
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let mut strat = Strat::new(stems_ptr);
+
+        assert!(strat.can_take_full_block(stems.len(), 2));
+        assert!(!strat.can_take_full_block(7, 2));
+        assert!(!strat.can_take_full_block(stems.len(), 1));
+
+        strat.traverse(false);
+        assert!(!strat.can_take_full_block(stems.len(), 3));
+    }
+
+    #[test]
+    fn test_block_child_matches_manual_traverse_block() {
+        type Strat = DonnellySimdDescent<64, 8, 3>;
+
+        let stems = build_test_block3_pivots_f64();
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let strat = Strat::new(stems_ptr);
+
+        let child = strat.block_child(5);
+
+        let mut manual = strat;
+        manual.core.traverse_block(5, Strat::BLOCK_SIZE as u32);
+
+        assert_eq!(child.stem_idx(), manual.stem_idx());
+        assert_eq!(child.level(), manual.level());
+        assert_eq!(child.leaf_idx(), manual.leaf_idx());
+        assert_eq!(child.dim(), manual.dim());
+    }
+
+    #[test]
+    fn test_child_new_off_uses_child_interval_bounds() {
+        type Strat = DonnellySimdDescent<64, 8, 3>;
+
+        let stems = build_test_block3_pivots_f64();
+        let query = 0.45;
+
+        let left_off =
+            Strat::child_new_off::<f64, f64, SquaredEuclidean<f64>, 3>(&stems, 0, 0, query);
+        let middle_off =
+            Strat::child_new_off::<f64, f64, SquaredEuclidean<f64>, 3>(&stems, 0, 4, query);
+        let right_off =
+            Strat::child_new_off::<f64, f64, SquaredEuclidean<f64>, 3>(&stems, 0, 7, query);
+
+        assert!((left_off - 0.35).abs() < 1e-12);
+        assert_eq!(middle_off, 0.0);
+        assert!((right_off - 0.25).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_leaf_metadata_helpers_match_current_layout() {
+        type Strat = DonnellySimdDescent<64, 8, 3>;
+
+        assert_eq!(Strat::get_stem_node_count_from_leaf_node_count(0), 0);
+        assert_eq!(Strat::get_stem_node_count_from_leaf_node_count(1), 0);
+        assert_eq!(Strat::get_stem_node_count_from_leaf_node_count(2), 1);
+        assert_eq!(Strat::get_stem_node_count_from_leaf_node_count(7), 7);
+        assert_eq!(Strat::get_stem_node_count_from_leaf_node_count(9), 15);
+        assert_eq!(Strat::stem_node_padding_factor(), 50);
+    }
+
+    #[test]
+    fn test_trim_unneeded_stems_truncates_to_last_reachable_left_path_node() {
+        type Strat = DonnellySimdDescent<64, 8, 3>;
+
+        let mut stems = avec![f64::INFINITY; 100];
+        Strat::trim_unneeded_stems(&mut stems, 2);
+
+        let ptr = NonNull::dangling();
+        let mut manual = Strat::new(ptr);
+        loop {
+            manual.traverse(false);
+            if manual.level() == 2 {
+                break;
+            }
+        }
+
+        assert_eq!(stems.len(), manual.stem_idx() + 1);
+        assert!(stems.iter().all(|&x| x.is_infinite()));
+    }
+
+    #[test]
+    fn test_get_leaf_idx_matches_manual_full_block_traversal() {
+        type Strat = DonnellySimdDescent<64, 8, 3>;
+
+        let stems = build_test_block3_pivots_f64();
+        let query = [0.45, 0.0, 0.0];
+        let leaf_idx = Strat::get_leaf_idx::<f64, 3>(&stems, &query, 2);
+
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let mut manual = Strat::new(stems_ptr);
+        let child_idx = compare_block3(&stems, query[0], 0);
+        manual.core.traverse_block(child_idx, 3);
+
+        assert_eq!(leaf_idx, manual.leaf_idx());
+    }
+
+    #[test]
+    fn test_get_leaf_idx_matches_manual_scalar_fallback() {
+        type Strat = DonnellySimdDescent<64, 8, 3>;
+
+        let stems = build_test_block3_pivots_f64();
+        let query = [0.45, 0.0, 0.0];
+        let leaf_idx = Strat::get_leaf_idx::<f64, 3>(&stems, &query, 1);
+
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let mut manual = Strat::new(stems_ptr);
+        manual.traverse(true);
+        manual.traverse(false);
+
+        assert_eq!(leaf_idx, manual.leaf_idx());
+    }
+
+    #[test]
+    fn test_backtracking_step_full_block_updates_state_and_pushes_sorted_siblings() {
+        type Strat = DonnellySimdDescent<64, 8, 3>;
+
+        let stems = build_test_block3_pivots_f64();
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let mut strat = Strat::new(stems_ptr);
+        let query = [0.45, 0.0, 0.0];
+        let query_wide = query;
+        let mut off = [0.0; 3];
+        let mut dim = 0usize;
+        let mut stack = <Strat as StemStrategy>::Stack::<f64>::default();
+
+        let child_idx = compare_block3(&stems, query[0], 0) as usize;
+        let mut expected = Vec::new();
+        for sibling_idx in 0..8 {
+            if sibling_idx == child_idx {
+                continue;
+            }
+
+            let new_off = Strat::child_new_off::<f64, f64, SquaredEuclidean<f64>, 3>(
+                &stems,
+                0,
+                sibling_idx,
+                query_wide[0],
+            );
+            let rd_far = new_off * new_off;
+            if rd_far <= 0.2 {
+                expected.push((sibling_idx as u8, new_off, rd_far));
+            }
+        }
+        expected.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap());
+
+        let stepped = strat.backtracking_traverse_step::<f64, f64, SquaredEuclidean<f64>, 3>(
+            &stems,
+            &query,
+            &query_wide,
+            &mut off,
+            &mut dim,
+            0.0,
+            2,
+            0.2,
+            &mut stack,
+        );
+
+        assert!(stepped);
+        assert_eq!(off[0], 0.0);
+        assert_eq!(dim, strat.dim());
+
+        let mut popped = Vec::new();
+        while let Some(ctx) = stack.pop() {
+            let (state, restore_dim, old_off, rd) =
+                <DonnellySimdDescentStackContext<f64, Strat> as ScalarStackContext<f64, Strat>>::into_parts_with_restore_dim(ctx);
+            popped.push((state.stem_idx(), restore_dim, old_off, rd));
+        }
+
+        assert_eq!(popped.len(), expected.len());
+        for ((stem_idx, restore_dim, old_off, rd), (sibling_idx, expected_off, expected_rd)) in
+            popped.into_iter().zip(expected.into_iter())
+        {
+            let expected_state = Strat::new(stems_ptr).block_child(sibling_idx);
+            assert_eq!(stem_idx, expected_state.stem_idx());
+            assert_eq!(restore_dim, Some(0));
+            assert_eq!(old_off, expected_off);
+            assert_eq!(rd, expected_rd);
+        }
+    }
+
+    #[test]
+    fn test_backtracking_step_scalar_fallback_pushes_far_context() {
+        type Strat = DonnellySimdDescent<64, 8, 3>;
+
+        let stems = build_test_block3_pivots_f64();
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let mut strat = Strat::new(stems_ptr);
+        let query = [0.45, 0.0, 0.0];
+        let query_wide = query;
+        let mut off = [0.0; 3];
+        let mut dim = 0usize;
+        let mut stack = <Strat as StemStrategy>::Stack::<f64>::default();
+
+        let stepped = strat.backtracking_traverse_step::<f64, f64, SquaredEuclidean<f64>, 3>(
+            &stems,
+            &query,
+            &query_wide,
+            &mut off,
+            &mut dim,
+            0.0,
+            0,
+            1.0,
+            &mut stack,
+        );
+
+        assert!(stepped);
+        assert_eq!(strat.level(), 1);
+        assert_eq!(strat.dim(), 0);
+
+        let popped = stack.pop().expect("expected deferred far context");
+        let (state, restore_dim, old_off, rd) =
+            <DonnellySimdDescentStackContext<f64, Strat> as ScalarStackContext<f64, Strat>>::into_parts_with_restore_dim(popped);
+
+        let mut expected_far = Strat::new(stems_ptr);
+        expected_far.traverse(false);
+
+        assert_eq!(state.stem_idx(), expected_far.stem_idx());
+        assert_eq!(restore_dim, Some(0));
+        assert!((old_off - 0.25).abs() < 1e-12);
+        assert!((rd - 0.0625).abs() < 1e-12);
+        assert!(stack.pop().is_none());
+    }
+
+    #[test]
+    fn test_backtracking_step_returns_false_past_max_level() {
+        type Strat = DonnellySimdDescent<64, 8, 3>;
+
+        let stems = build_test_block3_pivots_f64();
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let mut strat = Strat::new(stems_ptr);
+        strat.core.traverse_block(4, 3);
+
+        let query = [0.45, 0.0, 0.0];
+        let query_wide = query;
+        let mut off = [0.0; 3];
+        let mut dim = strat.dim();
+        let mut stack = <Strat as StemStrategy>::Stack::<f64>::default();
+
+        let stepped = strat.backtracking_traverse_step::<f64, f64, SquaredEuclidean<f64>, 3>(
+            &stems,
+            &query,
+            &query_wide,
+            &mut off,
+            &mut dim,
+            0.0,
+            2,
+            1.0,
+            &mut stack,
+        );
+
+        assert!(!stepped);
+        assert!(stack.pop().is_none());
     }
 }

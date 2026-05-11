@@ -215,17 +215,17 @@ where
         }
     }
 
-    #[allow(unused)]
-    #[inline(always)]
-    fn subtree_may_contain_leaf(
-        &self,
-        stem_idx: usize,
-        level: i32,
-        leaf_idx_prefix: usize,
-    ) -> bool {
-        let _ = (level, leaf_idx_prefix);
-        stem_idx < self.stems().len() || self.stem_leaf_resolution().is_terminal_stem_idx(stem_idx)
-    }
+    // #[allow(unused)]
+    // #[inline(always)]
+    // fn subtree_may_contain_leaf(
+    //     &self,
+    //     stem_idx: usize,
+    //     level: i32,
+    //     leaf_idx_prefix: usize,
+    // ) -> bool {
+    //     let _ = (level, leaf_idx_prefix);
+    //     stem_idx < self.stems().len() || self.stem_leaf_resolution().is_terminal_stem_idx(stem_idx)
+    // }
 
     /// Backtracking query
     #[inline(always)]
