@@ -135,3 +135,113 @@ impl<const K: usize, const VB: usize> EytzingerPfFar<K, VB> {
 pub fn calc_child_idx(curr_idx: u32, is_right_child: bool, stems_ptr: NonNull<u8>) -> u32 {
     EytzingerPfFar::<3, 8>::step_pure(curr_idx, is_right_child, stems_ptr)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn eytzinger_pf_far_basics_and_traverse() {
+        let stems = vec![0u8; 256];
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let mut strat = EytzingerPfFar::<3, 8>::new(stems_ptr);
+
+        assert_eq!(strat.stem_idx(), 1);
+        assert_eq!(strat.level(), 0);
+        assert_eq!(strat.dim(), 0);
+        assert_eq!(strat.leaf_idx(), 0);
+
+        strat.traverse(false);
+        assert_eq!(strat.stem_idx(), 2);
+        assert_eq!(strat.level(), 1);
+        assert_eq!(strat.dim(), 1);
+        assert_eq!(strat.leaf_idx(), 0);
+
+        strat.traverse(true);
+        assert_eq!(strat.stem_idx(), 5);
+        assert_eq!(strat.level(), 2);
+        assert_eq!(strat.dim(), 2);
+        assert_eq!(strat.leaf_idx(), 1);
+
+        strat.traverse(false);
+        assert_eq!(strat.stem_idx(), 10);
+        assert_eq!(strat.level(), 3);
+        assert_eq!(strat.dim(), 0);
+        assert_eq!(strat.leaf_idx(), 2);
+    }
+
+    #[test]
+    fn eytzinger_pf_far_branch_returns_right_and_mutates_self_left() {
+        let stems = vec![0u8; 256];
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let mut strat = EytzingerPfFar::<3, 8>::new(stems_ptr);
+
+        let right = strat.branch();
+
+        assert_eq!(strat.stem_idx(), 2);
+        assert_eq!(strat.level(), 1);
+        assert_eq!(strat.dim(), 1);
+
+        assert_eq!(right.stem_idx(), 3);
+        assert_eq!(right.level(), 1);
+        assert_eq!(right.dim(), 1);
+    }
+
+    #[test]
+    fn eytzinger_pf_far_deferred_state_round_trip_restores_full_state() {
+        let stems = vec![0u8; 256];
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let mut original = EytzingerPfFar::<4, 8>::new(stems_ptr);
+        original.traverse(true);
+        original.traverse(false);
+
+        let state = original.deferred_state();
+
+        let mut restored = EytzingerPfFar::<4, 8>::new(NonNull::dangling());
+        restored.rehydrate_deferred_state(state);
+
+        assert_eq!(restored.stem_idx(), original.stem_idx());
+        assert_eq!(restored.level(), original.level());
+        assert_eq!(restored.dim(), original.dim());
+        assert_eq!(restored.leaf_idx(), original.leaf_idx());
+    }
+
+    #[test]
+    fn eytzinger_pf_far_step_pure_and_calc_child_idx_match_eytzinger_layout() {
+        let stems = vec![0u8; 512];
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+
+        assert_eq!(EytzingerPfFar::<3, 8>::step_pure(1, false, stems_ptr), 2);
+        assert_eq!(EytzingerPfFar::<3, 8>::step_pure(1, true, stems_ptr), 3);
+        assert_eq!(EytzingerPfFar::<3, 8>::step_pure(5, false, stems_ptr), 10);
+        assert_eq!(EytzingerPfFar::<3, 8>::step_pure(5, true, stems_ptr), 11);
+
+        assert_eq!(calc_child_idx(1, false, stems_ptr), 2);
+        assert_eq!(calc_child_idx(1, true, stems_ptr), 3);
+        assert_eq!(calc_child_idx(5, false, stems_ptr), 10);
+        assert_eq!(calc_child_idx(5, true, stems_ptr), 11);
+    }
+
+    #[test]
+    fn eytzinger_pf_far_leaf_count_metadata_matches_expected_padding() {
+        type Strat = EytzingerPfFar<3, 8>;
+
+        assert_eq!(Strat::get_stem_node_count_from_leaf_node_count(0), 0);
+        assert_eq!(Strat::get_stem_node_count_from_leaf_node_count(1), 0);
+        assert_eq!(Strat::get_stem_node_count_from_leaf_node_count(2), 2);
+        assert_eq!(Strat::get_stem_node_count_from_leaf_node_count(3), 4);
+        assert_eq!(Strat::get_stem_node_count_from_leaf_node_count(8), 8);
+        assert_eq!(Strat::get_stem_node_count_from_leaf_node_count(9), 16);
+        assert_eq!(Strat::stem_node_padding_factor(), 1);
+    }
+
+    #[test]
+    fn eytzinger_pf_far_child_indices_is_currently_unimplemented() {
+        let stems = vec![0u8; 64];
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        let strat = EytzingerPfFar::<3, 8>::new(stems_ptr);
+
+        let result = std::panic::catch_unwind(|| strat.child_indices());
+        assert!(result.is_err());
+    }
+}

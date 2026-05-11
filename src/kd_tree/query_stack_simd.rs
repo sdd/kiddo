@@ -626,3 +626,184 @@ impl<A, SS, S, const K: usize> ScalarStackContext<A, S> for Block3SimdQueryStack
         unreachable!("SIMD stack contexts do not support scalar stack unpacking")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::stem_strategy::Eytzinger;
+    use std::ptr::NonNull;
+
+    type TestStem = Eytzinger<3>;
+
+    fn test_stem() -> TestStem {
+        TestStem::new(NonNull::dangling())
+    }
+
+    #[test]
+    fn simd_query_stack_context_new_block_stores_all_fields() {
+        let root = test_stem();
+        let siblings = std::array::from_fn(|idx| {
+            let mut stem = root.clone();
+            stem.traverse(idx % 2 == 1);
+            stem
+        });
+
+        let ctx = SimdQueryStackContext::new_block(
+            siblings.clone(),
+            [0.1f32, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+            [1.1f32, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8],
+            [-1.0f32, -2.0, -3.0, -4.0, -5.0, -6.0, -7.0, -8.0],
+            [2.0f32, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+            0b1010_0101,
+            2,
+            9.5,
+            -10.0,
+            10.0,
+        );
+
+        match ctx {
+            SimdQueryStackContext::Block {
+                siblings: stored_siblings,
+                rd_values,
+                new_off_values,
+                lower_bounds,
+                upper_bounds,
+                sibling_mask,
+                dim,
+                old_off,
+                lower_bound,
+                upper_bound,
+            } => {
+                assert_eq!(stored_siblings[0].stem_idx(), siblings[0].stem_idx());
+                assert_eq!(stored_siblings[7].stem_idx(), siblings[7].stem_idx());
+                assert_eq!(rd_values, [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]);
+                assert_eq!(new_off_values, [1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8]);
+                assert_eq!(
+                    lower_bounds,
+                    [-1.0, -2.0, -3.0, -4.0, -5.0, -6.0, -7.0, -8.0]
+                );
+                assert_eq!(upper_bounds, [2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]);
+                assert_eq!(sibling_mask, 0b1010_0101);
+                assert_eq!(dim, 2);
+                assert_eq!(old_off, 9.5);
+                assert_eq!(lower_bound, -10.0);
+                assert_eq!(upper_bound, 10.0);
+            }
+            _ => panic!("expected block context"),
+        }
+    }
+
+    #[test]
+    fn simd_query_stack_context_new_block3_pending_stores_all_fields() {
+        let base = test_stem();
+
+        let ctx = SimdQueryStackContext::new_block3_pending(
+            base.clone(),
+            [0.5f32, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5],
+            [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+            [-8.0f32, -7.0, -6.0, -5.0, -4.0, -3.0, -2.0, -1.0],
+            [8.0f32, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0],
+            0b0011_0110,
+            1,
+            4.25,
+            -12.0,
+            12.0,
+        );
+
+        match ctx {
+            SimdQueryStackContext::Block3Pending {
+                base: stored_base,
+                rd_values,
+                new_off_values,
+                lower_bounds,
+                upper_bounds,
+                pending_mask,
+                dim,
+                old_off,
+                lower_bound,
+                upper_bound,
+            } => {
+                assert_eq!(stored_base.stem_idx(), base.stem_idx());
+                assert_eq!(rd_values, [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5]);
+                assert_eq!(new_off_values, [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]);
+                assert_eq!(
+                    lower_bounds,
+                    [-8.0, -7.0, -6.0, -5.0, -4.0, -3.0, -2.0, -1.0]
+                );
+                assert_eq!(upper_bounds, [8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0]);
+                assert_eq!(pending_mask, 0b0011_0110);
+                assert_eq!(dim, 1);
+                assert_eq!(old_off, 4.25);
+                assert_eq!(lower_bound, -12.0);
+                assert_eq!(upper_bound, 12.0);
+            }
+            _ => panic!("expected block3 pending context"),
+        }
+    }
+
+    #[test]
+    fn simd_query_stack_context_into_parts_extracts_single_fields() {
+        let stem = test_stem();
+        let ctx = SimdQueryStackContext::<f32, TestStem>::Single {
+            stem_strat: stem.clone(),
+            dim: 1,
+            lower_bound: -5.0,
+            upper_bound: 5.0,
+            old_off: 1.25,
+            rd: 2.5,
+        };
+
+        let (stored_stem, old_off, rd) = ctx.into_parts();
+
+        assert_eq!(stored_stem.stem_idx(), stem.stem_idx());
+        assert_eq!(old_off, 1.25);
+        assert_eq!(rd, 2.5);
+    }
+
+    #[test]
+    fn block3_simd_query_stack_context_into_parts_extracts_single_fields() {
+        let stem = test_stem();
+        let ctx = Block3SimdQueryStackContext::<f32, TestStem, 3>::Single {
+            stem_strat: stem.clone(),
+            dim: 2,
+            lower_bound: -3.0,
+            upper_bound: 7.0,
+            old_off: 0.75,
+            rd: 1.5,
+        };
+
+        let (stored_stem, old_off, rd) = ctx.into_parts();
+
+        assert_eq!(stored_stem.stem_idx(), stem.stem_idx());
+        assert_eq!(old_off, 0.75);
+        assert_eq!(rd, 1.5);
+    }
+
+    #[test]
+    fn block3_simd_query_stack_context_new_single_with_bounds_sets_single_variant() {
+        let stem = test_stem();
+        let ctx = <Block3SimdQueryStackContext<f32, TestStem, 3> as SimdIntervalStackContext<
+            f32,
+            TestStem,
+        >>::new_single_with_bounds(stem.clone(), 2, -4.0, 9.0, 1.0, 3.0);
+
+        match ctx {
+            Block3SimdQueryStackContext::Single {
+                stem_strat,
+                dim,
+                lower_bound,
+                upper_bound,
+                old_off,
+                rd,
+            } => {
+                assert_eq!(stem_strat.stem_idx(), stem.stem_idx());
+                assert_eq!(dim, 2);
+                assert_eq!(lower_bound, -4.0);
+                assert_eq!(upper_bound, 9.0);
+                assert_eq!(old_off, 1.0);
+                assert_eq!(rd, 3.0);
+            }
+            _ => panic!("expected single block3 simd context"),
+        }
+    }
+}
