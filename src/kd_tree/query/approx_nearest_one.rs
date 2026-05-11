@@ -283,7 +283,7 @@ mod tests {
         // Check that the root stem value was updated from max_value to a reasonable pivot
         let root_stem_value = tree.stems[1]; // Eytzinger root is at index 1
         assert!(
-            root_stem_value < f32::MAX,
+            root_stem_value < f32::INFINITY,
             "Root stem should be updated from max_value"
         );
         assert!(
@@ -330,7 +330,7 @@ mod tests {
         // Check that the root stem value was updated from max_value to a reasonable pivot
         let root_stem_value = tree.stems[1]; // Eytzinger root is at index 1
         assert!(
-            root_stem_value < f32::MAX,
+            root_stem_value < f32::INFINITY,
             "Root stem should be updated from max_value"
         );
         assert!(
@@ -343,7 +343,8 @@ mod tests {
         let right_child_stem = tree.stems[3]; // Eytzinger right child at index 3
 
         // At least one child should have been split (not max_value any more)
-        let has_initialized_child = (left_child_stem < f32::MAX) || (right_child_stem < f32::MAX);
+        let has_initialized_child =
+            (left_child_stem < f32::INFINITY) || (right_child_stem < f32::INFINITY);
         assert!(
             has_initialized_child,
             "At least one child stem should be initialized after second split"

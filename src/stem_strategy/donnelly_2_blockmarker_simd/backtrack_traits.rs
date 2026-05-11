@@ -2526,7 +2526,7 @@ unsafe fn simd_fill_block3_f64_avx512_squared_euclidean(
     let above = _mm512_max_pd(_mm512_sub_pd(query_vec, upper), zero_vec);
     let interval = _mm512_add_pd(below, above);
 
-    let max_vec = _mm512_set1_pd(f64::MAX);
+    let max_vec = _mm512_set1_pd(f64::INFINITY);
     let interval_out = _mm512_mask_mov_pd(max_vec, valid_mask, interval);
     _mm512_storeu_pd(new_off_values.as_mut_ptr(), interval_out);
 
@@ -3766,7 +3766,7 @@ mod tests {
     use std::panic::{catch_unwind, AssertUnwindSafe};
 
     fn is_invalid_f64_sentinel(value: f64) -> bool {
-        value == <f64 as crate::Axis>::max_value() || value.is_infinite()
+        value == <f64 as crate::Axis>::max_value() || value == f64::INFINITY || value.is_infinite()
     }
 
     #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]
@@ -3817,7 +3817,7 @@ mod tests {
         pivots[4] = 3.0; // p4
         pivots[5] = 5.0; // p5
         pivots[6] = 7.0; // p6
-        pivots[7] = f64::MAX;
+        pivots[7] = f64::INFINITY;
         pivots
     }
 
@@ -3831,7 +3831,7 @@ mod tests {
         pivots[4] = sorted[2]; // p4
         pivots[5] = sorted[4]; // p5
         pivots[6] = sorted[6]; // p6
-        pivots[7] = f64::MAX;
+        pivots[7] = f64::INFINITY;
         pivots
     }
 
@@ -3844,7 +3844,7 @@ mod tests {
         pivots[4] = 3.0;
         pivots[5] = 5.0;
         pivots[6] = 7.0;
-        pivots[7] = f32::MAX;
+        pivots[7] = f32::INFINITY;
         pivots
     }
 
@@ -3858,7 +3858,7 @@ mod tests {
         pivots[4] = sorted[2];
         pivots[5] = sorted[4];
         pivots[6] = sorted[6];
-        pivots[7] = f32::MAX;
+        pivots[7] = f32::INFINITY;
         pivots
     }
 
@@ -3867,7 +3867,7 @@ mod tests {
         for i in 0..15 {
             pivots[i] = (i + 1) as f64;
         }
-        pivots[15] = f64::MAX;
+        pivots[15] = f64::INFINITY;
         pivots
     }
 
@@ -3889,7 +3889,7 @@ mod tests {
         pivots[13] = sorted[12];
         pivots[6] = sorted[13];
         pivots[14] = sorted[14];
-        pivots[15] = f64::MAX;
+        pivots[15] = f64::INFINITY;
         pivots
     }
 
@@ -3898,7 +3898,7 @@ mod tests {
         for i in 0..15 {
             pivots[i] = (i + 1) as f32;
         }
-        pivots[15] = f32::MAX;
+        pivots[15] = f32::INFINITY;
         pivots
     }
 
@@ -3920,7 +3920,7 @@ mod tests {
         pivots[13] = sorted[12];
         pivots[6] = sorted[13];
         pivots[14] = sorted[14];
-        pivots[15] = f32::MAX;
+        pivots[15] = f32::INFINITY;
         pivots
     }
 
@@ -3936,13 +3936,13 @@ mod tests {
             let (lower_offset, upper_offset) = child_interval_bounds_block3(sibling_idx as usize);
 
             let lower = if lower_offset == 255 {
-                f64::MIN
+                f64::NEG_INFINITY
             } else {
                 pivots[lower_offset as usize]
             };
 
             let upper = if upper_offset == 255 {
-                f64::MAX
+                f64::INFINITY
             } else {
                 pivots[upper_offset as usize]
             };
@@ -3971,13 +3971,13 @@ mod tests {
             let (lower_offset, upper_offset) = child_interval_bounds_block3(sibling_idx as usize);
 
             let lower = if lower_offset == 255 {
-                f32::MIN
+                f32::NEG_INFINITY
             } else {
                 pivots[lower_offset as usize]
             };
 
             let upper = if upper_offset == 255 {
-                f32::MAX
+                f32::INFINITY
             } else {
                 pivots[upper_offset as usize]
             };
@@ -4006,13 +4006,13 @@ mod tests {
             let (lower_offset, upper_offset) = child_interval_bounds_block4(sibling_idx as usize);
 
             let lower = if lower_offset == 255 {
-                f64::MIN
+                f64::NEG_INFINITY
             } else {
                 pivots[lower_offset as usize]
             };
 
             let upper = if upper_offset == 255 {
-                f64::MAX
+                f64::INFINITY
             } else {
                 pivots[upper_offset as usize]
             };
@@ -4041,13 +4041,13 @@ mod tests {
             let (lower_offset, upper_offset) = child_interval_bounds_block4(sibling_idx as usize);
 
             let lower = if lower_offset == 255 {
-                f32::MIN
+                f32::NEG_INFINITY
             } else {
                 pivots[lower_offset as usize]
             };
 
             let upper = if upper_offset == 255 {
-                f32::MAX
+                f32::INFINITY
             } else {
                 pivots[upper_offset as usize]
             };
@@ -4077,7 +4077,7 @@ mod tests {
         pivots[4] = 5.0; // p2
         pivots[5] = 3.0; // p5
         pivots[6] = 7.0; // p6
-        pivots[7] = f64::MAX; // padding
+        pivots[7] = f64::INFINITY; // padding
 
         let stems_ptr = NonNull::new(pivots.as_mut_ptr() as *mut u8).unwrap();
 
@@ -4105,7 +4105,7 @@ mod tests {
         pivots[4] = 5.0;
         pivots[5] = 3.0;
         pivots[6] = 7.0;
-        pivots[7] = f32::MAX;
+        pivots[7] = f32::INFINITY;
 
         let stems_ptr = NonNull::new(pivots.as_mut_ptr() as *mut u8).unwrap();
 

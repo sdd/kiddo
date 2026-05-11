@@ -48,7 +48,7 @@ fn build_query_f32_k2() -> [f32; 2] {
 
 #[cfg(feature = "simd")]
 fn linear_search(points: &[[f32; 2]], query: &[f32; 2]) -> (f32, usize) {
-    let mut best_dist = f32::MAX;
+    let mut best_dist = f32::INFINITY;
     let mut best_idx = 0usize;
     for (idx, point) in points.iter().enumerate() {
         let dist =
@@ -63,7 +63,7 @@ fn linear_search(points: &[[f32; 2]], query: &[f32; 2]) -> (f32, usize) {
 
 #[cfg(feature = "simd")]
 fn linear_search_f64(points: &[[f64; 2]], query: &[f64; 2]) -> (f64, usize) {
-    let mut best_dist = f64::MAX;
+    let mut best_dist = f64::INFINITY;
     let mut best_idx = 0usize;
     for (idx, point) in points.iter().enumerate() {
         let dist =
