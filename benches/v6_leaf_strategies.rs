@@ -178,9 +178,9 @@ fn v6_leaf_strategies(c: &mut Criterion) {
     for log2_points in MIN_LOG2_POINTS..=MAX_LOG2_POINTS {
         let point_count = 1usize << log2_points;
         let points = build_points(point_count);
-        let flat_tree: FlatTree = KdTree::new_from_slice(&points);
-        let arena_tree: ArenaTree = KdTree::new_from_slice(&points);
-        let vec_of_arrays_tree: VecOfArraysTree = KdTree::new_from_slice(&points);
+        let flat_tree: FlatTree = KdTree::new_from_slice(&points).unwrap();
+        let arena_tree: ArenaTree = KdTree::new_from_slice(&points).unwrap();
+        let vec_of_arrays_tree: VecOfArraysTree = KdTree::new_from_slice(&points).unwrap();
 
         bench_nearest_group(
             &mut nearest_group,
@@ -198,9 +198,9 @@ fn v6_leaf_strategies(c: &mut Criterion) {
     for log2_points in MIN_LOG2_POINTS..=MAX_LOG2_POINTS {
         let point_count = 1usize << log2_points;
         let points = build_points(point_count);
-        let flat_tree: FlatTree = KdTree::new_from_slice(&points);
-        let arena_tree: ArenaTree = KdTree::new_from_slice(&points);
-        let vec_of_arrays_tree: VecOfArraysTree = KdTree::new_from_slice(&points);
+        let flat_tree: FlatTree = KdTree::new_from_slice(&points).unwrap();
+        let arena_tree: ArenaTree = KdTree::new_from_slice(&points).unwrap();
+        let vec_of_arrays_tree: VecOfArraysTree = KdTree::new_from_slice(&points).unwrap();
 
         bench_approx_group(
             &mut approx_group,

@@ -171,7 +171,7 @@ fn regression_donnelly_simd_block4_f32_nearest_one_matches_scalar_and_linear() {
     let expected = linear_search(&points, &query);
 
     let tree_scalar: KdTree<f32, usize, Donnelly<4, 64, 4, 2>, FlatVec<f32, usize, 2, 16>, 2, 16> =
-        KdTree::new_from_slice(&points);
+        KdTree::new_from_slice(&points).unwrap();
     let tree_simd: KdTree<
         f32,
         usize,
@@ -179,7 +179,7 @@ fn regression_donnelly_simd_block4_f32_nearest_one_matches_scalar_and_linear() {
         FlatVec<f32, usize, 2, 16>,
         2,
         16,
-    > = KdTree::new_from_slice(&points);
+    > = KdTree::new_from_slice(&points).unwrap();
 
     let scalar_result = tree_scalar.nearest_one::<SquaredEuclidean<f32>>(&query);
     let simd_result = tree_simd.nearest_one::<SquaredEuclidean<f32>>(&query);
@@ -196,7 +196,7 @@ fn regression_donnelly_simd_block4_f32_approx_self_lookup_hits_zero_distance() {
     let points = build_points_f32_k2();
 
     let tree_scalar: KdTree<f32, usize, Donnelly<4, 64, 4, 2>, FlatVec<f32, usize, 2, 16>, 2, 16> =
-        KdTree::new_from_slice(&points);
+        KdTree::new_from_slice(&points).unwrap();
     let tree_simd: KdTree<
         f32,
         usize,
@@ -204,7 +204,7 @@ fn regression_donnelly_simd_block4_f32_approx_self_lookup_hits_zero_distance() {
         FlatVec<f32, usize, 2, 16>,
         2,
         16,
-    > = KdTree::new_from_slice(&points);
+    > = KdTree::new_from_slice(&points).unwrap();
 
     for point in points.iter() {
         let scalar_result = tree_scalar.approx_nearest_one::<SquaredEuclidean<f32>>(point);
@@ -225,7 +225,7 @@ fn regression_donnelly_simd_block4_f32_best_n_within_matches_scalar_and_linear()
     let expected = linear_best_n_within_f32(&points, &query, max_dist, max_qty.get());
 
     let tree_scalar: KdTree<f32, usize, Donnelly<4, 64, 4, 2>, FlatVec<f32, usize, 2, 16>, 2, 16> =
-        KdTree::new_from_slice(&points);
+        KdTree::new_from_slice(&points).unwrap();
     let tree_simd: KdTree<
         f32,
         usize,
@@ -233,7 +233,7 @@ fn regression_donnelly_simd_block4_f32_best_n_within_matches_scalar_and_linear()
         FlatVec<f32, usize, 2, 16>,
         2,
         16,
-    > = KdTree::new_from_slice(&points);
+    > = KdTree::new_from_slice(&points).unwrap();
 
     let scalar_result = tree_scalar
         .best_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty)
@@ -270,7 +270,7 @@ fn control_donnelly_simd_block3_f64_nearest_one_matches_scalar_and_linear() {
     let expected = linear_search_f64(&points, &query);
 
     let tree_scalar: KdTree<f64, usize, Donnelly<3, 64, 8, 2>, FlatVec<f64, usize, 2, 16>, 2, 16> =
-        KdTree::new_from_slice(&points);
+        KdTree::new_from_slice(&points).unwrap();
     let tree_simd: KdTree<
         f64,
         usize,
@@ -278,7 +278,7 @@ fn control_donnelly_simd_block3_f64_nearest_one_matches_scalar_and_linear() {
         FlatVec<f64, usize, 2, 16>,
         2,
         16,
-    > = KdTree::new_from_slice(&points);
+    > = KdTree::new_from_slice(&points).unwrap();
 
     let scalar_result = tree_scalar.nearest_one::<SquaredEuclidean<f64>>(&query);
     let simd_result = tree_simd.nearest_one::<SquaredEuclidean<f64>>(&query);
@@ -304,7 +304,7 @@ fn control_donnelly_simd_block3_f64_best_n_within_matches_scalar_and_linear() {
     let expected = linear_best_n_within_f64(&points, &query, max_dist, max_qty.get());
 
     let tree_scalar: KdTree<f64, usize, Donnelly<3, 64, 8, 2>, FlatVec<f64, usize, 2, 16>, 2, 16> =
-        KdTree::new_from_slice(&points);
+        KdTree::new_from_slice(&points).unwrap();
     let tree_simd: KdTree<
         f64,
         usize,
@@ -312,7 +312,7 @@ fn control_donnelly_simd_block3_f64_best_n_within_matches_scalar_and_linear() {
         FlatVec<f64, usize, 2, 16>,
         2,
         16,
-    > = KdTree::new_from_slice(&points);
+    > = KdTree::new_from_slice(&points).unwrap();
 
     let scalar_result = tree_scalar
         .best_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty)
@@ -345,7 +345,7 @@ fn regression_donnelly_simd_block4_f32_small_grid_within_variants_match_linear()
     let max_qty = NonZeroUsize::new(usize::MAX).unwrap();
 
     let tree_scalar: KdTree<f32, usize, Donnelly<4, 64, 4, 2>, FlatVec<f32, usize, 2, 16>, 2, 16> =
-        KdTree::new_from_slice(&points);
+        KdTree::new_from_slice(&points).unwrap();
     let tree_simd: KdTree<
         f32,
         usize,
@@ -353,7 +353,7 @@ fn regression_donnelly_simd_block4_f32_small_grid_within_variants_match_linear()
         FlatVec<f32, usize, 2, 16>,
         2,
         16,
-    > = KdTree::new_from_slice(&points);
+    > = KdTree::new_from_slice(&points).unwrap();
 
     let mut scalar_within_unsorted: Vec<(f32, usize)> = tree_scalar
         .within_unsorted::<SquaredEuclidean<f32>>(&query, max_dist)

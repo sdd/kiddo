@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let points: Vec<[f64; 3]> = (0..NUM_ITEMS).map(|_| rng.random::<[f64; 3]>()).collect();
 
     let start = Instant::now();
-    let tree: Tree = KdTree::new_from_slice(&points);
+    let tree: Tree = KdTree::new_from_slice(&points)?;
     println!(
         "Populated KdTree with {} items ({})",
         tree.size(),

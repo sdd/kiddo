@@ -107,7 +107,7 @@ fn v6_result_collection_focus(c: &mut Criterion) {
 
     let points = build_points(point_count);
     let queries = build_queries(query_count);
-    let tree: DonnellyPfTree = KdTree::new_from_slice(&points);
+    let tree: DonnellyPfTree = KdTree::new_from_slice(&points).unwrap();
 
     let mut group = c.benchmark_group("v6 result collection focus");
     group.throughput(Throughput::Elements(query_count as u64));

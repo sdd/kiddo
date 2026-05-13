@@ -219,7 +219,7 @@ fn main() {
     let (flat_tree, flat_build_elapsed) =
         if matches!(strategy_kind, StrategyKind::Both | StrategyKind::Flat) {
             let flat_build_start = Instant::now();
-            let flat_tree = KdTree::new_from_slice(&points);
+            let flat_tree = KdTree::new_from_slice(&points).unwrap();
             (Some(flat_tree), Some(flat_build_start.elapsed()))
         } else {
             (None, None)
@@ -228,7 +228,7 @@ fn main() {
     let (arena_tree, arena_build_elapsed) =
         if matches!(strategy_kind, StrategyKind::Both | StrategyKind::Arena) {
             let arena_build_start = Instant::now();
-            let arena_tree = KdTree::new_from_slice(&points);
+            let arena_tree = KdTree::new_from_slice(&points).unwrap();
             (Some(arena_tree), Some(arena_build_start.elapsed()))
         } else {
             (None, None)
@@ -239,7 +239,7 @@ fn main() {
         StrategyKind::Both | StrategyKind::VecOfArrays
     ) {
         let vec_of_arrays_build_start = Instant::now();
-        let vec_of_arrays_tree = KdTree::new_from_slice(&points);
+        let vec_of_arrays_tree = KdTree::new_from_slice(&points).unwrap();
         (
             Some(vec_of_arrays_tree),
             Some(vec_of_arrays_build_start.elapsed()),

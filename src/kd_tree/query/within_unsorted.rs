@@ -238,9 +238,9 @@ mod tests {
                 .collect();
 
             let flat_tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
-                KdTree::new_from_slice(&points);
+                KdTree::new_from_slice(&points).unwrap();
             let arena_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
-                KdTree::new_from_slice(&points);
+                KdTree::new_from_slice(&points).unwrap();
 
             let mut flat: Vec<(f32, u32)> = flat_tree
                 .within_unsorted::<SquaredEuclidean<f32>>(&query, radius)
@@ -272,7 +272,7 @@ mod tests {
             })
             .collect();
         type Tree = KdTree<f64, u32, Eytzinger<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
-        let tree: Tree = KdTree::new_from_slice(&points);
+        let tree: Tree = KdTree::new_from_slice(&points).unwrap();
         let query = [0.37, 0.41, 0.43];
         let radius = 0.12;
 
@@ -304,7 +304,7 @@ mod tests {
             .map(|idx| [idx as f64, (idx * 2) as f64, (idx * 3) as f64])
             .collect();
         type Tree = KdTree<f64, u32, Eytzinger<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
-        let tree: Tree = KdTree::new_from_slice(&points);
+        let tree: Tree = KdTree::new_from_slice(&points).unwrap();
 
         let visited: Vec<(u32, [f64; 3])> = tree.iter().collect();
 
@@ -326,7 +326,7 @@ mod tests {
             (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
         let tree: KdTree<f32, u32, Eytzinger<4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
-            KdTree::new_from_slice(&content_to_add);
+            KdTree::new_from_slice(&content_to_add).unwrap();
 
         let query_points: Vec<[f32; 4]> =
             (0..NUM_QUERIES).map(|_| rng.random::<[f32; 4]>()).collect();
@@ -357,7 +357,7 @@ mod tests {
             (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
         let tree: KdTree<f32, (), Eytzinger<4>, FlatVec<f32, (), 4, 32>, 4, 32> =
-            KdTree::new_from_slice_no_items(&content_to_add);
+            KdTree::new_from_slice_no_items(&content_to_add).unwrap();
 
         let query_points: Vec<[f32; 4]> =
             (0..NUM_QUERIES).map(|_| rng.random::<[f32; 4]>()).collect();
@@ -397,7 +397,7 @@ mod tests {
             (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
         let tree: KdTree<f32, u32, Eytzinger<4>, VecOfArrays<f32, u32, 4, 32>, 4, 32> =
-            KdTree::new_from_slice(&content_to_add);
+            KdTree::new_from_slice(&content_to_add).unwrap();
 
         let query_points: Vec<[f32; 4]> =
             (0..NUM_QUERIES).map(|_| rng.random::<[f32; 4]>()).collect();
@@ -431,7 +431,7 @@ mod tests {
             KdTree::default();
 
         for (idx, point) in content_to_add.iter().enumerate() {
-            tree.add(point, idx as u32);
+            tree.add(point, idx as u32).unwrap();
         }
 
         let query_points: Vec<[f32; 4]> =

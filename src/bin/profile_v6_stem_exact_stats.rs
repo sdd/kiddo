@@ -179,11 +179,11 @@ fn main() {
     let queries = build_queries(query_count);
 
     let build_start = Instant::now();
-    let donnelly_tree: DonnellyTree = KdTree::new_from_slice(&points);
+    let donnelly_tree: DonnellyTree = KdTree::new_from_slice(&points).unwrap();
     let donnelly_build_ns = build_start.elapsed().as_nanos() as f64;
 
     let build_start = Instant::now();
-    let donnelly_simd_tree: DonnellySimdTree = KdTree::new_from_slice(&points);
+    let donnelly_simd_tree: DonnellySimdTree = KdTree::new_from_slice(&points).unwrap();
     let donnelly_simd_build_ns = build_start.elapsed().as_nanos() as f64;
 
     eprintln!(

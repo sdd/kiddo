@@ -129,7 +129,7 @@
 //!     [3f64, 3f64]
 //! ];
 //!
-//! let kdtree = ImmutableKdTree::new_from_slice(&entries);
+//! let kdtree = ImmutableKdTree::new_from_slice(&entries).unwrap();
 //!
 //! // How many items are in tree?
 //! assert_eq!(kdtree.size(), 4);

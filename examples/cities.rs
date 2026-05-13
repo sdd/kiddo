@@ -68,7 +68,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let city_points: Vec<[f32; 3]> = cities.iter().map(CityCsvRecord::as_xyz).collect();
 
     type Tree = KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32>;
-    let kdtree: Tree = KdTree::new_from_slice(&city_points);
+    let kdtree: Tree = KdTree::new_from_slice(&city_points)?;
 
     println!("Loaded {} items into Kiddo k-d tree", kdtree.size());
 

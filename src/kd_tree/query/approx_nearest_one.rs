@@ -162,7 +162,7 @@ mod tests {
         }
 
         let tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
-            KdTree::new_from_slice(&points);
+            KdTree::new_from_slice(&points).unwrap();
 
         assert!(!tree.is_empty());
         assert_eq!(tree.size(), 65_536);
@@ -189,7 +189,7 @@ mod tests {
         }
 
         let tree: KdTree<f32, (), Eytzinger<3>, FlatVec<f32, (), 3, 32>, 3, 32> =
-            KdTree::new_from_slice_no_items(&points);
+            KdTree::new_from_slice_no_items(&points).unwrap();
 
         assert!(!tree.is_empty());
         assert_eq!(tree.size(), 65_536);
@@ -216,7 +216,7 @@ mod tests {
         }
 
         let tree: KdTree<f32, u32, Eytzinger<3>, VecOfArrays<f32, u32, 3, 32>, 3, 32> =
-            KdTree::new_from_slice(&points);
+            KdTree::new_from_slice(&points).unwrap();
 
         assert!(!tree.is_empty());
         assert_eq!(tree.size(), 65_536);
@@ -242,9 +242,9 @@ mod tests {
         let query = [0.39f32, 0.51, 0.61];
 
         let flat_tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
-            KdTree::new_from_slice(&points);
+            KdTree::new_from_slice(&points).unwrap();
         let arena_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
-            KdTree::new_from_slice(&points);
+            KdTree::new_from_slice(&points).unwrap();
 
         let flat_result = flat_tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query);
         let arena_result = arena_tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query);
@@ -269,7 +269,7 @@ mod tests {
             KdTree::default();
 
         for (idx, point) in points.iter().enumerate() {
-            tree.add(point, idx as u32)
+            tree.add(point, idx as u32).unwrap();
         }
 
         // Print tree state for debugging
@@ -316,7 +316,7 @@ mod tests {
 
         for (idx, point) in points.iter().enumerate() {
             // println!("Tree at item {}: {}", idx, tree);
-            tree.add(point, idx as u32)
+            tree.add(point, idx as u32).unwrap();
         }
 
         // Print tree state for debugging
@@ -372,7 +372,7 @@ mod tests {
 
         for (idx, point) in points.iter().enumerate() {
             // println!("Tree at item {}: {}", idx, tree);
-            tree.add(point, idx as u32);
+            tree.add(point, idx as u32).unwrap();
         }
 
         assert!(!tree.is_empty());
@@ -410,7 +410,7 @@ mod tests {
             FlatVec<f32, u32, 4, 32>,
             4,
             32,
-        > = KdTree::new_from_slice(&points);
+        > = KdTree::new_from_slice(&points).unwrap();
 
         assert!(!tree.is_empty());
         assert_eq!(tree.size(), 131_072);
@@ -443,7 +443,7 @@ mod tests {
             .collect();
 
         let tree_eytz: KdTree<f32, u32, Eytzinger<4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
-            KdTree::new_from_slice(&points);
+            KdTree::new_from_slice(&points).unwrap();
 
         let tree_donnelly: KdTree<
             f32,
@@ -452,7 +452,7 @@ mod tests {
             FlatVec<f32, u32, 4, 32>,
             4,
             32,
-        > = KdTree::new_from_slice(&points);
+        > = KdTree::new_from_slice(&points).unwrap();
 
         // Test multiple query points
         let query_points: Vec<[f32; 4]> = (0..100)
@@ -497,7 +497,7 @@ mod tests {
             .collect();
 
         let tree_eytz: KdTree<f32, u32, Eytzinger<4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
-            KdTree::new_from_slice(&points);
+            KdTree::new_from_slice(&points).unwrap();
 
         let tree_donnelly: KdTree<
             f32,
@@ -506,7 +506,7 @@ mod tests {
             FlatVec<f32, u32, 4, 32>,
             4,
             32,
-        > = KdTree::new_from_slice(&points);
+        > = KdTree::new_from_slice(&points).unwrap();
 
         // Test multiple query points
         let query_points: Vec<[f32; 4]> = (0..100)
@@ -559,7 +559,7 @@ mod tests {
             FlatVec<f32, u32, 4, 32>,
             4,
             32,
-        > = KdTree::new_from_slice(&points);
+        > = KdTree::new_from_slice(&points).unwrap();
 
         let tree_donnelly_marker: KdTree<
             f32,
@@ -568,7 +568,7 @@ mod tests {
             FlatVec<f32, u32, 4, 32>,
             4,
             32,
-        > = KdTree::new_from_slice(&points);
+        > = KdTree::new_from_slice(&points).unwrap();
 
         // Test multiple query points
         let query_points: Vec<[f32; 4]> = (0..100)
@@ -624,7 +624,7 @@ mod tests {
             FlatVec<f64, u32, 3, 32>,
             3,
             32,
-        > = KdTree::new_from_slice(&points);
+        > = KdTree::new_from_slice(&points).unwrap();
 
         assert!(!tree.is_empty());
         assert_eq!(tree.size(), 2_097_152);
@@ -690,7 +690,7 @@ mod tests {
             FlatVec<f32, u32, 4, 32>,
             4,
             32,
-        > = KdTree::new_from_slice(&points);
+        > = KdTree::new_from_slice(&points).unwrap();
 
         assert!(!tree.is_empty());
         assert_eq!(tree.size(), 2_097_152);

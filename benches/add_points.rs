@@ -139,7 +139,7 @@ fn bench_add_to_empty_float<A: Axis, T: Content, const K: usize, IDX: Index<T = 
                 |(mut kdtree, points_to_add)| {
                     points_to_add
                         .iter()
-                        .for_each(|point| kdtree.add(&point.0, point.1));
+                        .for_each(|point| kdtree.add(&point.0, point.1)).unwrap();
                     black_box(())
                 },
                 BatchSize::SmallInput,
@@ -175,7 +175,7 @@ fn bench_add_to_populated_float<A: Axis, T: Content, const K: usize, IDX: Index<
                     );
 
                     for point in &initial_points {
-                        kdtree.add(&point.0, point.1);
+                        kdtree.add(&point.0, point.1).unwrap();
                     }
 
                     (kdtree, points_to_add)
@@ -183,7 +183,7 @@ fn bench_add_to_populated_float<A: Axis, T: Content, const K: usize, IDX: Index<
                 |(mut kdtree, points_to_add)| {
                     points_to_add
                         .iter()
-                        .for_each(|point| kdtree.add(&point.0, point.1));
+                        .for_each(|point| kdtree.add(&point.0, point.1)).unwrap();
                     black_box(())
                 },
                 BatchSize::SmallInput,
@@ -219,7 +219,7 @@ fn bench_add_to_empty_fixed_u16<A: Unsigned, T: Content, const K: usize, IDX: In
                 },
                 |(mut kdtree, points_to_add)| {
                     points_to_add.iter().for_each(|point| {
-                        kdtree.add(black_box(&point.0), point.1);
+                        kdtree.add(black_box(&point.0), point.1).unwrap();
                         black_box(())
                     })
                 },
@@ -258,14 +258,14 @@ fn bench_add_to_populated_fixed_u16<A: Unsigned, T: Content, const K: usize, IDX
                             size + points.len(),
                         );
                     for point in &initial_points {
-                        kdtree.add(&point.0, point.1);
+                        kdtree.add(&point.0, point.1).unwrap();
                     }
 
                     (kdtree, points)
                 },
                 |(mut kdtree, points_to_add)| {
                     points_to_add.iter().for_each(|point| {
-                        kdtree.add(black_box(&point.0), point.1);
+                        kdtree.add(black_box(&point.0), point.1).unwrap();
                         black_box(())
                     })
                 },

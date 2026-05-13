@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let start = Instant::now();
-    let tree: DonnellyPfTree = KdTree::new_from_slice(&points);
+    let tree: DonnellyPfTree = KdTree::new_from_slice(&points).unwrap();
     eprintln!(
         "built Donnelly PF tree in {:.0} ns",
         start.elapsed().as_nanos() as f64

@@ -38,10 +38,10 @@ fn test_kdtree_with_numeric_id() {
     let mut tree: TestTree<u32> = KdTree::default();
 
     // Add some points with associated numeric IDs
-    tree.add(&[0.0, 0.0], 1001);
-    tree.add(&[1.0, 1.0], 1002);
-    tree.add(&[2.0, 2.0], 1003);
-    tree.add(&[-1.0, -1.0], 1004);
+    tree.add(&[0.0, 0.0], 1001).unwrap();
+    tree.add(&[1.0, 1.0], 1002).unwrap();
+    tree.add(&[2.0, 2.0], 1003).unwrap();
+    tree.add(&[-1.0, -1.0], 1004).unwrap();
 
     // Test nearest neighbor query
     let query_point = [0.5, 0.25];
@@ -73,10 +73,14 @@ fn test_kdtree_with_fixed_string() {
     let mut tree: TestTree<MyFixedString> = KdTree::default();
 
     // Add some points with associated MyFixedString data
-    tree.add(&[0.0, 0.0], MyFixedString::from_str("Origin"));
-    tree.add(&[1.0, 1.0], MyFixedString::from_str("Point A"));
-    tree.add(&[2.0, 2.0], MyFixedString::from_str("Point B"));
-    tree.add(&[-1.0, -1.0], MyFixedString::from_str("Point C"));
+    tree.add(&[0.0, 0.0], MyFixedString::from_str("Origin"))
+        .unwrap();
+    tree.add(&[1.0, 1.0], MyFixedString::from_str("Point A"))
+        .unwrap();
+    tree.add(&[2.0, 2.0], MyFixedString::from_str("Point B"))
+        .unwrap();
+    tree.add(&[-1.0, -1.0], MyFixedString::from_str("Point C"))
+        .unwrap();
 
     // Test nearest neighbor query
     let query_point = [0.5, 0.25];
@@ -105,10 +109,10 @@ fn test_kdtree_with_empty_type_as_content() {
     let mut tree: TestTree<()> = KdTree::default();
 
     // Add some points with associated numeric IDs
-    tree.add(&[0.0, 0.0], ());
-    tree.add(&[1.0, 1.0], ());
-    tree.add(&[2.0, 2.0], ());
-    tree.add(&[-1.0, -1.0], ());
+    tree.add(&[0.0, 0.0], ()).unwrap();
+    tree.add(&[1.0, 1.0], ()).unwrap();
+    tree.add(&[2.0, 2.0], ()).unwrap();
+    tree.add(&[-1.0, -1.0], ()).unwrap();
 
     // Test nearest neighbor query
     let query_point = [0.5, 0.25];

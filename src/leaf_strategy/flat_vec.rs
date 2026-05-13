@@ -168,7 +168,7 @@ mod test {
     fn create_single_leaf_flat_vec_float_kd_tree() {
         let points: Vec<[f32; 3]> = vec![[1.0f32, 2.0f32, 3.0f32]];
         let tree: kd_tree::KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
-            kd_tree::KdTree::new_from_slice(&points);
+            kd_tree::KdTree::new_from_slice(&points).unwrap();
 
         assert_eq!(tree.size(), 1);
 
@@ -189,7 +189,7 @@ mod test {
     fn create_single_leaf_flat_vec_float_no_items_kd_tree() {
         let points: Vec<[f32; 3]> = vec![[1.0f32, 2.0f32, 3.0f32]];
         let tree: kd_tree::KdTree<f32, (), Eytzinger<3>, FlatVec<f32, (), 3, 32>, 3, 32> =
-            kd_tree::KdTree::new_from_slice_no_items(&points);
+            kd_tree::KdTree::new_from_slice_no_items(&points).unwrap();
 
         assert_eq!(tree.size(), 1);
 
@@ -216,7 +216,7 @@ mod test {
             FlatVec<FixedU16<U8>, u32, 3, 32>,
             3,
             32,
-        > = kd_tree::KdTree::new_from_slice(&points);
+        > = kd_tree::KdTree::new_from_slice(&points).unwrap();
 
         assert_eq!(tree.size(), 1);
 
@@ -248,7 +248,7 @@ mod test {
         }
 
         let tree: kd_tree::KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
-            kd_tree::KdTree::new_from_slice(&points);
+            kd_tree::KdTree::new_from_slice(&points).unwrap();
 
         assert!(!tree.is_empty());
         assert_eq!(tree.size(), 65_536);

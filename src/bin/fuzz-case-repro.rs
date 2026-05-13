@@ -558,7 +558,7 @@ where
     let mut tree: V6KdTree<f32, usize, SO, VecOfArrays<f32, usize, K, B>, K, B> =
         V6KdTree::default();
     for (idx, point) in points.iter().enumerate() {
-        tree.add(point, idx);
+        tree.add(point, idx).unwrap();
     }
 
     run_checks::<f32, K, _, _, _>(
@@ -614,7 +614,7 @@ where
     let mut tree: V6KdTree<f64, usize, SO, VecOfArrays<f64, usize, K, B>, K, B> =
         V6KdTree::default();
     for (idx, point) in points.iter().enumerate() {
-        tree.add(point, idx);
+        tree.add(point, idx).unwrap();
     }
 
     run_checks::<f64, K, _, _, _>(
@@ -667,7 +667,7 @@ where
         generate_query_with_params_f32::<K>(params, cfg, point_count);
 
     let tree: V6KdTree<f32, usize, SO, FlatVec<f32, usize, K, B>, K, B> =
-        V6KdTree::new_from_slice(&points);
+        V6KdTree::new_from_slice(&points).unwrap();
 
     run_checks::<f32, K, _, _, _>(
         ReproRunContext {
@@ -719,7 +719,7 @@ where
         generate_query_with_params_f64::<K>(params, cfg, point_count);
 
     let tree: V6KdTree<f64, usize, SO, FlatVec<f64, usize, K, B>, K, B> =
-        V6KdTree::new_from_slice(&points);
+        V6KdTree::new_from_slice(&points).unwrap();
 
     run_checks::<f64, K, _, _, _>(
         ReproRunContext {

@@ -249,5 +249,9 @@ where
 
     /// Splits a full leaf, returning the pivot value and the index of
     /// the new leaf that the leaf was split into.
-    fn split_leaf(&mut self, leaf_idx: usize, split_dim: usize) -> (AX, usize);
+    fn split_leaf(
+        &mut self,
+        leaf_idx: usize,
+        split_dim: usize,
+    ) -> Result<(AX, usize), crate::kd_tree::ConstructionError>;
 }

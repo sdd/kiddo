@@ -92,14 +92,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let start = Instant::now();
-    let eytzinger_tree: EytzingerTree = KdTree::new_from_slice(&points);
+    let eytzinger_tree: EytzingerTree = KdTree::new_from_slice(&points).unwrap();
     eprintln!(
         "built Eytzinger tree in {:.0} ns",
         start.elapsed().as_nanos() as f64
     );
 
     let start = Instant::now();
-    let donnelly_pf_tree: DonnellyPfTree = KdTree::new_from_slice(&points);
+    let donnelly_pf_tree: DonnellyPfTree = KdTree::new_from_slice(&points).unwrap();
     eprintln!(
         "built Donnelly PF tree in {:.0} ns",
         start.elapsed().as_nanos() as f64

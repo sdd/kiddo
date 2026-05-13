@@ -167,9 +167,10 @@ fn main() {
     let points = build_points(point_count);
     let queries = build_queries(query_count);
 
-    let donnelly_tree: DonnellyTree = KdTree::new_from_slice(&points);
-    let donnelly_block_scalar_tree: DonnellyBlockScalarTree = KdTree::new_from_slice(&points);
-    let donnelly_simd_tree: DonnellySimdTree = KdTree::new_from_slice(&points);
+    let donnelly_tree: DonnellyTree = KdTree::new_from_slice(&points).unwrap();
+    let donnelly_block_scalar_tree: DonnellyBlockScalarTree =
+        KdTree::new_from_slice(&points).unwrap();
+    let donnelly_simd_tree: DonnellySimdTree = KdTree::new_from_slice(&points).unwrap();
 
     for (query_idx, query) in queries.iter().enumerate() {
         let expected = linear_search(&points, query);

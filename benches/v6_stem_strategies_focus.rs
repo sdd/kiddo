@@ -118,15 +118,15 @@ fn v6_stem_strategies_focus(c: &mut Criterion) {
     let points = build_points(point_count);
     let queries = build_queries(query_count);
 
-    let eytzinger_tree: EytzingerTree = KdTree::new_from_slice(&points);
-    let eytzinger_pf_far_tree: EytzingerPfFarTree = KdTree::new_from_slice(&points);
-    let donnelly_tree: DonnellyPfTree = KdTree::new_from_slice(&points);
+    let eytzinger_tree: EytzingerTree = KdTree::new_from_slice(&points).unwrap();
+    let eytzinger_pf_far_tree: EytzingerPfFarTree = KdTree::new_from_slice(&points).unwrap();
+    let donnelly_tree: DonnellyPfTree = KdTree::new_from_slice(&points).unwrap();
     #[cfg(all(
         feature = "simd",
         target_arch = "x86_64",
         any(target_feature = "avx2", target_feature = "avx512f")
     ))]
-    let donnelly_simd_tree: DonnellySimdTree = KdTree::new_from_slice(&points);
+    let donnelly_simd_tree: DonnellySimdTree = KdTree::new_from_slice(&points).unwrap();
 
     let mut group = c.benchmark_group("v6 nearest_one stem strategies focus");
     group.throughput(Throughput::Elements(query_count as u64));

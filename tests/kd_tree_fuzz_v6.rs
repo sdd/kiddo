@@ -1025,7 +1025,7 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
             KdTree::default();
 
         for (idx, point) in points.iter().enumerate() {
-            tree.add(point, idx);
+            let _ = tree.add(point, idx);
         }
 
         let max_nearest_n = cfg.max_nearest_n.max(1).min(point_count);
@@ -1417,7 +1417,7 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
             KdTree::default();
 
         for (idx, point) in points.iter().enumerate() {
-            tree.add(point, idx);
+            let _ = tree.add(point, idx);
         }
 
         let max_nearest_n = cfg.max_nearest_n.max(1).min(point_count);
@@ -1806,7 +1806,7 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
 
         progress.case_start(case_idx, point_count, content_seed);
 
-        let tree: KdTree<f32, usize, SO, LS, K, B> = KdTree::new_from_slice(&points);
+        let tree: KdTree<f32, usize, SO, LS, K, B> = KdTree::new_from_slice(&points).unwrap();
 
         let max_nearest_n = cfg.max_nearest_n.max(1).min(point_count);
 
@@ -2216,7 +2216,7 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
 
         progress.case_start(case_idx, point_count, content_seed);
 
-        let tree: KdTree<f64, usize, SO, LS, K, B> = KdTree::new_from_slice(&points);
+        let tree: KdTree<f64, usize, SO, LS, K, B> = KdTree::new_from_slice(&points).unwrap();
 
         let max_nearest_n = cfg.max_nearest_n.max(1).min(point_count);
 
@@ -3813,7 +3813,7 @@ where
                 .collect();
 
             let tree: KdTree<f32, usize, SO, LS, 2, ADVERSARIAL_B> =
-                KdTree::new_from_slice(&points);
+                KdTree::new_from_slice(&points).unwrap();
 
             for (query_idx, query) in queries.iter().enumerate() {
                 let context = format!(
@@ -3877,7 +3877,7 @@ where
 
             let mut entries: Vec<EntryF32> = Vec::with_capacity(points.len() + queries.len());
             for (item, point) in points.iter().copied().enumerate() {
-                tree.add(&point, item);
+                let _ = tree.add(&point, item);
                 entries.push((point, item));
             }
 
@@ -3905,7 +3905,7 @@ where
                 }
 
                 let add_point = adversarial_mutation_point_f32(size, query_idx);
-                tree.add(&add_point, next_item);
+                let _ = tree.add(&add_point, next_item);
                 entries.push((add_point, next_item));
                 next_item += 1;
 
@@ -3946,7 +3946,7 @@ where
                 .collect();
 
             let tree: KdTree<f64, usize, SO, LS, 2, ADVERSARIAL_B> =
-                KdTree::new_from_slice(&points);
+                KdTree::new_from_slice(&points).unwrap();
 
             for (query_idx, query) in queries.iter().enumerate() {
                 let context = format!(
@@ -4273,7 +4273,7 @@ where
                 FlatVec<f32, usize, 2, ADVERSARIAL_B>,
                 2,
                 ADVERSARIAL_B,
-            > = KdTree::new_from_slice(&points);
+            > = KdTree::new_from_slice(&points).unwrap();
 
             for (query_idx, query) in queries.iter().enumerate() {
                 let context = format!(
@@ -4318,7 +4318,7 @@ where
 
             let mut entries: Vec<EntryF32> = Vec::with_capacity(points.len() + queries.len());
             for (item, point) in points.iter().copied().enumerate() {
-                tree.add(&point, item);
+                let _ = tree.add(&point, item);
                 entries.push((point, item));
             }
 
@@ -4345,7 +4345,7 @@ where
                 }
 
                 let add_point = adversarial_mutation_point_f32(size + 31, query_idx);
-                tree.add(&add_point, next_item);
+                let _ = tree.add(&add_point, next_item);
                 entries.push((add_point, next_item));
                 next_item += 1;
 
@@ -4386,7 +4386,7 @@ where
                 FlatVec<f64, usize, 2, ADVERSARIAL_B>,
                 2,
                 ADVERSARIAL_B,
-            > = KdTree::new_from_slice(&points);
+            > = KdTree::new_from_slice(&points).unwrap();
 
             for (query_idx, query) in queries.iter().enumerate() {
                 let context = format!(
@@ -4623,6 +4623,7 @@ fn fuzz_v6_approx_nearest_one_quality() {
                 2,
                 ADVERSARIAL_B,
             >::new_from_slice(points)
+            .unwrap()
         });
     }
 
@@ -4654,7 +4655,7 @@ fn fuzz_v6_approx_nearest_one_quality() {
                         FlatVec<f32, usize, 2, ADVERSARIAL_B>,
                         2,
                         ADVERSARIAL_B,
-                    > = KdTree::new_from_slice(&points_f32);
+                    > = KdTree::new_from_slice(&points_f32).unwrap();
                     record_approx_quality_case_f32(
                         &format!("v6 approx quality simd f32 Block4 case={}", case_idx + 1),
                         &tree_f32,
@@ -4684,7 +4685,7 @@ fn fuzz_v6_approx_nearest_one_quality() {
                     FlatVec<f64, usize, 2, ADVERSARIAL_B>,
                     2,
                     ADVERSARIAL_B,
-                > = KdTree::new_from_slice(&points_f64);
+                > = KdTree::new_from_slice(&points_f64).unwrap();
                 record_approx_quality_case_f64(
                     &format!("v6 approx quality simd f64 Block3 case={}", case_idx + 1),
                     &tree_f64,

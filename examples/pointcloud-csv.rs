@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Points loaded from CSV file. Count: {}", points.len());
 
-    let kdtree: Tree = KdTree::new_from_slice(&points);
+    let kdtree: Tree = KdTree::new_from_slice(&points)?;
 
     println!(
         "Populated k-d tree with {} items. Took {}",

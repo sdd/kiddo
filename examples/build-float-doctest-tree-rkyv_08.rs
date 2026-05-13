@@ -12,7 +12,7 @@ type Tree = KdTree<f64, u32, EytzingerPf<3, 8>, VecOfArenas<f64, u32, 3, 256>, 3
 
 fn main() -> Result<(), Box<dyn Error>> {
     let points: Vec<[f64; 3]> = vec![[1.0, 2.0, 5.0], [2.0, 3.0, 6.0]];
-    let tree: Tree = KdTree::new_from_slice(&points);
+    let tree: Tree = KdTree::new_from_slice(&points)?;
 
     let buf = to_bytes::<RkyvError>(&tree)?;
     let mut file = File::create("./examples/float-doctest-tree-rkyv_08.rkyv")?;

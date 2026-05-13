@@ -237,7 +237,7 @@ mod tests {
 
     #[test]
     fn eytzinger_pf_far_child_indices_is_currently_unimplemented() {
-        let stems = vec![0u8; 64];
+        let stems = [0u8; 64];
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         let strat = EytzingerPfFar::<3, 8>::new(stems_ptr);
 

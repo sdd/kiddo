@@ -1,3 +1,4 @@
+use crate::kd_tree::ConstructionError;
 use crate::leaf_view::LeafView;
 use crate::mirror_select_nth_unstable_by::mirror_select_nth_unstable_by;
 use crate::traits::leaf_strategy::{
@@ -319,7 +320,11 @@ where
     /// * moving items from the midpoint onwards to the new leaf
     ///
     /// Returns: A tuple of (split_value, new_leaf_idx)
-    fn split_leaf(&mut self, leaf_idx: usize, split_dim: usize) -> (AX, usize) {
+    fn split_leaf(
+        &mut self,
+        leaf_idx: usize,
+        split_dim: usize,
+    ) -> Result<(AX, usize), ConstructionError> {
         debug_assert!(leaf_idx < self.leaves.len(), "leaf_idx out of bounds");
         unsafe {
             let orig = self.leaves.get_unchecked_mut(leaf_idx);
@@ -450,9 +455,7 @@ where
                         pivot_idx += 1;
 
                         if pivot_idx == B {
-                            // TODO: should no longer panic here. Changing addition to be fallible
-                            // is quite a wide-ranging change though
-                            panic!("Too many items with the same position on one axis. Bucket size must be increased to at least 1 more than the number of items with the same position on one axis.");
+                            return Err(ConstructionError::UnsplittableBucket { split_dim });
                         }
                     }
                 }
@@ -470,7 +473,7 @@ where
 
             let new_leaf_idx = self.copy_split_data_to_new_leaf(&old_leaf_copy, pivot_idx);
 
-            (split_val, new_leaf_idx)
+            Ok((split_val, new_leaf_idx))
         }
     }
 }
@@ -493,7 +496,7 @@ mod test {
     fn create_single_leaf_vec_of_arrays_float_kd_tree() {
         let points: Vec<[f32; 3]> = vec![[1.0f32, 2.0f32, 3.0f32]];
         let tree: kd_tree::KdTree<f32, u32, Eytzinger<3>, VecOfArrays<f32, u32, 3, 32>, 3, 32> =
-            kd_tree::KdTree::new_from_slice(&points);
+            kd_tree::KdTree::new_from_slice(&points).unwrap();
 
         assert_eq!(tree.size(), 1);
 
@@ -522,7 +525,7 @@ mod test {
             VecOfArrays<FixedU16<U8>, u32, 3, 32>,
             3,
             32,
-        > = kd_tree::KdTree::new_from_slice(&points);
+        > = kd_tree::KdTree::new_from_slice(&points).unwrap();
 
         assert_eq!(tree.size(), 1);
 
@@ -545,7 +548,7 @@ mod test {
         let points: Vec<[f32; 3]> = vec![[1.0f32, 2.0f32, 3.0f32]];
 
         let tree: kd_tree::KdTree<f32, (), Eytzinger<3>, VecOfArrays<f32, (), 3, 32>, 3, 32> =
-            kd_tree::KdTree::new_from_slice_no_items(&points);
+            kd_tree::KdTree::new_from_slice_no_items(&points).unwrap();
 
         assert_eq!(tree.size(), 1);
 
@@ -577,7 +580,7 @@ mod test {
         }
 
         let tree: kd_tree::KdTree<f32, u32, Eytzinger<3>, VecOfArrays<f32, u32, 3, 32>, 3, 32> =
-            kd_tree::KdTree::new_from_slice(&points);
+            kd_tree::KdTree::new_from_slice(&points).unwrap();
 
         assert!(!tree.is_empty());
         assert_eq!(tree.size(), 65_536);
@@ -782,7 +785,8 @@ mod test {
             Eytzinger<2>,
             2,
             4,
-        >>::split_leaf(&mut leaves, 0, 0);
+        >>::split_leaf(&mut leaves, 0, 0)
+        .unwrap();
 
         assert_eq!(split_val, 4.0);
         assert_eq!(new_leaf_idx, 1);

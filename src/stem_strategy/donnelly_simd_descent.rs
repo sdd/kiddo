@@ -438,7 +438,7 @@ mod tests {
     fn test_stack_context_round_trips_restore_dim() {
         type Strat = DonnellySimdDescent<64, 8, 3>;
 
-        let stems = vec![f64::INFINITY; 8];
+        let stems = [f64::INFINITY; 8];
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         let strat = Strat::new(stems_ptr);
 

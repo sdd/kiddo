@@ -278,18 +278,19 @@ fn v6_stem_strategies(c: &mut Criterion) {
     for log2_points in MIN_LOG2_POINTS..=MAX_LOG2_POINTS {
         let point_count = 1usize << log2_points;
         let points = build_points(point_count);
-        let eytzinger_tree: EytzingerTree = KdTree::new_from_slice(&points);
-        let eytzinger_pf_tree: EytzingerPfTree = KdTree::new_from_slice(&points);
-        let eytzinger_pf_far_tree: EytzingerPfFarTree = KdTree::new_from_slice(&points);
-        let donnelly_tree: DonnellyTree = KdTree::new_from_slice(&points);
-        let donnelly_pf_tree: DonnellyPfTree = KdTree::new_from_slice(&points);
-        let donnelly_simd_descent_tree: DonnellySimdDescentTree = KdTree::new_from_slice(&points);
+        let eytzinger_tree: EytzingerTree = KdTree::new_from_slice(&points).unwrap();
+        let eytzinger_pf_tree: EytzingerPfTree = KdTree::new_from_slice(&points).unwrap();
+        let eytzinger_pf_far_tree: EytzingerPfFarTree = KdTree::new_from_slice(&points).unwrap();
+        let donnelly_tree: DonnellyTree = KdTree::new_from_slice(&points).unwrap();
+        let donnelly_pf_tree: DonnellyPfTree = KdTree::new_from_slice(&points).unwrap();
+        let donnelly_simd_descent_tree: DonnellySimdDescentTree =
+            KdTree::new_from_slice(&points).unwrap();
         #[cfg(all(
             feature = "simd",
             target_arch = "x86_64",
             any(target_feature = "avx2", target_feature = "avx512f")
         ))]
-        let donnelly_simd_tree: DonnellySimdTree = KdTree::new_from_slice(&points);
+        let donnelly_simd_tree: DonnellySimdTree = KdTree::new_from_slice(&points).unwrap();
 
         bench_nearest_group(
             &mut nearest_group,
@@ -316,18 +317,19 @@ fn v6_stem_strategies(c: &mut Criterion) {
     for log2_points in MIN_LOG2_POINTS..=MAX_LOG2_POINTS {
         let point_count = 1usize << log2_points;
         let points = build_points(point_count);
-        let eytzinger_tree: EytzingerTree = KdTree::new_from_slice(&points);
-        let eytzinger_pf_tree: EytzingerPfTree = KdTree::new_from_slice(&points);
-        let eytzinger_pf_far_tree: EytzingerPfFarTree = KdTree::new_from_slice(&points);
-        let donnelly_tree: DonnellyTree = KdTree::new_from_slice(&points);
-        let donnelly_pf_tree: DonnellyPfTree = KdTree::new_from_slice(&points);
-        let donnelly_simd_descent_tree: DonnellySimdDescentTree = KdTree::new_from_slice(&points);
+        let eytzinger_tree: EytzingerTree = KdTree::new_from_slice(&points).unwrap();
+        let eytzinger_pf_tree: EytzingerPfTree = KdTree::new_from_slice(&points).unwrap();
+        let eytzinger_pf_far_tree: EytzingerPfFarTree = KdTree::new_from_slice(&points).unwrap();
+        let donnelly_tree: DonnellyTree = KdTree::new_from_slice(&points).unwrap();
+        let donnelly_pf_tree: DonnellyPfTree = KdTree::new_from_slice(&points).unwrap();
+        let donnelly_simd_descent_tree: DonnellySimdDescentTree =
+            KdTree::new_from_slice(&points).unwrap();
         #[cfg(all(
             feature = "simd",
             target_arch = "x86_64",
             any(target_feature = "avx2", target_feature = "avx512f")
         ))]
-        let donnelly_simd_tree: DonnellySimdTree = KdTree::new_from_slice(&points);
+        let donnelly_simd_tree: DonnellySimdTree = KdTree::new_from_slice(&points).unwrap();
 
         bench_approx_group(
             &mut approx_group,

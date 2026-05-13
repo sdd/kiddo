@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     let mut kdtree: Tree = KdTree::with_capacity(cities.len());
     cities.iter().enumerate().for_each(|(idx, city)| {
-        kdtree.add(&city.as_xyz(), idx);
+        kdtree.add(&city.as_xyz(), idx).unwrap();
     });
     println!(
         "Populated k-d tree with {} items ({})",

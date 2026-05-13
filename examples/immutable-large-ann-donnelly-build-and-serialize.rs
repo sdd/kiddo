@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let start = Instant::now();
     println!("Building a tree of {TREE_SIZE} items...");
-    let tree: Tree = KdTree::new_from_slice(&points);
+    let tree: Tree = KdTree::new_from_slice(&points)?;
     println!(
         "Construction complete. ({})",
         ElapsedDuration::new(start.elapsed())

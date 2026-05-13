@@ -45,7 +45,7 @@ fn main() {
         .collect();
 
     let build_start = Instant::now();
-    let tree: Tree = KdTree::new_from_slice(&points);
+    let tree: Tree = KdTree::new_from_slice(&points).unwrap();
     let build_elapsed = build_start.elapsed();
 
     let mut query_rng = ChaCha8Rng::seed_from_u64(QUERY_SEED);
