@@ -117,6 +117,28 @@ where
     }
 }
 
+impl<AX, T, const K: usize, const B: usize> VecOfArrays<AX, T, K, B>
+where
+    AX: Axis<Coord = AX>,
+    T: Content,
+{
+    // Enforce bucket size of at least 2. B=1 can trigger UB in split fn
+    // https://github.com/sdd/kiddo/issues/295
+    const _VALID_B: () = {
+        assert!(
+            B > 1,
+            "Bucket size must be at least 2 with VecOfArrays leaf strategy"
+        );
+    };
+
+    fn new(leaves: Vec<LeafNode<AX, T, K, B>>, size: usize) -> Self {
+        #[allow(clippy::let_unit_value)]
+        let _ = Self::_VALID_B;
+
+        Self { leaves, size }
+    }
+}
+
 impl<AX, T, SS, const K: usize, const B: usize> ConstructibleLeafStrategy<AX, T, SS, K, B>
     for VecOfArrays<AX, T, K, B>
 where
@@ -125,17 +147,11 @@ where
     SS: StemStrategy,
 {
     fn new_with_capacity(capacity: usize) -> Self {
-        Self {
-            leaves: Vec::with_capacity(capacity / B + 1),
-            size: 0,
-        }
+        Self::new(Vec::with_capacity(capacity / B + 1), 0)
     }
 
     fn new_with_empty_leaf() -> Self {
-        let mut result = Self {
-            leaves: Vec::new(),
-            size: 0,
-        };
+        let mut result = Self::new(Vec::new(), 0);
 
         let leaf = LeafNode {
             content_points: [[AX::zero(); B]; K],
