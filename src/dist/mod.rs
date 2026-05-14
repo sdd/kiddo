@@ -18,11 +18,20 @@ pub mod distance_metric_neon;
 /// Dot Product distance metric
 pub mod dot_product;
 
+/// Chebyshev distance metric
+pub mod chebyshev;
+
+/// Minkowski distance metric
+pub mod minkowski;
+
 /// Manhattan distance metric
 pub mod manhattan;
 
 /// Squared Euclidean distance metric
 pub mod squared_euclidean;
+
+/// Shared distance metric functions
+pub(crate) mod common;
 
 pub use distance_metric_core::DistanceMetricCore;
 #[cfg(any(
@@ -47,8 +56,10 @@ use crate::{
     BestNeighbour, NearestNeighbour,
 };
 
+pub use chebyshev::Chebyshev;
 pub use dot_product::DotProduct;
 pub use manhattan::Manhattan;
+pub use minkowski::Minkowski;
 pub use squared_euclidean::SquaredEuclidean;
 
 #[cfg(feature = "simd")]
@@ -1142,7 +1153,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        DistanceMetricCore, DistanceMetricUnified, DotProduct, Manhattan, SquaredEuclidean,
+        Chebyshev, DistanceMetricCore, DistanceMetricUnified, DotProduct, Manhattan, Minkowski,
+        SquaredEuclidean,
     };
 
     #[test]
@@ -1170,9 +1182,35 @@ mod tests {
     }
 
     #[test]
+    fn v3_chebyshev_f64_works() {
+        type M = Chebyshev<f64>;
+        let a = [1.0, 2.0, 3.0];
+        let b = [4.0, 2.5, -1.0];
+
+        let aw = a.map(M::widen_coord);
+        let bw = b.map(M::widen_coord);
+        let d = <M as DistanceMetricCore<f64>>::dist::<3>(&aw, &bw);
+        assert_eq!(d, 4.0);
+    }
+
+    #[test]
+    fn v3_minkowski_3_f64_works() {
+        type M = Minkowski<3, f64>;
+        let a = [1.0, 2.0, 3.0];
+        let b = [4.0, 2.5, -1.0];
+
+        let aw = a.map(M::widen_coord);
+        let bw = b.map(M::widen_coord);
+        let d = <M as DistanceMetricCore<f64>>::dist::<3>(&aw, &bw);
+        assert_eq!(d, 91.125);
+    }
+
+    #[test]
     fn v3_unified_bound_is_satisfied() {
         fn assert_unified<M: DistanceMetricUnified<f64>>() {}
         assert_unified::<SquaredEuclidean<f64>>();
+        assert_unified::<Chebyshev<f64>>();
+        assert_unified::<Minkowski<3, f64>>();
     }
 
     #[test]

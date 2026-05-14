@@ -35,6 +35,15 @@ pub trait DistanceMetricCore<A: Copy> {
     /// Single-axis contribution in widened coordinates.
     fn dist1(a: Self::Output, b: Self::Output) -> Self::Output;
 
+    /// Combine a per-axis contribution into an accumulated point or box distance.
+    ///
+    /// Additive metrics keep the default `+` behavior; metrics such as
+    /// Chebyshev override this to use `max`.
+    #[inline(always)]
+    fn combine_component(acc: &mut Self::Output, component: Self::Output) {
+        *acc += component;
+    }
+
     /// Single-axis contribution on raw coordinates.
     #[inline(always)]
     fn dist1_raw(a: A, b: A) -> Self::Output {
@@ -44,10 +53,10 @@ pub trait DistanceMetricCore<A: Copy> {
     /// Full point distance in widened coordinates.
     #[inline(always)]
     fn dist<const K: usize>(a: &[Self::Output; K], b: &[Self::Output; K]) -> Self::Output {
-        let mut acc = Self::dist1(a[0], b[0]);
+        let mut acc = Self::Output::zero();
 
-        for dim in 1..K {
-            acc += Self::dist1(a[dim], b[dim]);
+        for dim in 0..K {
+            Self::combine_component(&mut acc, Self::dist1(a[dim], b[dim]));
         }
 
         acc
@@ -56,13 +65,41 @@ pub trait DistanceMetricCore<A: Copy> {
     /// Full point distance on raw coordinates.
     #[inline(always)]
     fn dist_raw<const K: usize>(a: &[A; K], b: &[A; K]) -> Self::Output {
-        let mut acc = Self::dist1_raw(a[0], b[0]);
+        let mut acc = Self::Output::zero();
 
-        for dim in 1..K {
-            acc += Self::dist1_raw(a[dim], b[dim]);
+        for dim in 0..K {
+            Self::combine_component(&mut acc, Self::dist1_raw(a[dim], b[dim]));
         }
 
         acc
+    }
+
+    /// Bounding-box distance derived from per-axis offsets to the query.
+    #[inline(always)]
+    fn rect_dist_from_off<const K: usize>(off: &[Self::Output; K]) -> Self::Output {
+        let mut acc = Self::Output::zero();
+
+        for off_val in off.iter().copied() {
+            Self::combine_component(&mut acc, Self::dist1(off_val, Self::Output::zero()));
+        }
+
+        acc
+    }
+
+    /// Bounding-box distance after replacing a single axis offset.
+    ///
+    /// Additive metrics can update in O(1); metrics with different aggregation
+    /// semantics can override.
+    #[inline(always)]
+    fn rect_dist_after_update<const K: usize>(
+        rd: Self::Output,
+        off: &[Self::Output; K],
+        dim: usize,
+        new_off: Self::Output,
+    ) -> Self::Output {
+        let new_dist1 = Self::dist1(new_off, Self::Output::zero());
+        let old_dist1 = Self::dist1(off[dim], Self::Output::zero());
+        Self::Output::saturating_add(rd - old_dist1, new_dist1)
     }
 
     /// Returns true if `a` is better than `b` under this metric ordering.

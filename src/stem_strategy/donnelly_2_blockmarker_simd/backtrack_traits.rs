@@ -8,7 +8,9 @@
 
 use std::ptr::NonNull;
 
-use crate::dist::{DistanceMetricCore, DotProduct, Manhattan, SquaredEuclidean};
+use crate::dist::{
+    Chebyshev, DistanceMetricCore, DotProduct, Manhattan, Minkowski, SquaredEuclidean,
+};
 use crate::Axis;
 
 mod sealed {
@@ -726,7 +728,6 @@ where
 {
     use super::{child_interval_bounds_block3, coord_min, interval_distance_1d};
 
-    let old_dist1 = D::dist1(old_off, O::zero());
     let mut mask: u8 = 0;
     let ptr = unsafe {
         stems_ptr
@@ -764,6 +765,7 @@ where
         let new_off = interval_distance_1d(query_wide, effective_lower, effective_upper);
         new_off_values[sibling_idx as usize] = new_off;
 
+        let old_dist1 = D::dist1(old_off, O::zero());
         let new_dist1 = D::dist1(new_off, O::zero());
         let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
         rd_values[sibling_idx as usize] = rd_far;
@@ -794,7 +796,6 @@ where
 {
     use super::{child_interval_bounds_block3, coord_min, interval_distance_1d};
 
-    let old_dist1 = D::dist1(old_off, O::zero());
     let mut mask: u8 = 0;
     let ptr = unsafe {
         stems_ptr
@@ -825,6 +826,7 @@ where
         }
 
         let new_off = interval_distance_1d(query_wide, effective_lower, effective_upper);
+        let old_dist1 = D::dist1(old_off, O::zero());
         let new_dist1 = D::dist1(new_off, O::zero());
         let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
 
@@ -1690,6 +1692,206 @@ where
         best_dist: f32,
     ) -> u16 {
         simd_backtrack_block4_f32_neon_manhattan::<A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+impl<A, const K: usize> DistanceMetricSimdBlock3<A, K, f64> for Chebyshev<f64>
+where
+    A: Copy,
+    Chebyshev<f64>: DistanceMetricCore<A, Output = f64>,
+{
+    #[inline(always)]
+    fn backtrack_block3_autovec(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u8 {
+        autovec_backtrack_block3::<f64, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f64> for Chebyshev<f64>
+where
+    A: Copy,
+    Chebyshev<f64>: DistanceMetricCore<A, Output = f64>,
+{
+    #[inline(always)]
+    fn backtrack_block4_autovec(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u16 {
+        autovec_backtrack_block4::<f64, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+impl<A, const K: usize> DistanceMetricSimdBlock3<A, K, f32> for Chebyshev<f32>
+where
+    A: Copy,
+    Chebyshev<f32>: DistanceMetricCore<A, Output = f32>,
+{
+    #[inline(always)]
+    fn backtrack_block3_autovec(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u8 {
+        autovec_backtrack_block3::<f32, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+impl<A, const K: usize> DistanceMetricSimdBlock4<A, K, f32> for Chebyshev<f32>
+where
+    A: Copy,
+    Chebyshev<f32>: DistanceMetricCore<A, Output = f32>,
+{
+    #[inline(always)]
+    fn backtrack_block4_autovec(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u16 {
+        autovec_backtrack_block4::<f32, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+impl<A, const K: usize, const P: u32> DistanceMetricSimdBlock3<A, K, f64> for Minkowski<P, f64>
+where
+    A: Copy,
+    Minkowski<P, f64>: DistanceMetricCore<A, Output = f64>,
+{
+    #[inline(always)]
+    fn backtrack_block3_autovec(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u8 {
+        autovec_backtrack_block3::<f64, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+impl<A, const K: usize, const P: u32> DistanceMetricSimdBlock4<A, K, f64> for Minkowski<P, f64>
+where
+    A: Copy,
+    Minkowski<P, f64>: DistanceMetricCore<A, Output = f64>,
+{
+    #[inline(always)]
+    fn backtrack_block4_autovec(
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
+    ) -> u16 {
+        autovec_backtrack_block4::<f64, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+impl<A, const K: usize, const P: u32> DistanceMetricSimdBlock3<A, K, f32> for Minkowski<P, f32>
+where
+    A: Copy,
+    Minkowski<P, f32>: DistanceMetricCore<A, Output = f32>,
+{
+    #[inline(always)]
+    fn backtrack_block3_autovec(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u8 {
+        autovec_backtrack_block3::<f32, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+}
+
+impl<A, const K: usize, const P: u32> DistanceMetricSimdBlock4<A, K, f32> for Minkowski<P, f32>
+where
+    A: Copy,
+    Minkowski<P, f32>: DistanceMetricCore<A, Output = f32>,
+{
+    #[inline(always)]
+    fn backtrack_block4_autovec(
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
+    ) -> u16 {
+        autovec_backtrack_block4::<f32, A, Self, K>(
             query_wide,
             stems_ptr,
             block_base_idx,

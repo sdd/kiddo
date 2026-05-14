@@ -443,11 +443,7 @@ where
                     let pivot_wide = D::widen_coord(pivot);
                     let query_elem_wide = unsafe { *self.query_wide.get_unchecked(dim) };
                     let new_off = D::Output::saturating_dist(query_elem_wide, pivot_wide);
-                    let old_off = unsafe { *off.get_unchecked(dim) };
-
-                    let new_dist1 = D::dist1(new_off, D::Output::zero());
-                    let old_dist1 = D::dist1(old_off, D::Output::zero());
-                    let rd_far = D::Output::saturating_add(rd - old_dist1, new_dist1);
+                    let rd_far = D::rect_dist_after_update(rd, &off, dim, new_off);
 
                     if D::Output::cmp(rd_far, self.max_dist) != std::cmp::Ordering::Greater {
                         let mut far_off = off;

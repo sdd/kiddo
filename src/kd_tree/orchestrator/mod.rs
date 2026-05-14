@@ -473,10 +473,7 @@ where
 
                 #[cfg(feature = "result_collection_stats")]
                 {
-                    let mut rd_from_off = O::zero();
-                    for off_val in off.iter().copied() {
-                        rd_from_off = O::saturating_add(rd_from_off, D::dist1(off_val, O::zero()));
-                    }
+                    let rd_from_off = D::rect_dist_from_off(&off);
                     crate::results::result_collection_stats::record_query_scalar_rd_off_check(
                         O::cmp(rd_from_off, rd),
                     );
@@ -492,10 +489,7 @@ where
                     let query_elem_wide = unsafe { *query_wide.get_unchecked(dim) };
                     let new_off = O::saturating_dist(query_elem_wide, pivot_wide);
                     let old_off = unsafe { *off.get_unchecked(dim) };
-
-                    let new_dist1 = D::dist1(new_off, O::zero());
-                    let old_dist1 = D::dist1(old_off, O::zero());
-                    let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
+                    let rd_far = D::rect_dist_after_update(rd, &off, dim, new_off);
 
                     if O::cmp(rd_far, query_ctx.max_dist()) != std::cmp::Ordering::Greater {
                         #[cfg(feature = "result_collection_stats")]
@@ -1450,8 +1444,6 @@ where
                         unsafe { *self.stems().get_unchecked(stem_idx) }
                     };
 
-                    let old_off = unsafe { *off.get_unchecked(dim_val) };
-
                     if pivot < A::max_value() {
                         let query_elem = unsafe { *query.get_unchecked(dim_val) };
                         let is_right_child = query_elem >= pivot;
@@ -1461,9 +1453,7 @@ where
                         let query_elem_wide = unsafe { *query_wide.get_unchecked(dim_val) };
                         let new_off = O::saturating_dist(query_elem_wide, pivot_wide);
 
-                        let new_dist1 = D::dist1(new_off, O::zero());
-                        let old_dist1 = D::dist1(old_off, O::zero());
-                        let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
+                        let rd_far = D::rect_dist_after_update(rd, off, dim_val, new_off);
 
                         let old_lower = unsafe { *lower.get_unchecked(dim_val) };
                         let old_upper = unsafe { *upper.get_unchecked(dim_val) };

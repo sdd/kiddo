@@ -28,9 +28,12 @@ pub(crate) fn nearest_one_with_query_wide_fallback<AX, T, D, const K: usize, con
             let mut dist = D::Output::zero();
             for dim in 0..K {
                 unsafe {
-                    dist += D::dist1(
-                        *widened_points.get_unchecked(dim).get_unchecked(idx),
-                        *query_wide.get_unchecked(dim),
+                    D::combine_component(
+                        &mut dist,
+                        D::dist1(
+                            *widened_points.get_unchecked(dim).get_unchecked(idx),
+                            *query_wide.get_unchecked(dim),
+                        ),
                     );
                 }
             }
@@ -46,9 +49,12 @@ pub(crate) fn nearest_one_with_query_wide_fallback<AX, T, D, const K: usize, con
         let mut dist = D::Output::zero();
 
         for dim in 0..K {
-            dist += D::dist1(
-                D::widen_coord(unsafe { *points.get_unchecked(dim).get_unchecked(idx) }),
-                unsafe { *query_wide.get_unchecked(dim) },
+            D::combine_component(
+                &mut dist,
+                D::dist1(
+                    D::widen_coord(unsafe { *points.get_unchecked(dim).get_unchecked(idx) }),
+                    unsafe { *query_wide.get_unchecked(dim) },
+                ),
             );
         }
 
@@ -81,9 +87,12 @@ pub(crate) fn nearest_one_with_query_wide_arena_fallback<AX, T, D, const K: usiz
 
             for dim in 0..K {
                 let coord = unsafe { tile.point_unaligned(dim, idx) };
-                dist += D::dist1(D::widen_coord(coord), unsafe {
-                    *query_wide.get_unchecked(dim)
-                });
+                D::combine_component(
+                    &mut dist,
+                    D::dist1(D::widen_coord(coord), unsafe {
+                        *query_wide.get_unchecked(dim)
+                    }),
+                );
             }
 
             if dist < *best_dist {

@@ -51,9 +51,12 @@ pub(crate) fn nearest_n_within_with_query_wide_arena_fallback<AX, T, D, R, const
 
             for dim in 0..K {
                 let coord = unsafe { tile.point_unaligned(dim, idx) };
-                candidate_dist += D::dist1(D::widen_coord(coord), unsafe {
-                    *query_wide.get_unchecked(dim)
-                });
+                D::combine_component(
+                    &mut candidate_dist,
+                    D::dist1(D::widen_coord(coord), unsafe {
+                        *query_wide.get_unchecked(dim)
+                    }),
+                );
             }
 
             if candidate_dist <= dist {

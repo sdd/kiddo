@@ -367,8 +367,8 @@ where
         parent_lower_bound,
         parent_upper_bound,
     );
-    let old_dist1 = D::dist1(old_off, O::zero());
     let new_dist1 = D::dist1(new_off, O::zero());
+    let old_dist1 = D::dist1(old_off, O::zero());
     let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
 
     (rd_far, new_off, effective_lower, effective_upper)
@@ -841,9 +841,7 @@ where
 
                 let pivot_wide: O = D::widen_coord(pivot);
                 let new_off = O::saturating_dist(query_wide_val, pivot_wide);
-                let old_dist1 = D::dist1(old_off_val, O::zero());
-                let new_dist1 = D::dist1(new_off, O::zero());
-                let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
+                let rd_far = D::rect_dist_after_update(rd, off, *dim, new_off);
 
                 if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
                     stack.push(Block3SimdQueryStackContext::Single {
@@ -1324,9 +1322,7 @@ where
 
                 let pivot_wide: O = D::widen_coord(pivot);
                 let new_off = O::saturating_dist(query_wide_val, pivot_wide);
-                let old_dist1 = D::dist1(old_off_val, O::zero());
-                let new_dist1 = D::dist1(new_off, O::zero());
-                let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
+                let rd_far = D::rect_dist_after_update(rd, off, *dim, new_off);
 
                 let (near_lower, near_upper, far_lower, far_upper) = if is_right_child {
                     (

@@ -77,9 +77,12 @@ where
             let mut dist = D::Output::zero();
             for dim in 0..K {
                 unsafe {
-                    dist += D::dist1(
-                        *remainder_points.get_unchecked(dim).get_unchecked(idx),
-                        *query_wide.get_unchecked(dim),
+                    D::combine_component(
+                        &mut dist,
+                        D::dist1(
+                            *remainder_points.get_unchecked(dim).get_unchecked(idx),
+                            *query_wide.get_unchecked(dim),
+                        ),
                     );
                 }
             }
@@ -121,7 +124,10 @@ where
 
         for idx in 0..C {
             unsafe {
-                *acc_ptr.add(idx) += D::dist1(*axis.get_unchecked(idx), q);
+                D::combine_component(
+                    &mut *acc_ptr.add(idx),
+                    D::dist1(*axis.get_unchecked(idx), q),
+                );
             }
         }
     }

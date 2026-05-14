@@ -261,8 +261,10 @@ impl<'a, AX: Axis<Coord = AX>, T: Content, const K: usize, const B: usize>
                 let mut idx = 0;
                 while idx < n {
                     unsafe {
-                        *acc.get_unchecked_mut(idx) +=
-                            D::dist1(*widened_axis.get_unchecked(idx), q);
+                        D::combine_component(
+                            acc.get_unchecked_mut(idx),
+                            D::dist1(*widened_axis.get_unchecked(idx), q),
+                        );
                     }
                     idx += 1;
                 }
@@ -318,7 +320,7 @@ impl<'a, AX: Axis<Coord = AX>, T: Content, const K: usize, const B: usize>
                 };
 
                 for (dst, &coord) in acc.iter_mut().zip(widened_axis.iter()) {
-                    *dst += D::dist1(coord, q);
+                    D::combine_component(dst, D::dist1(coord, q));
                 }
             }
 

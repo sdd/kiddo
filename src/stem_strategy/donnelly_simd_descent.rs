@@ -304,7 +304,6 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
         let dim_val = *dim;
         let query_val = unsafe { *query.get_unchecked(dim_val) };
         let query_wide_val = unsafe { *query_wide.get_unchecked(dim_val) };
-        let old_off_val = unsafe { *off.get_unchecked(dim_val) };
 
         if !self.can_take_full_block(stems.len(), max_stem_level) {
             let stem_idx = self.stem_idx();
@@ -319,9 +318,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
                 let far_ctx = self.branch_relative(is_right_child);
                 let pivot_wide: O = D::widen_coord(pivot);
                 let new_off = O::saturating_dist(query_wide_val, pivot_wide);
-                let old_dist1 = D::dist1(old_off_val, O::zero());
-                let new_dist1 = D::dist1(new_off, O::zero());
-                let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
+                let rd_far = D::rect_dist_after_update(rd, off, *dim, new_off);
 
                 if O::cmp(rd_far, best_dist) != std::cmp::Ordering::Greater {
                     stack.push(Self::StackContext::<O>::from_parts_with_restore_dim(
@@ -342,7 +339,6 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
         let block_base_idx = self.stem_idx();
         let child_idx = compare_block3(stems, query_val, block_base_idx) as usize;
         let base = *self;
-        let old_dist1 = D::dist1(old_off_val, O::zero());
 
         let mut candidate_idx = [0u8; 7];
         let mut candidate_new_off = [O::zero(); 7];
@@ -360,8 +356,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
                 sibling_idx,
                 query_wide_val,
             );
-            let new_dist1 = D::dist1(new_off, O::zero());
-            let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
+            let rd_far = D::rect_dist_after_update(rd, off, *dim, new_off);
 
             if O::cmp(rd_far, best_dist) == std::cmp::Ordering::Greater {
                 continue;

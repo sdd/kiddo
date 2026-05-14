@@ -233,10 +233,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
 
         #[cfg(feature = "result_collection_stats")]
         {
-            let mut rd_from_off = O::zero();
-            for off_val in off.iter().copied() {
-                rd_from_off = O::saturating_add(rd_from_off, D::dist1(off_val, O::zero()));
-            }
+            let rd_from_off = D::rect_dist_from_off(off);
             crate::results::result_collection_stats::record_query_scalar_rd_off_check(O::cmp(
                 rd_from_off,
                 rd,
@@ -269,9 +266,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
             let new_off = O::saturating_dist(query_elem_wide, pivot_wide);
             let old_off = *unsafe { off.get_unchecked(*dim) };
 
-            let new_dist1 = D::dist1(new_off, O::zero());
-            let old_dist1 = D::dist1(old_off, O::zero());
-            let rd_far = O::saturating_add(rd - old_dist1, new_dist1);
+            let rd_far = D::rect_dist_after_update(rd, off, *dim, new_off);
 
             #[cfg(feature = "test_utils")]
             {

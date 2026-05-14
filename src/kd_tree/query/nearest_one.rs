@@ -246,7 +246,7 @@ where
 #[allow(missing_docs)]
 #[cfg(feature = "cargo_asm")]
 pub mod cargo_asm {
-    use crate::dist::SquaredEuclidean;
+    use crate::dist::{Chebyshev, DistanceMetricCore, Minkowski, SquaredEuclidean};
     use crate::kd_tree::query_stack::QueryStack;
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::{FlatVec, VecOfArenas};
@@ -357,7 +357,7 @@ mod tests {
     use rand::SeedableRng;
     use test_log::test;
 
-    use crate::dist::SquaredEuclidean;
+    use crate::dist::{Chebyshev, DistanceMetricCore, Minkowski, SquaredEuclidean};
     use crate::kd_tree::query_stack::QueryStack;
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
@@ -743,6 +743,62 @@ mod tests {
         }
     }
 
+    #[test]
+    fn v6_query_nearest_one_large_f64_flatvec_eytzinger_chebyshev() {
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(31);
+
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 1000;
+
+        let content_to_add: Vec<[f64; 4]> =
+            (0..TREE_SIZE).map(|_| rng.random::<[f64; 4]>()).collect();
+
+        let tree: KdTree<f64, u32, Eytzinger<4>, FlatVec<f64, u32, 4, 32>, 4, 32> =
+            KdTree::new_from_slice(&content_to_add).unwrap();
+
+        assert_eq!(tree.size(), TREE_SIZE);
+
+        let query_points: Vec<[f64; 4]> =
+            (0..NUM_QUERIES).map(|_| rng.random::<[f64; 4]>()).collect();
+
+        for query_point in query_points.iter() {
+            let expected =
+                linear_search_with_metric::<f64, Chebyshev<f64>, 4>(&content_to_add, query_point);
+            let result = tree.nearest_one::<Chebyshev<f64>>(query_point);
+
+            assert_nearest_f64(result, &expected);
+        }
+    }
+
+    #[test]
+    fn v6_query_nearest_one_large_f64_flatvec_eytzinger_minkowski_3() {
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(37);
+
+        const TREE_SIZE: usize = 100_000;
+        const NUM_QUERIES: usize = 1000;
+
+        let content_to_add: Vec<[f64; 4]> =
+            (0..TREE_SIZE).map(|_| rng.random::<[f64; 4]>()).collect();
+
+        let tree: KdTree<f64, u32, Eytzinger<4>, FlatVec<f64, u32, 4, 32>, 4, 32> =
+            KdTree::new_from_slice(&content_to_add).unwrap();
+
+        assert_eq!(tree.size(), TREE_SIZE);
+
+        let query_points: Vec<[f64; 4]> =
+            (0..NUM_QUERIES).map(|_| rng.random::<[f64; 4]>()).collect();
+
+        for query_point in query_points.iter() {
+            let expected = linear_search_with_metric::<f64, Minkowski<3, f64>, 4>(
+                &content_to_add,
+                query_point,
+            );
+            let result = tree.nearest_one::<Minkowski<3, f64>>(query_point);
+
+            assert_nearest_f64(result, &expected);
+        }
+    }
+
     fn linear_search<A, const K: usize>(
         content: &[[A; K]],
         query_point: &[A; K],
@@ -787,6 +843,42 @@ mod tests {
         <crate::dist::SquaredEuclidean<A> as crate::dist::DistanceMetricCore<A>>::dist::<K>(
             &aw, &bw,
         )
+    }
+
+    fn linear_search_with_metric<A, D, const K: usize>(
+        content: &[[A; K]],
+        query_point: &[A; K],
+    ) -> NearestNeighbour<A, usize>
+    where
+        A: Axis<Coord = A>,
+        D: DistanceMetricCore<A, Output = A>,
+    {
+        let mut best_dist: A = A::max_value();
+        let mut best_item: usize = usize::MAX;
+
+        for (idx, p) in content.iter().enumerate() {
+            let dist = metric_dist::<A, D, K>(query_point, p);
+            if dist < best_dist {
+                best_item = idx;
+                best_dist = dist;
+            }
+        }
+
+        NearestNeighbour {
+            distance: best_dist,
+            item: best_item,
+        }
+    }
+
+    fn metric_dist<A, D, const K: usize>(a: &[A; K], b: &[A; K]) -> A
+    where
+        A: Axis<Coord = A>,
+        D: DistanceMetricCore<A, Output = A>,
+    {
+        let aw = (*a).map(D::widen_coord);
+        let bw = (*b).map(D::widen_coord);
+
+        D::dist::<K>(&aw, &bw)
     }
 
     #[test]

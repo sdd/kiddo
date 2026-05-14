@@ -200,7 +200,7 @@
 /// Distance metrics
 pub mod dist;
 
-pub use crate::dist::{DotProduct, Manhattan, SquaredEuclidean};
+pub use crate::dist::{Chebyshev, DotProduct, Manhattan, Minkowski, SquaredEuclidean};
 
 pub mod huge_pages;
 
