@@ -46,7 +46,7 @@ where
     /// This is faster than `nearest_one` but may not return the true nearest neighbour.
     /// It searches only the leaf that the query point falls into.
     #[inline(always)]
-    pub fn approx_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
+    pub(crate) fn approx_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K, Output = A>,
     {
@@ -110,7 +110,10 @@ pub mod cargo_asm {
         tree: &FlatVecKdT,
         query: [f64; 3],
     ) -> (f64, usize) {
-        tree.approx_nearest_one::<SquaredEuclidean<f64>>(&query)
+        tree.query(&query)
+            .nearest_one::<SquaredEuclidean<f64>>()
+            .approx()
+            .execute()
     }
 
     /// Hook for cargo-asm to render the v6 approx-nearest-one call path with VecOfArrays leaves.
@@ -120,7 +123,10 @@ pub mod cargo_asm {
         tree: &VecOfArraysKdT,
         query: [f64; 3],
     ) -> (f64, usize) {
-        tree.approx_nearest_one::<SquaredEuclidean<f64>>(&query)
+        tree.query(&query)
+            .nearest_one::<SquaredEuclidean<f64>>()
+            .approx()
+            .execute()
     }
 
     /// Hook for cargo-asm to render the v6 approx-nearest-one call path with VecOfArenas leaves.
@@ -130,7 +136,10 @@ pub mod cargo_asm {
         tree: &VecOfArenasKdT,
         query: [f64; 3],
     ) -> (f64, usize) {
-        tree.approx_nearest_one::<SquaredEuclidean<f64>>(&query)
+        tree.query(&query)
+            .nearest_one::<SquaredEuclidean<f64>>()
+            .approx()
+            .execute()
     }
 }
 
@@ -171,7 +180,11 @@ mod tests {
 
         let query_point = [0.5, 0.5, 0.5];
 
-        let results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
+        let results = tree
+            .query(&query_point)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .approx()
+            .execute();
 
         assert_eq!(results, (0.0014114721, 19074));
     }
@@ -198,7 +211,11 @@ mod tests {
 
         let query_point = [0.5, 0.5, 0.5];
 
-        let results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
+        let results = tree
+            .query(&query_point)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .approx()
+            .execute();
 
         assert_eq!(results, (0.0014114721, ()));
     }
@@ -225,7 +242,11 @@ mod tests {
 
         let query_point = [0.5, 0.5, 0.5];
 
-        let results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
+        let results = tree
+            .query(&query_point)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .approx()
+            .execute();
 
         assert_eq!(results, (0.0014114721, 19074));
     }
@@ -246,8 +267,16 @@ mod tests {
         let arena_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
-        let flat_result = flat_tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query);
-        let arena_result = arena_tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query);
+        let flat_result = flat_tree
+            .query(&query)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .approx()
+            .execute();
+        let arena_result = arena_tree
+            .query(&query)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .approx()
+            .execute();
 
         assert_eq!(arena_result, flat_result);
     }
@@ -293,7 +322,11 @@ mod tests {
 
         // Just verify the tree queries successfully - we'll verify correctness later
         let query_point = [0.5, 0.5, 0.5];
-        let _results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
+        let _results = tree
+            .query(&query_point)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .approx()
+            .execute();
     }
 
     #[test]
@@ -352,7 +385,11 @@ mod tests {
 
         // Just verify the tree queries successfully - we'll verify correctness later
         let query_point = [0.5, 0.5, 0.5];
-        let _results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
+        let _results = tree
+            .query(&query_point)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .approx()
+            .execute();
     }
 
     #[test]
@@ -382,7 +419,11 @@ mod tests {
 
         let query_point = [0.5, 0.5, 0.5];
 
-        let results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
+        let results = tree
+            .query(&query_point)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .approx()
+            .execute();
 
         assert_eq!(results, (0.0003201659, 21996));
     }
@@ -417,7 +458,11 @@ mod tests {
 
         let query_point = [0.5, 0.5, 0.5, 0.5];
 
-        let results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
+        let results = tree
+            .query(&query_point)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .approx()
+            .execute();
 
         assert!(results.0 < 0.1, "Distance should be reasonably small");
         assert!(results.1 < 131_072, "Item index should be valid");
@@ -467,9 +512,16 @@ mod tests {
             .collect();
 
         for (idx, query_point) in query_points.iter().enumerate() {
-            let result_eytz = tree_eytz.approx_nearest_one::<SquaredEuclidean<f32>>(query_point);
-            let result_donnelly =
-                tree_donnelly.approx_nearest_one::<SquaredEuclidean<f32>>(query_point);
+            let result_eytz = tree_eytz
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .approx()
+                .execute();
+            let result_donnelly = tree_donnelly
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .approx()
+                .execute();
 
             // The results should be identical since both use the same construction
             // and the approximate query just returns the best match in the target leaf
@@ -521,9 +573,16 @@ mod tests {
             .collect();
 
         for (idx, query_point) in query_points.iter().enumerate() {
-            let result_eytz = tree_eytz.approx_nearest_one::<SquaredEuclidean<f32>>(query_point);
-            let result_donnelly =
-                tree_donnelly.approx_nearest_one::<SquaredEuclidean<f32>>(query_point);
+            let result_eytz = tree_eytz
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .approx()
+                .execute();
+            let result_donnelly = tree_donnelly
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .approx()
+                .execute();
 
             assert_eq!(
                 result_eytz, result_donnelly,
@@ -583,10 +642,16 @@ mod tests {
             .collect();
 
         for (idx, query_point) in query_points.iter().enumerate() {
-            let result_eytz =
-                tree_donnelly.approx_nearest_one::<SquaredEuclidean<f32>>(query_point);
-            let result_donnelly =
-                tree_donnelly_marker.approx_nearest_one::<SquaredEuclidean<f32>>(query_point);
+            let result_eytz = tree_donnelly
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .approx()
+                .execute();
+            let result_donnelly = tree_donnelly_marker
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .approx()
+                .execute();
 
             // The results should be identical since both use the same construction
             // and the approximate query just returns the best match in the target leaf
@@ -645,7 +710,11 @@ mod tests {
             .collect();
 
         for query_point in query_points.iter() {
-            let result = tree.approx_nearest_one::<SquaredEuclidean<f64>>(query_point);
+            let result = tree
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .approx()
+                .execute();
 
             // Verify result is valid
             assert!(result.0 >= 0.0, "Distance should be non-negative");
@@ -699,7 +768,11 @@ mod tests {
         assert_eq!((tree.max_stem_level() + 1) % 4, 0);
 
         let query_point = [0.5, 0.5, 0.5, 0.5];
-        let results = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query_point);
+        let results = tree
+            .query(&query_point)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .approx()
+            .execute();
 
         assert!(
             results.0 < 0.2,

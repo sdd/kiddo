@@ -52,7 +52,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let start = Instant::now();
     for point in query_points.iter() {
-        black_box(archived_tree.approx_nearest_one::<SquaredEuclidean<f64>>(point));
+        black_box(
+            archived_tree
+                .query(point)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .approx()
+                .execute(),
+        );
     }
     println!(
         "Queries complete. ({})",

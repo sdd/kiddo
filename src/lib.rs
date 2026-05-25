@@ -66,42 +66,45 @@
 //!
 //! Kiddo supports the following query types:
 //!
-//! - [`KdTree::nearest_one`] finds the single nearest item to a query point.
+//! - [`KdTree::query`] starts a fluent query builder for nearest-neighbour and
+//!   radius-search operations.
 //!   Useful for tasks like finding the nearest airport to a given location, or
 //!   finding the nearest catalogued star to a sky position.
 //!
-//! - [`KdTree::best_n_within`] finds the "best" `n` items within a specified
+//! - [`KdTree::query`] can also find the "best" `n` items within a specified
 //!   distance of a query point, for some definition of "best".
 //!   For example, "give me the 5 largest settlements within 50km of a given
 //!   point, ordered by descending population", or "the 5 brightest stars
 //!   within a degree of a point on the sky, ordered brightest first".
+//!   This only makes semantic sense when your item type has meaningful ordering; for
+//!   points-only trees with `T = ()`, the query is allowed but not useful.
 //!
-//! - [`KdTree::approx_nearest_one`] performs approximate nearest-neighbour
+//! - [`KdTree::query`] can also perform approximate nearest-neighbour
 //!   (ANN) search, returning a good approximate nearest item, often much faster
 //!   than exact nearest-neighbour search.
 //!   Useful for latency-sensitive workloads like interactive point-cloud
 //!   picking, or mapping image pixels to a palette colour during colour
 //!   quantization.
 //!
-//! - [`KdTree::nearest_n`] performs k-nearest-neighbour (k-NN) search, finding
+//! - [`KdTree::query`] performs k-nearest-neighbour (k-NN) search, finding
 //!   the `n` nearest items to a query point ordered by distance.
 //!   Useful for finding the nearest weather stations or sensors to a location,
 //!   or generating candidate correspondences for point-cloud registration.
 //!
-//! - [`KdTree::nearest_n_within`] finds up to `n` nearest items within a
+//! - [`KdTree::query`] finds up to `n` nearest items within a
 //!   specified radius of a query point, ordered by distance.
 //!   Useful when you want the closest local neighbours inside a meaningful
 //!   cutoff, such as the nearest shops within 5 miles, or nearby atoms within
 //!   an interaction radius.
 //!
-//! - [`KdTree::within`] finds all items within a specified radius of a query
+//! - [`KdTree::query`] finds all items within a specified radius of a query
 //!   point, ordered by distance.
 //!   Useful for radial catalogue searches in astronomy, or collision and
 //!   proximity queries where the full neighbourhood is needed in sorted order.
 //!
-//! - [`KdTree::within_unsorted`] finds all items within a specified radius of a
+//! - [`KdTree::query`] finds all items within a specified radius of a
 //!   query point without sorting the results.
-//!   This is often faster than [`KdTree::within`] when result order does not
+//!   This is often faster than the sorted radius-query form when result order does not
 //!   matter, such as finding all customers within 5 miles of a store, or
 //!   collecting point-cloud neighbourhoods for clustering or normal estimation.
 //!
@@ -137,17 +140,19 @@
 //! // find the nearest item to [0f64, 0f64].
 //! // returns a tuple of (dist, index)
 //! assert_eq!(
-//!     kdtree.nearest_one::<SquaredEuclidean<f64>>(&[0f64, 0f64]),
+//!     kdtree
+//!         .query(&[0f64, 0f64])
+//!         .nearest_one::<SquaredEuclidean<f64>>()
+//!         .execute(),
 //!     (0f64, 0)
 //! );
 //!
 //! // find the nearest 3 items to [0f64, 0f64], and collect into a `Vec`
 //! assert_eq!(
-//!     kdtree.nearest_n::<SquaredEuclidean<f64>>(
-//!         &[0f64, 0f64],
-//!         NonZero::new(3usize).unwrap(),
-//!         true
-//!     ),
+//!     kdtree
+//!         .query(&[0f64, 0f64])
+//!         .nearest_n::<SquaredEuclidean<f64>>(NonZero::new(3usize).unwrap())
+//!         .execute(),
 //!     vec![NearestNeighbour { distance: 0f64, item: 0 }, NearestNeighbour { distance: 2f64, item: 1 }, NearestNeighbour { distance: 8f64, item: 2 }]
 //! );
 //! ```

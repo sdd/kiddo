@@ -67,8 +67,12 @@ where
     /// Prefer this over [`within_unsorted_iter`](Self::within_unsorted_iter) when callback
     /// style is acceptable and allocation/dispatch overhead matters.
     #[inline]
-    pub fn within_unsorted_visit<D, F>(&self, query: &[A; K], max_dist: D::Output, mut visitor: F)
-    where
+    pub(crate) fn within_unsorted_visit<D, F>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        mut visitor: F,
+    ) where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
@@ -100,7 +104,7 @@ where
     /// Returns all points within `max_dist` of the query point, unsorted.
     /// This is faster than `within` when order doesn't matter.
     #[inline]
-    pub fn within_unsorted<D>(
+    pub(crate) fn within_unsorted<D>(
         &self,
         query: &[A; K],
         max_dist: D::Output,
@@ -126,8 +130,9 @@ where
     /// tree depth or a single leaf's match count exceeds the inline capacities.
     ///
     /// For the absolute lowest overhead, use [`within_unsorted_visit`](Self::within_unsorted_visit).
+    #[allow(dead_code)]
     #[inline]
-    pub fn within_unsorted_iter<D>(
+    pub(crate) fn within_unsorted_iter<D>(
         &self,
         query: &[A; K],
         max_dist: D::Output,
@@ -168,7 +173,11 @@ pub mod cargo_asm {
         tree: &EytzingerPfFarKdT,
         query: [f64; 3],
     ) -> (usize, u64, u64) {
-        let results = tree.within_unsorted::<SquaredEuclidean<f64>>(&query, MAX_DIST);
+        let results = tree
+            .query(&query)
+            .within::<SquaredEuclidean<f64>>(MAX_DIST)
+            .unsorted()
+            .execute();
 
         let mut checksum_item = 0u64;
         let mut checksum_dist_bits = 0u64;
@@ -282,9 +291,12 @@ mod tests {
             .map(|result| (result.item, result.distance.to_bits()))
             .collect();
         let mut visited = Vec::new();
-        tree.within_unsorted_visit::<SquaredEuclidean<f64>, _>(&query, radius, |result| {
-            visited.push((result.item, result.distance.to_bits()));
-        });
+        tree.query(&query)
+            .within::<SquaredEuclidean<f64>>(radius)
+            .unsorted()
+            .visit(|result| {
+                visited.push((result.item, result.distance.to_bits()));
+            });
         let mut iterated: Vec<(u32, u64)> = tree
             .within_unsorted_iter::<SquaredEuclidean<f64>>(&query, radius)
             .map(|result| (result.item, result.distance.to_bits()))

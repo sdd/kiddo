@@ -181,8 +181,14 @@ fn regression_donnelly_simd_block4_f32_nearest_one_matches_scalar_and_linear() {
         16,
     > = KdTree::new_from_slice(&points).unwrap();
 
-    let scalar_result = tree_scalar.nearest_one::<SquaredEuclidean<f32>>(&query);
-    let simd_result = tree_simd.nearest_one::<SquaredEuclidean<f32>>(&query);
+    let scalar_result = tree_scalar
+        .query(&query)
+        .nearest_one::<SquaredEuclidean<f32>>()
+        .execute();
+    let simd_result = tree_simd
+        .query(&query)
+        .nearest_one::<SquaredEuclidean<f32>>()
+        .execute();
 
     assert_float_relative_eq!(scalar_result.0, expected.0, REL_EPS_F32);
     assert_eq!(scalar_result.1, expected.1);
@@ -207,8 +213,16 @@ fn regression_donnelly_simd_block4_f32_approx_self_lookup_hits_zero_distance() {
     > = KdTree::new_from_slice(&points).unwrap();
 
     for point in points.iter() {
-        let scalar_result = tree_scalar.approx_nearest_one::<SquaredEuclidean<f32>>(point);
-        let simd_result = tree_simd.approx_nearest_one::<SquaredEuclidean<f32>>(point);
+        let scalar_result = tree_scalar
+            .query(point)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .approx()
+            .execute();
+        let simd_result = tree_simd
+            .query(point)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .approx()
+            .execute();
 
         assert_eq!(scalar_result.0, 0.0);
         assert_eq!(simd_result.0, 0.0);
@@ -236,10 +250,14 @@ fn regression_donnelly_simd_block4_f32_best_n_within_matches_scalar_and_linear()
     > = KdTree::new_from_slice(&points).unwrap();
 
     let scalar_result = tree_scalar
-        .best_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty)
+        .query(&query)
+        .best_n_within::<SquaredEuclidean<f32>>(max_dist, max_qty)
+        .execute()
         .into_sorted_vec();
     let simd_result = tree_simd
-        .best_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty)
+        .query(&query)
+        .best_n_within::<SquaredEuclidean<f32>>(max_dist, max_qty)
+        .execute()
         .into_sorted_vec();
 
     assert_eq!(scalar_result.len(), expected.len());
@@ -280,8 +298,14 @@ fn control_donnelly_simd_block3_f64_nearest_one_matches_scalar_and_linear() {
         16,
     > = KdTree::new_from_slice(&points).unwrap();
 
-    let scalar_result = tree_scalar.nearest_one::<SquaredEuclidean<f64>>(&query);
-    let simd_result = tree_simd.nearest_one::<SquaredEuclidean<f64>>(&query);
+    let scalar_result = tree_scalar
+        .query(&query)
+        .nearest_one::<SquaredEuclidean<f64>>()
+        .execute();
+    let simd_result = tree_simd
+        .query(&query)
+        .nearest_one::<SquaredEuclidean<f64>>()
+        .execute();
 
     assert_float_relative_eq!(scalar_result.0, expected.0, REL_EPS_F64);
     assert_eq!(scalar_result.1, expected.1);
@@ -315,10 +339,14 @@ fn control_donnelly_simd_block3_f64_best_n_within_matches_scalar_and_linear() {
     > = KdTree::new_from_slice(&points).unwrap();
 
     let scalar_result = tree_scalar
-        .best_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty)
+        .query(&query)
+        .best_n_within::<SquaredEuclidean<f64>>(max_dist, max_qty)
+        .execute()
         .into_sorted_vec();
     let simd_result = tree_simd
-        .best_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty)
+        .query(&query)
+        .best_n_within::<SquaredEuclidean<f64>>(max_dist, max_qty)
+        .execute()
         .into_sorted_vec();
 
     assert_eq!(scalar_result.len(), expected.len());
@@ -356,56 +384,80 @@ fn regression_donnelly_simd_block4_f32_small_grid_within_variants_match_linear()
     > = KdTree::new_from_slice(&points).unwrap();
 
     let mut scalar_within_unsorted: Vec<(f32, usize)> = tree_scalar
-        .within_unsorted::<SquaredEuclidean<f32>>(&query, max_dist)
+        .query(&query)
+        .within::<SquaredEuclidean<f32>>(max_dist)
+        .unsorted()
+        .execute()
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
     stabilize_neighbours_f32(&mut scalar_within_unsorted);
 
     let mut simd_within_unsorted: Vec<(f32, usize)> = tree_simd
-        .within_unsorted::<SquaredEuclidean<f32>>(&query, max_dist)
+        .query(&query)
+        .within::<SquaredEuclidean<f32>>(max_dist)
+        .unsorted()
+        .execute()
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
     stabilize_neighbours_f32(&mut simd_within_unsorted);
 
     let mut scalar_within_sorted: Vec<(f32, usize)> = tree_scalar
-        .within::<SquaredEuclidean<f32>>(&query, max_dist)
+        .query(&query)
+        .within::<SquaredEuclidean<f32>>(max_dist)
+        .execute()
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
     stabilize_neighbours_f32(&mut scalar_within_sorted);
 
     let mut simd_within_sorted: Vec<(f32, usize)> = tree_simd
-        .within::<SquaredEuclidean<f32>>(&query, max_dist)
+        .query(&query)
+        .within::<SquaredEuclidean<f32>>(max_dist)
+        .execute()
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
     stabilize_neighbours_f32(&mut simd_within_sorted);
 
     let mut scalar_nearest_n_unsorted: Vec<(f32, usize)> = tree_scalar
-        .nearest_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty, false)
+        .query(&query)
+        .nearest_n::<SquaredEuclidean<f32>>(max_qty)
+        .within(max_dist)
+        .unsorted()
+        .execute()
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
     stabilize_neighbours_f32(&mut scalar_nearest_n_unsorted);
 
     let mut simd_nearest_n_unsorted: Vec<(f32, usize)> = tree_simd
-        .nearest_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty, false)
+        .query(&query)
+        .nearest_n::<SquaredEuclidean<f32>>(max_qty)
+        .within(max_dist)
+        .unsorted()
+        .execute()
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
     stabilize_neighbours_f32(&mut simd_nearest_n_unsorted);
 
     let mut scalar_nearest_n_sorted: Vec<(f32, usize)> = tree_scalar
-        .nearest_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty, true)
+        .query(&query)
+        .nearest_n::<SquaredEuclidean<f32>>(max_qty)
+        .within(max_dist)
+        .execute()
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
     stabilize_neighbours_f32(&mut scalar_nearest_n_sorted);
 
     let mut simd_nearest_n_sorted: Vec<(f32, usize)> = tree_simd
-        .nearest_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty, true)
+        .query(&query)
+        .nearest_n::<SquaredEuclidean<f32>>(max_qty)
+        .within(max_dist)
+        .execute()
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();

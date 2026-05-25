@@ -39,7 +39,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         ElapsedDuration::new(start.elapsed())
     );
 
-    let nearest_neighbour = tree.nearest_one::<SquaredEuclidean<f64>>(&query);
+    let nearest_neighbour = tree
+        .query(&query)
+        .nearest_one::<SquaredEuclidean<f64>>()
+        .execute();
     println!("Nearest item to query: {:?}", nearest_neighbour.1);
 
     let start = Instant::now();

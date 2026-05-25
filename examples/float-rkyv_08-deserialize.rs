@@ -39,15 +39,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let start = Instant::now();
-    let nearest_neighbour = archived_tree.nearest_one::<SquaredEuclidean<f64>>(&query);
+    let nearest_neighbour = archived_tree
+        .query(&query)
+        .nearest_one::<SquaredEuclidean<f64>>()
+        .execute();
     println!(
         "Nearest item to query (zero-copy archived): {:?}",
         nearest_neighbour.1
     );
     println!("took {}.\n", ElapsedDuration::new(start.elapsed()));
 
-    let approx_nearest_neighbour =
-        archived_tree.approx_nearest_one::<SquaredEuclidean<f64>>(&query);
+    let approx_nearest_neighbour = archived_tree
+        .query(&query)
+        .nearest_one::<SquaredEuclidean<f64>>()
+        .approx()
+        .execute();
     println!(
         "Approx nearest item to query (zero-copy archived): {:?}",
         approx_nearest_neighbour.1
@@ -57,21 +63,36 @@ fn main() -> Result<(), Box<dyn Error>> {
     let max_qty = NonZero::new(10usize).unwrap();
 
     let best_n_within = archived_tree
-        .best_n_within::<SquaredEuclidean<f64>>(&query, dist, max_qty)
+        .query(&query)
+        .best_n_within::<SquaredEuclidean<f64>>(dist, max_qty)
+        .execute()
         .into_sorted_vec();
     println!("Best n items within radius of query: {best_n_within:?}");
 
-    let nearest_n = archived_tree.nearest_n::<SquaredEuclidean<f64>>(&query, max_qty, true);
+    let nearest_n = archived_tree
+        .query(&query)
+        .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+        .execute();
     println!("Nearest n items: {nearest_n:?}");
 
-    let nearest_n_within =
-        archived_tree.nearest_n_within::<SquaredEuclidean<f64>>(&query, dist, max_qty, true);
+    let nearest_n_within = archived_tree
+        .query(&query)
+        .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+        .within(dist)
+        .execute();
     println!("Nearest n items within radius: {nearest_n_within:?}");
 
-    let within = archived_tree.within::<SquaredEuclidean<f64>>(&query, dist);
+    let within = archived_tree
+        .query(&query)
+        .within::<SquaredEuclidean<f64>>(dist)
+        .execute();
     println!("All items within radius, sorted: {} items", within.len());
 
-    let within_unsorted = archived_tree.within_unsorted::<SquaredEuclidean<f64>>(&query, dist);
+    let within_unsorted = archived_tree
+        .query(&query)
+        .within::<SquaredEuclidean<f64>>(dist)
+        .unsorted()
+        .execute();
     println!(
         "All items within radius, unsorted: {} items",
         within_unsorted.len()

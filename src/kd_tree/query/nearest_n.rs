@@ -18,7 +18,7 @@ where
     /// Finds the N nearest points to the query point.
     ///
     /// If `sorted` is true, results are returned in order of increasing distance.
-    pub fn nearest_n<D>(
+    pub(crate) fn nearest_n<D>(
         &self,
         query: &[A; K],
         max_qty: NonZero<usize>,

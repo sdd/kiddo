@@ -81,7 +81,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // first need to convert our query point into this co-ordinate scheme:
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
 
-    let (nearest_dist, nearest_idx) = kdtree.nearest_one::<SquaredEuclidean<f32>>(&query);
+    let (nearest_dist, nearest_idx) = kdtree
+        .query(&query)
+        .nearest_one::<SquaredEuclidean<f32>>()
+        .execute();
 
     let nearest = &cities[nearest_idx as usize];
     println!(
@@ -95,8 +98,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // This allows us to find, for example, the five nearest cities to a specified
     // point, sorted in order of distance.
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let nearest_5_idx =
-        kdtree.nearest_n::<SquaredEuclidean<f32>>(&query, NonZeroUsize::new(5).unwrap(), true);
+    let nearest_5_idx = kdtree
+        .query(&query)
+        .nearest_n::<SquaredEuclidean<f32>>(NonZeroUsize::new(5).unwrap())
+        .execute();
 
     let nearest_5 = nearest_5_idx
         .into_iter()
@@ -120,7 +125,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let query = degrees_lat_lng_to_unit_sphere(0f32, 0f32);
     let dist = kilometres_to_unit_sphere_squared_euclidean(1000.0);
     let all_within = kdtree
-        .within::<SquaredEuclidean<f32>>(&query, dist)
+        .query(&query)
+        .within::<SquaredEuclidean<f32>>(dist)
+        .execute()
         .iter()
         .map(|neighbour| &cities[neighbour.item as usize].name)
         .collect::<Vec<_>>();
@@ -138,8 +145,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // first three, which is significantly slower.
     let query = degrees_lat_lng_to_unit_sphere(0f32, 0f32);
     let dist = kilometres_to_unit_sphere_squared_euclidean(1000.0);
-    let best_3_iter =
-        kdtree.best_n_within::<SquaredEuclidean<f32>>(&query, dist, NonZeroUsize::new(3).unwrap());
+    let best_3_iter = kdtree
+        .query(&query)
+        .best_n_within::<SquaredEuclidean<f32>>(dist, NonZeroUsize::new(3).unwrap())
+        .execute();
     let best_3 = best_3_iter
         .into_iter()
         .map(|neighbour| &cities[neighbour.item as usize].name)

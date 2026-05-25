@@ -57,12 +57,11 @@ fn run_sorted_nearest_n_within_queries(
     let mut checksum_dist = 0.0f64;
 
     for query in queries {
-        let results = tree.nearest_n_within::<SquaredEuclidean<f64>>(
-            black_box(query),
-            max_dist,
-            max_qty,
-            true,
-        );
+        let results = tree
+            .query(black_box(query))
+            .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+            .within(max_dist)
+            .execute();
         checksum_len += results.len();
 
         for result in results {
@@ -85,8 +84,10 @@ fn run_best_n_within_queries(
     let mut checksum_dist = 0.0f64;
 
     for query in queries {
-        let results =
-            tree.best_n_within::<SquaredEuclidean<f64>>(black_box(query), max_dist, max_qty);
+        let results = tree
+            .query(black_box(query))
+            .best_n_within::<SquaredEuclidean<f64>>(max_dist, max_qty)
+            .execute();
         checksum_len += results.len();
 
         for result in results.into_vec() {

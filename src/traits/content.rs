@@ -10,7 +10,9 @@ use std::fmt::Debug;
 ///
 /// If you only care about storing the points themselves, you can use [`()`](https://doc.rust-lang.org/std/primitive.unit.html) for the item type.
 /// If you do this, you'll need to use a specific constructor for the [`KdTree`](crate::KdTree)
-/// ([`KdTree::new_from_slice_no_items`](crate::KdTree::new_from_slice_no_items)), and the [`best_n_within`](crate::KdTree::best_n_within) query method will be unavailable.
+/// ([`KdTree::new_from_slice_no_items`](crate::KdTree::new_from_slice_no_items)).
+/// The `best_n_within` query remains available through the fluent query API, but it is not meaningful with `T = ()`
+/// because there is no item ordering to define what "best" means.
 ///
 /// Using a [`usize`] is a good start - it's the most ergonomic,
 /// since you can use it directly without a cast to index into a [`Vec`] containing more detail

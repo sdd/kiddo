@@ -64,7 +64,10 @@ fn linear_search(points: &[[f64; K]], query: &[f64; K]) -> (f64, u32) {
 
 fn run_donnelly(tree: &DonnellyTree, query: &[f64; K]) -> ((f64, u32), ExactQueryStats) {
     reset();
-    let result = tree.nearest_one::<SquaredEuclidean<f64>>(query);
+    let result = tree
+        .query(query)
+        .nearest_one::<SquaredEuclidean<f64>>()
+        .execute();
     (result, snapshot())
 }
 
@@ -73,7 +76,10 @@ fn run_donnelly_block_scalar(
     query: &[f64; K],
 ) -> ((f64, u32), ExactQueryStats) {
     reset();
-    let result = tree.nearest_one::<SquaredEuclidean<f64>>(query);
+    let result = tree
+        .query(query)
+        .nearest_one::<SquaredEuclidean<f64>>()
+        .execute();
     (result, snapshot())
 }
 
@@ -88,7 +94,10 @@ fn run_donnelly_simd(
     } else {
         unsafe { std::env::remove_var("KIDDO_FORCE_MAPPED_SIMD_BLOCK_STEP") };
     }
-    let result = tree.nearest_one::<SquaredEuclidean<f64>>(query);
+    let result = tree
+        .query(query)
+        .nearest_one::<SquaredEuclidean<f64>>()
+        .execute();
     unsafe { std::env::remove_var("KIDDO_FORCE_MAPPED_SIMD_BLOCK_STEP") };
     (result, snapshot())
 }
@@ -103,7 +112,10 @@ fn run_donnelly_trace(
 ) {
     reset();
     exact_query_trace::set_enabled(true);
-    let result = tree.nearest_one::<SquaredEuclidean<f64>>(query);
+    let result = tree
+        .query(query)
+        .nearest_one::<SquaredEuclidean<f64>>()
+        .execute();
     let stats = snapshot();
     let trace = exact_query_trace::snapshot();
     exact_query_trace::set_enabled(false);
@@ -120,7 +132,10 @@ fn run_donnelly_block_scalar_trace(
 ) {
     reset();
     exact_query_trace::set_enabled(true);
-    let result = tree.nearest_one::<SquaredEuclidean<f64>>(query);
+    let result = tree
+        .query(query)
+        .nearest_one::<SquaredEuclidean<f64>>()
+        .execute();
     let stats = snapshot();
     let trace = exact_query_trace::snapshot();
     exact_query_trace::set_enabled(false);
@@ -143,7 +158,10 @@ fn run_donnelly_simd_trace(
     } else {
         unsafe { std::env::remove_var("KIDDO_FORCE_MAPPED_SIMD_BLOCK_STEP") };
     }
-    let result = tree.nearest_one::<SquaredEuclidean<f64>>(query);
+    let result = tree
+        .query(query)
+        .nearest_one::<SquaredEuclidean<f64>>()
+        .execute();
     unsafe { std::env::remove_var("KIDDO_FORCE_MAPPED_SIMD_BLOCK_STEP") };
     let stats = snapshot();
     let trace = exact_query_trace::snapshot();

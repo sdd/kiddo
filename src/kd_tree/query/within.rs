@@ -18,7 +18,7 @@ where
     /// Finds all points within a given distance of the query point.
     ///
     /// Returns all points within `max_dist` of the query point, sorted by distance.
-    pub fn within<D>(
+    pub(crate) fn within<D>(
         &self,
         query: &[A; K],
         max_dist: D::Output,

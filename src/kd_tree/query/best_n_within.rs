@@ -89,7 +89,7 @@ where
     ///
     /// Returns up to `max_qty` points that are within `max_dist` of the query point,
     /// prioritizing better items according to `BestNeighbour` ordering.
-    pub fn best_n_within<D>(
+    pub(crate) fn best_n_within<D>(
         &self,
         query: &[A; K],
         max_dist: D::Output,
@@ -177,11 +177,10 @@ pub mod cargo_asm {
         tree: &DonnellyPfKdT,
         query: [f64; 3],
     ) -> (usize, u64, u64) {
-        let results = tree.best_n_within::<SquaredEuclidean<f64>>(
-            &query,
-            MAX_DIST,
-            NonZeroUsize::new(MAX_QTY).unwrap(),
-        );
+        let results = tree
+            .query(&query)
+            .best_n_within::<SquaredEuclidean<f64>>(MAX_DIST, NonZeroUsize::new(MAX_QTY).unwrap())
+            .execute();
 
         let mut checksum_item = 0u64;
         let mut checksum_dist_bits = 0u64;
@@ -257,7 +256,10 @@ mod tests {
         let query_point = [0.5, 0.5, 0.5];
         let radius = 0.1f32;
         let max_qty = NonZeroUsize::new(10).unwrap();
-        let results = tree.best_n_within::<SquaredEuclidean<f32>>(&query_point, radius, max_qty);
+        let results = tree
+            .query(&query_point)
+            .best_n_within::<SquaredEuclidean<f32>>(radius, max_qty)
+            .execute();
         assert_eq!(results.len(), 10);
     }
 
@@ -285,7 +287,9 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, radius, max_qty.into());
 
             let result: Vec<_> = tree
-                .best_n_within::<SquaredEuclidean<f64>>(&query_point, radius, max_qty)
+                .query(&query_point)
+                .best_n_within::<SquaredEuclidean<f64>>(radius, max_qty)
+                .execute()
                 .into_iter()
                 .collect();
 
@@ -317,7 +321,9 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, radius, max_qty.into());
 
             let result: Vec<_> = tree
-                .best_n_within::<SquaredEuclidean<f64>>(&query_point, radius, max_qty)
+                .query(&query_point)
+                .best_n_within::<SquaredEuclidean<f64>>(radius, max_qty)
+                .execute()
                 .into_iter()
                 .collect();
 
@@ -353,7 +359,9 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, radius, max_qty.into());
 
             let result: Vec<_> = tree
-                .best_n_within::<SquaredEuclidean<f64>>(&query_point, radius, max_qty)
+                .query(&query_point)
+                .best_n_within::<SquaredEuclidean<f64>>(radius, max_qty)
+                .execute()
                 .into_iter()
                 .collect();
 
@@ -377,10 +385,14 @@ mod tests {
                 KdTree::new_from_slice(&points).unwrap();
 
             let mut flat_results: Vec<_> = flat_tree
-                .best_n_within::<SquaredEuclidean<f64>>(&query, radius, max_qty)
+                .query(&query)
+                .best_n_within::<SquaredEuclidean<f64>>(radius, max_qty)
+                .execute()
                 .into_sorted_vec();
             let mut arena_results: Vec<_> = arena_tree
-                .best_n_within::<SquaredEuclidean<f64>>(&query, radius, max_qty)
+                .query(&query)
+                .best_n_within::<SquaredEuclidean<f64>>(radius, max_qty)
+                .execute()
                 .into_sorted_vec();
 
             flat_results.sort();
@@ -412,10 +424,14 @@ mod tests {
             KdTree::new_from_slice(&points).unwrap();
 
         let flat_result = flat_tree
-            .best_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty)
+            .query(&query)
+            .best_n_within::<SquaredEuclidean<f64>>(max_dist, max_qty)
+            .execute()
             .into_sorted_vec();
         let arena_result = arena_tree
-            .best_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty)
+            .query(&query)
+            .best_n_within::<SquaredEuclidean<f64>>(max_dist, max_qty)
+            .execute()
             .into_sorted_vec();
 
         assert_eq!(arena_result, flat_result);
@@ -443,10 +459,14 @@ mod tests {
             KdTree::new_from_slice(&points).unwrap();
 
         let flat_result = flat_tree
-            .best_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty)
+            .query(&query)
+            .best_n_within::<SquaredEuclidean<f32>>(max_dist, max_qty)
+            .execute()
             .into_sorted_vec();
         let arena_result = arena_tree
-            .best_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty)
+            .query(&query)
+            .best_n_within::<SquaredEuclidean<f32>>(max_dist, max_qty)
+            .execute()
             .into_sorted_vec();
 
         assert_eq!(arena_result, flat_result);
@@ -474,10 +494,14 @@ mod tests {
             KdTree::new_from_slice(&points).unwrap();
 
         let flat_result = flat_tree
-            .best_n_within::<crate::dist::Manhattan<f64>>(&query, max_dist, max_qty)
+            .query(&query)
+            .best_n_within::<crate::dist::Manhattan<f64>>(max_dist, max_qty)
+            .execute()
             .into_sorted_vec();
         let arena_result = arena_tree
-            .best_n_within::<crate::dist::Manhattan<f64>>(&query, max_dist, max_qty)
+            .query(&query)
+            .best_n_within::<crate::dist::Manhattan<f64>>(max_dist, max_qty)
+            .execute()
             .into_sorted_vec();
 
         assert_eq!(arena_result, flat_result);

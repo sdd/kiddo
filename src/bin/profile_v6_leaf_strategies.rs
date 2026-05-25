@@ -81,7 +81,10 @@ fn time_nearest_flat(
 
     for _ in 0..repeats {
         for query in queries {
-            let (dist, item) = tree.nearest_one::<SquaredEuclidean<f64>>(black_box(query));
+            let (dist, item) = tree
+                .query(black_box(query))
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .execute();
             checksum_dist += dist;
             checksum_item = checksum_item.wrapping_add(item as u64);
         }
@@ -101,7 +104,10 @@ fn time_nearest_arena(
 
     for _ in 0..repeats {
         for query in queries {
-            let (dist, item) = tree.nearest_one::<SquaredEuclidean<f64>>(black_box(query));
+            let (dist, item) = tree
+                .query(black_box(query))
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .execute();
             checksum_dist += dist;
             checksum_item = checksum_item.wrapping_add(item as u64);
         }
@@ -121,7 +127,10 @@ fn time_nearest_vec_of_arrays(
 
     for _ in 0..repeats {
         for query in queries {
-            let (dist, item) = tree.nearest_one::<SquaredEuclidean<f64>>(black_box(query));
+            let (dist, item) = tree
+                .query(black_box(query))
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .execute();
             checksum_dist += dist;
             checksum_item = checksum_item.wrapping_add(item as u64);
         }
@@ -137,7 +146,11 @@ fn time_approx_flat(tree: &FlatTree, queries: &[[f64; K]], repeats: usize) -> (D
 
     for _ in 0..repeats {
         for query in queries {
-            let (dist, item) = tree.approx_nearest_one::<SquaredEuclidean<f64>>(black_box(query));
+            let (dist, item) = tree
+                .query(black_box(query))
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .approx()
+                .execute();
             checksum_dist += dist;
             checksum_item = checksum_item.wrapping_add(item as u64);
         }
@@ -157,7 +170,11 @@ fn time_approx_arena(
 
     for _ in 0..repeats {
         for query in queries {
-            let (dist, item) = tree.approx_nearest_one::<SquaredEuclidean<f64>>(black_box(query));
+            let (dist, item) = tree
+                .query(black_box(query))
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .approx()
+                .execute();
             checksum_dist += dist;
             checksum_item = checksum_item.wrapping_add(item as u64);
         }
@@ -177,7 +194,11 @@ fn time_approx_vec_of_arrays(
 
     for _ in 0..repeats {
         for query in queries {
-            let (dist, item) = tree.approx_nearest_one::<SquaredEuclidean<f64>>(black_box(query));
+            let (dist, item) = tree
+                .query(black_box(query))
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .approx()
+                .execute();
             checksum_dist += dist;
             checksum_item = checksum_item.wrapping_add(item as u64);
         }

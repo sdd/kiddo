@@ -259,7 +259,10 @@ mod test {
         let query_point = [0.5, 0.5, 0.5];
         let radius = 0.1;
         let max_qty = NonZeroUsize::new(10).unwrap();
-        let results = tree.best_n_within::<SquaredEuclidean<f32>>(&query_point, radius, max_qty);
+        let results = tree
+            .query(&query_point)
+            .best_n_within::<SquaredEuclidean<f32>>(radius, max_qty)
+            .execute();
         assert_eq!(results.len(), 10);
     }
 }

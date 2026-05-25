@@ -58,7 +58,7 @@ where
     ///
     /// Returns a tuple of (distance, item) for the nearest neighbor.
     #[inline(always)]
-    pub fn nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
+    pub(crate) fn nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -391,7 +391,10 @@ mod tests {
         let tree: KdTree<f64, u32, Eytzinger<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
-        let result = tree.nearest_one::<SquaredEuclidean<f64>>(&[0.45, 0.55, 0.65]);
+        let result = tree
+            .query(&[0.45, 0.55, 0.65])
+            .nearest_one::<SquaredEuclidean<f64>>()
+            .execute();
 
         assert_float_relative_eq!(result.0, 0.0075, REL_EPS_F64);
         assert_eq!(result.1, 3);
@@ -409,7 +412,10 @@ mod tests {
         let tree: KdTree<f64, (), Eytzinger<3>, VecOfArenas<f64, (), 3, 32>, 3, 32> =
             KdTree::new_from_slice_no_items(&points).unwrap();
 
-        let result = tree.nearest_one::<SquaredEuclidean<f64>>(&[0.45, 0.55, 0.65]);
+        let result = tree
+            .query(&[0.45, 0.55, 0.65])
+            .nearest_one::<SquaredEuclidean<f64>>()
+            .execute();
 
         assert_float_relative_eq!(result.0, 0.0075, REL_EPS_F64);
         assert_eq!(result.1, ());
@@ -431,8 +437,14 @@ mod tests {
         let arena_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
-        let flat_result = flat_tree.nearest_one::<SquaredEuclidean<f32>>(&query);
-        let arena_result = arena_tree.nearest_one::<SquaredEuclidean<f32>>(&query);
+        let flat_result = flat_tree
+            .query(&query)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .execute();
+        let arena_result = arena_tree
+            .query(&query)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .execute();
 
         assert_float_relative_eq!(arena_result.0, flat_result.0, REL_EPS_F32);
         assert_eq!(arena_result.1, flat_result.1);
@@ -562,7 +574,10 @@ mod tests {
 
         let expected = (0.17570000000000008, 5);
 
-        let results = tree.nearest_one::<SquaredEuclidean<f64>>(&query_point);
+        let results = tree
+            .query(&query_point)
+            .nearest_one::<SquaredEuclidean<f64>>()
+            .execute();
         assert_float_relative_eq!(results.0, expected.0, REL_EPS_F64);
         assert_eq!(results.1, expected.1);
     }
@@ -588,7 +603,10 @@ mod tests {
 
         for query_point in query_points.iter() {
             let expected = linear_search(&content_to_add, query_point);
-            let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
+            let result = tree
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .execute();
 
             assert_nearest_f32(result, &expected);
         }
@@ -615,7 +633,10 @@ mod tests {
 
         for query_point in query_points.iter() {
             let expected = linear_search(&content_to_add, query_point);
-            let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
+            let result = tree
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .execute();
 
             assert_nearest_f32(result, &expected);
         }
@@ -644,7 +665,10 @@ mod tests {
 
         for query_point in query_points.iter() {
             let expected = linear_search(&content_to_add, query_point);
-            let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
+            let result = tree
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .execute();
 
             assert_nearest_f32(result, &expected);
         }
@@ -675,7 +699,10 @@ mod tests {
 
         for (i, query_point) in query_points.iter().enumerate() {
             let expected = linear_search(&content_to_add, query_point);
-            let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
+            let result = tree
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .execute();
 
             assert_float_relative_eq!(result.0, expected.distance, REL_EPS_F32);
             assert_eq!(
@@ -710,7 +737,10 @@ mod tests {
 
         for query_point in query_points.iter() {
             let expected = linear_search(&content_to_add, query_point);
-            let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
+            let result = tree
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .execute();
 
             assert_nearest_f32(result, &expected);
         }
@@ -737,7 +767,10 @@ mod tests {
 
         for query_point in query_points.iter() {
             let expected = linear_search(&content_to_add, query_point);
-            let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
+            let result = tree
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .execute();
 
             assert_nearest_f32(result, &expected);
         }
@@ -764,7 +797,10 @@ mod tests {
         for query_point in query_points.iter() {
             let expected =
                 linear_search_with_metric::<f64, Chebyshev<f64>, 4>(&content_to_add, query_point);
-            let result = tree.nearest_one::<Chebyshev<f64>>(query_point);
+            let result = tree
+                .query(query_point)
+                .nearest_one::<Chebyshev<f64>>()
+                .execute();
 
             assert_nearest_f64(result, &expected);
         }
@@ -793,7 +829,10 @@ mod tests {
                 &content_to_add,
                 query_point,
             );
-            let result = tree.nearest_one::<Minkowski<3, f64>>(query_point);
+            let result = tree
+                .query(query_point)
+                .nearest_one::<Minkowski<3, f64>>()
+                .execute();
 
             assert_nearest_f64(result, &expected);
         }
@@ -952,10 +991,16 @@ mod tests {
             // println!("Query point: {:?}", query_point);
             // println!("Expected: item={}, dist²={}", expected.item, expected.distance);
 
-            let _result = tree_non_simd.nearest_one::<SquaredEuclidean<f64>>(query_point);
+            let _result = tree_non_simd
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .execute();
             // println!("NON-SIMD: item={}, dist²={}", result.1, result.0);
 
-            let result = tree.nearest_one::<SquaredEuclidean<f64>>(query_point);
+            let result = tree
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .execute();
             // println!("SIMD: item={}, dist²={}", result.1, result.0);
 
             assert_nearest_f64(result, &expected);
@@ -1014,7 +1059,10 @@ mod tests {
 
         for query_point in query_points.iter() {
             let expected = linear_search(&points, query_point);
-            let result = tree.nearest_one::<SquaredEuclidean<f32>>(query_point);
+            let result = tree
+                .query(query_point)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .execute();
 
             assert_float_relative_eq!(result.0, expected.distance, REL_EPS_F32);
             assert_eq!(

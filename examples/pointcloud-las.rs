@@ -38,7 +38,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let query = [0.123f32, 0.456f32, 0.789f32];
-    let (distance, item) = kdtree.nearest_one::<SquaredEuclidean<f32>>(&query);
+    let (distance, item) = kdtree
+        .query(&query)
+        .nearest_one::<SquaredEuclidean<f32>>()
+        .execute();
     println!("Nearest item to query: index={item}, distance={distance:?}");
 
     Ok(())

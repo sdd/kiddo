@@ -13,6 +13,11 @@ use nonmax::NonMaxUsize;
 
 pub use iter::{KdTreeIter, WithinUnsortedIter};
 pub use orchestrator::KdTreeQueryOps;
+pub use query::{
+    ApproxNearestOneQuery, BestNWithinQuery, NearestNQuery, NearestNUnsortedQuery,
+    NearestNWithinQuery, NearestNWithinUnsortedQuery, NearestOneQuery, QueryBuilder, WithinQuery,
+    WithinUnsortedQuery,
+};
 pub use stem_leaf_resolution::OwnedStemLeafResolution;
 
 use crate::traits::leaf_strategy::{BucketLimitType, ConstructibleLeafStrategy, Mutability};
@@ -706,7 +711,10 @@ mod tests {
 
         let tree = Tree::new_from_slice(&points).unwrap();
         let query = [0.123, 0.456, 0.789];
-        let expected = tree.nearest_one::<SquaredEuclidean<f64>>(&query);
+        let expected = tree
+            .query(&query)
+            .nearest_one::<SquaredEuclidean<f64>>()
+            .execute();
 
         let bytes = rkyv_08::api::high::to_bytes_in::<_, rkyv_08::rancor::Error>(
             &tree,
@@ -730,7 +738,10 @@ mod tests {
             0
         );
         assert_eq!(
-            roundtrip.nearest_one::<SquaredEuclidean<f64>>(&query),
+            roundtrip
+                .query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .execute(),
             expected
         );
     }
@@ -770,7 +781,10 @@ mod tests {
         let tree = Tree::new_from_slice(&points).unwrap();
         let query = [0.33, 0.27, 0.41, 0.59];
         let max_dist = 0.55f32;
-        let expected = tree.within::<crate::Manhattan<f32>>(&query, max_dist);
+        let expected = tree
+            .query(&query)
+            .within::<crate::Manhattan<f32>>(max_dist)
+            .execute();
 
         let bytes = rkyv_08::api::high::to_bytes_in::<_, rkyv_08::rancor::Error>(
             &tree,
@@ -780,7 +794,10 @@ mod tests {
 
         let archived =
             rkyv_08::access::<ArchivedTree, rkyv_08::rancor::Error>(bytes.as_slice()).unwrap();
-        let actual = archived.within::<crate::Manhattan<f32>>(&query, max_dist);
+        let actual = archived
+            .query(&query)
+            .within::<crate::Manhattan<f32>>(max_dist)
+            .execute();
 
         assert_eq!(actual, expected);
     }
@@ -816,37 +833,78 @@ mod tests {
             rkyv_08::access::<ArchivedTree, rkyv_08::rancor::Error>(bytes.as_slice()).unwrap();
 
         assert_eq!(
-            archived.approx_nearest_one::<SquaredEuclidean<f64>>(&query),
-            tree.approx_nearest_one::<SquaredEuclidean<f64>>(&query)
-        );
-        assert_eq!(
-            archived.nearest_one::<SquaredEuclidean<f64>>(&query),
-            tree.nearest_one::<SquaredEuclidean<f64>>(&query)
-        );
-        assert_eq!(
-            archived.nearest_n::<SquaredEuclidean<f64>>(&query, max_qty, true),
-            tree.nearest_n::<SquaredEuclidean<f64>>(&query, max_qty, true)
-        );
-        assert_eq!(
-            archived.nearest_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty, true),
-            tree.nearest_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty, true)
-        );
-        assert_eq!(
-            archived.within::<SquaredEuclidean<f64>>(&query, max_dist),
-            tree.within::<SquaredEuclidean<f64>>(&query, max_dist)
+            archived
+                .query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .approx()
+                .execute(),
+            tree.query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .approx()
+                .execute()
         );
         assert_eq!(
             archived
-                .within_unsorted::<SquaredEuclidean<f64>>(&query, max_dist)
+                .query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .execute(),
+            tree.query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .execute()
+        );
+        assert_eq!(
+            archived
+                .query(&query)
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .execute(),
+            tree.query(&query)
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .execute()
+        );
+        assert_eq!(
+            archived
+                .query(&query)
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .within(max_dist)
+                .execute(),
+            tree.query(&query)
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .within(max_dist)
+                .execute()
+        );
+        assert_eq!(
+            archived
+                .query(&query)
+                .within::<SquaredEuclidean<f64>>(max_dist)
+                .execute(),
+            tree.query(&query)
+                .within::<SquaredEuclidean<f64>>(max_dist)
+                .execute()
+        );
+        assert_eq!(
+            archived
+                .query(&query)
+                .within::<SquaredEuclidean<f64>>(max_dist)
+                .unsorted()
+                .execute()
                 .len(),
-            tree.within_unsorted::<SquaredEuclidean<f64>>(&query, max_dist)
+            tree.query(&query)
+                .within::<SquaredEuclidean<f64>>(max_dist)
+                .unsorted()
+                .execute()
                 .len()
         );
         assert_eq!(
             archived
-                .within_unsorted_iter::<SquaredEuclidean<f64>>(&query, max_dist)
+                .query(&query)
+                .within::<SquaredEuclidean<f64>>(max_dist)
+                .unsorted()
+                .iter()
                 .count(),
-            tree.within_unsorted_iter::<SquaredEuclidean<f64>>(&query, max_dist)
+            tree.query(&query)
+                .within::<SquaredEuclidean<f64>>(max_dist)
+                .unsorted()
+                .iter()
                 .count()
         );
         let archived_iter: Vec<_> = archived.iter().collect();
@@ -854,9 +912,13 @@ mod tests {
         assert_eq!(archived_iter, tree_iter);
         assert_eq!(
             archived
-                .best_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty)
+                .query(&query)
+                .best_n_within::<SquaredEuclidean<f64>>(max_dist, max_qty)
+                .execute()
                 .into_sorted_vec(),
-            tree.best_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty)
+            tree.query(&query)
+                .best_n_within::<SquaredEuclidean<f64>>(max_dist, max_qty)
+                .execute()
                 .into_sorted_vec()
         );
     }

@@ -217,8 +217,10 @@ fn run_best_n_within_archived_donnelly(
 
     for _ in 0..repeats {
         for query in queries.iter() {
-            let results =
-                tree.best_n_within::<SquaredEuclidean<f64>>(black_box(query), max_dist, max_qty);
+            let results = tree
+                .query(black_box(query))
+                .best_n_within::<SquaredEuclidean<f64>>(max_dist, max_qty)
+                .execute();
             checksum_len += results.len();
 
             for result in results.into_vec() {
@@ -291,8 +293,10 @@ fn run_best_n_within_archived_eytzinger(
 
     for _ in 0..repeats {
         for query in queries.iter() {
-            let results =
-                tree.best_n_within::<SquaredEuclidean<f64>>(black_box(query), max_dist, max_qty);
+            let results = tree
+                .query(black_box(query))
+                .best_n_within::<SquaredEuclidean<f64>>(max_dist, max_qty)
+                .execute();
             checksum_len += results.len();
 
             for result in results.into_vec() {

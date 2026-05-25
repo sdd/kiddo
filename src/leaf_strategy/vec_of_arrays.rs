@@ -608,7 +608,10 @@ mod test {
         // perform a nearest_one query
         let query_point = [0.5, 0.5, 0.5];
 
-        let _nearest = tree.nearest_one::<SquaredEuclidean<f32>>(&query_point);
+        let _nearest = tree
+            .query(&query_point)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .execute();
     }
 
     #[test]

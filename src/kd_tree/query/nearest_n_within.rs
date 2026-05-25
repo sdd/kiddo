@@ -81,7 +81,7 @@ where
     ///
     /// Returns up to `max_qty` points that are within `max_dist` of the query point.
     /// If `sorted` is true, results are returned in order of increasing distance.
-    pub fn nearest_n_within<D>(
+    pub(crate) fn nearest_n_within<D>(
         &self,
         query: &[A; K],
         max_dist: D::Output,
@@ -319,8 +319,11 @@ mod tests {
         let radius = 0.1;
         let max_qty = NonZeroUsize::new(10).unwrap();
 
-        let results =
-            tree.nearest_n_within::<SquaredEuclidean<f32>>(&query_point, radius, max_qty, true);
+        let results = tree
+            .query(&query_point)
+            .nearest_n::<SquaredEuclidean<f32>>(max_qty)
+            .within(radius)
+            .execute();
         assert_eq!(results.len(), 10);
     }
 
@@ -348,8 +351,11 @@ mod tests {
         let radius = 0.1;
         let max_qty = NonZeroUsize::new(10).unwrap();
 
-        let results =
-            tree.nearest_n_within::<SquaredEuclidean<f32>>(&query_point, radius, max_qty, true);
+        let results = tree
+            .query(&query_point)
+            .nearest_n::<SquaredEuclidean<f32>>(max_qty)
+            .within(radius)
+            .execute();
         assert_eq!(results.len(), 10);
     }
 
@@ -373,10 +379,16 @@ mod tests {
         let arena_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
-        let flat_result =
-            flat_tree.nearest_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty, true);
-        let arena_result =
-            arena_tree.nearest_n_within::<SquaredEuclidean<f32>>(&query, max_dist, max_qty, true);
+        let flat_result = flat_tree
+            .query(&query)
+            .nearest_n::<SquaredEuclidean<f32>>(max_qty)
+            .within(max_dist)
+            .execute();
+        let arena_result = arena_tree
+            .query(&query)
+            .nearest_n::<SquaredEuclidean<f32>>(max_qty)
+            .within(max_dist)
+            .execute();
 
         assert_eq!(arena_result, flat_result);
     }
@@ -437,10 +449,16 @@ mod tests {
         let arena_tree: KdTree<f64, u32, Eytzinger<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
-        let flat_result =
-            flat_tree.nearest_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty, true);
-        let arena_result =
-            arena_tree.nearest_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty, true);
+        let flat_result = flat_tree
+            .query(&query)
+            .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+            .within(max_dist)
+            .execute();
+        let arena_result = arena_tree
+            .query(&query)
+            .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+            .within(max_dist)
+            .execute();
 
         assert_eq!(arena_result, flat_result);
     }
@@ -680,8 +698,11 @@ mod tests {
             KdTree::new_from_slice(&points).unwrap();
 
         reset();
-        let result =
-            tree.nearest_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty, true);
+        let result = tree
+            .query(&query)
+            .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+            .within(max_dist)
+            .execute();
         let stats = snapshot();
 
         let expected = linear_search(&points, &query, max_dist)
@@ -727,8 +748,11 @@ mod tests {
         > = KdTree::new_from_slice(&points).unwrap();
 
         reset();
-        let result =
-            tree.nearest_n_within::<SquaredEuclidean<f64>>(&query, max_dist, max_qty, true);
+        let result = tree
+            .query(&query)
+            .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+            .within(max_dist)
+            .execute();
         let stats = snapshot();
 
         let expected = linear_search(&points, &query, max_dist)

@@ -273,7 +273,10 @@ mod linux {
 
         for _ in 0..repeats {
             for query in queries.iter() {
-                let (dist, item) = tree.nearest_one::<SquaredEuclidean<f64>>(black_box(query));
+                let (dist, item) = tree
+                    .query(black_box(query))
+                    .nearest_one::<SquaredEuclidean<f64>>()
+                    .execute();
                 checksum_dist += dist;
                 checksum_item = checksum_item.wrapping_add(item as u64);
             }
@@ -300,8 +303,11 @@ mod linux {
 
         for _ in 0..repeats {
             for query in queries.iter() {
-                let results =
-                    tree.within_unsorted::<SquaredEuclidean<f64>>(black_box(query), max_dist);
+                let results = tree
+                    .query(black_box(query))
+                    .within::<SquaredEuclidean<f64>>(max_dist)
+                    .unsorted()
+                    .execute();
                 checksum_len += results.len();
                 for result in results {
                     checksum_dist += result.distance;
@@ -332,12 +338,11 @@ mod linux {
 
         for _ in 0..repeats {
             for query in queries.iter() {
-                let results = tree.nearest_n_within::<SquaredEuclidean<f64>>(
-                    black_box(query),
-                    max_dist,
-                    max_qty,
-                    true,
-                );
+                let results = tree
+                    .query(black_box(query))
+                    .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                    .within(max_dist)
+                    .execute();
                 checksum_len += results.len();
                 for result in results {
                     checksum_dist += result.distance;

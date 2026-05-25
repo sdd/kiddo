@@ -59,7 +59,7 @@ where
 
     /// Finds an approximate nearest point to the query point.
     #[inline(always)]
-    pub fn approx_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
+    pub(crate) fn approx_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K, Output = A>,
     {
@@ -80,7 +80,7 @@ where
 
     /// Finds the nearest point to the query point.
     #[inline(always)]
-    pub fn nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
+    pub(crate) fn nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -153,7 +153,7 @@ where
     }
 
     /// Finds up to N nearest points within a given distance.
-    pub fn nearest_n_within<D>(
+    pub(crate) fn nearest_n_within<D>(
         &self,
         query: &[A; K],
         max_dist: D::Output,
@@ -226,7 +226,7 @@ where
     }
 
     /// Finds the N nearest points to the query point.
-    pub fn nearest_n<D>(
+    pub(crate) fn nearest_n<D>(
         &self,
         query: &[A; K],
         max_qty: NonZeroUsize,
@@ -246,7 +246,7 @@ where
     }
 
     /// Finds all points within a given distance of the query point, sorted by distance.
-    pub fn within<D>(
+    pub(crate) fn within<D>(
         &self,
         query: &[A; K],
         max_dist: D::Output,
@@ -269,8 +269,12 @@ where
     /// This is the lowest-overhead streaming range-query API for archived trees. It runs
     /// traversal and optimized leaf kernels, but routes each match directly to `visitor`
     /// instead of building a result collection.
-    pub fn within_unsorted_visit<D, F>(&self, query: &[A; K], max_dist: D::Output, mut visitor: F)
-    where
+    pub(crate) fn within_unsorted_visit<D, F>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        mut visitor: F,
+    ) where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
@@ -299,7 +303,7 @@ where
     }
 
     /// Finds all points within a given distance of the query point, unsorted.
-    pub fn within_unsorted<D>(
+    pub(crate) fn within_unsorted<D>(
         &self,
         query: &[A; K],
         max_dist: D::Output,
@@ -323,7 +327,8 @@ where
     ///
     /// This avoids materializing the full result set returned by [`within_unsorted`](Self::within_unsorted).
     /// For the absolute lowest overhead, use [`within_unsorted_visit`](Self::within_unsorted_visit).
-    pub fn within_unsorted_iter<D>(
+    #[allow(dead_code)]
+    pub(crate) fn within_unsorted_iter<D>(
         &self,
         query: &[A; K],
         max_dist: D::Output,
@@ -389,7 +394,7 @@ where
     }
 
     /// Finds the best N points within a given distance.
-    pub fn best_n_within<D>(
+    pub(crate) fn best_n_within<D>(
         &self,
         query: &[A; K],
         max_dist: D::Output,

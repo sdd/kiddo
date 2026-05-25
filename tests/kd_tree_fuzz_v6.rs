@@ -1041,7 +1041,10 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
             let (mut sq_state, mut man_state) =
                 brute_states_f32(&points, &query, max_qty, radius_sq, radius_man);
 
-            let result_sq = tree.nearest_one::<SquaredEuclidean<f32>>(&query);
+            let result_sq = tree
+                .query(&query)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .execute();
             assert_nearest_one(
                 meta,
                 label,
@@ -1058,7 +1061,7 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
                 &sq_state,
             );
 
-            let result_man = tree.nearest_one::<Manhattan<f32>>(&query);
+            let result_man = tree.query(&query).nearest_one::<Manhattan<f32>>().execute();
             assert_nearest_one(
                 meta,
                 label,
@@ -1075,7 +1078,11 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
                 &man_state,
             );
 
-            let approx_sq = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query);
+            let approx_sq = tree
+                .query(&query)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .approx()
+                .execute();
             assert_approx_nearest_one_f32::<SquaredEuclidean<f32>, K>(
                 meta,
                 label,
@@ -1093,7 +1100,11 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
                 approx_sq,
             );
 
-            let approx_man = tree.approx_nearest_one::<Manhattan<f32>>(&query);
+            let approx_man = tree
+                .query(&query)
+                .nearest_one::<Manhattan<f32>>()
+                .approx()
+                .execute();
             assert_approx_nearest_one_f32::<Manhattan<f32>, K>(
                 meta,
                 label,
@@ -1275,7 +1286,9 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
             let expected_best_within_sq = expected_best_n_within(&expected_within_sq, max_qty);
             let max_qty_nz = NonZeroUsize::new(max_qty).expect("max_qty must be non-zero");
             let mut result_best_within_sq: Vec<(f32, usize)> = tree
-                .best_n_within::<SquaredEuclidean<f32>>(&query, radius_sq, max_qty_nz)
+                .query(&query)
+                .best_n_within::<SquaredEuclidean<f32>>(radius_sq, max_qty_nz)
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -1362,7 +1375,9 @@ fn run_mutable_case_f32<const K: usize, const B: usize, SO>(
             let expected_best_within_man = expected_best_n_within(&expected_within_man, max_qty);
             let max_qty_nz = NonZeroUsize::new(max_qty).expect("max_qty must be non-zero");
             let mut result_best_within_man: Vec<(f32, usize)> = tree
-                .best_n_within::<Manhattan<f32>>(&query, radius_man, max_qty_nz)
+                .query(&query)
+                .best_n_within::<Manhattan<f32>>(radius_man, max_qty_nz)
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -1433,7 +1448,10 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
             let (mut sq_state, mut man_state) =
                 brute_states_f64(&points, &query, max_qty, radius_sq, radius_man);
 
-            let result_sq = tree.nearest_one::<SquaredEuclidean<f64>>(&query);
+            let result_sq = tree
+                .query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .execute();
             assert_nearest_one(
                 meta,
                 label,
@@ -1450,7 +1468,7 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
                 &sq_state,
             );
 
-            let result_man = tree.nearest_one::<Manhattan<f64>>(&query);
+            let result_man = tree.query(&query).nearest_one::<Manhattan<f64>>().execute();
             assert_nearest_one(
                 meta,
                 label,
@@ -1467,7 +1485,11 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
                 &man_state,
             );
 
-            let approx_sq = tree.approx_nearest_one::<SquaredEuclidean<f64>>(&query);
+            let approx_sq = tree
+                .query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .approx()
+                .execute();
             assert_approx_nearest_one_f64::<SquaredEuclidean<f64>, K>(
                 meta,
                 label,
@@ -1485,7 +1507,11 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
                 approx_sq,
             );
 
-            let approx_man = tree.approx_nearest_one::<Manhattan<f64>>(&query);
+            let approx_man = tree
+                .query(&query)
+                .nearest_one::<Manhattan<f64>>()
+                .approx()
+                .execute();
             assert_approx_nearest_one_f64::<Manhattan<f64>, K>(
                 meta,
                 label,
@@ -1667,7 +1693,9 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
             let expected_best_within_sq = expected_best_n_within(&expected_within_sq, max_qty);
             let max_qty_nz = NonZeroUsize::new(max_qty).expect("max_qty must be non-zero");
             let mut result_best_within_sq: Vec<(f64, usize)> = tree
-                .best_n_within::<SquaredEuclidean<f64>>(&query, radius_sq, max_qty_nz)
+                .query(&query)
+                .best_n_within::<SquaredEuclidean<f64>>(radius_sq, max_qty_nz)
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -1754,7 +1782,9 @@ fn run_mutable_case_f64<const K: usize, const B: usize, SO>(
             let expected_best_within_man = expected_best_n_within(&expected_within_man, max_qty);
             let max_qty_nz = NonZeroUsize::new(max_qty).expect("max_qty must be non-zero");
             let mut result_best_within_man: Vec<(f64, usize)> = tree
-                .best_n_within::<Manhattan<f64>>(&query, radius_man, max_qty_nz)
+                .query(&query)
+                .best_n_within::<Manhattan<f64>>(radius_man, max_qty_nz)
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -1821,7 +1851,10 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
             let (mut sq_state, mut man_state) =
                 brute_states_f32(&points, &query, max_qty, radius_sq, radius_man);
 
-            let result_sq = tree.nearest_one::<SquaredEuclidean<f32>>(&query);
+            let result_sq = tree
+                .query(&query)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .execute();
             assert_nearest_one(
                 meta,
                 label,
@@ -1838,7 +1871,7 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
                 &sq_state,
             );
 
-            let result_man = tree.nearest_one::<Manhattan<f32>>(&query);
+            let result_man = tree.query(&query).nearest_one::<Manhattan<f32>>().execute();
             assert_nearest_one(
                 meta,
                 label,
@@ -1855,7 +1888,11 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
                 &man_state,
             );
 
-            let approx_sq = tree.approx_nearest_one::<SquaredEuclidean<f32>>(&query);
+            let approx_sq = tree
+                .query(&query)
+                .nearest_one::<SquaredEuclidean<f32>>()
+                .approx()
+                .execute();
             assert_approx_nearest_one_f32::<SquaredEuclidean<f32>, K>(
                 meta,
                 label,
@@ -1873,7 +1910,11 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
                 approx_sq,
             );
 
-            let approx_man = tree.approx_nearest_one::<Manhattan<f32>>(&query);
+            let approx_man = tree
+                .query(&query)
+                .nearest_one::<Manhattan<f32>>()
+                .approx()
+                .execute();
             assert_approx_nearest_one_f32::<Manhattan<f32>, K>(
                 meta,
                 label,
@@ -2055,7 +2096,9 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
             let expected_best_within_sq = expected_best_n_within(&expected_within_sq, max_qty);
             let max_qty_nz = NonZeroUsize::new(max_qty).expect("max_qty must be non-zero");
             let mut result_best_within_sq: Vec<(f32, usize)> = tree
-                .best_n_within::<SquaredEuclidean<f32>>(&query, radius_sq, max_qty_nz)
+                .query(&query)
+                .best_n_within::<SquaredEuclidean<f32>>(radius_sq, max_qty_nz)
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -2142,7 +2185,9 @@ fn run_immutable_case_f32_with_leaf<const K: usize, const B: usize, SO, LS>(
             let expected_best_within_man = expected_best_n_within(&expected_within_man, max_qty);
             let max_qty_nz = NonZeroUsize::new(max_qty).expect("max_qty must be non-zero");
             let mut result_best_within_man: Vec<(f32, usize)> = tree
-                .best_n_within::<Manhattan<f32>>(&query, radius_man, max_qty_nz)
+                .query(&query)
+                .best_n_within::<Manhattan<f32>>(radius_man, max_qty_nz)
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -2231,7 +2276,10 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
             let (mut sq_state, mut man_state) =
                 brute_states_f64(&points, &query, max_qty, radius_sq, radius_man);
 
-            let result_sq = tree.nearest_one::<SquaredEuclidean<f64>>(&query);
+            let result_sq = tree
+                .query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .execute();
             assert_nearest_one(
                 meta,
                 label,
@@ -2248,7 +2296,7 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
                 &sq_state,
             );
 
-            let result_man = tree.nearest_one::<Manhattan<f64>>(&query);
+            let result_man = tree.query(&query).nearest_one::<Manhattan<f64>>().execute();
             assert_nearest_one(
                 meta,
                 label,
@@ -2265,7 +2313,11 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
                 &man_state,
             );
 
-            let approx_sq = tree.approx_nearest_one::<SquaredEuclidean<f64>>(&query);
+            let approx_sq = tree
+                .query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .approx()
+                .execute();
             assert_approx_nearest_one_f64::<SquaredEuclidean<f64>, K>(
                 meta,
                 label,
@@ -2283,7 +2335,11 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
                 approx_sq,
             );
 
-            let approx_man = tree.approx_nearest_one::<Manhattan<f64>>(&query);
+            let approx_man = tree
+                .query(&query)
+                .nearest_one::<Manhattan<f64>>()
+                .approx()
+                .execute();
             assert_approx_nearest_one_f64::<Manhattan<f64>, K>(
                 meta,
                 label,
@@ -2465,7 +2521,9 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
             let expected_best_within_sq = expected_best_n_within(&expected_within_sq, max_qty);
             let max_qty_nz = NonZeroUsize::new(max_qty).expect("max_qty must be non-zero");
             let mut result_best_within_sq: Vec<(f64, usize)> = tree
-                .best_n_within::<SquaredEuclidean<f64>>(&query, radius_sq, max_qty_nz)
+                .query(&query)
+                .best_n_within::<SquaredEuclidean<f64>>(radius_sq, max_qty_nz)
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -2552,7 +2610,9 @@ fn run_immutable_case_f64_with_leaf<const K: usize, const B: usize, SO, LS>(
             let expected_best_within_man = expected_best_n_within(&expected_within_man, max_qty);
             let max_qty_nz = NonZeroUsize::new(max_qty).expect("max_qty must be non-zero");
             let mut result_best_within_man: Vec<(f64, usize)> = tree
-                .best_n_within::<Manhattan<f64>>(&query, radius_man, max_qty_nz)
+                .query(&query)
+                .best_n_within::<Manhattan<f64>>(radius_man, max_qty_nz)
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -3367,7 +3427,9 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
 
     let expected_best_sq = expected_best_n_within(&expected_within_sq, max_qty);
     let mut got_best_sq: Vec<(f32, usize)> = tree
-        .best_n_within::<SquaredEuclidean<f32>>(query, ADVERSARIAL_RADIUS_SQ_F32, max_qty_nz)
+        .query(query)
+        .best_n_within::<SquaredEuclidean<f32>>(ADVERSARIAL_RADIUS_SQ_F32, max_qty_nz)
+        .execute()
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
@@ -3452,7 +3514,9 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
 
     let expected_best_man = expected_best_n_within(&expected_within_man, max_qty);
     let mut got_best_man: Vec<(f32, usize)> = tree
-        .best_n_within::<Manhattan<f32>>(query, ADVERSARIAL_RADIUS_MAN_F32, max_qty_nz)
+        .query(query)
+        .best_n_within::<Manhattan<f32>>(ADVERSARIAL_RADIUS_MAN_F32, max_qty_nz)
+        .execute()
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
@@ -3471,7 +3535,10 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
             .take_while(|(dist, _)| *dist == best_sq_dist)
             .map(|(_, item)| *item)
             .collect();
-        let got_sq = tree.nearest_one::<SquaredEuclidean<f32>>(query);
+        let got_sq = tree
+            .query(query)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .execute();
         assert_distance_match_for_fuzz!(
             best_sq_dist,
             got_sq.0,
@@ -3485,7 +3552,11 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
             got_sq.1
         );
 
-        let approx_sq = tree.approx_nearest_one::<SquaredEuclidean<f32>>(query);
+        let approx_sq = tree
+            .query(query)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .approx()
+            .execute();
         let approx_sq_point = find_point_by_item_f32(entries, approx_sq.1);
         let approx_sq_dist =
             <SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_sq_point);
@@ -3505,7 +3576,7 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
             .take_while(|(dist, _)| *dist == best_man_dist)
             .map(|(_, item)| *item)
             .collect();
-        let got_man = tree.nearest_one::<Manhattan<f32>>(query);
+        let got_man = tree.query(query).nearest_one::<Manhattan<f32>>().execute();
         assert_distance_match_for_fuzz!(
             best_man_dist,
             got_man.0,
@@ -3519,7 +3590,11 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
             got_man.1
         );
 
-        let approx_man = tree.approx_nearest_one::<Manhattan<f32>>(query);
+        let approx_man = tree
+            .query(query)
+            .nearest_one::<Manhattan<f32>>()
+            .approx()
+            .execute();
         let approx_man_point = find_point_by_item_f32(entries, approx_man.1);
         let approx_man_dist =
             <Manhattan<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_man_point);
@@ -3620,7 +3695,9 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
 
     let expected_best_sq = expected_best_n_within(&expected_within_sq, max_qty);
     let mut got_best_sq: Vec<(f64, usize)> = tree
-        .best_n_within::<SquaredEuclidean<f64>>(query, ADVERSARIAL_RADIUS_SQ_F64, max_qty_nz)
+        .query(query)
+        .best_n_within::<SquaredEuclidean<f64>>(ADVERSARIAL_RADIUS_SQ_F64, max_qty_nz)
+        .execute()
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
@@ -3705,7 +3782,9 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
 
     let expected_best_man = expected_best_n_within(&expected_within_man, max_qty);
     let mut got_best_man: Vec<(f64, usize)> = tree
-        .best_n_within::<Manhattan<f64>>(query, ADVERSARIAL_RADIUS_MAN_F64, max_qty_nz)
+        .query(query)
+        .best_n_within::<Manhattan<f64>>(ADVERSARIAL_RADIUS_MAN_F64, max_qty_nz)
+        .execute()
         .into_iter()
         .map(|n| (n.distance, n.item))
         .collect();
@@ -3724,7 +3803,10 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
             .take_while(|(dist, _)| *dist == best_sq_dist)
             .map(|(_, item)| *item)
             .collect();
-        let got_sq = tree.nearest_one::<SquaredEuclidean<f64>>(query);
+        let got_sq = tree
+            .query(query)
+            .nearest_one::<SquaredEuclidean<f64>>()
+            .execute();
         assert_distance_match_for_fuzz!(
             best_sq_dist,
             got_sq.0,
@@ -3738,7 +3820,11 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
             got_sq.1
         );
 
-        let approx_sq = tree.approx_nearest_one::<SquaredEuclidean<f64>>(query);
+        let approx_sq = tree
+            .query(query)
+            .nearest_one::<SquaredEuclidean<f64>>()
+            .approx()
+            .execute();
         let approx_sq_point = find_point_by_item_f64(entries, approx_sq.1);
         let approx_sq_dist =
             <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_sq_point);
@@ -3758,7 +3844,7 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
             .take_while(|(dist, _)| *dist == best_man_dist)
             .map(|(_, item)| *item)
             .collect();
-        let got_man = tree.nearest_one::<Manhattan<f64>>(query);
+        let got_man = tree.query(query).nearest_one::<Manhattan<f64>>().execute();
         assert_distance_match_for_fuzz!(
             best_man_dist,
             got_man.0,
@@ -3772,7 +3858,11 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
             got_man.1
         );
 
-        let approx_man = tree.approx_nearest_one::<Manhattan<f64>>(query);
+        let approx_man = tree
+            .query(query)
+            .nearest_one::<Manhattan<f64>>()
+            .approx()
+            .execute();
         let approx_man_point = find_point_by_item_f64(entries, approx_man.1);
         let approx_man_dist =
             <Manhattan<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_man_point);
@@ -4038,7 +4128,11 @@ fn assert_approx_invariants_f32<SO, LS, const B: usize>(
         .map(|(_, item)| *item)
         .collect();
 
-    let approx_sq = tree.approx_nearest_one::<SquaredEuclidean<f32>>(query);
+    let approx_sq = tree
+        .query(query)
+        .nearest_one::<SquaredEuclidean<f32>>()
+        .approx()
+        .execute();
     let approx_sq_point = find_point_by_item_f32(entries, approx_sq.1);
     let approx_sq_dist =
         <SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_sq_point);
@@ -4051,7 +4145,10 @@ fn assert_approx_invariants_f32<SO, LS, const B: usize>(
         approx_sq.1
     );
 
-    let exact_sq = tree.nearest_one::<SquaredEuclidean<f32>>(query);
+    let exact_sq = tree
+        .query(query)
+        .nearest_one::<SquaredEuclidean<f32>>()
+        .execute();
     assert_distance_match_for_fuzz!(
         best_sq_dist,
         exact_sq.0,
@@ -4088,7 +4185,11 @@ fn assert_approx_invariants_f32<SO, LS, const B: usize>(
         .map(|(_, item)| *item)
         .collect();
 
-    let approx_man = tree.approx_nearest_one::<Manhattan<f32>>(query);
+    let approx_man = tree
+        .query(query)
+        .nearest_one::<Manhattan<f32>>()
+        .approx()
+        .execute();
     let approx_man_point = find_point_by_item_f32(entries, approx_man.1);
     let approx_man_dist =
         <Manhattan<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_man_point);
@@ -4101,7 +4202,7 @@ fn assert_approx_invariants_f32<SO, LS, const B: usize>(
         approx_man.1
     );
 
-    let exact_man = tree.nearest_one::<Manhattan<f32>>(query);
+    let exact_man = tree.query(query).nearest_one::<Manhattan<f32>>().execute();
     assert_distance_match_for_fuzz!(
         best_man_dist,
         exact_man.0,
@@ -4154,7 +4255,11 @@ fn assert_approx_invariants_f64<SO, LS, const B: usize>(
         .map(|(_, item)| *item)
         .collect();
 
-    let approx_sq = tree.approx_nearest_one::<SquaredEuclidean<f64>>(query);
+    let approx_sq = tree
+        .query(query)
+        .nearest_one::<SquaredEuclidean<f64>>()
+        .approx()
+        .execute();
     let approx_sq_point = find_point_by_item_f64(entries, approx_sq.1);
     let approx_sq_dist =
         <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_sq_point);
@@ -4167,7 +4272,10 @@ fn assert_approx_invariants_f64<SO, LS, const B: usize>(
         approx_sq.1
     );
 
-    let exact_sq = tree.nearest_one::<SquaredEuclidean<f64>>(query);
+    let exact_sq = tree
+        .query(query)
+        .nearest_one::<SquaredEuclidean<f64>>()
+        .execute();
     assert_distance_match_for_fuzz!(
         best_sq_dist,
         exact_sq.0,
@@ -4204,7 +4312,11 @@ fn assert_approx_invariants_f64<SO, LS, const B: usize>(
         .map(|(_, item)| *item)
         .collect();
 
-    let approx_man = tree.approx_nearest_one::<Manhattan<f64>>(query);
+    let approx_man = tree
+        .query(query)
+        .nearest_one::<Manhattan<f64>>()
+        .approx()
+        .execute();
     let approx_man_point = find_point_by_item_f64(entries, approx_man.1);
     let approx_man_dist =
         <Manhattan<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_man_point);
@@ -4217,7 +4329,7 @@ fn assert_approx_invariants_f64<SO, LS, const B: usize>(
         approx_man.1
     );
 
-    let exact_man = tree.nearest_one::<Manhattan<f64>>(query);
+    let exact_man = tree.query(query).nearest_one::<Manhattan<f64>>().execute();
     assert_distance_match_for_fuzz!(
         best_man_dist,
         exact_man.0,
@@ -4444,8 +4556,18 @@ fn record_approx_quality_case_f32<SO, const B: usize>(
         let exact_sq =
             brute_ranked_entries_f32::<SquaredEuclidean<f32>>(entries, query)[0].0 as f64;
         let exact_man = brute_ranked_entries_f32::<Manhattan<f32>>(entries, query)[0].0 as f64;
-        let approx_sq = tree.approx_nearest_one::<SquaredEuclidean<f32>>(query).0 as f64;
-        let approx_man = tree.approx_nearest_one::<Manhattan<f32>>(query).0 as f64;
+        let approx_sq = tree
+            .query(query)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .approx()
+            .execute()
+            .0 as f64;
+        let approx_man = tree
+            .query(query)
+            .nearest_one::<Manhattan<f32>>()
+            .approx()
+            .execute()
+            .0 as f64;
 
         let sq_ratio = if exact_sq == 0.0 {
             if approx_sq == 0.0 {
@@ -4498,8 +4620,18 @@ fn record_approx_quality_case_f64<SO, const B: usize>(
     for query in queries {
         let exact_sq = brute_ranked_entries_f64::<SquaredEuclidean<f64>>(entries, query)[0].0;
         let exact_man = brute_ranked_entries_f64::<Manhattan<f64>>(entries, query)[0].0;
-        let approx_sq = tree.approx_nearest_one::<SquaredEuclidean<f64>>(query).0;
-        let approx_man = tree.approx_nearest_one::<Manhattan<f64>>(query).0;
+        let approx_sq = tree
+            .query(query)
+            .nearest_one::<SquaredEuclidean<f64>>()
+            .approx()
+            .execute()
+            .0;
+        let approx_man = tree
+            .query(query)
+            .nearest_one::<Manhattan<f64>>()
+            .approx()
+            .execute()
+            .0;
 
         let sq_ratio = if exact_sq == 0.0 {
             if approx_sq == 0.0 {
