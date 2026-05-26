@@ -33,7 +33,25 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.nearest_n_within::<D>(query, max_dist, NonZeroUsize::MAX, true)
+        self.within_impl::<D, false>(query, max_dist)
+    }
+
+    pub(crate) fn within_impl<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+    ) -> Vec<NearestNeighbour<D::Output, T>>
+    where
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    {
+        self.nearest_n_within_impl::<D, EXCLUSIVE>(query, max_dist, NonZeroUsize::MAX, true)
     }
 }
 
@@ -45,6 +63,7 @@ mod tests {
     use std::cmp::Ordering;
 
     use crate::dist::Manhattan;
+    use crate::dist::SquaredEuclidean;
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::Axis;
@@ -52,6 +71,33 @@ mod tests {
 
     const RNG_SEED: u64 = 42;
     const TILE_BOUNDARY_CASES: [usize; 7] = [1, 2, 4, 8, 32, 33, 47];
+
+    #[test]
+    fn within_exclusive_boundaries_excludes_exact_threshold_matches() {
+        let points = vec![[0.0f64, 0.0], [1.0, 0.0], [2.0, 0.0], [0.5, 0.0]];
+        let tree: KdTree<f64, u32, Eytzinger<2>, FlatVec<f64, u32, 2, 32>, 2, 32> =
+            KdTree::new_from_slice(&points).unwrap();
+        let query = [0.0, 0.0];
+
+        let inclusive: Vec<_> = tree
+            .query(&query)
+            .within::<SquaredEuclidean<f64>>(1.0)
+            .execute()
+            .into_iter()
+            .map(|n| n.item)
+            .collect();
+        let exclusive: Vec<_> = tree
+            .query(&query)
+            .within::<SquaredEuclidean<f64>>(1.0)
+            .exclusive_boundaries()
+            .execute()
+            .into_iter()
+            .map(|n| n.item)
+            .collect();
+
+        assert_eq!(inclusive, vec![0, 3, 1]);
+        assert_eq!(exclusive, vec![0, 3]);
+    }
 
     #[test]
     fn within_vec_of_arenas_matches_flat_vec_across_tile_boundaries() {

@@ -9,7 +9,7 @@ use crate::leaf_view::LeafView;
 use crate::Content;
 
 #[inline(always)]
-unsafe fn emit_results_avx2_f64<T, F>(
+unsafe fn emit_results_avx2_f64<T, F, const EXCLUSIVE: bool>(
     dists: __m256d,
     items: *const T,
     base: usize,
@@ -19,8 +19,11 @@ unsafe fn emit_results_avx2_f64<T, F>(
     T: Content,
     F: FnMut(f64, T),
 {
-    let mask =
-        _mm256_movemask_pd(_mm256_cmp_pd(dists, _mm256_set1_pd(max_dist), _CMP_LE_OQ)) as u32;
+    let mask = _mm256_movemask_pd(_mm256_cmp_pd(
+        dists,
+        _mm256_set1_pd(max_dist),
+        if EXCLUSIVE { _CMP_LT_OQ } else { _CMP_LE_OQ },
+    )) as u32;
     if mask == 0 {
         return;
     }
@@ -40,7 +43,7 @@ unsafe fn emit_results_avx2_f64<T, F>(
 }
 
 #[inline(always)]
-unsafe fn emit_results_sse_f64<T, F>(
+unsafe fn emit_results_sse_f64<T, F, const EXCLUSIVE: bool>(
     dists: __m128d,
     items: *const T,
     base: usize,
@@ -50,7 +53,11 @@ unsafe fn emit_results_sse_f64<T, F>(
     T: Content,
     F: FnMut(f64, T),
 {
-    let mask = _mm_movemask_pd(_mm_cmple_pd(dists, _mm_set1_pd(max_dist))) as u32;
+    let mask = _mm_movemask_pd(if EXCLUSIVE {
+        _mm_cmplt_pd(dists, _mm_set1_pd(max_dist))
+    } else {
+        _mm_cmple_pd(dists, _mm_set1_pd(max_dist))
+    }) as u32;
     if mask == 0 {
         return;
     }
@@ -130,7 +137,14 @@ where
 }
 
 #[target_feature(enable = "avx2")]
-pub(crate) unsafe fn nearest_n_within_avx2_unchecked_f64<L, T, F, const K: usize, const B: usize>(
+pub(crate) unsafe fn nearest_n_within_avx2_unchecked_f64<
+    L,
+    T,
+    F,
+    const EXCLUSIVE: bool,
+    const K: usize,
+    const B: usize,
+>(
     leaf: &LeafView<'_, f64, T, K, B>,
     query: &[f64; K],
     max_dist: f64,
@@ -142,7 +156,7 @@ pub(crate) unsafe fn nearest_n_within_avx2_unchecked_f64<L, T, F, const K: usize
 {
     let points = leaf.points();
     let point_ptrs = array_init(|dim| points[dim].as_ptr());
-    nearest_n_within_avx2_raw_f64::<L, T, F, K>(
+    nearest_n_within_avx2_raw_f64::<L, T, F, EXCLUSIVE, K>(
         point_ptrs,
         leaf.items().as_ptr(),
         leaf.items().len(),
@@ -153,7 +167,13 @@ pub(crate) unsafe fn nearest_n_within_avx2_unchecked_f64<L, T, F, const K: usize
 }
 
 #[target_feature(enable = "avx2")]
-pub(crate) unsafe fn nearest_n_within_avx2_arena_unchecked_f64<L, T, F, const K: usize>(
+pub(crate) unsafe fn nearest_n_within_avx2_arena_unchecked_f64<
+    L,
+    T,
+    F,
+    const EXCLUSIVE: bool,
+    const K: usize,
+>(
     tile_base: *const u8,
     len: usize,
     query: &[f64; K],
@@ -168,11 +188,13 @@ pub(crate) unsafe fn nearest_n_within_avx2_arena_unchecked_f64<L, T, F, const K:
     let point_ptrs = array_init(|dim| point_base.add(dim * len));
     let items = tile_base.add(K * len * std::mem::size_of::<f64>()) as *const T;
 
-    nearest_n_within_avx2_raw_f64::<L, T, F, K>(point_ptrs, items, len, query, max_dist, emit);
+    nearest_n_within_avx2_raw_f64::<L, T, F, EXCLUSIVE, K>(
+        point_ptrs, items, len, query, max_dist, emit,
+    );
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn nearest_n_within_avx2_raw_f64<L, T, F, const K: usize>(
+unsafe fn nearest_n_within_avx2_raw_f64<L, T, F, const EXCLUSIVE: bool, const K: usize>(
     points: [*const f64; K],
     items: *const T,
     len: usize,
@@ -194,26 +216,32 @@ unsafe fn nearest_n_within_avx2_raw_f64<L, T, F, const K: usize>(
 
     while base + 4 <= len {
         let d0 = line_dists_avx2_f64::<L, K>(&points, &query_avx2, base);
-        emit_results_avx2_f64(d0, items, base, max_dist, emit);
+        emit_results_avx2_f64::<_, _, EXCLUSIVE>(d0, items, base, max_dist, emit);
         base += 4;
     }
 
     if base + 2 <= len {
         let d0 = line_dists_sse_f64::<L, K>(&points, &query_sse, base);
-        emit_results_sse_f64(d0, items, base, max_dist, emit);
+        emit_results_sse_f64::<_, _, EXCLUSIVE>(d0, items, base, max_dist, emit);
         base += 2;
     }
 
     for idx in base..len {
         let dist = dist_scalar_f64::<L, K>(&points, query, idx);
-        if dist <= max_dist {
+        let is_within_dist = if EXCLUSIVE {
+            dist < max_dist
+        } else {
+            dist <= max_dist
+        };
+
+        if is_within_dist {
             emit(dist, std::ptr::read_unaligned(items.add(idx)));
         }
     }
 }
 
 #[inline(always)]
-unsafe fn emit_results_avx2_f32<T, F>(
+unsafe fn emit_results_avx2_f32<T, F, const EXCLUSIVE: bool>(
     dists: __m256,
     items: *const T,
     base: usize,
@@ -223,8 +251,11 @@ unsafe fn emit_results_avx2_f32<T, F>(
     T: Content,
     F: FnMut(f32, T),
 {
-    let mask =
-        _mm256_movemask_ps(_mm256_cmp_ps(dists, _mm256_set1_ps(max_dist), _CMP_LE_OQ)) as u32;
+    let mask = _mm256_movemask_ps(_mm256_cmp_ps(
+        dists,
+        _mm256_set1_ps(max_dist),
+        if EXCLUSIVE { _CMP_LT_OQ } else { _CMP_LE_OQ },
+    )) as u32;
     if mask == 0 {
         return;
     }
@@ -244,7 +275,7 @@ unsafe fn emit_results_avx2_f32<T, F>(
 }
 
 #[inline(always)]
-unsafe fn emit_results_sse_f32<T, F>(
+unsafe fn emit_results_sse_f32<T, F, const EXCLUSIVE: bool>(
     dists: __m128,
     items: *const T,
     base: usize,
@@ -254,7 +285,11 @@ unsafe fn emit_results_sse_f32<T, F>(
     T: Content,
     F: FnMut(f32, T),
 {
-    let mask = _mm_movemask_ps(_mm_cmp_ps(dists, _mm_set1_ps(max_dist), _CMP_LE_OQ)) as u32;
+    let mask = _mm_movemask_ps(_mm_cmp_ps(
+        dists,
+        _mm_set1_ps(max_dist),
+        if EXCLUSIVE { _CMP_LT_OQ } else { _CMP_LE_OQ },
+    )) as u32;
     if mask == 0 {
         return;
     }
@@ -334,7 +369,14 @@ where
 }
 
 #[target_feature(enable = "avx2")]
-pub(crate) unsafe fn nearest_n_within_avx2_unchecked_f32<L, T, F, const K: usize, const B: usize>(
+pub(crate) unsafe fn nearest_n_within_avx2_unchecked_f32<
+    L,
+    T,
+    F,
+    const EXCLUSIVE: bool,
+    const K: usize,
+    const B: usize,
+>(
     leaf: &LeafView<'_, f32, T, K, B>,
     query: &[f32; K],
     max_dist: f32,
@@ -346,7 +388,7 @@ pub(crate) unsafe fn nearest_n_within_avx2_unchecked_f32<L, T, F, const K: usize
 {
     let points = leaf.points();
     let point_ptrs = array_init(|dim| points[dim].as_ptr());
-    nearest_n_within_avx2_raw_f32::<L, T, F, K>(
+    nearest_n_within_avx2_raw_f32::<L, T, F, EXCLUSIVE, K>(
         point_ptrs,
         leaf.items().as_ptr(),
         leaf.items().len(),
@@ -357,7 +399,13 @@ pub(crate) unsafe fn nearest_n_within_avx2_unchecked_f32<L, T, F, const K: usize
 }
 
 #[target_feature(enable = "avx2")]
-pub(crate) unsafe fn nearest_n_within_avx2_arena_unchecked_f32<L, T, F, const K: usize>(
+pub(crate) unsafe fn nearest_n_within_avx2_arena_unchecked_f32<
+    L,
+    T,
+    F,
+    const EXCLUSIVE: bool,
+    const K: usize,
+>(
     tile_base: *const u8,
     len: usize,
     query: &[f32; K],
@@ -372,11 +420,13 @@ pub(crate) unsafe fn nearest_n_within_avx2_arena_unchecked_f32<L, T, F, const K:
     let point_ptrs = array_init(|dim| point_base.add(dim * len));
     let items = tile_base.add(K * len * std::mem::size_of::<f32>()) as *const T;
 
-    nearest_n_within_avx2_raw_f32::<L, T, F, K>(point_ptrs, items, len, query, max_dist, emit);
+    nearest_n_within_avx2_raw_f32::<L, T, F, EXCLUSIVE, K>(
+        point_ptrs, items, len, query, max_dist, emit,
+    );
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn nearest_n_within_avx2_raw_f32<L, T, F, const K: usize>(
+unsafe fn nearest_n_within_avx2_raw_f32<L, T, F, const EXCLUSIVE: bool, const K: usize>(
     points: [*const f32; K],
     items: *const T,
     len: usize,
@@ -398,19 +448,25 @@ unsafe fn nearest_n_within_avx2_raw_f32<L, T, F, const K: usize>(
 
     while base + 8 <= len {
         let d0 = line_dists_avx2_f32::<L, K>(&points, &query_avx2, base);
-        emit_results_avx2_f32(d0, items, base, max_dist, emit);
+        emit_results_avx2_f32::<_, _, EXCLUSIVE>(d0, items, base, max_dist, emit);
         base += 8;
     }
 
     if base + 4 <= len {
         let d0 = line_dists_sse_f32::<L, K>(&points, &query_sse, base);
-        emit_results_sse_f32(d0, items, base, max_dist, emit);
+        emit_results_sse_f32::<_, _, EXCLUSIVE>(d0, items, base, max_dist, emit);
         base += 4;
     }
 
     for idx in base..len {
         let dist = dist_scalar_f32::<L, K>(&points, query, idx);
-        if dist <= max_dist {
+        let is_within_dist = if EXCLUSIVE {
+            dist < max_dist
+        } else {
+            dist <= max_dist
+        };
+
+        if is_within_dist {
             emit(dist, std::ptr::read_unaligned(items.add(idx)));
         }
     }

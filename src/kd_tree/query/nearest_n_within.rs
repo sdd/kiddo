@@ -32,7 +32,7 @@ where
     SS: StemStrategy,
 {
     #[inline(always)]
-    fn process_leaf_nearest_n_within<D, R>(
+    fn process_leaf_nearest_n_within<D, R, const EXCLUSIVE: bool>(
         &self,
         leaf_idx: usize,
         query_wide: &[D::Output; K],
@@ -56,13 +56,13 @@ where
         match LS::LEAF_PROJECTION {
             LeafProjection::LeafArena => {
                 let arena = self.leaves.leaf_arena(leaf_idx);
-                nearest_n_within_with_query_wide_arena::<A, T, D, R, K>(
+                nearest_n_within_with_query_wide_arena::<A, T, D, R, EXCLUSIVE, K>(
                     &arena, query_wide, max_dist, results,
                 );
             }
             LeafProjection::LeafView => {
                 let leaf = self.leaves.leaf_view(leaf_idx);
-                nearest_n_within_with_query_wide::<A, T, D, R, K, B>(
+                nearest_n_within_with_query_wide::<A, T, D, R, EXCLUSIVE, K, B>(
                     &leaf, query_wide, max_dist, results,
                 );
             }
@@ -98,18 +98,40 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
+        self.nearest_n_within_impl::<D, false>(query, max_dist, max_qty, sorted)
+    }
+
+    pub(crate) fn nearest_n_within_impl<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        max_qty: NonZeroUsize,
+        sorted: bool,
+    ) -> Vec<NearestNeighbour<D::Output, T>>
+    where
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    {
         let max_qty: usize = max_qty.get();
 
         if max_qty == usize::MAX {
-            self.nearest_n_within_inner::<D, Vec<NearestNeighbour<D::Output, T>>>(
+            self.nearest_n_within_inner::<D, Vec<NearestNeighbour<D::Output, T>>, EXCLUSIVE>(
                 query, max_dist, max_qty, sorted,
             )
         } else if sorted {
             #[cfg(feature = "small_n_result_collectors")]
             if max_qty <= SMALL_RESULT_COLLECTION_MAX_QTY {
-                return self.nearest_n_within_inner::<D, SmallSortedVecResultCollection<
-                    NearestNeighbour<D::Output, T>,
-                >>(query, max_dist, max_qty, sorted);
+                return self.nearest_n_within_inner::<
+                    D,
+                    SmallSortedVecResultCollection<NearestNeighbour<D::Output, T>>,
+                    EXCLUSIVE,
+                >(query, max_dist, max_qty, sorted);
             }
 
             #[cfg(not(feature = "small_n_result_collectors"))]
@@ -117,22 +139,25 @@ where
                 return self.nearest_n_within_inner::<
                     D,
                     SortedVecResultCollection<NearestNeighbour<D::Output, T>>,
+                    EXCLUSIVE,
                 >(query, max_dist, max_qty, sorted);
             }
 
             self.nearest_n_within_inner::<
                 D,
                 BinaryHeapResultCollection<NearestNeighbour<D::Output, T>>,
+                EXCLUSIVE,
             >(query, max_dist, max_qty, sorted)
         } else {
             self.nearest_n_within_inner::<
                 D,
                 BinaryHeapResultCollection<NearestNeighbour<D::Output, T>>,
+                EXCLUSIVE,
             >(query, max_dist, max_qty, sorted)
         }
     }
 
-    fn nearest_n_within_inner<D, R>(
+    fn nearest_n_within_inner<D, R, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
         max_dist: D::Output,
@@ -150,7 +175,7 @@ where
         R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        let mut req_ctx = NearestNWithinReqCtx {
+        let mut req_ctx = NearestNWithinReqCtx::<A, T, D::Output, R, EXCLUSIVE, K> {
             query,
             max_dist,
             results: R::with_max_qty(max_qty),
@@ -159,7 +184,7 @@ where
 
         self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
             let leaf_max_dist = req_ctx.max_dist();
-            self.process_leaf_nearest_n_within::<D, R>(
+            self.process_leaf_nearest_n_within::<D, R, EXCLUSIVE>(
                 leaf_idx,
                 query_wide,
                 leaf_max_dist,
@@ -244,7 +269,7 @@ pub mod cargo_asm {
 }
 
 #[allow(unused)]
-struct NearestNWithinReqCtx<'a, A, T, O, R, const K: usize>
+struct NearestNWithinReqCtx<'a, A, T, O, R, const EXCLUSIVE: bool, const K: usize>
 where
     O: Axis<Coord = O>,
 {
@@ -254,7 +279,8 @@ where
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<A, T, O, R, const K: usize> QueryContext<A, O, K> for NearestNWithinReqCtx<'_, A, T, O, R, K>
+impl<A, T, O, R, const EXCLUSIVE: bool, const K: usize> QueryContext<A, O, K>
+    for NearestNWithinReqCtx<'_, A, T, O, R, EXCLUSIVE, K>
 where
     O: Axis<Coord = O>,
     R: ResultCollection<O, NearestNeighbour<O, T>>,
@@ -270,6 +296,11 @@ where
         } else {
             self.max_dist
         }
+    }
+
+    #[inline]
+    fn prune_on_equal_max_dist(&self) -> bool {
+        EXCLUSIVE
     }
 }
 
@@ -294,6 +325,49 @@ mod tests {
     use crate::Eytzinger;
 
     const RNG_SEED: u64 = 42;
+
+    #[test]
+    fn nearest_n_within_exclusive_boundaries_exclude_exact_threshold_matches() {
+        let points = vec![[0.0f64, 0.0], [1.0, 0.0], [2.0, 0.0], [0.5, 0.0]];
+        let tree: KdTree<f64, u32, Eytzinger<2>, FlatVec<f64, u32, 2, 32>, 2, 32> =
+            KdTree::new_from_slice(&points).unwrap();
+        let query = [0.0, 0.0];
+        let max_qty = NonZeroUsize::new(8).unwrap();
+
+        let inclusive_sorted: Vec<_> = tree
+            .query(&query)
+            .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+            .within(1.0)
+            .execute()
+            .into_iter()
+            .map(|n| n.item)
+            .collect();
+        let exclusive_sorted: Vec<_> = tree
+            .query(&query)
+            .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+            .within(1.0)
+            .exclusive_boundaries()
+            .execute()
+            .into_iter()
+            .map(|n| n.item)
+            .collect();
+        let mut exclusive_unsorted: Vec<_> = tree
+            .query(&query)
+            .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+            .within(1.0)
+            .exclusive_boundaries()
+            .unsorted()
+            .execute()
+            .into_iter()
+            .map(|n| n.item)
+            .collect();
+
+        exclusive_unsorted.sort_unstable();
+
+        assert_eq!(inclusive_sorted, vec![0, 3, 1]);
+        assert_eq!(exclusive_sorted, vec![0, 3]);
+        assert_eq!(exclusive_unsorted, vec![0, 3]);
+    }
 
     #[test]
     fn nearest_n_within_sorted_flat_vec_f32() {

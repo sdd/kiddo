@@ -3,7 +3,14 @@ use crate::leaf_view::LeafView;
 use crate::Content;
 
 #[target_feature(enable = "neon")]
-pub(crate) unsafe fn best_n_within_neon_unchecked_f64<L, T, F, const K: usize, const B: usize>(
+pub(crate) unsafe fn best_n_within_neon_unchecked_f64<
+    L,
+    T,
+    F,
+    const EXCLUSIVE: bool,
+    const K: usize,
+    const B: usize,
+>(
     leaf: &LeafView<'_, f64, T, K, B>,
     query: &[f64; K],
     max_dist: f64,
@@ -17,13 +24,20 @@ pub(crate) unsafe fn best_n_within_neon_unchecked_f64<L, T, F, const K: usize, c
         L,
         T,
         _,
+        EXCLUSIVE,
         K,
         B,
     >(leaf, query, max_dist, emit);
 }
 
 #[target_feature(enable = "neon")]
-pub(crate) unsafe fn best_n_within_neon_arena_unchecked_f64<L, T, F, const K: usize>(
+pub(crate) unsafe fn best_n_within_neon_arena_unchecked_f64<
+    L,
+    T,
+    F,
+    const EXCLUSIVE: bool,
+    const K: usize,
+>(
     tile_base: *const u8,
     len: usize,
     query: &[f64; K],
@@ -38,12 +52,20 @@ pub(crate) unsafe fn best_n_within_neon_arena_unchecked_f64<L, T, F, const K: us
         L,
         T,
         _,
+        EXCLUSIVE,
         K,
     >(tile_base, len, query, max_dist, emit);
 }
 
 #[target_feature(enable = "neon")]
-pub(crate) unsafe fn best_n_within_neon_unchecked_f32<L, T, F, const K: usize, const B: usize>(
+pub(crate) unsafe fn best_n_within_neon_unchecked_f32<
+    L,
+    T,
+    F,
+    const EXCLUSIVE: bool,
+    const K: usize,
+    const B: usize,
+>(
     leaf: &LeafView<'_, f32, T, K, B>,
     query: &[f32; K],
     max_dist: f32,
@@ -57,13 +79,20 @@ pub(crate) unsafe fn best_n_within_neon_unchecked_f32<L, T, F, const K: usize, c
         L,
         T,
         _,
+        EXCLUSIVE,
         K,
         B,
     >(leaf, query, max_dist, emit);
 }
 
 #[target_feature(enable = "neon")]
-pub(crate) unsafe fn best_n_within_neon_arena_unchecked_f32<L, T, F, const K: usize>(
+pub(crate) unsafe fn best_n_within_neon_arena_unchecked_f32<
+    L,
+    T,
+    F,
+    const EXCLUSIVE: bool,
+    const K: usize,
+>(
     tile_base: *const u8,
     len: usize,
     query: &[f32; K],
@@ -78,6 +107,7 @@ pub(crate) unsafe fn best_n_within_neon_arena_unchecked_f32<L, T, F, const K: us
         L,
         T,
         _,
+        EXCLUSIVE,
         K,
     >(tile_base, len, query, max_dist, emit);
 }

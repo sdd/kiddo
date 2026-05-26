@@ -16,6 +16,12 @@ use crate::stem_strategy::donnelly_2_blockmarker_simd::{
 };
 use crate::{Axis, BestNeighbour, Content, LeafStrategy, NearestNeighbour, StemStrategy};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum BoundaryMode {
+    Inclusive,
+    Exclusive,
+}
+
 pub(crate) trait QueryBuilderTreeOps<A, T, SS, LS, const K: usize, const B: usize>:
     KdTreeAccessor<A, T, SS, LS, K, B> + Sized
 where
@@ -58,7 +64,7 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static;
 
-    fn qb_nearest_n_within<D>(
+    fn qb_nearest_n_within<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
         radius: D::Output,
@@ -76,7 +82,7 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static;
 
-    fn qb_within<D>(
+    fn qb_within<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
         radius: D::Output,
@@ -92,7 +98,7 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static;
 
-    fn qb_within_unsorted<D>(
+    fn qb_within_unsorted<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
         radius: D::Output,
@@ -108,8 +114,12 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static;
 
-    fn qb_within_unsorted_visit<D, F>(&self, query: &[A; K], radius: D::Output, visitor: F)
-    where
+    fn qb_within_unsorted_visit<D, F, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        visitor: F,
+    ) where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -121,7 +131,7 @@ where
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
         F: FnMut(NearestNeighbour<D::Output, T>);
 
-    fn qb_best_n_within<D>(
+    fn qb_best_n_within<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
         radius: D::Output,
@@ -194,7 +204,7 @@ where
     }
 
     #[inline]
-    fn qb_nearest_n_within<D>(
+    fn qb_nearest_n_within<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
         radius: D::Output,
@@ -212,27 +222,11 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.nearest_n_within::<D>(query, radius, max_qty, sorted)
+        self.nearest_n_within_impl::<D, EXCLUSIVE>(query, radius, max_qty, sorted)
     }
 
     #[inline]
-    fn qb_within<D>(&self, query: &[A; K], radius: D::Output) -> Vec<NearestNeighbour<D::Output, T>>
-    where
-        T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategy::SimdPrune
-            + SimdSelectBestChildBlock3
-            + BacktrackBlock3
-            + BacktrackBlock4
-            + TlsLeafScratch
-            + 'static,
-        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
-    {
-        self.within::<D>(query, radius)
-    }
-
-    #[inline]
-    fn qb_within_unsorted<D>(
+    fn qb_within<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
         radius: D::Output,
@@ -248,12 +242,36 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.within_unsorted::<D>(query, radius)
+        self.within_impl::<D, EXCLUSIVE>(query, radius)
     }
 
     #[inline]
-    fn qb_within_unsorted_visit<D, F>(&self, query: &[A; K], radius: D::Output, visitor: F)
+    fn qb_within_unsorted<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+    ) -> Vec<NearestNeighbour<D::Output, T>>
     where
+        T: PartialOrd,
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    {
+        self.within_unsorted_impl::<D, EXCLUSIVE>(query, radius)
+    }
+
+    #[inline]
+    fn qb_within_unsorted_visit<D, F, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        visitor: F,
+    ) where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -265,11 +283,11 @@ where
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
         F: FnMut(NearestNeighbour<D::Output, T>),
     {
-        self.within_unsorted_visit::<D, F>(query, radius, visitor)
+        self.within_unsorted_visit_impl::<D, F, EXCLUSIVE>(query, radius, visitor)
     }
 
     #[inline]
-    fn qb_best_n_within<D>(
+    fn qb_best_n_within<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
         radius: D::Output,
@@ -286,7 +304,7 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.best_n_within::<D>(query, radius, max_qty)
+        self.best_n_within_impl::<D, EXCLUSIVE>(query, radius, max_qty)
     }
 }
 
@@ -348,7 +366,7 @@ where
     }
 
     #[inline]
-    fn qb_nearest_n_within<D>(
+    fn qb_nearest_n_within<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
         radius: D::Output,
@@ -366,27 +384,11 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.nearest_n_within::<D>(query, radius, max_qty, sorted)
+        self.nearest_n_within_impl::<D, EXCLUSIVE>(query, radius, max_qty, sorted)
     }
 
     #[inline]
-    fn qb_within<D>(&self, query: &[A; K], radius: D::Output) -> Vec<NearestNeighbour<D::Output, T>>
-    where
-        T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategy::SimdPrune
-            + SimdSelectBestChildBlock3
-            + BacktrackBlock3
-            + BacktrackBlock4
-            + TlsLeafScratch
-            + 'static,
-        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
-    {
-        self.within::<D>(query, radius)
-    }
-
-    #[inline]
-    fn qb_within_unsorted<D>(
+    fn qb_within<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
         radius: D::Output,
@@ -402,12 +404,36 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.within_unsorted::<D>(query, radius)
+        self.within_impl::<D, EXCLUSIVE>(query, radius)
     }
 
     #[inline]
-    fn qb_within_unsorted_visit<D, F>(&self, query: &[A; K], radius: D::Output, visitor: F)
+    fn qb_within_unsorted<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+    ) -> Vec<NearestNeighbour<D::Output, T>>
     where
+        T: PartialOrd,
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    {
+        self.within_unsorted_impl::<D, EXCLUSIVE>(query, radius)
+    }
+
+    #[inline]
+    fn qb_within_unsorted_visit<D, F, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        visitor: F,
+    ) where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -419,11 +445,11 @@ where
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
         F: FnMut(NearestNeighbour<D::Output, T>),
     {
-        self.within_unsorted_visit::<D, F>(query, radius, visitor)
+        self.within_unsorted_visit_impl::<D, F, EXCLUSIVE>(query, radius, visitor)
     }
 
     #[inline]
-    fn qb_best_n_within<D>(
+    fn qb_best_n_within<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
         radius: D::Output,
@@ -440,7 +466,7 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.best_n_within::<D>(query, radius, max_qty)
+        self.best_n_within_impl::<D, EXCLUSIVE>(query, radius, max_qty)
     }
 }
 
@@ -491,6 +517,7 @@ where
     query: &'a [A; K],
     max_qty: NonZero<usize>,
     radius: D::Output,
+    boundary: BoundaryMode,
     _phantom: PhantomData<(T, SS, LS, D)>,
 }
 
@@ -504,6 +531,7 @@ where
     query: &'a [A; K],
     max_qty: NonZeroUsize,
     radius: D::Output,
+    boundary: BoundaryMode,
     _phantom: PhantomData<(T, SS, LS, D)>,
 }
 
@@ -517,6 +545,7 @@ where
     query: &'a [A; K],
     max_qty: NonZeroUsize,
     radius: D::Output,
+    boundary: BoundaryMode,
     _phantom: PhantomData<(T, SS, LS, D)>,
 }
 
@@ -529,6 +558,7 @@ where
     tree: &'a Tree,
     query: &'a [A; K],
     radius: D::Output,
+    boundary: BoundaryMode,
     _phantom: PhantomData<(T, SS, LS, D)>,
 }
 
@@ -541,7 +571,56 @@ where
     tree: &'a Tree,
     query: &'a [A; K],
     radius: D::Output,
+    boundary: BoundaryMode,
     _phantom: PhantomData<(T, SS, LS, D)>,
+}
+
+enum WithinUnsortedBuilderIter<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize>
+where
+    A: Axis<Coord = A> + 'static,
+    T: Content + PartialOrd,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+    Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
+    D: KdTreeDistanceMetric<A, K>,
+    D::Output: crate::stem_strategy::SimdPrune
+        + SimdSelectBestChildBlock3
+        + BacktrackBlock3
+        + BacktrackBlock4
+        + TlsLeafScratch
+        + 'static,
+    SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+{
+    Inclusive(WithinUnsortedIter<'a, Tree, A, T, SS, LS, D, false, K, B>),
+    Exclusive(WithinUnsortedIter<'a, Tree, A, T, SS, LS, D, true, K, B>),
+}
+
+impl<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize> Iterator
+    for WithinUnsortedBuilderIter<'a, Tree, A, T, SS, LS, D, K, B>
+where
+    A: Axis<Coord = A> + 'static,
+    T: Content + PartialOrd,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+    Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
+    D: KdTreeDistanceMetric<A, K>,
+    D::Output: crate::stem_strategy::SimdPrune
+        + SimdSelectBestChildBlock3
+        + BacktrackBlock3
+        + BacktrackBlock4
+        + TlsLeafScratch
+        + 'static,
+    SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+{
+    type Item = NearestNeighbour<D::Output, T>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Inclusive(iter) => iter.next(),
+            Self::Exclusive(iter) => iter.next(),
+        }
+    }
 }
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B> {
@@ -622,6 +701,7 @@ impl<'a, Tree, A: Copy, T, SS, LS, const K: usize, const B: usize>
             tree: self.tree,
             query: self.query,
             radius,
+            boundary: BoundaryMode::Inclusive,
             _phantom: PhantomData,
         }
     }
@@ -642,6 +722,7 @@ impl<'a, Tree, A: Copy, T, SS, LS, const K: usize, const B: usize>
             query: self.query,
             max_qty,
             radius,
+            boundary: BoundaryMode::Inclusive,
             _phantom: PhantomData,
         }
     }
@@ -717,6 +798,7 @@ where
             query: self.query,
             max_qty: self.max_qty,
             radius,
+            boundary: BoundaryMode::Inclusive,
             _phantom: PhantomData,
         }
     }
@@ -739,9 +821,9 @@ where
     A: Axis<Coord = A> + 'static,
     T: Content + PartialOrd,
     SS: StemStrategy,
-    LS: LeafStrategy<A, T, SS, K, B>,
+    LS: LeafStrategy<A, T, SS, K, B> + 'a,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: KdTreeDistanceMetric<A, K> + 'a,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -773,6 +855,7 @@ where
             query: self.query,
             max_qty: self.max_qty,
             radius,
+            boundary: BoundaryMode::Inclusive,
             _phantom: PhantomData,
         }
     }
@@ -784,9 +867,9 @@ where
     A: Axis<Coord = A> + 'static,
     T: Content + PartialOrd,
     SS: StemStrategy,
-    LS: LeafStrategy<A, T, SS, K, B>,
+    LS: LeafStrategy<A, T, SS, K, B> + 'a,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: KdTreeDistanceMetric<A, K> + 'a,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -807,6 +890,13 @@ impl<'a, Tree, A: Copy, T, SS, LS, D, const K: usize, const B: usize>
 where
     D: KdTreeDistanceMetric<A, K>,
 {
+    /// Excludes points lying exactly on the radius boundary.
+    #[inline]
+    pub fn exclusive_boundaries(mut self) -> Self {
+        self.boundary = BoundaryMode::Exclusive;
+        self
+    }
+
     /// Executes the nearest-N-within query without sorting.
     #[inline]
     pub fn unsorted(self) -> NearestNWithinUnsortedQuery<'a, Tree, A, T, SS, LS, D, K, B> {
@@ -815,6 +905,7 @@ where
             query: self.query,
             max_qty: self.max_qty,
             radius: self.radius,
+            boundary: self.boundary,
             _phantom: PhantomData,
         }
     }
@@ -826,9 +917,9 @@ where
     A: Axis<Coord = A> + 'static,
     T: Content + PartialOrd,
     SS: StemStrategy,
-    LS: LeafStrategy<A, T, SS, K, B>,
+    LS: LeafStrategy<A, T, SS, K, B> + 'a,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: KdTreeDistanceMetric<A, K> + 'a,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -840,8 +931,33 @@ where
     /// Executes the nearest-N-within query sorted by distance.
     #[inline]
     pub fn execute(self) -> Vec<NearestNeighbour<D::Output, T>> {
-        self.tree
-            .qb_nearest_n_within::<D>(self.query, self.radius, self.max_qty, true)
+        match self.boundary {
+            BoundaryMode::Inclusive => self.tree.qb_nearest_n_within::<D, false>(
+                self.query,
+                self.radius,
+                self.max_qty,
+                true,
+            ),
+            BoundaryMode::Exclusive => self.tree.qb_nearest_n_within::<D, true>(
+                self.query,
+                self.radius,
+                self.max_qty,
+                true,
+            ),
+        }
+    }
+}
+
+impl<'a, Tree, A: Copy, T, SS, LS, D, const K: usize, const B: usize>
+    NearestNWithinUnsortedQuery<'a, Tree, A, T, SS, LS, D, K, B>
+where
+    D: KdTreeDistanceMetric<A, K>,
+{
+    /// Excludes points lying exactly on the radius boundary.
+    #[inline]
+    pub fn exclusive_boundaries(mut self) -> Self {
+        self.boundary = BoundaryMode::Exclusive;
+        self
     }
 }
 
@@ -865,8 +981,33 @@ where
     /// Executes the nearest-N-within query without sorting.
     #[inline]
     pub fn execute(self) -> Vec<NearestNeighbour<D::Output, T>> {
-        self.tree
-            .qb_nearest_n_within::<D>(self.query, self.radius, self.max_qty, false)
+        match self.boundary {
+            BoundaryMode::Inclusive => self.tree.qb_nearest_n_within::<D, false>(
+                self.query,
+                self.radius,
+                self.max_qty,
+                false,
+            ),
+            BoundaryMode::Exclusive => self.tree.qb_nearest_n_within::<D, true>(
+                self.query,
+                self.radius,
+                self.max_qty,
+                false,
+            ),
+        }
+    }
+}
+
+impl<'a, Tree, A: Copy, T, SS, LS, D, const K: usize, const B: usize>
+    BestNWithinQuery<'a, Tree, A, T, SS, LS, D, K, B>
+where
+    D: KdTreeDistanceMetric<A, K>,
+{
+    /// Excludes points lying exactly on the radius boundary.
+    #[inline]
+    pub fn exclusive_boundaries(mut self) -> Self {
+        self.boundary = BoundaryMode::Exclusive;
+        self
     }
 }
 
@@ -890,8 +1031,16 @@ where
     /// Executes the best-N-within query.
     #[inline]
     pub fn execute(self) -> BinaryHeap<BestNeighbour<D::Output, T>> {
-        self.tree
-            .qb_best_n_within::<D>(self.query, self.radius, self.max_qty)
+        match self.boundary {
+            BoundaryMode::Inclusive => {
+                self.tree
+                    .qb_best_n_within::<D, false>(self.query, self.radius, self.max_qty)
+            }
+            BoundaryMode::Exclusive => {
+                self.tree
+                    .qb_best_n_within::<D, true>(self.query, self.radius, self.max_qty)
+            }
+        }
     }
 }
 
@@ -900,6 +1049,13 @@ impl<'a, Tree, A: Copy, T, SS, LS, D, const K: usize, const B: usize>
 where
     D: KdTreeDistanceMetric<A, K>,
 {
+    /// Excludes points lying exactly on the radius boundary.
+    #[inline]
+    pub fn exclusive_boundaries(mut self) -> Self {
+        self.boundary = BoundaryMode::Exclusive;
+        self
+    }
+
     /// Switches to unsorted within-radius execution.
     #[inline]
     pub fn unsorted(self) -> WithinUnsortedQuery<'a, Tree, A, T, SS, LS, D, K, B> {
@@ -907,6 +1063,7 @@ where
             tree: self.tree,
             query: self.query,
             radius: self.radius,
+            boundary: self.boundary,
             _phantom: PhantomData,
         }
     }
@@ -932,7 +1089,23 @@ where
     /// Executes the within-radius query sorted by distance.
     #[inline]
     pub fn execute(self) -> Vec<NearestNeighbour<D::Output, T>> {
-        self.tree.qb_within::<D>(self.query, self.radius)
+        match self.boundary {
+            BoundaryMode::Inclusive => self.tree.qb_within::<D, false>(self.query, self.radius),
+            BoundaryMode::Exclusive => self.tree.qb_within::<D, true>(self.query, self.radius),
+        }
+    }
+}
+
+impl<'a, Tree, A: Copy, T, SS, LS, D, const K: usize, const B: usize>
+    WithinUnsortedQuery<'a, Tree, A, T, SS, LS, D, K, B>
+where
+    D: KdTreeDistanceMetric<A, K>,
+{
+    /// Excludes points lying exactly on the radius boundary.
+    #[inline]
+    pub fn exclusive_boundaries(mut self) -> Self {
+        self.boundary = BoundaryMode::Exclusive;
+        self
     }
 }
 
@@ -942,9 +1115,9 @@ where
     A: Axis<Coord = A> + 'static,
     T: Content + PartialOrd,
     SS: StemStrategy,
-    LS: LeafStrategy<A, T, SS, K, B>,
+    LS: LeafStrategy<A, T, SS, K, B> + 'a,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: KdTreeDistanceMetric<A, K> + 'a,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -956,7 +1129,14 @@ where
     /// Executes the unsorted within-radius query.
     #[inline]
     pub fn execute(self) -> Vec<NearestNeighbour<D::Output, T>> {
-        self.tree.qb_within_unsorted::<D>(self.query, self.radius)
+        match self.boundary {
+            BoundaryMode::Inclusive => self
+                .tree
+                .qb_within_unsorted::<D, false>(self.query, self.radius),
+            BoundaryMode::Exclusive => self
+                .tree
+                .qb_within_unsorted::<D, true>(self.query, self.radius),
+        }
     }
 
     /// Streams unsorted within-radius results directly to a visitor.
@@ -965,13 +1145,40 @@ where
     where
         F: FnMut(NearestNeighbour<D::Output, T>),
     {
-        self.tree
-            .qb_within_unsorted_visit::<D, F>(self.query, self.radius, visitor)
+        match self.boundary {
+            BoundaryMode::Inclusive => {
+                self.tree
+                    .qb_within_unsorted_visit::<D, F, false>(self.query, self.radius, visitor)
+            }
+            BoundaryMode::Exclusive => {
+                self.tree
+                    .qb_within_unsorted_visit::<D, F, true>(self.query, self.radius, visitor)
+            }
+        }
     }
 
     /// Returns an iterator over unsorted within-radius results.
     #[inline]
-    pub fn iter(self) -> WithinUnsortedIter<'a, Tree, A, T, SS, LS, D, K, B> {
-        WithinUnsortedIter::new(self.tree, self.query, self.radius)
+    pub fn iter(self) -> impl Iterator<Item = NearestNeighbour<D::Output, T>> + 'a {
+        match self.boundary {
+            BoundaryMode::Inclusive => {
+                WithinUnsortedBuilderIter::<Tree, A, T, SS, LS, D, K, B>::Inclusive(
+                    WithinUnsortedIter::<_, _, _, _, _, _, false, K, B>::new(
+                        self.tree,
+                        self.query,
+                        self.radius,
+                    ),
+                )
+            }
+            BoundaryMode::Exclusive => {
+                WithinUnsortedBuilderIter::<Tree, A, T, SS, LS, D, K, B>::Exclusive(
+                    WithinUnsortedIter::<_, _, _, _, _, _, true, K, B>::new(
+                        self.tree,
+                        self.query,
+                        self.radius,
+                    ),
+                )
+            }
+        }
     }
 }

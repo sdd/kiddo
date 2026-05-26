@@ -253,7 +253,13 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
     #[inline(always)]
     /// Try an AVX512-specialized `nearest_n_within` leaf kernel.
-    unsafe fn try_nearest_n_within_leaf_avx512<T, R, const K: usize, const B: usize>(
+    unsafe fn try_nearest_n_within_leaf_avx512<
+        T,
+        R,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    >(
         leaf: &LeafView<'_, A, T, K, B>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
@@ -279,6 +285,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
                     Self::Avx512F64Ops,
                     T,
                     _,
+                    EXCLUSIVE,
                     K,
                     B,
                 >(leaf, query_wide, max_dist, &mut emit);
@@ -301,6 +308,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
                     Self::Avx512F32Ops,
                     T,
                     _,
+                    EXCLUSIVE,
                     K,
                     B,
                 >(leaf, query_wide, max_dist, &mut emit);
@@ -315,7 +323,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
     #[inline(always)]
     /// Try an AVX512-specialized `nearest_n_within` arena kernel.
-    unsafe fn try_nearest_n_within_arena_avx512<T, R, const K: usize>(
+    unsafe fn try_nearest_n_within_arena_avx512<T, R, const EXCLUSIVE: bool, const K: usize>(
         arena: &LeafArena<'_, A, T, K>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
@@ -344,6 +352,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
                         Self::Avx512F64Ops,
                         T,
                         _,
+                        EXCLUSIVE,
                         K,
                     >(tile_base, tile_len, query_wide, max_dist, &mut emit);
                     let tile_bytes = K * tile_len * std::mem::size_of::<f64>()
@@ -373,6 +382,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
                         Self::Avx512F32Ops,
                         T,
                         _,
+                        EXCLUSIVE,
                         K,
                     >(tile_base, tile_len, query_wide, max_dist, &mut emit);
                     let tile_bytes = K * tile_len * std::mem::size_of::<f32>()
@@ -391,7 +401,13 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
     #[inline(always)]
     /// Try an AVX512-specialized `best_n_within` leaf kernel.
-    unsafe fn try_best_n_within_leaf_avx512<T, R, const K: usize, const B: usize>(
+    unsafe fn try_best_n_within_leaf_avx512<
+        T,
+        R,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    >(
         leaf: &LeafView<'_, A, T, K, B>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
@@ -418,6 +434,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
                     Self::Avx512F64Ops,
                     T,
                     _,
+                    EXCLUSIVE,
                     K,
                     B,
                 >(leaf, query_wide, max_dist, &mut emit);
@@ -440,6 +457,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
                     Self::Avx512F32Ops,
                     T,
                     _,
+                    EXCLUSIVE,
                     K,
                     B,
                 >(leaf, query_wide, max_dist, &mut emit);
@@ -454,7 +472,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
     #[inline(always)]
     /// Try an AVX512-specialized `best_n_within` arena kernel.
-    unsafe fn try_best_n_within_arena_avx512<T, R, const K: usize>(
+    unsafe fn try_best_n_within_arena_avx512<T, R, const EXCLUSIVE: bool, const K: usize>(
         arena: &LeafArena<'_, A, T, K>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
@@ -484,6 +502,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
                         Self::Avx512F64Ops,
                         T,
                         _,
+                        EXCLUSIVE,
                         K,
                     >(tile_base, tile_len, query_wide, max_dist, &mut emit);
                     let tile_bytes = K * tile_len * std::mem::size_of::<f64>()
@@ -513,6 +532,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
                         Self::Avx512F32Ops,
                         T,
                         _,
+                        EXCLUSIVE,
                         K,
                     >(tile_base, tile_len, query_wide, max_dist, &mut emit);
                     let tile_bytes = K * tile_len * std::mem::size_of::<f32>()
@@ -545,7 +565,13 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
     #[inline(always)]
     /// Try an AVX2-specialized `nearest_n_within` leaf kernel.
-    unsafe fn try_nearest_n_within_leaf_avx2<T, R, const K: usize, const B: usize>(
+    unsafe fn try_nearest_n_within_leaf_avx2<
+        T,
+        R,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    >(
         leaf: &LeafView<'_, A, T, K, B>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
@@ -571,6 +597,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
                     Self::Avx2F64Ops,
                     T,
                     _,
+                    EXCLUSIVE,
                     K,
                     B,
                 >(leaf, query_wide, max_dist, &mut emit);
@@ -593,6 +620,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
                     Self::Avx2F32Ops,
                     T,
                     _,
+                    EXCLUSIVE,
                     K,
                     B,
                 >(leaf, query_wide, max_dist, &mut emit);
@@ -607,7 +635,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
     #[inline(always)]
     /// Try an AVX2-specialized `nearest_n_within` arena kernel.
-    unsafe fn try_nearest_n_within_arena_avx2<T, R, const K: usize>(
+    unsafe fn try_nearest_n_within_arena_avx2<T, R, const EXCLUSIVE: bool, const K: usize>(
         arena: &LeafArena<'_, A, T, K>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
@@ -636,6 +664,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
                         Self::Avx2F64Ops,
                         T,
                         _,
+                        EXCLUSIVE,
                         K,
                     >(tile_base, tile_len, query_wide, max_dist, &mut emit);
                     let tile_bytes = K * tile_len * std::mem::size_of::<f64>()
@@ -665,6 +694,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
                         Self::Avx2F32Ops,
                         T,
                         _,
+                        EXCLUSIVE,
                         K,
                     >(tile_base, tile_len, query_wide, max_dist, &mut emit);
                     let tile_bytes = K * tile_len * std::mem::size_of::<f32>()
@@ -683,7 +713,13 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
     #[inline(always)]
     /// Try an AVX2-specialized `best_n_within` leaf kernel.
-    unsafe fn try_best_n_within_leaf_avx2<T, R, const K: usize, const B: usize>(
+    unsafe fn try_best_n_within_leaf_avx2<
+        T,
+        R,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    >(
         leaf: &LeafView<'_, A, T, K, B>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
@@ -710,6 +746,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
                     Self::Avx2F64Ops,
                     T,
                     _,
+                    EXCLUSIVE,
                     K,
                     B,
                 >(leaf, query_wide, max_dist, &mut emit);
@@ -732,6 +769,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
                     Self::Avx2F32Ops,
                     T,
                     _,
+                    EXCLUSIVE,
                     K,
                     B,
                 >(leaf, query_wide, max_dist, &mut emit);
@@ -746,7 +784,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
     #[inline(always)]
     /// Try an AVX2-specialized `best_n_within` arena kernel.
-    unsafe fn try_best_n_within_arena_avx2<T, R, const K: usize>(
+    unsafe fn try_best_n_within_arena_avx2<T, R, const EXCLUSIVE: bool, const K: usize>(
         arena: &LeafArena<'_, A, T, K>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
@@ -776,6 +814,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
                         Self::Avx2F64Ops,
                         T,
                         _,
+                        EXCLUSIVE,
                         K,
                     >(tile_base, tile_len, query_wide, max_dist, &mut emit);
                     let tile_bytes = K * tile_len * std::mem::size_of::<f64>()
@@ -805,6 +844,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
                         Self::Avx2F32Ops,
                         T,
                         _,
+                        EXCLUSIVE,
                         K,
                     >(tile_base, tile_len, query_wide, max_dist, &mut emit);
                     let tile_bytes = K * tile_len * std::mem::size_of::<f32>()
@@ -837,7 +877,13 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
     #[inline(always)]
     /// Try a NEON-specialized `nearest_n_within` leaf kernel.
-    unsafe fn try_nearest_n_within_leaf_neon<T, R, const K: usize, const B: usize>(
+    unsafe fn try_nearest_n_within_leaf_neon<
+        T,
+        R,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    >(
         leaf: &LeafView<'_, A, T, K, B>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
@@ -863,6 +909,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
                     Self::NeonF64Ops,
                     T,
                     _,
+                    EXCLUSIVE,
                     K,
                     B,
                 >(leaf, query_wide, max_dist, &mut emit);
@@ -885,6 +932,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
                     Self::NeonF32Ops,
                     T,
                     _,
+                    EXCLUSIVE,
                     K,
                     B,
                 >(leaf, query_wide, max_dist, &mut emit);
@@ -899,7 +947,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
     #[inline(always)]
     /// Try a NEON-specialized `nearest_n_within` arena kernel.
-    unsafe fn try_nearest_n_within_arena_neon<T, R, const K: usize>(
+    unsafe fn try_nearest_n_within_arena_neon<T, R, const EXCLUSIVE: bool, const K: usize>(
         arena: &LeafArena<'_, A, T, K>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
@@ -928,6 +976,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
                         Self::NeonF64Ops,
                         T,
                         _,
+                        EXCLUSIVE,
                         K,
                     >(tile_base, tile_len, query_wide, max_dist, &mut emit);
                     let tile_bytes = K * tile_len * std::mem::size_of::<f64>()
@@ -957,6 +1006,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
                         Self::NeonF32Ops,
                         T,
                         _,
+                        EXCLUSIVE,
                         K,
                     >(tile_base, tile_len, query_wide, max_dist, &mut emit);
                     let tile_bytes = K * tile_len * std::mem::size_of::<f32>()
@@ -975,7 +1025,13 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
     #[inline(always)]
     /// Try a NEON-specialized `best_n_within` leaf kernel.
-    unsafe fn try_best_n_within_leaf_neon<T, R, const K: usize, const B: usize>(
+    unsafe fn try_best_n_within_leaf_neon<
+        T,
+        R,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    >(
         leaf: &LeafView<'_, A, T, K, B>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
@@ -1002,6 +1058,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
                     Self::NeonF64Ops,
                     T,
                     _,
+                    EXCLUSIVE,
                     K,
                     B,
                 >(leaf, query_wide, max_dist, &mut emit);
@@ -1024,6 +1081,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
                     Self::NeonF32Ops,
                     T,
                     _,
+                    EXCLUSIVE,
                     K,
                     B,
                 >(leaf, query_wide, max_dist, &mut emit);
@@ -1038,7 +1096,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
     #[inline(always)]
     /// Try a NEON-specialized `best_n_within` arena kernel.
-    unsafe fn try_best_n_within_arena_neon<T, R, const K: usize>(
+    unsafe fn try_best_n_within_arena_neon<T, R, const EXCLUSIVE: bool, const K: usize>(
         arena: &LeafArena<'_, A, T, K>,
         query_wide: &[Self::Output; K],
         max_dist: Self::Output,
@@ -1068,6 +1126,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
                         Self::NeonF64Ops,
                         T,
                         _,
+                        EXCLUSIVE,
                         K,
                     >(tile_base, tile_len, query_wide, max_dist, &mut emit);
                     let tile_bytes = K * tile_len * std::mem::size_of::<f64>()
@@ -1097,6 +1156,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
                         Self::NeonF32Ops,
                         T,
                         _,
+                        EXCLUSIVE,
                         K,
                     >(tile_base, tile_len, query_wide, max_dist, &mut emit);
                     let tile_bytes = K * tile_len * std::mem::size_of::<f32>()

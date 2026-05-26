@@ -351,13 +351,19 @@ impl<'a, AX: Axis<Coord = AX>, T: Content, const K: usize, const B: usize>
     }
 
     #[cfg_attr(not(feature = "no_inline"), inline)]
-    pub(crate) fn update_nearest_dists<O, R>(dists: &[O], items: &[T], dist: O, results: &mut R)
-    where
+    pub(crate) fn update_nearest_dists<O, R, const EXCLUSIVE: bool>(
+        dists: &[O],
+        items: &[T],
+        dist: O,
+        results: &mut R,
+    ) where
         O: Axis<Coord = O>,
         R: ResultCollection<O, NearestNeighbour<O, T>>,
     {
         dists.iter().zip(items).for_each(|(&d, &i)| {
-            if d <= dist {
+            let is_within_dist = if EXCLUSIVE { d < dist } else { d <= dist };
+
+            if is_within_dist {
                 #[cfg(feature = "result_collection_stats")]
                 crate::results::result_collection_stats::record_candidate_emitted();
                 results.add(NearestNeighbour {
@@ -515,7 +521,7 @@ impl<'a, AX: Axis<Coord = AX>, T: Content + PartialOrd, const K: usize, const B:
     LeafView<'a, AX, T, K, B>
 {
     #[cfg_attr(not(feature = "no_inline"), inline)]
-    pub(crate) fn update_best_dists<O, R>(
+    pub(crate) fn update_best_dists<O, R, const EXCLUSIVE: bool>(
         dists: &[O],
         items: &[T],
         dist: O,
@@ -526,7 +532,9 @@ impl<'a, AX: Axis<Coord = AX>, T: Content + PartialOrd, const K: usize, const B:
         R: BestNeighbourResultCollection<O, T>,
     {
         dists.iter().zip(items).for_each(|(&d, &item)| {
-            if d <= dist {
+            let is_within_dist = if EXCLUSIVE { d < dist } else { d <= dist };
+
+            if is_within_dist {
                 if threshold_item.is_some_and(|worst_item| item >= worst_item) {
                     #[cfg(feature = "result_collection_stats")]
                     crate::results::result_collection_stats::record_best_item_threshold_reject();
@@ -854,7 +862,12 @@ mod tests {
         let items = [11u32, 22, 33, 44];
         let mut results = TestNearestResults::default();
 
-        LeafView::<f32, u32, 2, 8>::update_nearest_dists(&dists, &items, 2.0, &mut results);
+        LeafView::<f32, u32, 2, 8>::update_nearest_dists::<_, _, false>(
+            &dists,
+            &items,
+            2.0,
+            &mut results,
+        );
 
         let entries = results.into_sorted_vec();
         assert_eq!(entries.len(), 2);
@@ -870,7 +883,13 @@ mod tests {
         let items = [11u32, 22, 33, 44];
         let mut results = TestBestResults::default();
 
-        LeafView::<f32, u32, 2, 8>::update_best_dists(&dists, &items, 2.0, Some(30), &mut results);
+        LeafView::<f32, u32, 2, 8>::update_best_dists::<_, _, false>(
+            &dists,
+            &items,
+            2.0,
+            Some(30),
+            &mut results,
+        );
 
         let entries = results.into_sorted_vec();
         assert_eq!(entries.len(), 1);

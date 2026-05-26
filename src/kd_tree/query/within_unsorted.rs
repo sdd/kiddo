@@ -23,7 +23,7 @@ where
     SS: StemStrategy,
 {
     #[inline(always)]
-    fn process_leaf_within_unsorted_visit<D, F>(
+    fn process_leaf_within_unsorted_visit<D, F, const EXCLUSIVE: bool>(
         &self,
         leaf_idx: usize,
         query_wide: &[D::Output; K],
@@ -39,7 +39,7 @@ where
         match LS::LEAF_PROJECTION {
             LeafProjection::LeafArena => {
                 let arena = self.leaves.leaf_arena(leaf_idx);
-                nearest_n_within_with_query_wide_arena::<A, T, D, _, K>(
+                nearest_n_within_with_query_wide_arena::<A, T, D, _, EXCLUSIVE, K>(
                     &arena,
                     query_wide,
                     max_dist,
@@ -48,7 +48,7 @@ where
             }
             LeafProjection::LeafView => {
                 let leaf = self.leaves.leaf_view(leaf_idx);
-                nearest_n_within_with_query_wide::<A, T, D, _, K, B>(
+                nearest_n_within_with_query_wide::<A, T, D, _, EXCLUSIVE, K, B>(
                     &leaf,
                     query_wide,
                     max_dist,
@@ -83,14 +83,47 @@ where
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
         F: FnMut(NearestNeighbour<D::Output, T>),
     {
-        let mut req_ctx = WithinUnsortedVisitReqCtx {
+        let mut req_ctx = WithinUnsortedVisitReqCtx::<A, D::Output, false, K> {
             query,
             max_dist,
             _phantom: std::marker::PhantomData,
         };
 
         self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
-            self.process_leaf_within_unsorted_visit::<D, F>(
+            self.process_leaf_within_unsorted_visit::<D, F, false>(
+                leaf_idx,
+                query_wide,
+                req_ctx.max_dist(),
+                &mut visitor,
+            );
+        });
+    }
+
+    #[inline]
+    pub(crate) fn within_unsorted_visit_impl<D, F, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        mut visitor: F,
+    ) where
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+        F: FnMut(NearestNeighbour<D::Output, T>),
+    {
+        let mut req_ctx = WithinUnsortedVisitReqCtx::<A, D::Output, EXCLUSIVE, K> {
+            query,
+            max_dist,
+            _phantom: std::marker::PhantomData,
+        };
+
+        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
+            self.process_leaf_within_unsorted_visit::<D, F, EXCLUSIVE>(
                 leaf_idx,
                 query_wide,
                 req_ctx.max_dist(),
@@ -119,7 +152,26 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.nearest_n_within::<D>(query, max_dist, NonZeroUsize::MAX, false)
+        self.within_unsorted_impl::<D, false>(query, max_dist)
+    }
+
+    #[inline]
+    pub(crate) fn within_unsorted_impl<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+    ) -> Vec<NearestNeighbour<D::Output, T>>
+    where
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    {
+        self.nearest_n_within_impl::<D, EXCLUSIVE>(query, max_dist, NonZeroUsize::MAX, false)
     }
 
     /// Returns a streaming iterator over all points within a given distance, unsorted.
@@ -136,7 +188,7 @@ where
         &self,
         query: &[A; K],
         max_dist: D::Output,
-    ) -> crate::kd_tree::WithinUnsortedIter<'_, Self, A, T, SS, LS, D, K, B>
+    ) -> crate::kd_tree::WithinUnsortedIter<'_, Self, A, T, SS, LS, D, false, K, B>
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -190,7 +242,7 @@ pub mod cargo_asm {
     }
 }
 
-struct WithinUnsortedVisitReqCtx<'a, A, O, const K: usize>
+struct WithinUnsortedVisitReqCtx<'a, A, O, const EXCLUSIVE: bool, const K: usize>
 where
     O: Axis<Coord = O>,
 {
@@ -199,7 +251,8 @@ where
     _phantom: std::marker::PhantomData<A>,
 }
 
-impl<A, O, const K: usize> QueryContext<A, O, K> for WithinUnsortedVisitReqCtx<'_, A, O, K>
+impl<A, O, const EXCLUSIVE: bool, const K: usize> QueryContext<A, O, K>
+    for WithinUnsortedVisitReqCtx<'_, A, O, EXCLUSIVE, K>
 where
     O: Axis<Coord = O>,
 {
@@ -211,6 +264,11 @@ where
     #[inline(always)]
     fn max_dist(&self) -> O {
         self.max_dist
+    }
+
+    #[inline(always)]
+    fn prune_on_equal_max_dist(&self) -> bool {
+        EXCLUSIVE
     }
 }
 
@@ -229,6 +287,56 @@ mod tests {
 
     const RNG_SEED: u64 = 42;
     const TILE_BOUNDARY_CASES: [usize; 7] = [1, 2, 4, 8, 32, 33, 47];
+
+    #[test]
+    fn within_unsorted_exclusive_boundaries_match_visit_and_iter() {
+        let points = vec![[0.0f64, 0.0], [1.0, 0.0], [2.0, 0.0], [0.5, 0.0]];
+        let tree: KdTree<f64, u32, Eytzinger<2>, FlatVec<f64, u32, 2, 32>, 2, 32> =
+            KdTree::new_from_slice(&points).unwrap();
+        let query = [0.0, 0.0];
+
+        let mut inclusive_materialized: Vec<_> = tree
+            .query(&query)
+            .within::<SquaredEuclidean<f64>>(1.0)
+            .unsorted()
+            .execute()
+            .into_iter()
+            .map(|n| n.item)
+            .collect();
+        let mut exclusive_materialized: Vec<_> = tree
+            .query(&query)
+            .within::<SquaredEuclidean<f64>>(1.0)
+            .exclusive_boundaries()
+            .unsorted()
+            .execute()
+            .into_iter()
+            .map(|n| n.item)
+            .collect();
+        let mut exclusive_visit = Vec::new();
+        tree.query(&query)
+            .within::<SquaredEuclidean<f64>>(1.0)
+            .exclusive_boundaries()
+            .unsorted()
+            .visit(|n| exclusive_visit.push(n.item));
+        let mut exclusive_iter: Vec<_> = tree
+            .query(&query)
+            .within::<SquaredEuclidean<f64>>(1.0)
+            .exclusive_boundaries()
+            .unsorted()
+            .iter()
+            .map(|n| n.item)
+            .collect();
+
+        inclusive_materialized.sort_unstable();
+        exclusive_materialized.sort_unstable();
+        exclusive_visit.sort_unstable();
+        exclusive_iter.sort_unstable();
+
+        assert_eq!(inclusive_materialized, vec![0, 1, 3]);
+        assert_eq!(exclusive_materialized, vec![0, 3]);
+        assert_eq!(exclusive_visit, exclusive_materialized);
+        assert_eq!(exclusive_iter, exclusive_materialized);
+    }
 
     #[test]
     fn within_unsorted_vec_of_arenas_matches_flat_vec_across_tile_boundaries() {

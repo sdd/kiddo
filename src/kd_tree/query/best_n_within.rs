@@ -30,7 +30,7 @@ where
     SS: StemStrategy,
 {
     #[inline(always)]
-    fn process_leaf_best_n_within<D, R>(
+    fn process_leaf_best_n_within<D, R, const EXCLUSIVE: bool>(
         &self,
         leaf_idx: usize,
         query_wide: &[D::Output; K],
@@ -55,7 +55,7 @@ where
             LeafProjection::LeafArena => {
                 let arena = self.leaves.leaf_arena(leaf_idx);
                 let threshold_item = results.threshold_item();
-                best_n_within_with_query_wide_arena::<A, T, D, R, K>(
+                best_n_within_with_query_wide_arena::<A, T, D, R, EXCLUSIVE, K>(
                     &arena,
                     query_wide,
                     max_dist,
@@ -66,7 +66,7 @@ where
             LeafProjection::LeafView => {
                 let leaf = self.leaves.leaf_view(leaf_idx);
                 let threshold_item = results.threshold_item();
-                best_n_within_with_query_wide::<A, T, D, R, K, B>(
+                best_n_within_with_query_wide::<A, T, D, R, EXCLUSIVE, K, B>(
                     &leaf,
                     query_wide,
                     max_dist,
@@ -105,6 +105,25 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
+        self.best_n_within_impl::<D, false>(query, max_dist, max_qty)
+    }
+
+    pub(crate) fn best_n_within_impl<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        max_qty: NonZero<usize>,
+    ) -> BinaryHeap<BestNeighbour<D::Output, T>>
+    where
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    {
         let max_qty = max_qty.into();
 
         #[cfg(feature = "small_n_result_collectors")]
@@ -112,17 +131,26 @@ where
             return self
                 .best_n_within_inner::<D, SmallBinaryHeapResultCollection<
                     BestNeighbour<D::Output, T>,
-                >>(query, max_dist, max_qty)
+                >, EXCLUSIVE>(query, max_dist, max_qty)
                 .into_inner();
         }
 
-        self.best_n_within_inner::<D, BinaryHeapResultCollection<BestNeighbour<D::Output, T>>>(
+        self.best_n_within_inner::<
+            D,
+            BinaryHeapResultCollection<BestNeighbour<D::Output, T>>,
+            EXCLUSIVE,
+        >(
             query, max_dist, max_qty,
         )
         .into_inner()
     }
 
-    fn best_n_within_inner<D, R>(&self, query: &[A; K], max_dist: D::Output, max_qty: usize) -> R
+    fn best_n_within_inner<D, R, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        max_qty: usize,
+    ) -> R
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -134,14 +162,14 @@ where
         R: BestNeighbourResultCollection<D::Output, T>,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        let mut req_ctx = BestNWithinReqCtx::<A, D::Output, R, K> {
+        let mut req_ctx = BestNWithinReqCtx::<A, D::Output, R, EXCLUSIVE, K> {
             query,
             max_dist,
             results: R::with_max_qty(max_qty),
         };
 
         self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
-            self.process_leaf_best_n_within::<D, _>(
+            self.process_leaf_best_n_within::<D, _, EXCLUSIVE>(
                 leaf_idx,
                 query_wide,
                 max_dist,
@@ -195,7 +223,7 @@ pub mod cargo_asm {
 
 #[allow(unused)]
 #[derive(Debug)]
-struct BestNWithinReqCtx<'a, A, O, R, const K: usize>
+struct BestNWithinReqCtx<'a, A, O, R, const EXCLUSIVE: bool, const K: usize>
 where
     O: Axis<Coord = O>,
 {
@@ -204,7 +232,8 @@ where
     results: R,
 }
 
-impl<'a, A, O, R, const K: usize> QueryContext<A, O, K> for BestNWithinReqCtx<'a, A, O, R, K>
+impl<'a, A, O, R, const EXCLUSIVE: bool, const K: usize> QueryContext<A, O, K>
+    for BestNWithinReqCtx<'a, A, O, R, EXCLUSIVE, K>
 where
     O: Axis<Coord = O>,
 {
@@ -213,6 +242,11 @@ where
     }
     fn max_dist(&self) -> O {
         self.max_dist
+    }
+
+    #[inline]
+    fn prune_on_equal_max_dist(&self) -> bool {
+        EXCLUSIVE
     }
 }
 
@@ -231,6 +265,36 @@ mod tests {
     use crate::{BestNeighbour, Eytzinger};
 
     const RNG_SEED: u64 = 42;
+
+    #[test]
+    fn best_n_within_exclusive_boundaries_exclude_exact_threshold_matches() {
+        let points = vec![[0.0f64, 0.0], [1.0, 0.0], [2.0, 0.0], [0.5, 0.0]];
+        let tree: KdTree<f64, u32, Eytzinger<2>, FlatVec<f64, u32, 2, 32>, 2, 32> =
+            KdTree::new_from_slice(&points).unwrap();
+        let query = [0.0, 0.0];
+        let max_qty = NonZero::new(8usize).unwrap();
+
+        let inclusive: Vec<_> = tree
+            .query(&query)
+            .best_n_within::<SquaredEuclidean<f64>>(1.0, max_qty)
+            .execute()
+            .into_sorted_vec()
+            .into_iter()
+            .map(|n| n.item)
+            .collect();
+        let exclusive: Vec<_> = tree
+            .query(&query)
+            .best_n_within::<SquaredEuclidean<f64>>(1.0, max_qty)
+            .exclusive_boundaries()
+            .execute()
+            .into_sorted_vec()
+            .into_iter()
+            .map(|n| n.item)
+            .collect();
+
+        assert_eq!(inclusive, vec![0, 1, 3]);
+        assert_eq!(exclusive, vec![0, 3]);
+    }
 
     #[test]
     fn best_n_within_flat_vec_f32() {

@@ -4,7 +4,15 @@ use crate::results::result_collection::BestNeighbourResultCollection;
 use crate::{Axis, BestNeighbour, Content};
 
 #[inline(always)]
-pub(crate) fn best_n_within_with_query_wide_fallback<AX, T, D, R, const K: usize, const B: usize>(
+pub(crate) fn best_n_within_with_query_wide_fallback<
+    AX,
+    T,
+    D,
+    R,
+    const EXCLUSIVE: bool,
+    const K: usize,
+    const B: usize,
+>(
     leaf: &LeafView<'_, AX, T, K, B>,
     query_wide: &[D::Output; K],
     dist: D::Output,
@@ -18,7 +26,7 @@ pub(crate) fn best_n_within_with_query_wide_fallback<AX, T, D, R, const K: usize
     R: BestNeighbourResultCollection<D::Output, T>,
 {
     leaf.with_dists_for_slice_wide::<D, _>(query_wide, |dists| {
-        LeafView::<AX, T, K, B>::update_best_dists(
+        LeafView::<AX, T, K, B>::update_best_dists::<_, _, EXCLUSIVE>(
             dists,
             leaf.items(),
             dist,
@@ -29,7 +37,14 @@ pub(crate) fn best_n_within_with_query_wide_fallback<AX, T, D, R, const K: usize
 }
 
 #[inline(always)]
-pub(crate) fn best_n_within_with_query_wide_arena_fallback<AX, T, D, R, const K: usize>(
+pub(crate) fn best_n_within_with_query_wide_arena_fallback<
+    AX,
+    T,
+    D,
+    R,
+    const EXCLUSIVE: bool,
+    const K: usize,
+>(
     arena: &LeafArena<'_, AX, T, K>,
     query_wide: &[D::Output; K],
     dist: D::Output,
@@ -60,7 +75,13 @@ pub(crate) fn best_n_within_with_query_wide_arena_fallback<AX, T, D, R, const K:
                 );
             }
 
-            if candidate_dist <= dist {
+            let is_within_dist = if EXCLUSIVE {
+                candidate_dist < dist
+            } else {
+                candidate_dist <= dist
+            };
+
+            if is_within_dist {
                 let item = unsafe { tile.item_unaligned(idx) };
                 if threshold_item.is_some_and(|worst_item| item >= worst_item) {
                     #[cfg(feature = "result_collection_stats")]

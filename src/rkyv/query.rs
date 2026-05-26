@@ -120,7 +120,7 @@ where
     rkyv_08::Archived<LS>: LeafStrategy<A, T, SS, K, B>,
 {
     #[inline(always)]
-    fn process_leaf_nearest_n_within<D, R>(
+    fn process_leaf_nearest_n_within<D, R, const EXCLUSIVE: bool>(
         &self,
         leaf_idx: usize,
         query_wide: &[D::Output; K],
@@ -134,7 +134,7 @@ where
         match <rkyv_08::Archived<LS> as LeafStrategy<A, T, SS, K, B>>::LEAF_PROJECTION {
             LeafProjection::LeafArena => {
                 let arena = self.leaves().leaf_arena(leaf_idx);
-                nearest_n_within_with_query_wide_arena::<A, T, D, R, K>(
+                nearest_n_within_with_query_wide_arena::<A, T, D, R, EXCLUSIVE, K>(
                     &arena, query_wide, max_dist, results,
                 );
             }
@@ -145,6 +145,7 @@ where
                     T,
                     D,
                     R,
+                    EXCLUSIVE,
                     K,
                     B,
                 >(&leaf, query_wide, max_dist, results);
@@ -170,20 +171,41 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
+        self.nearest_n_within_impl::<D, false>(query, max_dist, max_qty, sorted)
+    }
+
+    pub(crate) fn nearest_n_within_impl<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        max_qty: NonZeroUsize,
+        sorted: bool,
+    ) -> Vec<NearestNeighbour<D::Output, T>>
+    where
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    {
         let max_qty = max_qty.get();
         if max_qty == usize::MAX {
-            self.nearest_n_within_inner::<D, Vec<NearestNeighbour<D::Output, T>>>(
+            self.nearest_n_within_inner::<D, Vec<NearestNeighbour<D::Output, T>>, EXCLUSIVE>(
                 query, max_dist, max_qty, sorted,
             )
         } else {
             self.nearest_n_within_inner::<
                 D,
                 BinaryHeapResultCollection<NearestNeighbour<D::Output, T>>,
+                EXCLUSIVE,
             >(query, max_dist, max_qty, sorted)
         }
     }
 
-    fn nearest_n_within_inner<D, R>(
+    fn nearest_n_within_inner<D, R, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
         max_dist: D::Output,
@@ -201,7 +223,7 @@ where
         R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        let mut req_ctx = ArchivedNearestNWithinReqCtx {
+        let mut req_ctx = ArchivedNearestNWithinReqCtx::<A, T, D::Output, R, EXCLUSIVE, K> {
             query,
             max_dist,
             results: R::with_max_qty(max_qty),
@@ -210,7 +232,7 @@ where
 
         self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
             let leaf_max_dist = req_ctx.max_dist();
-            self.process_leaf_nearest_n_within::<D, R>(
+            self.process_leaf_nearest_n_within::<D, R, EXCLUSIVE>(
                 leaf_idx,
                 query_wide,
                 leaf_max_dist,
@@ -261,7 +283,25 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.nearest_n_within::<D>(query, max_dist, NonZeroUsize::MAX, true)
+        self.within_impl::<D, false>(query, max_dist)
+    }
+
+    pub(crate) fn within_impl<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+    ) -> Vec<NearestNeighbour<D::Output, T>>
+    where
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    {
+        self.nearest_n_within_impl::<D, EXCLUSIVE>(query, max_dist, NonZeroUsize::MAX, true)
     }
 
     /// Visits every point within a given distance of the query point, unsorted.
@@ -285,7 +325,7 @@ where
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
         F: FnMut(NearestNeighbour<D::Output, T>),
     {
-        let mut req_ctx = ArchivedWithinUnsortedVisitReqCtx {
+        let mut req_ctx = ArchivedWithinUnsortedVisitReqCtx::<A, D::Output, false, K> {
             query,
             max_dist,
             _phantom: std::marker::PhantomData,
@@ -293,7 +333,40 @@ where
 
         self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
             let mut results = VisitorResultCollection::new(&mut visitor);
-            self.process_leaf_nearest_n_within::<D, _>(
+            self.process_leaf_nearest_n_within::<D, _, false>(
+                leaf_idx,
+                query_wide,
+                req_ctx.max_dist(),
+                &mut results,
+            );
+        });
+    }
+
+    pub(crate) fn within_unsorted_visit_impl<D, F, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        mut visitor: F,
+    ) where
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+        F: FnMut(NearestNeighbour<D::Output, T>),
+    {
+        let mut req_ctx = ArchivedWithinUnsortedVisitReqCtx::<A, D::Output, EXCLUSIVE, K> {
+            query,
+            max_dist,
+            _phantom: std::marker::PhantomData,
+        };
+
+        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
+            let mut results = VisitorResultCollection::new(&mut visitor);
+            self.process_leaf_nearest_n_within::<D, _, EXCLUSIVE>(
                 leaf_idx,
                 query_wide,
                 req_ctx.max_dist(),
@@ -318,8 +391,28 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
+        self.within_unsorted_impl::<D, false>(query, max_dist)
+    }
+
+    pub(crate) fn within_unsorted_impl<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+    ) -> Vec<NearestNeighbour<D::Output, T>>
+    where
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    {
         let mut results = Vec::new();
-        self.within_unsorted_visit::<D, _>(query, max_dist, |result| results.push(result));
+        self.within_unsorted_visit_impl::<D, _, EXCLUSIVE>(query, max_dist, |result| {
+            results.push(result)
+        });
         results
     }
 
@@ -332,7 +425,7 @@ where
         &self,
         query: &[A; K],
         max_dist: D::Output,
-    ) -> crate::kd_tree::WithinUnsortedIter<'_, Self, A, T, SS, rkyv_08::Archived<LS>, D, K, B>
+    ) -> crate::kd_tree::WithinUnsortedIter<'_, Self, A, T, SS, rkyv_08::Archived<LS>, D, false, K, B>
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -356,7 +449,7 @@ where
     rkyv_08::Archived<LS>: LeafStrategy<A, T, SS, K, B>,
 {
     #[inline(always)]
-    fn process_leaf_best_n_within<D, R>(
+    fn process_leaf_best_n_within<D, R, const EXCLUSIVE: bool>(
         &self,
         leaf_idx: usize,
         query_wide: &[D::Output; K],
@@ -371,7 +464,7 @@ where
         match <rkyv_08::Archived<LS> as LeafStrategy<A, T, SS, K, B>>::LEAF_PROJECTION {
             LeafProjection::LeafArena => {
                 let arena = self.leaves().leaf_arena(leaf_idx);
-                best_n_within_with_query_wide_arena::<A, T, D, R, K>(
+                best_n_within_with_query_wide_arena::<A, T, D, R, EXCLUSIVE, K>(
                     &arena,
                     query_wide,
                     max_dist,
@@ -386,6 +479,7 @@ where
                     T,
                     D,
                     R,
+                    EXCLUSIVE,
                     K,
                     B,
                 >(&leaf, query_wide, max_dist, threshold_item, results);
@@ -410,7 +504,26 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        let mut req_ctx = ArchivedBestNWithinReqCtx {
+        self.best_n_within_impl::<D, false>(query, max_dist, max_qty)
+    }
+
+    pub(crate) fn best_n_within_impl<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        max_qty: NonZeroUsize,
+    ) -> BinaryHeap<BestNeighbour<D::Output, T>>
+    where
+        D: KdTreeDistanceMetric<A, K>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    {
+        let mut req_ctx = ArchivedBestNWithinReqCtx::<A, D::Output, _, EXCLUSIVE, K> {
             query,
             max_dist,
             results: BinaryHeapResultCollection::<BestNeighbour<D::Output, T>>::with_max_qty(
@@ -419,7 +532,7 @@ where
         };
 
         self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
-            self.process_leaf_best_n_within::<D, _>(
+            self.process_leaf_best_n_within::<D, _, EXCLUSIVE>(
                 leaf_idx,
                 query_wide,
                 max_dist,
@@ -473,7 +586,7 @@ where
     }
 }
 
-struct ArchivedNearestNWithinReqCtx<'a, A, T, O, R, const K: usize>
+struct ArchivedNearestNWithinReqCtx<'a, A, T, O, R, const EXCLUSIVE: bool, const K: usize>
 where
     O: Axis<Coord = O>,
 {
@@ -483,7 +596,7 @@ where
     _phantom: std::marker::PhantomData<T>,
 }
 
-struct ArchivedWithinUnsortedVisitReqCtx<'a, A, O, const K: usize>
+struct ArchivedWithinUnsortedVisitReqCtx<'a, A, O, const EXCLUSIVE: bool, const K: usize>
 where
     O: Axis<Coord = O>,
 {
@@ -492,7 +605,8 @@ where
     _phantom: std::marker::PhantomData<A>,
 }
 
-impl<A, O, const K: usize> QueryContext<A, O, K> for ArchivedWithinUnsortedVisitReqCtx<'_, A, O, K>
+impl<A, O, const EXCLUSIVE: bool, const K: usize> QueryContext<A, O, K>
+    for ArchivedWithinUnsortedVisitReqCtx<'_, A, O, EXCLUSIVE, K>
 where
     O: Axis<Coord = O>,
 {
@@ -503,10 +617,15 @@ where
     fn max_dist(&self) -> O {
         self.max_dist
     }
+
+    #[inline]
+    fn prune_on_equal_max_dist(&self) -> bool {
+        EXCLUSIVE
+    }
 }
 
-impl<A, T, O, R, const K: usize> QueryContext<A, O, K>
-    for ArchivedNearestNWithinReqCtx<'_, A, T, O, R, K>
+impl<A, T, O, R, const EXCLUSIVE: bool, const K: usize> QueryContext<A, O, K>
+    for ArchivedNearestNWithinReqCtx<'_, A, T, O, R, EXCLUSIVE, K>
 where
     O: Axis<Coord = O>,
     R: ResultCollection<O, NearestNeighbour<O, T>>,
@@ -523,9 +642,14 @@ where
             self.max_dist
         }
     }
+
+    #[inline]
+    fn prune_on_equal_max_dist(&self) -> bool {
+        EXCLUSIVE
+    }
 }
 
-struct ArchivedBestNWithinReqCtx<'a, A, O, R, const K: usize>
+struct ArchivedBestNWithinReqCtx<'a, A, O, R, const EXCLUSIVE: bool, const K: usize>
 where
     O: Axis<Coord = O>,
 {
@@ -534,7 +658,8 @@ where
     results: R,
 }
 
-impl<A, O, R, const K: usize> QueryContext<A, O, K> for ArchivedBestNWithinReqCtx<'_, A, O, R, K>
+impl<A, O, R, const EXCLUSIVE: bool, const K: usize> QueryContext<A, O, K>
+    for ArchivedBestNWithinReqCtx<'_, A, O, R, EXCLUSIVE, K>
 where
     O: Axis<Coord = O>,
 {
@@ -544,5 +669,10 @@ where
 
     fn max_dist(&self) -> O {
         self.max_dist
+    }
+
+    #[inline]
+    fn prune_on_equal_max_dist(&self) -> bool {
+        EXCLUSIVE
     }
 }

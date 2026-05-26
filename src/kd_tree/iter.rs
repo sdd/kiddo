@@ -295,8 +295,18 @@ impl<E: Copy, const N: usize> InlineResultBuffer<E, N> {
 /// result set. It keeps traversal state and per-leaf matches inline in the common case, spilling
 /// to heap allocation only if the tree depth or a single leaf's match count exceeds the inline
 /// capacities.
-pub struct WithinUnsortedIter<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize>
-where
+pub struct WithinUnsortedIter<
+    'a,
+    Tree,
+    A,
+    T,
+    SS,
+    LS,
+    D,
+    const EXCLUSIVE: bool,
+    const K: usize,
+    const B: usize,
+> where
     A: Axis<Coord = A> + 'static,
     T: Content + PartialOrd,
     SS: StemStrategy,
@@ -319,8 +329,8 @@ where
     _phantom: std::marker::PhantomData<(T, LS, D)>,
 }
 
-impl<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize>
-    WithinUnsortedIter<'a, Tree, A, T, SS, LS, D, K, B>
+impl<'a, Tree, A, T, SS, LS, D, const EXCLUSIVE: bool, const K: usize, const B: usize>
+    WithinUnsortedIter<'a, Tree, A, T, SS, LS, D, EXCLUSIVE, K, B>
 where
     A: Axis<Coord = A> + 'static,
     T: Content + PartialOrd,
@@ -385,7 +395,7 @@ where
         match LS::LEAF_PROJECTION {
             LeafProjection::LeafArena => {
                 let arena = self.tree.leaves().leaf_arena(leaf_idx);
-                nearest_n_within_with_query_wide_arena::<A, T, D, _, K>(
+                nearest_n_within_with_query_wide_arena::<A, T, D, _, EXCLUSIVE, K>(
                     &arena,
                     &self.query_wide,
                     self.max_dist,
@@ -394,7 +404,7 @@ where
             }
             LeafProjection::LeafView => {
                 let leaf = self.tree.leaves().leaf_view(leaf_idx);
-                nearest_n_within_with_query_wide::<A, T, D, _, K, B>(
+                nearest_n_within_with_query_wide::<A, T, D, _, EXCLUSIVE, K, B>(
                     &leaf,
                     &self.query_wide,
                     self.max_dist,
@@ -411,7 +421,13 @@ where
         // TODO: specialize this traversal cursor for Donnelly Block SIMD so iterator traversal
         // follows the same block-at-once pruning path as the callback/materialized queries.
         while let Some(frame) = self.stack.pop() {
-            if D::Output::cmp(frame.rd, self.max_dist) == std::cmp::Ordering::Greater {
+            let should_prune = if EXCLUSIVE {
+                D::Output::cmp(frame.rd, self.max_dist) != std::cmp::Ordering::Less
+            } else {
+                D::Output::cmp(frame.rd, self.max_dist) == std::cmp::Ordering::Greater
+            };
+
+            if should_prune {
                 continue;
             }
 
@@ -445,7 +461,13 @@ where
                     let new_off = D::Output::saturating_dist(query_elem_wide, pivot_wide);
                     let rd_far = D::rect_dist_after_update(rd, &off, dim, new_off);
 
-                    if D::Output::cmp(rd_far, self.max_dist) != std::cmp::Ordering::Greater {
+                    let should_visit_far = if EXCLUSIVE {
+                        D::Output::cmp(rd_far, self.max_dist) == std::cmp::Ordering::Less
+                    } else {
+                        D::Output::cmp(rd_far, self.max_dist) != std::cmp::Ordering::Greater
+                    };
+
+                    if should_visit_far {
                         let mut far_off = off;
                         unsafe { *far_off.get_unchecked_mut(dim) = new_off };
                         self.stack.push(TraversalFrame {
@@ -464,8 +486,8 @@ where
     }
 }
 
-impl<Tree, A, T, SS, LS, D, const K: usize, const B: usize> Iterator
-    for WithinUnsortedIter<'_, Tree, A, T, SS, LS, D, K, B>
+impl<Tree, A, T, SS, LS, D, const EXCLUSIVE: bool, const K: usize, const B: usize> Iterator
+    for WithinUnsortedIter<'_, Tree, A, T, SS, LS, D, EXCLUSIVE, K, B>
 where
     A: Axis<Coord = A> + 'static,
     T: Content + PartialOrd,

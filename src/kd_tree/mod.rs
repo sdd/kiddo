@@ -866,10 +866,23 @@ mod tests {
                 .query(&query)
                 .nearest_n::<SquaredEuclidean<f64>>(max_qty)
                 .within(max_dist)
+                .exclusive_boundaries()
                 .execute(),
             tree.query(&query)
                 .nearest_n::<SquaredEuclidean<f64>>(max_qty)
                 .within(max_dist)
+                .exclusive_boundaries()
+                .execute()
+        );
+        assert_eq!(
+            archived
+                .query(&query)
+                .within::<SquaredEuclidean<f64>>(max_dist)
+                .exclusive_boundaries()
+                .execute(),
+            tree.query(&query)
+                .within::<SquaredEuclidean<f64>>(max_dist)
+                .exclusive_boundaries()
                 .execute()
         );
         assert_eq!(
@@ -898,6 +911,21 @@ mod tests {
             archived
                 .query(&query)
                 .within::<SquaredEuclidean<f64>>(max_dist)
+                .exclusive_boundaries()
+                .unsorted()
+                .execute()
+                .len(),
+            tree.query(&query)
+                .within::<SquaredEuclidean<f64>>(max_dist)
+                .exclusive_boundaries()
+                .unsorted()
+                .execute()
+                .len()
+        );
+        assert_eq!(
+            archived
+                .query(&query)
+                .within::<SquaredEuclidean<f64>>(max_dist)
                 .unsorted()
                 .iter()
                 .count(),
@@ -907,9 +935,37 @@ mod tests {
                 .iter()
                 .count()
         );
+        assert_eq!(
+            archived
+                .query(&query)
+                .within::<SquaredEuclidean<f64>>(max_dist)
+                .exclusive_boundaries()
+                .unsorted()
+                .iter()
+                .count(),
+            tree.query(&query)
+                .within::<SquaredEuclidean<f64>>(max_dist)
+                .exclusive_boundaries()
+                .unsorted()
+                .iter()
+                .count()
+        );
         let archived_iter: Vec<_> = archived.iter().collect();
         let tree_iter: Vec<_> = tree.iter().collect();
         assert_eq!(archived_iter, tree_iter);
+        assert_eq!(
+            archived
+                .query(&query)
+                .best_n_within::<SquaredEuclidean<f64>>(max_dist, max_qty)
+                .exclusive_boundaries()
+                .execute()
+                .into_sorted_vec(),
+            tree.query(&query)
+                .best_n_within::<SquaredEuclidean<f64>>(max_dist, max_qty)
+                .exclusive_boundaries()
+                .execute()
+                .into_sorted_vec()
+        );
         assert_eq!(
             archived
                 .query(&query)

@@ -19,7 +19,14 @@ pub(crate) use fallback::{
 };
 
 #[inline(always)]
-pub(crate) fn best_n_within_with_query_wide_arena<AX, T, D, R, const K: usize>(
+pub(crate) fn best_n_within_with_query_wide_arena<
+    AX,
+    T,
+    D,
+    R,
+    const EXCLUSIVE: bool,
+    const K: usize,
+>(
     arena: &LeafArena<'_, AX, T, K>,
     query_wide: &[D::Output; K],
     dist: D::Output,
@@ -47,7 +54,7 @@ pub(crate) fn best_n_within_with_query_wide_arena<AX, T, D, R, const K: usize>(
 
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
     if unsafe {
-        try_best_n_within_arena_avx2::<AX, T, D, R, K>(
+        try_best_n_within_arena_avx2::<AX, T, D, R, EXCLUSIVE, K>(
             arena,
             query_wide,
             dist,
@@ -60,7 +67,7 @@ pub(crate) fn best_n_within_with_query_wide_arena<AX, T, D, R, const K: usize>(
 
     #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
     if unsafe {
-        try_best_n_within_arena_neon::<AX, T, D, R, K>(
+        try_best_n_within_arena_neon::<AX, T, D, R, EXCLUSIVE, K>(
             arena,
             query_wide,
             dist,
@@ -71,7 +78,7 @@ pub(crate) fn best_n_within_with_query_wide_arena<AX, T, D, R, const K: usize>(
         return;
     }
 
-    best_n_within_with_query_wide_arena_fallback::<AX, T, D, R, K>(
+    best_n_within_with_query_wide_arena_fallback::<AX, T, D, R, EXCLUSIVE, K>(
         arena,
         query_wide,
         dist,
@@ -81,7 +88,15 @@ pub(crate) fn best_n_within_with_query_wide_arena<AX, T, D, R, const K: usize>(
 }
 
 #[inline(always)]
-pub(crate) fn best_n_within_with_query_wide<AX, T, D, R, const K: usize, const B: usize>(
+pub(crate) fn best_n_within_with_query_wide<
+    AX,
+    T,
+    D,
+    R,
+    const EXCLUSIVE: bool,
+    const K: usize,
+    const B: usize,
+>(
     leaf: &LeafView<'_, AX, T, K, B>,
     query_wide: &[D::Output; K],
     dist: D::Output,
@@ -96,7 +111,7 @@ pub(crate) fn best_n_within_with_query_wide<AX, T, D, R, const K: usize, const B
 {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
     if unsafe {
-        try_best_n_within_avx512::<AX, T, D, R, K, B>(
+        try_best_n_within_avx512::<AX, T, D, R, EXCLUSIVE, K, B>(
             leaf,
             query_wide,
             dist,
@@ -109,19 +124,31 @@ pub(crate) fn best_n_within_with_query_wide<AX, T, D, R, const K: usize, const B
 
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
     if unsafe {
-        try_best_n_within_avx2::<AX, T, D, R, K, B>(leaf, query_wide, dist, threshold_item, results)
+        try_best_n_within_avx2::<AX, T, D, R, EXCLUSIVE, K, B>(
+            leaf,
+            query_wide,
+            dist,
+            threshold_item,
+            results,
+        )
     } {
         return;
     }
 
     #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
     if unsafe {
-        try_best_n_within_neon::<AX, T, D, R, K, B>(leaf, query_wide, dist, threshold_item, results)
+        try_best_n_within_neon::<AX, T, D, R, EXCLUSIVE, K, B>(
+            leaf,
+            query_wide,
+            dist,
+            threshold_item,
+            results,
+        )
     } {
         return;
     }
 
-    best_n_within_with_query_wide_fallback::<AX, T, D, R, K, B>(
+    best_n_within_with_query_wide_fallback::<AX, T, D, R, EXCLUSIVE, K, B>(
         leaf,
         query_wide,
         dist,
@@ -132,7 +159,15 @@ pub(crate) fn best_n_within_with_query_wide<AX, T, D, R, const K: usize, const B
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 #[inline(always)]
-unsafe fn try_best_n_within_avx512<AX, T, D, R, const K: usize, const B: usize>(
+unsafe fn try_best_n_within_avx512<
+    AX,
+    T,
+    D,
+    R,
+    const EXCLUSIVE: bool,
+    const K: usize,
+    const B: usize,
+>(
     leaf: &LeafView<'_, AX, T, K, B>,
     query_wide: &[D::Output; K],
     dist: D::Output,
@@ -146,12 +181,18 @@ where
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
-    D::try_best_n_within_leaf_avx512(leaf, query_wide, dist, threshold_item, results)
+    D::try_best_n_within_leaf_avx512::<T, R, EXCLUSIVE, K, B>(
+        leaf,
+        query_wide,
+        dist,
+        threshold_item,
+        results,
+    )
 }
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 #[inline(always)]
-unsafe fn try_best_n_within_arena_avx512<AX, T, D, R, const K: usize>(
+unsafe fn try_best_n_within_arena_avx512<AX, T, D, R, const EXCLUSIVE: bool, const K: usize>(
     arena: &LeafArena<'_, AX, T, K>,
     query_wide: &[D::Output; K],
     dist: D::Output,
@@ -165,12 +206,26 @@ where
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
-    D::try_best_n_within_arena_avx512(arena, query_wide, dist, threshold_item, results)
+    D::try_best_n_within_arena_avx512::<T, R, EXCLUSIVE, K>(
+        arena,
+        query_wide,
+        dist,
+        threshold_item,
+        results,
+    )
 }
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
 #[inline(always)]
-unsafe fn try_best_n_within_avx2<AX, T, D, R, const K: usize, const B: usize>(
+unsafe fn try_best_n_within_avx2<
+    AX,
+    T,
+    D,
+    R,
+    const EXCLUSIVE: bool,
+    const K: usize,
+    const B: usize,
+>(
     leaf: &LeafView<'_, AX, T, K, B>,
     query_wide: &[D::Output; K],
     dist: D::Output,
@@ -184,12 +239,18 @@ where
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
-    D::try_best_n_within_leaf_avx2(leaf, query_wide, dist, threshold_item, results)
+    D::try_best_n_within_leaf_avx2::<T, R, EXCLUSIVE, K, B>(
+        leaf,
+        query_wide,
+        dist,
+        threshold_item,
+        results,
+    )
 }
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
 #[inline(always)]
-unsafe fn try_best_n_within_arena_avx2<AX, T, D, R, const K: usize>(
+unsafe fn try_best_n_within_arena_avx2<AX, T, D, R, const EXCLUSIVE: bool, const K: usize>(
     arena: &LeafArena<'_, AX, T, K>,
     query_wide: &[D::Output; K],
     dist: D::Output,
@@ -203,12 +264,26 @@ where
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
-    D::try_best_n_within_arena_avx2(arena, query_wide, dist, threshold_item, results)
+    D::try_best_n_within_arena_avx2::<T, R, EXCLUSIVE, K>(
+        arena,
+        query_wide,
+        dist,
+        threshold_item,
+        results,
+    )
 }
 
 #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
-unsafe fn try_best_n_within_neon<AX, T, D, R, const K: usize, const B: usize>(
+unsafe fn try_best_n_within_neon<
+    AX,
+    T,
+    D,
+    R,
+    const EXCLUSIVE: bool,
+    const K: usize,
+    const B: usize,
+>(
     leaf: &LeafView<'_, AX, T, K, B>,
     query_wide: &[D::Output; K],
     dist: D::Output,
@@ -222,12 +297,18 @@ where
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
-    D::try_best_n_within_leaf_neon(leaf, query_wide, dist, threshold_item, results)
+    D::try_best_n_within_leaf_neon::<T, R, EXCLUSIVE, K, B>(
+        leaf,
+        query_wide,
+        dist,
+        threshold_item,
+        results,
+    )
 }
 
 #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
-unsafe fn try_best_n_within_arena_neon<AX, T, D, R, const K: usize>(
+unsafe fn try_best_n_within_arena_neon<AX, T, D, R, const EXCLUSIVE: bool, const K: usize>(
     arena: &LeafArena<'_, AX, T, K>,
     query_wide: &[D::Output; K],
     dist: D::Output,
@@ -241,5 +322,11 @@ where
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
-    D::try_best_n_within_arena_neon(arena, query_wide, dist, threshold_item, results)
+    D::try_best_n_within_arena_neon::<T, R, EXCLUSIVE, K>(
+        arena,
+        query_wide,
+        dist,
+        threshold_item,
+        results,
+    )
 }
