@@ -875,66 +875,82 @@ pub mod cargo_asm {
 
     const SORTED_NEAREST_INPUTS: [NearestNeighbour<f64, u32>; MAX_QTY] = [
         NearestNeighbour {
+            point: (),
             distance: 0.91,
             item: 91,
         },
         NearestNeighbour {
+            point: (),
             distance: 0.12,
             item: 12,
         },
         NearestNeighbour {
+            point: (),
             distance: 0.54,
             item: 54,
         },
         NearestNeighbour {
+            point: (),
             distance: 0.07,
             item: 7,
         },
         NearestNeighbour {
+            point: (),
             distance: 0.63,
             item: 63,
         },
         NearestNeighbour {
+            point: (),
             distance: 0.33,
             item: 33,
         },
         NearestNeighbour {
+            point: (),
             distance: 0.88,
             item: 88,
         },
         NearestNeighbour {
+            point: (),
             distance: 0.19,
             item: 19,
         },
         NearestNeighbour {
+            point: (),
             distance: 0.41,
             item: 41,
         },
         NearestNeighbour {
+            point: (),
             distance: 0.02,
             item: 2,
         },
         NearestNeighbour {
+            point: (),
             distance: 0.76,
             item: 76,
         },
         NearestNeighbour {
+            point: (),
             distance: 0.27,
             item: 27,
         },
         NearestNeighbour {
+            point: (),
             distance: 0.69,
             item: 69,
         },
         NearestNeighbour {
+            point: (),
             distance: 0.58,
             item: 58,
         },
         NearestNeighbour {
+            point: (),
             distance: 0.15,
             item: 15,
         },
         NearestNeighbour {
+            point: (),
             distance: 0.47,
             item: 47,
         },
@@ -942,66 +958,82 @@ pub mod cargo_asm {
 
     const BEST_INPUTS: [BestNeighbour<f64, u32>; MAX_QTY] = [
         BestNeighbour {
+            point: (),
             distance: 0.91,
             item: 91,
         },
         BestNeighbour {
+            point: (),
             distance: 0.12,
             item: 12,
         },
         BestNeighbour {
+            point: (),
             distance: 0.54,
             item: 54,
         },
         BestNeighbour {
+            point: (),
             distance: 0.07,
             item: 7,
         },
         BestNeighbour {
+            point: (),
             distance: 0.63,
             item: 63,
         },
         BestNeighbour {
+            point: (),
             distance: 0.33,
             item: 33,
         },
         BestNeighbour {
+            point: (),
             distance: 0.88,
             item: 88,
         },
         BestNeighbour {
+            point: (),
             distance: 0.19,
             item: 19,
         },
         BestNeighbour {
+            point: (),
             distance: 0.41,
             item: 41,
         },
         BestNeighbour {
+            point: (),
             distance: 0.02,
             item: 2,
         },
         BestNeighbour {
+            point: (),
             distance: 0.76,
             item: 76,
         },
         BestNeighbour {
+            point: (),
             distance: 0.27,
             item: 27,
         },
         BestNeighbour {
+            point: (),
             distance: 0.69,
             item: 69,
         },
         BestNeighbour {
+            point: (),
             distance: 0.58,
             item: 58,
         },
         BestNeighbour {
+            point: (),
             distance: 0.15,
             item: 15,
         },
         BestNeighbour {
+            point: (),
             distance: 0.47,
             item: 47,
         },

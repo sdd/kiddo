@@ -267,25 +267,6 @@ where
         self.nearest_n_within::<D>(query, D::Output::max_value(), max_qty, sorted)
     }
 
-    /// Finds all points within a given distance of the query point, sorted by distance.
-    pub(crate) fn within<D>(
-        &self,
-        query: &[A; K],
-        max_dist: D::Output,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
-    where
-        D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategy::SimdPrune
-            + SimdSelectBestChildBlock3
-            + BacktrackBlock3
-            + BacktrackBlock4
-            + TlsLeafScratch
-            + 'static,
-        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
-    {
-        self.within_impl::<D, false>(query, max_dist)
-    }
-
     pub(crate) fn within_impl<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
@@ -302,44 +283,6 @@ where
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
         self.nearest_n_within_impl::<D, EXCLUSIVE>(query, max_dist, NonZeroUsize::MAX, true)
-    }
-
-    /// Visits every point within a given distance of the query point, unsorted.
-    ///
-    /// This is the lowest-overhead streaming range-query API for archived trees. It runs
-    /// traversal and optimized leaf kernels, but routes each match directly to `visitor`
-    /// instead of building a result collection.
-    pub(crate) fn within_unsorted_visit<D, F>(
-        &self,
-        query: &[A; K],
-        max_dist: D::Output,
-        mut visitor: F,
-    ) where
-        D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategy::SimdPrune
-            + SimdSelectBestChildBlock3
-            + BacktrackBlock3
-            + BacktrackBlock4
-            + TlsLeafScratch
-            + 'static,
-        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
-        F: FnMut(NearestNeighbour<D::Output, T>),
-    {
-        let mut req_ctx = ArchivedWithinUnsortedVisitReqCtx::<A, D::Output, false, K> {
-            query,
-            max_dist,
-            _phantom: std::marker::PhantomData,
-        };
-
-        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
-            let mut results = VisitorResultCollection::new(&mut visitor);
-            self.process_leaf_nearest_n_within::<D, _, false>(
-                leaf_idx,
-                query_wide,
-                req_ctx.max_dist(),
-                &mut results,
-            );
-        });
     }
 
     pub(crate) fn within_unsorted_visit_impl<D, F, const EXCLUSIVE: bool>(
@@ -373,25 +316,6 @@ where
                 &mut results,
             );
         });
-    }
-
-    /// Finds all points within a given distance of the query point, unsorted.
-    pub(crate) fn within_unsorted<D>(
-        &self,
-        query: &[A; K],
-        max_dist: D::Output,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
-    where
-        D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategy::SimdPrune
-            + SimdSelectBestChildBlock3
-            + BacktrackBlock3
-            + BacktrackBlock4
-            + TlsLeafScratch
-            + 'static,
-        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
-    {
-        self.within_unsorted_impl::<D, false>(query, max_dist)
     }
 
     pub(crate) fn within_unsorted_impl<D, const EXCLUSIVE: bool>(
@@ -485,26 +409,6 @@ where
                 >(&leaf, query_wide, max_dist, threshold_item, results);
             }
         }
-    }
-
-    /// Finds the best N points within a given distance.
-    pub(crate) fn best_n_within<D>(
-        &self,
-        query: &[A; K],
-        max_dist: D::Output,
-        max_qty: NonZeroUsize,
-    ) -> BinaryHeap<BestNeighbour<D::Output, T>>
-    where
-        D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategy::SimdPrune
-            + SimdSelectBestChildBlock3
-            + BacktrackBlock3
-            + BacktrackBlock4
-            + TlsLeafScratch
-            + 'static,
-        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
-    {
-        self.best_n_within_impl::<D, false>(query, max_dist, max_qty)
     }
 
     pub(crate) fn best_n_within_impl<D, const EXCLUSIVE: bool>(

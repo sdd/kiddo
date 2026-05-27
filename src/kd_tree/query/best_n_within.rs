@@ -85,29 +85,6 @@ where
         }
     }
 
-    /// Finds the best N points within a given distance.
-    ///
-    /// Returns up to `max_qty` points that are within `max_dist` of the query point,
-    /// prioritizing better items according to `BestNeighbour` ordering.
-    pub(crate) fn best_n_within<D>(
-        &self,
-        query: &[A; K],
-        max_dist: D::Output,
-        max_qty: NonZero<usize>,
-    ) -> BinaryHeap<BestNeighbour<D::Output, T>>
-    where
-        D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategy::SimdPrune
-            + SimdSelectBestChildBlock3
-            + BacktrackBlock3
-            + BacktrackBlock4
-            + TlsLeafScratch
-            + 'static,
-        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
-    {
-        self.best_n_within_impl::<D, false>(query, max_dist, max_qty)
-    }
-
     pub(crate) fn best_n_within_impl<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
@@ -616,12 +593,14 @@ mod tests {
             if distance <= radius {
                 if best_items.len() < max_qty {
                     best_items.push(BestNeighbour {
+                        point: (),
                         distance,
                         item: item as u32,
                     });
                 } else if (item as u32) < best_items.last().unwrap().item {
                     best_items.pop().unwrap();
                     best_items.push(BestNeighbour {
+                        point: (),
                         distance,
                         item: item as u32,
                     });

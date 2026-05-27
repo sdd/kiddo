@@ -90,10 +90,18 @@ fn linear_best_n_within_f32(
             <kiddo::SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, point);
         if distance <= max_dist {
             if best_items.len() < max_qty {
-                best_items.push(BestNeighbour { distance, item });
+                best_items.push(BestNeighbour {
+                    point: (),
+                    distance,
+                    item,
+                });
             } else if item < best_items.last().unwrap().item {
                 best_items.pop();
-                best_items.push(BestNeighbour { distance, item });
+                best_items.push(BestNeighbour {
+                    point: (),
+                    distance,
+                    item,
+                });
             }
             best_items.sort_unstable();
         }
@@ -116,10 +124,18 @@ fn linear_best_n_within_f64(
             <kiddo::SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, point);
         if distance <= max_dist {
             if best_items.len() < max_qty {
-                best_items.push(BestNeighbour { distance, item });
+                best_items.push(BestNeighbour {
+                    point: (),
+                    distance,
+                    item,
+                });
             } else if item < best_items.last().unwrap().item {
                 best_items.pop();
-                best_items.push(BestNeighbour { distance, item });
+                best_items.push(BestNeighbour {
+                    point: (),
+                    distance,
+                    item,
+                });
             }
             best_items.sort_unstable();
         }
@@ -190,10 +206,10 @@ fn regression_donnelly_simd_block4_f32_nearest_one_matches_scalar_and_linear() {
         .nearest_one::<SquaredEuclidean<f32>>()
         .execute();
 
-    assert_float_relative_eq!(scalar_result.0, expected.0, REL_EPS_F32);
-    assert_eq!(scalar_result.1, expected.1);
-    assert_float_relative_eq!(simd_result.0, expected.0, REL_EPS_F32);
-    assert_eq!(simd_result.1, expected.1);
+    assert_float_relative_eq!(scalar_result.distance, expected.0, REL_EPS_F32);
+    assert_eq!(scalar_result.item, expected.1);
+    assert_float_relative_eq!(simd_result.distance, expected.0, REL_EPS_F32);
+    assert_eq!(simd_result.item, expected.1);
 }
 
 #[test]
@@ -224,8 +240,8 @@ fn regression_donnelly_simd_block4_f32_approx_self_lookup_hits_zero_distance() {
             .approx()
             .execute();
 
-        assert_eq!(scalar_result.0, 0.0);
-        assert_eq!(simd_result.0, 0.0);
+        assert_eq!(scalar_result.distance, 0.0);
+        assert_eq!(simd_result.distance, 0.0);
     }
 }
 
@@ -307,10 +323,10 @@ fn control_donnelly_simd_block3_f64_nearest_one_matches_scalar_and_linear() {
         .nearest_one::<SquaredEuclidean<f64>>()
         .execute();
 
-    assert_float_relative_eq!(scalar_result.0, expected.0, REL_EPS_F64);
-    assert_eq!(scalar_result.1, expected.1);
-    assert_float_relative_eq!(simd_result.0, expected.0, REL_EPS_F64);
-    assert_eq!(simd_result.1, expected.1);
+    assert_float_relative_eq!(scalar_result.distance, expected.0, REL_EPS_F64);
+    assert_eq!(scalar_result.item, expected.1);
+    assert_float_relative_eq!(simd_result.distance, expected.0, REL_EPS_F64);
+    assert_eq!(simd_result.item, expected.1);
 }
 
 #[test]

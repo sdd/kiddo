@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .execute();
     println!(
         "Nearest item to query (zero-copy archived): {:?}",
-        nearest_neighbour.1
+        nearest_neighbour.item
     );
     println!("took {}.\n", ElapsedDuration::new(start.elapsed()));
 
@@ -56,7 +56,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .execute();
     println!(
         "Approx nearest item to query (zero-copy archived): {:?}",
-        approx_nearest_neighbour.1
+        approx_nearest_neighbour.item
     );
 
     let dist = 0.01;

@@ -59,12 +59,12 @@ fn main() {
 
     for _ in 0..query_batch_repeats {
         for query in &queries {
-            let (dist, item) = tree
+            let result = tree
                 .query(black_box(query))
                 .nearest_one::<SquaredEuclidean<f64>>()
                 .execute();
-            checksum_dist += dist;
-            checksum_item = checksum_item.wrapping_add(item as u64);
+            checksum_dist += result.distance;
+            checksum_item = checksum_item.wrapping_add(result.item as u64);
         }
     }
 

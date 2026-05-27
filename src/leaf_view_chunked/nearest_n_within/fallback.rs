@@ -83,6 +83,7 @@ pub(crate) fn nearest_n_within_with_query_wide_arena_fallback<
                 crate::results::result_collection_stats::record_candidate_emitted();
 
                 let candidate = NearestNeighbour {
+                    point: (),
                     distance: candidate_dist,
                     item: unsafe { tile.item_unaligned(idx) },
                 };

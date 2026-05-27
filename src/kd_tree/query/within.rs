@@ -15,27 +15,6 @@ where
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
-    /// Finds all points within a given distance of the query point.
-    ///
-    /// Returns all points within `max_dist` of the query point, sorted by distance.
-    pub(crate) fn within<D>(
-        &self,
-        query: &[A; K],
-        max_dist: D::Output,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
-    where
-        D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategy::SimdPrune
-            + SimdSelectBestChildBlock3
-            + BacktrackBlock3
-            + BacktrackBlock4
-            + TlsLeafScratch
-            + 'static,
-        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
-    {
-        self.within_impl::<D, false>(query, max_dist)
-    }
-
     pub(crate) fn within_impl<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
@@ -121,12 +100,16 @@ mod tests {
                 KdTree::new_from_slice(&points).unwrap();
 
             let mut flat: Vec<(f32, u32)> = flat_tree
-                .within::<Manhattan<f32>>(&query, radius)
+                .query(&query)
+                .within::<Manhattan<f32>>(radius)
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
             let mut arena: Vec<(f32, u32)> = arena_tree
-                .within::<Manhattan<f32>>(&query, radius)
+                .query(&query)
+                .within::<Manhattan<f32>>(radius)
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -159,7 +142,9 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, RADIUS);
 
             let mut result: Vec<_> = tree
-                .within::<Manhattan<f32>>(&query_point, RADIUS)
+                .query(&query_point)
+                .within::<Manhattan<f32>>(RADIUS)
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -191,7 +176,9 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, RADIUS);
 
             let mut result: Vec<_> = tree
-                .within::<Manhattan<f32>>(&query_point, RADIUS)
+                .query(&query_point)
+                .within::<Manhattan<f32>>(RADIUS)
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -226,7 +213,9 @@ mod tests {
                 .collect();
 
             let mut result: Vec<_> = tree
-                .within::<Manhattan<f32>>(&query_point, RADIUS)
+                .query(&query_point)
+                .within::<Manhattan<f32>>(RADIUS)
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, 1))
                 .collect();
@@ -267,7 +256,9 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, RADIUS);
 
             let mut result: Vec<_> = tree
-                .within::<Manhattan<f32>>(&query_point, RADIUS)
+                .query(&query_point)
+                .within::<Manhattan<f32>>(RADIUS)
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();

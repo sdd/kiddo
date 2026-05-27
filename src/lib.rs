@@ -138,14 +138,12 @@
 //! assert_eq!(kdtree.size(), 4);
 //!
 //! // find the nearest item to [0f64, 0f64].
-//! // returns a tuple of (dist, index)
-//! assert_eq!(
-//!     kdtree
-//!         .query(&[0f64, 0f64])
-//!         .nearest_one::<SquaredEuclidean<f64>>()
-//!         .execute(),
-//!     (0f64, 0)
-//! );
+//! let nearest = kdtree
+//!     .query(&[0f64, 0f64])
+//!     .nearest_one::<SquaredEuclidean<f64>>()
+//!     .execute();
+//! assert_eq!(nearest.distance, 0f64);
+//! assert_eq!(nearest.item, 0);
 //!
 //! // find the nearest 3 items to [0f64, 0f64], and collect into a `Vec`
 //! assert_eq!(
@@ -153,7 +151,11 @@
 //!         .query(&[0f64, 0f64])
 //!         .nearest_n::<SquaredEuclidean<f64>>(NonZero::new(3usize).unwrap())
 //!         .execute(),
-//!     vec![NearestNeighbour { distance: 0f64, item: 0 }, NearestNeighbour { distance: 2f64, item: 1 }, NearestNeighbour { distance: 8f64, item: 2 }]
+//!     vec![
+//!         NearestNeighbour { point: (), distance: 0f64, item: 0 },
+//!         NearestNeighbour { point: (), distance: 2f64, item: 1 },
+//!         NearestNeighbour { point: (), distance: 8f64, item: 2 }
+//!     ]
 //! );
 //! ```
 //!
@@ -234,7 +236,10 @@ mod mirror_select_nth_unstable_by;
 
 /// Structs that are returned as query results
 pub mod results;
-pub use results::{best_neighbour::BestNeighbour, nearest_neighbour::NearestNeighbour};
+pub use results::{
+    best_neighbour::BestNeighbour, best_query_result_item::BestQueryResultItem,
+    nearest_neighbour::NearestNeighbour, query_result_item::QueryResultItem,
+};
 
 #[cfg(feature = "rkyv_08")]
 mod rkyv;

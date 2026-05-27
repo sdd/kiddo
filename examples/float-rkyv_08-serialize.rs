@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .query(&query)
         .nearest_one::<SquaredEuclidean<f64>>()
         .execute();
-    println!("Nearest item to query: {:?}", nearest_neighbour.1);
+    println!("Nearest item to query: {:?}", nearest_neighbour.item);
 
     let start = Instant::now();
     let buf = to_bytes::<RkyvError>(&tree)?;

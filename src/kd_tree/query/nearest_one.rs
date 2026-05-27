@@ -246,7 +246,7 @@ where
 #[allow(missing_docs)]
 #[cfg(feature = "cargo_asm")]
 pub mod cargo_asm {
-    use crate::dist::{Chebyshev, DistanceMetricCore, Minkowski, SquaredEuclidean};
+    use crate::dist::SquaredEuclidean;
     use crate::kd_tree::query_stack::QueryStack;
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::{FlatVec, VecOfArenas};
@@ -363,20 +363,26 @@ mod tests {
     use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::stem_strategy::Donnelly;
     use crate::Axis;
-    use crate::{Eytzinger, NearestNeighbour};
+    use crate::{Eytzinger, NearestNeighbour, QueryResultItem};
 
     const REL_EPS_F32: f32 = 1.0e-6;
     const REL_EPS_F64: f64 = 1.0e-12;
 
-    fn assert_nearest_f32(actual: (f32, u32), expected: &NearestNeighbour<f32, usize>) {
-        assert_float_relative_eq!(actual.0, expected.distance, REL_EPS_F32);
-        assert_eq!(actual.1 as usize, expected.item);
+    fn assert_nearest_f32(
+        actual: QueryResultItem<(), u32, f32>,
+        expected: &NearestNeighbour<f32, usize>,
+    ) {
+        assert_float_relative_eq!(actual.distance, expected.distance, REL_EPS_F32);
+        assert_eq!(actual.item as usize, expected.item);
     }
 
     #[allow(dead_code)]
-    fn assert_nearest_f64(actual: (f64, u32), expected: &NearestNeighbour<f64, usize>) {
-        assert_float_relative_eq!(actual.0, expected.distance, REL_EPS_F64);
-        assert_eq!(actual.1 as usize, expected.item);
+    fn assert_nearest_f64(
+        actual: QueryResultItem<(), u32, f64>,
+        expected: &NearestNeighbour<f64, usize>,
+    ) {
+        assert_float_relative_eq!(actual.distance, expected.distance, REL_EPS_F64);
+        assert_eq!(actual.item as usize, expected.item);
     }
 
     #[test]
@@ -396,8 +402,8 @@ mod tests {
             .nearest_one::<SquaredEuclidean<f64>>()
             .execute();
 
-        assert_float_relative_eq!(result.0, 0.0075, REL_EPS_F64);
-        assert_eq!(result.1, 3);
+        assert_float_relative_eq!(result.distance, 0.0075, REL_EPS_F64);
+        assert_eq!(result.item, 3);
     }
 
     #[test]
@@ -417,8 +423,8 @@ mod tests {
             .nearest_one::<SquaredEuclidean<f64>>()
             .execute();
 
-        assert_float_relative_eq!(result.0, 0.0075, REL_EPS_F64);
-        assert_eq!(result.1, ());
+        assert_float_relative_eq!(result.distance, 0.0075, REL_EPS_F64);
+        assert_eq!(result.item, ());
     }
 
     #[test]
@@ -446,8 +452,8 @@ mod tests {
             .nearest_one::<SquaredEuclidean<f32>>()
             .execute();
 
-        assert_float_relative_eq!(arena_result.0, flat_result.0, REL_EPS_F32);
-        assert_eq!(arena_result.1, flat_result.1);
+        assert_float_relative_eq!(arena_result.distance, flat_result.distance, REL_EPS_F32);
+        assert_eq!(arena_result.item, flat_result.item);
     }
 
     #[test]
@@ -578,8 +584,8 @@ mod tests {
             .query(&query_point)
             .nearest_one::<SquaredEuclidean<f64>>()
             .execute();
-        assert_float_relative_eq!(results.0, expected.0, REL_EPS_F64);
-        assert_eq!(results.1, expected.1);
+        assert_float_relative_eq!(results.distance, expected.0, REL_EPS_F64);
+        assert_eq!(results.item, expected.1);
     }
 
     #[test]
@@ -704,9 +710,9 @@ mod tests {
                 .nearest_one::<SquaredEuclidean<f32>>()
                 .execute();
 
-            assert_float_relative_eq!(result.0, expected.distance, REL_EPS_F32);
+            assert_float_relative_eq!(result.distance, expected.distance, REL_EPS_F32);
             assert_eq!(
-                result.1 as usize, expected.item,
+                result.item as usize, expected.item,
                 "Incorrect item, query index: {i}"
             );
         }
@@ -858,6 +864,7 @@ mod tests {
         }
 
         NearestNeighbour {
+            point: (),
             distance: best_dist,
             item: best_item,
         }
@@ -904,6 +911,7 @@ mod tests {
         }
 
         NearestNeighbour {
+            point: (),
             distance: best_dist,
             item: best_item,
         }
@@ -1064,9 +1072,9 @@ mod tests {
                 .nearest_one::<SquaredEuclidean<f32>>()
                 .execute();
 
-            assert_float_relative_eq!(result.0, expected.distance, REL_EPS_F32);
+            assert_float_relative_eq!(result.distance, expected.distance, REL_EPS_F32);
             assert_eq!(
-                result.1 as usize, expected.item,
+                result.item as usize, expected.item,
                 "Item mismatch for query {:?}",
                 query_point
             );

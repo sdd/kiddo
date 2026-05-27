@@ -14,9 +14,9 @@ use nonmax::NonMaxUsize;
 pub use iter::{KdTreeIter, WithinUnsortedIter};
 pub use orchestrator::KdTreeQueryOps;
 pub use query::{
-    ApproxNearestOneQuery, BestNWithinQuery, NearestNQuery, NearestNUnsortedQuery,
-    NearestNWithinQuery, NearestNWithinUnsortedQuery, NearestOneQuery, QueryBuilder, WithinQuery,
-    WithinUnsortedQuery,
+    ApproxNearestOneQuery, BestNWithinQuery, Exclude, Include, NearestNQuery,
+    NearestNUnsortedQuery, NearestNWithinQuery, NearestNWithinUnsortedQuery, NearestOneQuery,
+    Projected, Projection, QueryBuilder, WithinQuery, WithinUnsortedQuery,
 };
 pub use stem_leaf_resolution::OwnedStemLeafResolution;
 

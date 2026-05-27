@@ -114,6 +114,7 @@ pub mod cargo_asm {
             .nearest_one::<SquaredEuclidean<f64>>()
             .approx()
             .execute()
+            .into()
     }
 
     /// Hook for cargo-asm to render the v6 approx-nearest-one call path with VecOfArrays leaves.
@@ -127,6 +128,7 @@ pub mod cargo_asm {
             .nearest_one::<SquaredEuclidean<f64>>()
             .approx()
             .execute()
+            .into()
     }
 
     /// Hook for cargo-asm to render the v6 approx-nearest-one call path with VecOfArenas leaves.
@@ -140,6 +142,7 @@ pub mod cargo_asm {
             .nearest_one::<SquaredEuclidean<f64>>()
             .approx()
             .execute()
+            .into()
     }
 }
 
@@ -186,7 +189,8 @@ mod tests {
             .approx()
             .execute();
 
-        assert_eq!(results, (0.0014114721, 19074));
+        assert_eq!(results.distance, 0.0014114721);
+        assert_eq!(results.item, 19074);
     }
 
     #[test]
@@ -217,7 +221,8 @@ mod tests {
             .approx()
             .execute();
 
-        assert_eq!(results, (0.0014114721, ()));
+        assert_eq!(results.distance, 0.0014114721);
+        assert_eq!(results.item, ());
     }
 
     #[test]
@@ -248,7 +253,8 @@ mod tests {
             .approx()
             .execute();
 
-        assert_eq!(results, (0.0014114721, 19074));
+        assert_eq!(results.distance, 0.0014114721);
+        assert_eq!(results.item, 19074);
     }
 
     #[test]
@@ -425,7 +431,8 @@ mod tests {
             .approx()
             .execute();
 
-        assert_eq!(results, (0.0003201659, 21996));
+        assert_eq!(results.distance, 0.0003201659);
+        assert_eq!(results.item, 21996);
     }
 
     #[test]
@@ -464,8 +471,11 @@ mod tests {
             .approx()
             .execute();
 
-        assert!(results.0 < 0.1, "Distance should be reasonably small");
-        assert!(results.1 < 131_072, "Item index should be valid");
+        assert!(
+            results.distance < 0.1,
+            "Distance should be reasonably small"
+        );
+        assert!(results.item < 131_072, "Item index should be valid");
     }
 
     #[test]
@@ -775,10 +785,10 @@ mod tests {
             .execute();
 
         assert!(
-            results.0 < 0.2,
+            results.distance < 0.2,
             "Distance ({}) should be reasonably small",
-            results.0
+            results.distance
         );
-        assert!(results.1 < 2_097_152, "Item index should be valid");
+        assert!(results.item < 2_097_152, "Item index should be valid");
     }
 }

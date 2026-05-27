@@ -51,8 +51,8 @@ fn test_kdtree_with_numeric_id() {
         .execute();
 
     // The closest point should be [0.0, 0.0] with ID 1001
-    assert_eq!(nearest.1, 1001);
-    assert!((nearest.0 - (0.5f64 * 0.5 + 0.25 * 0.25)).abs() < f64::EPSILON);
+    assert_eq!(nearest.item, 1001);
+    assert!((nearest.distance - (0.5f64 * 0.5 + 0.25 * 0.25)).abs() < f64::EPSILON);
 
     // Test k-nearest neighbors
     let k_nearest = tree
@@ -98,8 +98,8 @@ fn test_kdtree_with_fixed_string() {
         .execute();
 
     // The closest point should be [0.0, 0.0] with data "Origin"
-    assert_eq!(nearest.1.as_str(), "Origin");
-    assert!((nearest.0 - (0.5f64 * 0.5 + 0.25 * 0.25)).abs() < f64::EPSILON);
+    assert_eq!(nearest.item.as_str(), "Origin");
+    assert!((nearest.distance - (0.5f64 * 0.5 + 0.25 * 0.25)).abs() < f64::EPSILON);
 
     // Test k-nearest neighbors
     let k_nearest = tree
@@ -138,8 +138,8 @@ fn test_kdtree_with_empty_type_as_content() {
         .execute();
 
     // The closest point should be [0.0, 0.0]
-    assert!((nearest.0 - (0.5f64 * 0.5 + 0.25 * 0.25)).abs() < f64::EPSILON);
-    assert_eq!(nearest.1, ());
+    assert!((nearest.distance - (0.5f64 * 0.5 + 0.25 * 0.25)).abs() < f64::EPSILON);
+    assert_eq!(nearest.item, ());
 
     // Test k-nearest neighbors
     let k_nearest = tree

@@ -367,6 +367,7 @@ impl<'a, AX: Axis<Coord = AX>, T: Content, const K: usize, const B: usize>
                 #[cfg(feature = "result_collection_stats")]
                 crate::results::result_collection_stats::record_candidate_emitted();
                 results.add(NearestNeighbour {
+                    point: (),
                     distance: d,
                     item: i,
                 });
@@ -542,7 +543,11 @@ impl<'a, AX: Axis<Coord = AX>, T: Content + PartialOrd, const K: usize, const B:
                 }
                 #[cfg(feature = "result_collection_stats")]
                 crate::results::result_collection_stats::record_candidate_emitted();
-                results.add(BestNeighbour { distance: d, item });
+                results.add(BestNeighbour {
+                    point: (),
+                    distance: d,
+                    item,
+                });
             }
         })
     }

@@ -58,47 +58,6 @@ where
         }
     }
 
-    /// Visits every point within a given distance of the query point, unsorted.
-    ///
-    /// This is the lowest-overhead streaming range-query API. It runs the normal
-    /// traversal and optimized leaf kernels, but routes each match directly to
-    /// `visitor` instead of building a result collection.
-    ///
-    /// Prefer this over [`within_unsorted_iter`](Self::within_unsorted_iter) when callback
-    /// style is acceptable and allocation/dispatch overhead matters.
-    #[inline]
-    pub(crate) fn within_unsorted_visit<D, F>(
-        &self,
-        query: &[A; K],
-        max_dist: D::Output,
-        mut visitor: F,
-    ) where
-        D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategy::SimdPrune
-            + SimdSelectBestChildBlock3
-            + BacktrackBlock3
-            + BacktrackBlock4
-            + TlsLeafScratch
-            + 'static,
-        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
-        F: FnMut(NearestNeighbour<D::Output, T>),
-    {
-        let mut req_ctx = WithinUnsortedVisitReqCtx::<A, D::Output, false, K> {
-            query,
-            max_dist,
-            _phantom: std::marker::PhantomData,
-        };
-
-        self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
-            self.process_leaf_within_unsorted_visit::<D, F, false>(
-                leaf_idx,
-                query_wide,
-                req_ctx.max_dist(),
-                &mut visitor,
-            );
-        });
-    }
-
     #[inline]
     pub(crate) fn within_unsorted_visit_impl<D, F, const EXCLUSIVE: bool>(
         &self,
@@ -130,29 +89,6 @@ where
                 &mut visitor,
             );
         });
-    }
-
-    /// Finds all points within a given distance of the query point.
-    ///
-    /// Returns all points within `max_dist` of the query point, unsorted.
-    /// This is faster than `within` when order doesn't matter.
-    #[inline]
-    pub(crate) fn within_unsorted<D>(
-        &self,
-        query: &[A; K],
-        max_dist: D::Output,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
-    where
-        D: KdTreeDistanceMetric<A, K>,
-        D::Output: crate::stem_strategy::SimdPrune
-            + SimdSelectBestChildBlock3
-            + BacktrackBlock3
-            + BacktrackBlock4
-            + TlsLeafScratch
-            + 'static,
-        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
-    {
-        self.within_unsorted_impl::<D, false>(query, max_dist)
     }
 
     #[inline]
@@ -360,12 +296,18 @@ mod tests {
                 KdTree::new_from_slice(&points).unwrap();
 
             let mut flat: Vec<(f32, u32)> = flat_tree
-                .within_unsorted::<SquaredEuclidean<f32>>(&query, radius)
+                .query(&query)
+                .within::<SquaredEuclidean<f32>>(radius)
+                .unsorted()
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
             let mut arena: Vec<(f32, u32)> = arena_tree
-                .within_unsorted::<SquaredEuclidean<f32>>(&query, radius)
+                .query(&query)
+                .within::<SquaredEuclidean<f32>>(radius)
+                .unsorted()
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -394,7 +336,10 @@ mod tests {
         let radius = 0.12;
 
         let mut materialized: Vec<(u32, u64)> = tree
-            .within_unsorted::<SquaredEuclidean<f64>>(&query, radius)
+            .query(&query)
+            .within::<SquaredEuclidean<f64>>(radius)
+            .unsorted()
+            .execute()
             .into_iter()
             .map(|result| (result.item, result.distance.to_bits()))
             .collect();
@@ -406,7 +351,10 @@ mod tests {
                 visited.push((result.item, result.distance.to_bits()));
             });
         let mut iterated: Vec<(u32, u64)> = tree
-            .within_unsorted_iter::<SquaredEuclidean<f64>>(&query, radius)
+            .query(&query)
+            .within::<SquaredEuclidean<f64>>(radius)
+            .unsorted()
+            .iter()
             .map(|result| (result.item, result.distance.to_bits()))
             .collect();
 
@@ -455,7 +403,10 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, RADIUS);
 
             let mut result: Vec<_> = tree
-                .within_unsorted::<SquaredEuclidean<f32>>(&query_point, RADIUS)
+                .query(&query_point)
+                .within::<SquaredEuclidean<f32>>(RADIUS)
+                .unsorted()
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -489,7 +440,10 @@ mod tests {
                 .collect();
 
             let mut result: Vec<_> = tree
-                .within_unsorted::<SquaredEuclidean<f32>>(&query_point, RADIUS)
+                .query(&query_point)
+                .within::<SquaredEuclidean<f32>>(RADIUS)
+                .unsorted()
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, 1))
                 .collect();
@@ -526,7 +480,10 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, RADIUS);
 
             let mut result: Vec<_> = tree
-                .within_unsorted::<SquaredEuclidean<f32>>(&query_point, RADIUS)
+                .query(&query_point)
+                .within::<SquaredEuclidean<f32>>(RADIUS)
+                .unsorted()
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();
@@ -561,7 +518,10 @@ mod tests {
             let expected = linear_search(&content_to_add, &query_point, RADIUS);
 
             let mut result: Vec<_> = tree
-                .within_unsorted::<SquaredEuclidean<f32>>(&query_point, RADIUS)
+                .query(&query_point)
+                .within::<SquaredEuclidean<f32>>(RADIUS)
+                .unsorted()
+                .execute()
                 .into_iter()
                 .map(|n| (n.distance, n.item))
                 .collect();

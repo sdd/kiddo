@@ -70,6 +70,7 @@ macro_rules! with_nearest_result_emitter {
             crate::results::result_collection_stats::record_candidate_emitted();
 
             let candidate = NearestNeighbour {
+                point: (),
                 distance: std::mem::transmute_copy::<$distance_ty, Self::Output>(&candidate_dist),
                 item,
             };
@@ -96,6 +97,7 @@ macro_rules! with_best_result_emitter {
             crate::results::result_collection_stats::record_candidate_emitted();
 
             let candidate = BestNeighbour {
+                point: (),
                 distance: std::mem::transmute_copy::<$distance_ty, Self::Output>(&candidate_dist),
                 item,
             };
