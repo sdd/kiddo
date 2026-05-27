@@ -20,7 +20,7 @@ use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits::leaf_strategy::LeafProjection;
-use crate::{Axis, BestNeighbour, Content, LeafStrategy, NearestNeighbour, StemStrategy};
+use crate::{Axis, BestQueryResultItem, Content, LeafStrategy, QueryResultItem, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> ArchivedKdTree<A, T, SS, LS, K, B>
 where
@@ -129,7 +129,7 @@ where
     ) where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
-        R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
+        R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
     {
         match <rkyv_08::Archived<LS> as LeafStrategy<A, T, SS, K, B>>::LEAF_PROJECTION {
             LeafProjection::LeafArena => {
@@ -160,7 +160,7 @@ where
         max_dist: D::Output,
         max_qty: NonZeroUsize,
         sorted: bool,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -180,7 +180,7 @@ where
         max_dist: D::Output,
         max_qty: NonZeroUsize,
         sorted: bool,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -193,13 +193,13 @@ where
     {
         let max_qty = max_qty.get();
         if max_qty == usize::MAX {
-            self.nearest_n_within_inner::<D, Vec<NearestNeighbour<D::Output, T>>, EXCLUSIVE>(
+            self.nearest_n_within_inner::<D, Vec<QueryResultItem<(), T, D::Output>>, EXCLUSIVE>(
                 query, max_dist, max_qty, sorted,
             )
         } else {
             self.nearest_n_within_inner::<
                 D,
-                BinaryHeapResultCollection<NearestNeighbour<D::Output, T>>,
+                BinaryHeapResultCollection<QueryResultItem<(), T, D::Output>>,
                 EXCLUSIVE,
             >(query, max_dist, max_qty, sorted)
         }
@@ -211,7 +211,7 @@ where
         max_dist: D::Output,
         max_qty: usize,
         sorted: bool,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -220,7 +220,7 @@ where
             + BacktrackBlock4
             + TlsLeafScratch
             + 'static,
-        R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
+        R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
         let mut req_ctx = ArchivedNearestNWithinReqCtx::<A, T, D::Output, R, EXCLUSIVE, K> {
@@ -253,7 +253,7 @@ where
         query: &[A; K],
         max_qty: NonZeroUsize,
         sorted: bool,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -271,7 +271,7 @@ where
         &self,
         query: &[A; K],
         max_dist: D::Output,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -299,7 +299,7 @@ where
             + TlsLeafScratch
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
-        F: FnMut(NearestNeighbour<D::Output, T>),
+        F: FnMut(QueryResultItem<(), T, D::Output>),
     {
         let mut req_ctx = ArchivedWithinUnsortedVisitReqCtx::<A, D::Output, EXCLUSIVE, K> {
             query,
@@ -322,7 +322,7 @@ where
         &self,
         query: &[A; K],
         max_dist: D::Output,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -416,7 +416,7 @@ where
         query: &[A; K],
         max_dist: D::Output,
         max_qty: NonZeroUsize,
-    ) -> BinaryHeap<BestNeighbour<D::Output, T>>
+    ) -> BinaryHeap<BestQueryResultItem<(), T, D::Output>>
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -430,9 +430,10 @@ where
         let mut req_ctx = ArchivedBestNWithinReqCtx::<A, D::Output, _, EXCLUSIVE, K> {
             query,
             max_dist,
-            results: BinaryHeapResultCollection::<BestNeighbour<D::Output, T>>::with_max_qty(
-                max_qty.get(),
-            ),
+            results:
+                BinaryHeapResultCollection::<BestQueryResultItem<(), T, D::Output>>::with_max_qty(
+                    max_qty.get(),
+                ),
         };
 
         self.backtracking_query::<_, _, D>(&mut req_ctx, |leaf_idx, query_wide, req_ctx| {
@@ -532,7 +533,7 @@ impl<A, T, O, R, const EXCLUSIVE: bool, const K: usize> QueryContext<A, O, K>
     for ArchivedNearestNWithinReqCtx<'_, A, T, O, R, EXCLUSIVE, K>
 where
     O: Axis<Coord = O>,
-    R: ResultCollection<O, NearestNeighbour<O, T>>,
+    R: ResultCollection<O, QueryResultItem<(), T, O>>,
 {
     fn query(&self) -> &[A; K] {
         self.query

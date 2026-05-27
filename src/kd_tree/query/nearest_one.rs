@@ -363,14 +363,14 @@ mod tests {
     use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     use crate::stem_strategy::Donnelly;
     use crate::Axis;
-    use crate::{Eytzinger, NearestNeighbour, QueryResultItem};
+    use crate::{Eytzinger, QueryResultItem};
 
     const REL_EPS_F32: f32 = 1.0e-6;
     const REL_EPS_F64: f64 = 1.0e-12;
 
     fn assert_nearest_f32(
         actual: QueryResultItem<(), u32, f32>,
-        expected: &NearestNeighbour<f32, usize>,
+        expected: &QueryResultItem<(), usize, f32>,
     ) {
         assert_float_relative_eq!(actual.distance, expected.distance, REL_EPS_F32);
         assert_eq!(actual.item as usize, expected.item);
@@ -379,7 +379,7 @@ mod tests {
     #[allow(dead_code)]
     fn assert_nearest_f64(
         actual: QueryResultItem<(), u32, f64>,
-        expected: &NearestNeighbour<f64, usize>,
+        expected: &QueryResultItem<(), usize, f64>,
     ) {
         assert_float_relative_eq!(actual.distance, expected.distance, REL_EPS_F64);
         assert_eq!(actual.item as usize, expected.item);
@@ -847,7 +847,7 @@ mod tests {
     fn linear_search<A, const K: usize>(
         content: &[[A; K]],
         query_point: &[A; K],
-    ) -> NearestNeighbour<A, usize>
+    ) -> QueryResultItem<(), usize, A>
     where
         A: Axis<Coord = A>,
         SquaredEuclidean<A>: crate::dist::DistanceMetricCore<A, Output = A>,
@@ -863,7 +863,7 @@ mod tests {
             }
         }
 
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: best_dist,
             item: best_item,
@@ -894,7 +894,7 @@ mod tests {
     fn linear_search_with_metric<A, D, const K: usize>(
         content: &[[A; K]],
         query_point: &[A; K],
-    ) -> NearestNeighbour<A, usize>
+    ) -> QueryResultItem<(), usize, A>
     where
         A: Axis<Coord = A>,
         D: DistanceMetricCore<A, Output = A>,
@@ -910,7 +910,7 @@ mod tests {
             }
         }
 
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: best_dist,
             item: best_item,

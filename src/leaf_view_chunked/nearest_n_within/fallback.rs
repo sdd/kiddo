@@ -1,7 +1,7 @@
 use crate::dist::KdTreeDistanceMetric;
 use crate::leaf_view::{LeafArena, LeafView, TlsLeafScratch};
 use crate::results::result_collection::ResultCollection;
-use crate::{Axis, Content, NearestNeighbour};
+use crate::{Axis, Content, QueryResultItem};
 
 #[inline(always)]
 pub(crate) fn nearest_n_within_with_query_wide_fallback<
@@ -22,7 +22,7 @@ pub(crate) fn nearest_n_within_with_query_wide_fallback<
     T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
-    R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
+    R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
     leaf.with_dists_for_slice_wide::<D, _>(query_wide, |dists| {
         LeafView::<AX, T, K, B>::update_nearest_dists::<_, _, EXCLUSIVE>(
@@ -52,7 +52,7 @@ pub(crate) fn nearest_n_within_with_query_wide_arena_fallback<
     T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
-    R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
+    R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
     if arena.is_empty() {
         return;
@@ -82,7 +82,7 @@ pub(crate) fn nearest_n_within_with_query_wide_arena_fallback<
                 #[cfg(feature = "result_collection_stats")]
                 crate::results::result_collection_stats::record_candidate_emitted();
 
-                let candidate = NearestNeighbour {
+                let candidate = QueryResultItem {
                     point: (),
                     distance: candidate_dist,
                     item: unsafe { tile.item_unaligned(idx) },

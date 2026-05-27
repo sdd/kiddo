@@ -110,11 +110,12 @@ pub mod cargo_asm {
         tree: &FlatVecKdT,
         query: [f64; 3],
     ) -> (f64, usize) {
-        tree.query(&query)
+        let result = tree
+            .query(&query)
             .nearest_one::<SquaredEuclidean<f64>>()
             .approx()
-            .execute()
-            .into()
+            .execute();
+        (result.distance, result.item)
     }
 
     /// Hook for cargo-asm to render the v6 approx-nearest-one call path with VecOfArrays leaves.
@@ -124,11 +125,12 @@ pub mod cargo_asm {
         tree: &VecOfArraysKdT,
         query: [f64; 3],
     ) -> (f64, usize) {
-        tree.query(&query)
+        let result = tree
+            .query(&query)
             .nearest_one::<SquaredEuclidean<f64>>()
             .approx()
-            .execute()
-            .into()
+            .execute();
+        (result.distance, result.item)
     }
 
     /// Hook for cargo-asm to render the v6 approx-nearest-one call path with VecOfArenas leaves.
@@ -138,11 +140,12 @@ pub mod cargo_asm {
         tree: &VecOfArenasKdT,
         query: [f64; 3],
     ) -> (f64, usize) {
-        tree.query(&query)
+        let result = tree
+            .query(&query)
             .nearest_one::<SquaredEuclidean<f64>>()
             .approx()
-            .execute()
-            .into()
+            .execute();
+        (result.distance, result.item)
     }
 }
 
@@ -727,13 +730,13 @@ mod tests {
                 .execute();
 
             // Verify result is valid
-            assert!(result.0 >= 0.0, "Distance should be non-negative");
-            assert!(result.1 < 2_097_152, "Item index should be valid");
+            assert!(result.distance >= 0.0, "Distance should be non-negative");
+            assert!(result.item < 2_097_152, "Item index should be valid");
 
             // Verify the returned item is actually close to the query
             // (approximate query returns best in target leaf, so should be reasonably close)
             assert!(
-                result.0 < 1.0,
+                result.distance < 1.0,
                 "Distance should be reasonable for unit cube"
             );
         }

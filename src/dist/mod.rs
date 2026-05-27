@@ -53,7 +53,7 @@ use crate::Axis;
 use crate::{
     leaf_view::{LeafArena, LeafView},
     results::result_collection::{BestNeighbourResultCollection, ResultCollection},
-    BestNeighbour, NearestNeighbour,
+    BestQueryResultItem, QueryResultItem,
 };
 
 pub use chebyshev::Chebyshev;
@@ -69,7 +69,7 @@ macro_rules! with_nearest_result_emitter {
             #[cfg(feature = "result_collection_stats")]
             crate::results::result_collection_stats::record_candidate_emitted();
 
-            let candidate = NearestNeighbour {
+            let candidate = QueryResultItem {
                 point: (),
                 distance: std::mem::transmute_copy::<$distance_ty, Self::Output>(&candidate_dist),
                 item,
@@ -96,7 +96,7 @@ macro_rules! with_best_result_emitter {
             #[cfg(feature = "result_collection_stats")]
             crate::results::result_collection_stats::record_candidate_emitted();
 
-            let candidate = BestNeighbour {
+            let candidate = BestQueryResultItem {
                 point: (),
                 distance: std::mem::transmute_copy::<$distance_ty, Self::Output>(&candidate_dist),
                 item,
@@ -271,7 +271,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
         A: Axis<Coord = A> + 'static,
         T: crate::Content,
         Self::Output: Axis<Coord = Self::Output> + 'static,
-        R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
+        R: ResultCollection<Self::Output, QueryResultItem<(), T, Self::Output>>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
             && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
@@ -335,7 +335,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
         A: Axis<Coord = A> + 'static,
         T: crate::Content,
         Self::Output: Axis<Coord = Self::Output> + 'static,
-        R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
+        R: ResultCollection<Self::Output, QueryResultItem<(), T, Self::Output>>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
             && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
@@ -583,7 +583,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
         A: Axis<Coord = A> + 'static,
         T: crate::Content,
         Self::Output: Axis<Coord = Self::Output> + 'static,
-        R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
+        R: ResultCollection<Self::Output, QueryResultItem<(), T, Self::Output>>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
             && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
@@ -647,7 +647,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
         A: Axis<Coord = A> + 'static,
         T: crate::Content,
         Self::Output: Axis<Coord = Self::Output> + 'static,
-        R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
+        R: ResultCollection<Self::Output, QueryResultItem<(), T, Self::Output>>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
             && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
@@ -895,7 +895,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
         A: Axis<Coord = A> + 'static,
         T: crate::Content,
         Self::Output: Axis<Coord = Self::Output> + 'static,
-        R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
+        R: ResultCollection<Self::Output, QueryResultItem<(), T, Self::Output>>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
             && TypeId::of::<Self::Output>() == TypeId::of::<f64>()
@@ -959,7 +959,7 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
         A: Axis<Coord = A> + 'static,
         T: crate::Content,
         Self::Output: Axis<Coord = Self::Output> + 'static,
-        R: ResultCollection<Self::Output, NearestNeighbour<Self::Output, T>>,
+        R: ResultCollection<Self::Output, QueryResultItem<(), T, Self::Output>>,
     {
         if TypeId::of::<A>() == TypeId::of::<f64>()
             && TypeId::of::<Self::Output>() == TypeId::of::<f64>()

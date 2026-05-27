@@ -6,13 +6,12 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use elapsed::ElapsedDuration;
-use kiddo::distance::float::SquaredEuclidean;
+use kiddo::dist::SquaredEuclidean;
+use kiddo::{Eytzinger, KdTree, VecOfArenas};
 use rand::{Rng, SeedableRng};
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 
-use kiddo::immutable::float::kdtree::ImmutableKdTree;
-use kiddo::stem_strategies::Eytzinger;
 use kiddo::test_utils::build_query_points_float;
 
 const TREE_SIZE: usize = 2usize.pow(28); // ~250M
@@ -48,8 +47,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let start = Instant::now();
     println!("Building an optimized tree of {TREE_SIZE:?} items...");
-    let tree: ImmutableKdTree<f64, usize, Eytzinger<4>, 4, 32> =
-        ImmutableKdTree::new_from_slice(&content_to_add);
+    let tree: KdTree<f64, usize, Eytzinger<4>, VecOfArenas<f64, usize, 4, 32>, 4, 32> =
+        KdTree::new_from_slice(&content_to_add).unwrap();
     println!(
         "Construction complete. ({})",
         ElapsedDuration::new(start.elapsed())
@@ -62,7 +61,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let start = Instant::now();
     query_points.par_iter().for_each(|point| {
-        black_box(tree.nearest_one::<SquaredEuclidean>(point));
+        black_box(
+            tree.query(point)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .execute(),
+        );
     });
     println!(
         "Queries complete. ({})",

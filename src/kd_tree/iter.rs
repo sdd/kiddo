@@ -8,7 +8,7 @@ use crate::leaf_view_chunked::nearest_n_within::{
 };
 use crate::results::result_collection::ResultCollection;
 use crate::traits::leaf_strategy::LeafProjection;
-use crate::{Axis, Content, LeafStrategy, NearestNeighbour, StemStrategy};
+use crate::{Axis, Content, LeafStrategy, QueryResultItem, StemStrategy};
 
 use super::{KdTreeAccessor, StemLeafResolution};
 
@@ -322,7 +322,7 @@ pub struct WithinUnsortedIter<
     stack:
         InlineStack<TraversalFrame<SS, D::Output, K>, WITHIN_UNSORTED_ITER_INLINE_STACK_CAPACITY>,
     leaf_results: InlineResultBuffer<
-        NearestNeighbour<D::Output, T>,
+        QueryResultItem<(), T, D::Output>,
         WITHIN_UNSORTED_ITER_INLINE_RESULT_CAPACITY,
     >,
     leaf_result_pos: usize,
@@ -497,7 +497,7 @@ where
     D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
 {
-    type Item = NearestNeighbour<D::Output, T>;
+    type Item = QueryResultItem<(), T, D::Output>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

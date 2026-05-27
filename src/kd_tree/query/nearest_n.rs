@@ -6,7 +6,7 @@ use crate::leaf_view::TlsLeafScratch;
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
-use crate::{Axis, Content, KdTree, LeafStrategy, NearestNeighbour, StemStrategy};
+use crate::{Axis, Content, KdTree, LeafStrategy, QueryResultItem, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
@@ -23,7 +23,7 @@ where
         query: &[A; K],
         max_qty: NonZero<usize>,
         sorted: bool,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune

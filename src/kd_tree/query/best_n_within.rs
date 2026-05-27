@@ -20,7 +20,7 @@ use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits::leaf_strategy::LeafProjection;
-use crate::{Axis, BestNeighbour, Content, KdTree, LeafStrategy, StemStrategy};
+use crate::{Axis, BestQueryResultItem, Content, KdTree, LeafStrategy, StemStrategy};
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
@@ -90,7 +90,7 @@ where
         query: &[A; K],
         max_dist: D::Output,
         max_qty: NonZero<usize>,
-    ) -> BinaryHeap<BestNeighbour<D::Output, T>>
+    ) -> BinaryHeap<BestQueryResultItem<(), T, D::Output>>
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -107,14 +107,14 @@ where
         if max_qty <= SMALL_RESULT_COLLECTION_MAX_QTY {
             return self
                 .best_n_within_inner::<D, SmallBinaryHeapResultCollection<
-                    BestNeighbour<D::Output, T>,
+                    BestQueryResultItem<(), T, D::Output>,
                 >, EXCLUSIVE>(query, max_dist, max_qty)
                 .into_inner();
         }
 
         self.best_n_within_inner::<
             D,
-            BinaryHeapResultCollection<BestNeighbour<D::Output, T>>,
+            BinaryHeapResultCollection<BestQueryResultItem<(), T, D::Output>>,
             EXCLUSIVE,
         >(
             query, max_dist, max_qty,
@@ -239,7 +239,7 @@ mod tests {
     use crate::dist::SquaredEuclidean;
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
-    use crate::{BestNeighbour, Eytzinger};
+    use crate::{BestQueryResultItem, Eytzinger};
 
     const RNG_SEED: u64 = 42;
 
@@ -549,8 +549,8 @@ mod tests {
     }
 
     fn assert_best_neighbours_close_f64<T>(
-        actual: &[BestNeighbour<f64, T>],
-        expected: &[BestNeighbour<f64, T>],
+        actual: &[BestQueryResultItem<(), T, f64>],
+        expected: &[BestQueryResultItem<(), T, f64>],
     ) where
         T: Debug + PartialEq,
     {
@@ -585,21 +585,21 @@ mod tests {
         query: &[f64; 2],
         radius: f64,
         max_qty: usize,
-    ) -> Vec<BestNeighbour<f64, u32>> {
+    ) -> Vec<BestQueryResultItem<(), u32, f64>> {
         let mut best_items = Vec::with_capacity(max_qty);
 
         for (item, p) in content.iter().enumerate() {
             let distance = squared_euclidean_dist(query, p);
             if distance <= radius {
                 if best_items.len() < max_qty {
-                    best_items.push(BestNeighbour {
+                    best_items.push(BestQueryResultItem {
                         point: (),
                         distance,
                         item: item as u32,
                     });
                 } else if (item as u32) < best_items.last().unwrap().item {
                     best_items.pop().unwrap();
-                    best_items.push(BestNeighbour {
+                    best_items.push(BestQueryResultItem {
                         point: (),
                         distance,
                         item: item as u32,

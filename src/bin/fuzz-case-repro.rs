@@ -12,10 +12,9 @@ use std::num::NonZeroUsize;
 use kiddo::dist::DistanceMetricCore;
 use kiddo::kd_tree::KdTree as V6KdTree;
 use kiddo::leaf_strategy::{FlatVec, VecOfArrays};
-use kiddo::results::nearest_neighbour::NearestNeighbour;
 use kiddo::stem_strategy::{Donnelly, Eytzinger};
 use kiddo::StemStrategy;
-use kiddo::{Manhattan as V6Manhattan, SquaredEuclidean as V6SquaredEuclidean};
+use kiddo::{Manhattan as V6Manhattan, QueryResultItem, SquaredEuclidean as V6SquaredEuclidean};
 
 #[cfg(feature = "simd")]
 use kiddo::stem_strategy::{Block3, Block4, DonnellyMarkerSimd};
@@ -571,29 +570,39 @@ where
             radius_man,
         },
         |metric| match metric {
-            Metric::SquaredEuclidean => {
-                let (distance, item) = tree.nearest_one::<V6SquaredEuclidean<f32>>(&query);
-                NearestNeighbour { distance, item }
-            }
-            Metric::Manhattan => {
-                let (distance, item) = tree.nearest_one::<V6Manhattan<f32>>(&query);
-                NearestNeighbour { distance, item }
-            }
+            Metric::SquaredEuclidean => tree
+                .query(&query)
+                .nearest_one::<V6SquaredEuclidean<f32>>()
+                .execute(),
+            Metric::Manhattan => tree
+                .query(&query)
+                .nearest_one::<V6Manhattan<f32>>()
+                .execute(),
         },
         |metric, max_qty| {
             let max_qty = NonZeroUsize::new(max_qty).ok_or("max_qty was zero")?;
             Ok(match metric {
-                Metric::SquaredEuclidean => {
-                    tree.nearest_n::<V6SquaredEuclidean<f32>>(&query, max_qty, true)
-                }
-                Metric::Manhattan => tree.nearest_n::<V6Manhattan<f32>>(&query, max_qty, true),
+                Metric::SquaredEuclidean => tree
+                    .query(&query)
+                    .nearest_n::<V6SquaredEuclidean<f32>>(max_qty)
+                    .execute(),
+                Metric::Manhattan => tree
+                    .query(&query)
+                    .nearest_n::<V6Manhattan<f32>>(max_qty)
+                    .execute(),
             })
         },
         |metric, radius| match metric {
-            Metric::SquaredEuclidean => {
-                tree.within_unsorted::<V6SquaredEuclidean<f32>>(&query, radius)
-            }
-            Metric::Manhattan => tree.within_unsorted::<V6Manhattan<f32>>(&query, radius),
+            Metric::SquaredEuclidean => tree
+                .query(&query)
+                .within::<V6SquaredEuclidean<f32>>(radius)
+                .unsorted()
+                .execute(),
+            Metric::Manhattan => tree
+                .query(&query)
+                .within::<V6Manhattan<f32>>(radius)
+                .unsorted()
+                .execute(),
         },
     )
 }
@@ -627,29 +636,39 @@ where
             radius_man,
         },
         |metric| match metric {
-            Metric::SquaredEuclidean => {
-                let (distance, item) = tree.nearest_one::<V6SquaredEuclidean<f64>>(&query);
-                NearestNeighbour { distance, item }
-            }
-            Metric::Manhattan => {
-                let (distance, item) = tree.nearest_one::<V6Manhattan<f64>>(&query);
-                NearestNeighbour { distance, item }
-            }
+            Metric::SquaredEuclidean => tree
+                .query(&query)
+                .nearest_one::<V6SquaredEuclidean<f64>>()
+                .execute(),
+            Metric::Manhattan => tree
+                .query(&query)
+                .nearest_one::<V6Manhattan<f64>>()
+                .execute(),
         },
         |metric, max_qty| {
             let max_qty = NonZeroUsize::new(max_qty).ok_or("max_qty was zero")?;
             Ok(match metric {
-                Metric::SquaredEuclidean => {
-                    tree.nearest_n::<V6SquaredEuclidean<f64>>(&query, max_qty, true)
-                }
-                Metric::Manhattan => tree.nearest_n::<V6Manhattan<f64>>(&query, max_qty, true),
+                Metric::SquaredEuclidean => tree
+                    .query(&query)
+                    .nearest_n::<V6SquaredEuclidean<f64>>(max_qty)
+                    .execute(),
+                Metric::Manhattan => tree
+                    .query(&query)
+                    .nearest_n::<V6Manhattan<f64>>(max_qty)
+                    .execute(),
             })
         },
         |metric, radius| match metric {
-            Metric::SquaredEuclidean => {
-                tree.within_unsorted::<V6SquaredEuclidean<f64>>(&query, radius)
-            }
-            Metric::Manhattan => tree.within_unsorted::<V6Manhattan<f64>>(&query, radius),
+            Metric::SquaredEuclidean => tree
+                .query(&query)
+                .within::<V6SquaredEuclidean<f64>>(radius)
+                .unsorted()
+                .execute(),
+            Metric::Manhattan => tree
+                .query(&query)
+                .within::<V6Manhattan<f64>>(radius)
+                .unsorted()
+                .execute(),
         },
     )
 }
@@ -679,29 +698,39 @@ where
             radius_man,
         },
         |metric| match metric {
-            Metric::SquaredEuclidean => {
-                let (distance, item) = tree.nearest_one::<V6SquaredEuclidean<f32>>(&query);
-                NearestNeighbour { distance, item }
-            }
-            Metric::Manhattan => {
-                let (distance, item) = tree.nearest_one::<V6Manhattan<f32>>(&query);
-                NearestNeighbour { distance, item }
-            }
+            Metric::SquaredEuclidean => tree
+                .query(&query)
+                .nearest_one::<V6SquaredEuclidean<f32>>()
+                .execute(),
+            Metric::Manhattan => tree
+                .query(&query)
+                .nearest_one::<V6Manhattan<f32>>()
+                .execute(),
         },
         |metric, max_qty| {
             let max_qty = NonZeroUsize::new(max_qty).ok_or("max_qty was zero")?;
             Ok(match metric {
-                Metric::SquaredEuclidean => {
-                    tree.nearest_n::<V6SquaredEuclidean<f32>>(&query, max_qty, true)
-                }
-                Metric::Manhattan => tree.nearest_n::<V6Manhattan<f32>>(&query, max_qty, true),
+                Metric::SquaredEuclidean => tree
+                    .query(&query)
+                    .nearest_n::<V6SquaredEuclidean<f32>>(max_qty)
+                    .execute(),
+                Metric::Manhattan => tree
+                    .query(&query)
+                    .nearest_n::<V6Manhattan<f32>>(max_qty)
+                    .execute(),
             })
         },
         |metric, radius| match metric {
-            Metric::SquaredEuclidean => {
-                tree.within_unsorted::<V6SquaredEuclidean<f32>>(&query, radius)
-            }
-            Metric::Manhattan => tree.within_unsorted::<V6Manhattan<f32>>(&query, radius),
+            Metric::SquaredEuclidean => tree
+                .query(&query)
+                .within::<V6SquaredEuclidean<f32>>(radius)
+                .unsorted()
+                .execute(),
+            Metric::Manhattan => tree
+                .query(&query)
+                .within::<V6Manhattan<f32>>(radius)
+                .unsorted()
+                .execute(),
         },
     )
 }
@@ -731,29 +760,39 @@ where
             radius_man,
         },
         |metric| match metric {
-            Metric::SquaredEuclidean => {
-                let (distance, item) = tree.nearest_one::<V6SquaredEuclidean<f64>>(&query);
-                NearestNeighbour { distance, item }
-            }
-            Metric::Manhattan => {
-                let (distance, item) = tree.nearest_one::<V6Manhattan<f64>>(&query);
-                NearestNeighbour { distance, item }
-            }
+            Metric::SquaredEuclidean => tree
+                .query(&query)
+                .nearest_one::<V6SquaredEuclidean<f64>>()
+                .execute(),
+            Metric::Manhattan => tree
+                .query(&query)
+                .nearest_one::<V6Manhattan<f64>>()
+                .execute(),
         },
         |metric, max_qty| {
             let max_qty = NonZeroUsize::new(max_qty).ok_or("max_qty was zero")?;
             Ok(match metric {
-                Metric::SquaredEuclidean => {
-                    tree.nearest_n::<V6SquaredEuclidean<f64>>(&query, max_qty, true)
-                }
-                Metric::Manhattan => tree.nearest_n::<V6Manhattan<f64>>(&query, max_qty, true),
+                Metric::SquaredEuclidean => tree
+                    .query(&query)
+                    .nearest_n::<V6SquaredEuclidean<f64>>(max_qty)
+                    .execute(),
+                Metric::Manhattan => tree
+                    .query(&query)
+                    .nearest_n::<V6Manhattan<f64>>(max_qty)
+                    .execute(),
             })
         },
         |metric, radius| match metric {
-            Metric::SquaredEuclidean => {
-                tree.within_unsorted::<V6SquaredEuclidean<f64>>(&query, radius)
-            }
-            Metric::Manhattan => tree.within_unsorted::<V6Manhattan<f64>>(&query, radius),
+            Metric::SquaredEuclidean => tree
+                .query(&query)
+                .within::<V6SquaredEuclidean<f64>>(radius)
+                .unsorted()
+                .execute(),
+            Metric::Manhattan => tree
+                .query(&query)
+                .within::<V6Manhattan<f64>>(radius)
+                .unsorted()
+                .execute(),
         },
     )
 }
@@ -768,9 +807,9 @@ where
     A: Axis<Coord = A> + 'static,
     V6SquaredEuclidean<A>: DistanceMetricCore<A, Output = A>,
     V6Manhattan<A>: DistanceMetricCore<A, Output = A>,
-    FNearestOne: Fn(Metric) -> NearestNeighbour<A, usize>,
-    FNearestN: Fn(Metric, usize) -> Result<Vec<NearestNeighbour<A, usize>>, String>,
-    FWithin: Fn(Metric, A) -> Vec<NearestNeighbour<A, usize>>,
+    FNearestOne: Fn(Metric) -> QueryResultItem<(), usize, A>,
+    FNearestN: Fn(Metric, usize) -> Result<Vec<QueryResultItem<(), usize, A>>, String>,
+    FWithin: Fn(Metric, A) -> Vec<QueryResultItem<(), usize, A>>,
 {
     let (mut sq, mut man) = brute_states(
         ctx.points,
@@ -869,7 +908,7 @@ enum Metric {
 
 fn check_nearest_one<A>(
     metric: &str,
-    result: NearestNeighbour<A, usize>,
+    result: QueryResultItem<(), usize, A>,
     expected: &MetricState<A>,
 ) -> Result<(), String>
 where
@@ -1252,7 +1291,7 @@ fn format_preview<A: std::fmt::Debug>(items: &[(A, usize)], limit: usize) -> Str
 struct MetricState<A: Axis> {
     best_dist: A,
     best_items: Vec<usize>,
-    heap: BinaryHeap<NearestNeighbour<A, usize>>,
+    heap: BinaryHeap<QueryResultItem<(), usize, A>>,
     within: Vec<(A, usize)>,
     max_qty: usize,
     radius: A,
@@ -1291,14 +1330,16 @@ where
         }
 
         if self.heap.len() < self.max_qty {
-            self.heap.push(NearestNeighbour {
+            self.heap.push(QueryResultItem {
+                point: (),
                 distance: dist,
                 item: idx,
             });
         } else if let Some(top) = self.heap.peek() {
             if dist < top.distance {
                 self.heap.pop();
-                self.heap.push(NearestNeighbour {
+                self.heap.push(QueryResultItem {
+                    point: (),
                     distance: dist,
                     item: idx,
                 });

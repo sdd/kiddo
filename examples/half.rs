@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         101,
     );
 
-    let (nearest_dist, nearest_item) = tree
+    let result = tree
         .query(&[
             f16::from_f32(1.0),
             f16::from_f32(2.0),
@@ -27,10 +27,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nearest_one::<SquaredEuclidean<f16>>()
         .execute();
 
-    println!("Nearest: distance={nearest_dist:?} item={nearest_item}");
+    println!(
+        "Nearest: distance={:?} item={}",
+        result.distance, result.item
+    );
 
-    assert!((nearest_dist - f16::from_f32(0.01)).abs() < f16::EPSILON);
-    assert_eq!(nearest_item, 100);
+    assert!((result.distance - f16::from_f32(0.01)).abs() < f16::EPSILON);
+    assert_eq!(result.item, 100);
     Ok(())
 }
 

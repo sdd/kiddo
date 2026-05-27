@@ -178,12 +178,11 @@ fn run_sorted_nearest_n_within_archived_donnelly(
 
     for _ in 0..repeats {
         for query in queries.iter() {
-            let results = tree.nearest_n_within::<SquaredEuclidean<f64>>(
-                black_box(query),
-                max_dist,
-                max_qty,
-                true,
-            );
+            let results = tree
+                .query(black_box(query))
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .within(max_dist)
+                .execute();
             checksum_len += results.len();
 
             for result in results {
@@ -254,12 +253,11 @@ fn run_sorted_nearest_n_within_archived_eytzinger(
 
     for _ in 0..repeats {
         for query in queries.iter() {
-            let results = tree.nearest_n_within::<SquaredEuclidean<f64>>(
-                black_box(query),
-                max_dist,
-                max_qty,
-                true,
-            );
+            let results = tree
+                .query(black_box(query))
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .within(max_dist)
+                .execute();
             checksum_len += results.len();
 
             for result in results {

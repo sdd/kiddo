@@ -68,7 +68,7 @@ fn run_donnelly(tree: &DonnellyTree, query: &[f64; K]) -> ((f64, u32), ExactQuer
         .query(query)
         .nearest_one::<SquaredEuclidean<f64>>()
         .execute();
-    (result.into(), snapshot())
+    ((result.distance, result.item), snapshot())
 }
 
 fn run_donnelly_block_scalar(
@@ -80,7 +80,7 @@ fn run_donnelly_block_scalar(
         .query(query)
         .nearest_one::<SquaredEuclidean<f64>>()
         .execute();
-    (result.into(), snapshot())
+    ((result.distance, result.item), snapshot())
 }
 
 fn run_donnelly_simd(
@@ -99,7 +99,7 @@ fn run_donnelly_simd(
         .nearest_one::<SquaredEuclidean<f64>>()
         .execute();
     unsafe { std::env::remove_var("KIDDO_FORCE_MAPPED_SIMD_BLOCK_STEP") };
-    (result.into(), snapshot())
+    ((result.distance, result.item), snapshot())
 }
 
 fn run_donnelly_trace(
@@ -119,7 +119,7 @@ fn run_donnelly_trace(
     let stats = snapshot();
     let trace = exact_query_trace::snapshot();
     exact_query_trace::set_enabled(false);
-    (result.into(), stats, trace)
+    ((result.distance, result.item), stats, trace)
 }
 
 fn run_donnelly_block_scalar_trace(
@@ -139,7 +139,7 @@ fn run_donnelly_block_scalar_trace(
     let stats = snapshot();
     let trace = exact_query_trace::snapshot();
     exact_query_trace::set_enabled(false);
-    (result.into(), stats, trace)
+    ((result.distance, result.item), stats, trace)
 }
 
 fn run_donnelly_simd_trace(
@@ -166,7 +166,7 @@ fn run_donnelly_simd_trace(
     let stats = snapshot();
     let trace = exact_query_trace::snapshot();
     exact_query_trace::set_enabled(false);
-    (result.into(), stats, trace)
+    ((result.distance, result.item), stats, trace)
 }
 
 fn same_result(lhs: (f64, u32), rhs: (f64, u32)) -> bool {

@@ -15,10 +15,7 @@ use crate::leaf_view::TlsLeafScratch;
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
-use crate::{
-    Axis, BestNeighbour, BestQueryResultItem, Content, LeafStrategy, NearestNeighbour,
-    QueryResultItem, StemStrategy,
-};
+use crate::{Axis, BestQueryResultItem, Content, LeafStrategy, QueryResultItem, StemStrategy};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum BoundaryMode {
@@ -113,7 +110,7 @@ where
 
 #[inline(always)]
 fn project_nearest_without_point<A, T, O, P, I, D, const K: usize>(
-    result: NearestNeighbour<O, T>,
+    result: QueryResultItem<(), T, O>,
 ) -> QueryResultItem<P::Output, I::Output, D::Output>
 where
     A: Axis<Coord = A>,
@@ -148,7 +145,7 @@ where
 
 #[inline(always)]
 fn project_best_without_point<A, T, O, P, I, D, const K: usize>(
-    result: BestNeighbour<O, T>,
+    result: BestQueryResultItem<(), T, O>,
 ) -> BestQueryResultItem<P::Output, I::Output, D::Output>
 where
     A: Axis<Coord = A>,
@@ -249,7 +246,7 @@ where
         query: &[A; K],
         max_qty: NonZeroUsize,
         sorted: bool,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
@@ -267,7 +264,7 @@ where
         radius: D::Output,
         max_qty: NonZeroUsize,
         sorted: bool,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
@@ -283,7 +280,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
@@ -299,7 +296,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
@@ -326,14 +323,14 @@ where
             + TlsLeafScratch
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
-        F: FnMut(NearestNeighbour<D::Output, T>);
+        F: FnMut(QueryResultItem<(), T, D::Output>);
 
     fn qb_best_n_within<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
         radius: D::Output,
         max_qty: NonZero<usize>,
-    ) -> BinaryHeap<BestNeighbour<D::Output, T>>
+    ) -> BinaryHeap<BestQueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
@@ -385,7 +382,7 @@ where
         query: &[A; K],
         max_qty: NonZeroUsize,
         sorted: bool,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
@@ -407,7 +404,7 @@ where
         radius: D::Output,
         max_qty: NonZeroUsize,
         sorted: bool,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
@@ -427,7 +424,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
@@ -447,7 +444,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
@@ -478,7 +475,7 @@ where
             + TlsLeafScratch
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
-        F: FnMut(NearestNeighbour<D::Output, T>),
+        F: FnMut(QueryResultItem<(), T, D::Output>),
     {
         self.within_unsorted_visit_impl::<D, F, EXCLUSIVE>(query, radius, visitor)
     }
@@ -489,7 +486,7 @@ where
         query: &[A; K],
         radius: D::Output,
         max_qty: NonZero<usize>,
-    ) -> BinaryHeap<BestNeighbour<D::Output, T>>
+    ) -> BinaryHeap<BestQueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
@@ -547,7 +544,7 @@ where
         query: &[A; K],
         max_qty: NonZeroUsize,
         sorted: bool,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
@@ -569,7 +566,7 @@ where
         radius: D::Output,
         max_qty: NonZeroUsize,
         sorted: bool,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
@@ -589,7 +586,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
@@ -609,7 +606,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
@@ -640,7 +637,7 @@ where
             + TlsLeafScratch
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
-        F: FnMut(NearestNeighbour<D::Output, T>),
+        F: FnMut(QueryResultItem<(), T, D::Output>),
     {
         self.within_unsorted_visit_impl::<D, F, EXCLUSIVE>(query, radius, visitor)
     }
@@ -651,7 +648,7 @@ where
         query: &[A; K],
         radius: D::Output,
         max_qty: NonZero<usize>,
-    ) -> BinaryHeap<BestNeighbour<D::Output, T>>
+    ) -> BinaryHeap<BestQueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
         D: KdTreeDistanceMetric<A, K>,
@@ -866,7 +863,7 @@ where
         + 'static,
     SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
 {
-    type Item = NearestNeighbour<D::Output, T>;
+    type Item = QueryResultItem<(), T, D::Output>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

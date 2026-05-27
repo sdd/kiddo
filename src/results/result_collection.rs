@@ -7,8 +7,7 @@ use std::collections::BinaryHeap;
 use smallvec::SmallVec;
 use sorted_vec::SortedVec;
 
-use super::nearest_neighbour::NearestNeighbour;
-use crate::{Axis, BestNeighbour, Content};
+use crate::{Axis, BestQueryResultItem, Content, QueryResultItem};
 
 #[cfg(feature = "small_n_result_collectors")]
 pub(crate) const SMALL_RESULT_COLLECTION_MAX_QTY: usize = 32;
@@ -128,7 +127,7 @@ where
 
 #[doc(hidden)]
 pub trait BestNeighbourResultCollection<O: Axis<Coord = O>, T: Content + PartialOrd>:
-    ResultCollection<O, BestNeighbour<O, T>>
+    ResultCollection<O, BestQueryResultItem<(), T, O>>
 {
     fn threshold_item(&self) -> Option<T>;
 }
@@ -273,8 +272,8 @@ where
     }
 }
 
-impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
-    for BinaryHeapResultCollection<NearestNeighbour<O, T>>
+impl<O: Axis<Coord = O>, T> ResultCollection<O, QueryResultItem<(), T, O>>
+    for BinaryHeapResultCollection<QueryResultItem<(), T, O>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
         Self {
@@ -291,7 +290,7 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
         self.inner.len()
     }
 
-    fn add(&mut self, entry: NearestNeighbour<O, T>) {
+    fn add(&mut self, entry: QueryResultItem<(), T, O>) {
         #[cfg(feature = "result_collection_stats")]
         crate::results::result_collection_stats::record_collector_add_call();
 
@@ -316,7 +315,7 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     #[allow(unreachable_code)] // needed because of early return when result_collection_stats feature is enabled
     fn add_all<I>(&mut self, entries: I)
     where
-        I: IntoIterator<Item = NearestNeighbour<O, T>>,
+        I: IntoIterator<Item = QueryResultItem<(), T, O>>,
     {
         #[cfg(feature = "result_collection_stats")]
         {
@@ -362,17 +361,17 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
         result
     }
 
-    fn into_vec(self) -> Vec<NearestNeighbour<O, T>> {
+    fn into_vec(self) -> Vec<QueryResultItem<(), T, O>> {
         self.inner.into_vec()
     }
 
-    fn into_sorted_vec(self) -> Vec<NearestNeighbour<O, T>> {
+    fn into_sorted_vec(self) -> Vec<QueryResultItem<(), T, O>> {
         self.inner.into_sorted_vec()
     }
 }
 
-impl<O: Axis<Coord = O>, T: Content + PartialOrd> ResultCollection<O, BestNeighbour<O, T>>
-    for BinaryHeapResultCollection<BestNeighbour<O, T>>
+impl<O: Axis<Coord = O>, T: Content + PartialOrd> ResultCollection<O, BestQueryResultItem<(), T, O>>
+    for BinaryHeapResultCollection<BestQueryResultItem<(), T, O>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
         Self {
@@ -389,7 +388,7 @@ impl<O: Axis<Coord = O>, T: Content + PartialOrd> ResultCollection<O, BestNeighb
         self.inner.len()
     }
 
-    fn add(&mut self, entry: BestNeighbour<O, T>) {
+    fn add(&mut self, entry: BestQueryResultItem<(), T, O>) {
         #[cfg(feature = "result_collection_stats")]
         crate::results::result_collection_stats::record_collector_add_call();
 
@@ -414,7 +413,7 @@ impl<O: Axis<Coord = O>, T: Content + PartialOrd> ResultCollection<O, BestNeighb
     #[cfg(feature = "buffered_result_collection")]
     fn add_all<I>(&mut self, entries: I)
     where
-        I: IntoIterator<Item = BestNeighbour<O, T>>,
+        I: IntoIterator<Item = BestQueryResultItem<(), T, O>>,
     {
         #[cfg(feature = "result_collection_stats")]
         {
@@ -449,17 +448,17 @@ impl<O: Axis<Coord = O>, T: Content + PartialOrd> ResultCollection<O, BestNeighb
         None
     }
 
-    fn into_vec(self) -> Vec<BestNeighbour<O, T>> {
+    fn into_vec(self) -> Vec<BestQueryResultItem<(), T, O>> {
         self.inner.into_vec()
     }
 
-    fn into_sorted_vec(self) -> Vec<BestNeighbour<O, T>> {
+    fn into_sorted_vec(self) -> Vec<BestQueryResultItem<(), T, O>> {
         self.inner.into_sorted_vec()
     }
 }
 
 impl<O: Axis<Coord = O>, T: Content + PartialOrd> BestNeighbourResultCollection<O, T>
-    for BinaryHeapResultCollection<BestNeighbour<O, T>>
+    for BinaryHeapResultCollection<BestQueryResultItem<(), T, O>>
 {
     #[inline(always)]
     fn threshold_item(&self) -> Option<T> {
@@ -471,8 +470,8 @@ impl<O: Axis<Coord = O>, T: Content + PartialOrd> BestNeighbourResultCollection<
     }
 }
 
-impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
-    for SortedVecResultCollection<NearestNeighbour<O, T>>
+impl<O: Axis<Coord = O>, T> ResultCollection<O, QueryResultItem<(), T, O>>
+    for SortedVecResultCollection<QueryResultItem<(), T, O>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
         Self {
@@ -489,7 +488,7 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
         self.inner.len()
     }
 
-    fn add(&mut self, entry: NearestNeighbour<O, T>) {
+    fn add(&mut self, entry: QueryResultItem<(), T, O>) {
         #[cfg(feature = "result_collection_stats")]
         crate::results::result_collection_stats::record_collector_add_call();
 
@@ -521,7 +520,7 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     #[cfg(feature = "buffered_result_collection")]
     fn add_all<I>(&mut self, entries: I)
     where
-        I: IntoIterator<Item = NearestNeighbour<O, T>>,
+        I: IntoIterator<Item = QueryResultItem<(), T, O>>,
     {
         #[cfg(feature = "result_collection_stats")]
         {
@@ -565,18 +564,18 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
         result
     }
 
-    fn into_vec(self) -> Vec<NearestNeighbour<O, T>> {
+    fn into_vec(self) -> Vec<QueryResultItem<(), T, O>> {
         self.inner.into_vec()
     }
 
-    fn into_sorted_vec(self) -> Vec<NearestNeighbour<O, T>> {
+    fn into_sorted_vec(self) -> Vec<QueryResultItem<(), T, O>> {
         self.inner.into_vec()
     }
 }
 
 #[cfg(feature = "small_n_result_collectors")]
-impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
-    for SmallBinaryHeapResultCollection<NearestNeighbour<O, T>>
+impl<O: Axis<Coord = O>, T> ResultCollection<O, QueryResultItem<(), T, O>>
+    for SmallBinaryHeapResultCollection<QueryResultItem<(), T, O>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
         debug_assert!(max_qty <= SMALL_RESULT_COLLECTION_MAX_QTY);
@@ -594,7 +593,7 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
         self.inner.len()
     }
 
-    fn add(&mut self, entry: NearestNeighbour<O, T>) {
+    fn add(&mut self, entry: QueryResultItem<(), T, O>) {
         #[cfg(feature = "result_collection_stats")]
         crate::results::result_collection_stats::record_collector_add_call();
 
@@ -619,7 +618,7 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     #[cfg(feature = "buffered_result_collection")]
     fn add_all<I>(&mut self, entries: I)
     where
-        I: IntoIterator<Item = NearestNeighbour<O, T>>,
+        I: IntoIterator<Item = QueryResultItem<(), T, O>>,
     {
         #[cfg(feature = "result_collection_stats")]
         {
@@ -667,11 +666,11 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
         result
     }
 
-    fn into_vec(self) -> Vec<NearestNeighbour<O, T>> {
+    fn into_vec(self) -> Vec<QueryResultItem<(), T, O>> {
         self.inner.into_vec()
     }
 
-    fn into_sorted_vec(self) -> Vec<NearestNeighbour<O, T>> {
+    fn into_sorted_vec(self) -> Vec<QueryResultItem<(), T, O>> {
         let mut vec = self.inner.into_vec();
         vec.sort();
         vec
@@ -679,8 +678,8 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
 }
 
 #[cfg(feature = "small_n_result_collectors")]
-impl<O: Axis<Coord = O>, T: Content + PartialOrd> ResultCollection<O, BestNeighbour<O, T>>
-    for SmallBinaryHeapResultCollection<BestNeighbour<O, T>>
+impl<O: Axis<Coord = O>, T: Content + PartialOrd> ResultCollection<O, BestQueryResultItem<(), T, O>>
+    for SmallBinaryHeapResultCollection<BestQueryResultItem<(), T, O>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
         debug_assert!(max_qty <= SMALL_RESULT_COLLECTION_MAX_QTY);
@@ -698,7 +697,7 @@ impl<O: Axis<Coord = O>, T: Content + PartialOrd> ResultCollection<O, BestNeighb
         self.inner.len()
     }
 
-    fn add(&mut self, entry: BestNeighbour<O, T>) {
+    fn add(&mut self, entry: BestQueryResultItem<(), T, O>) {
         #[cfg(feature = "result_collection_stats")]
         crate::results::result_collection_stats::record_collector_add_call();
 
@@ -723,7 +722,7 @@ impl<O: Axis<Coord = O>, T: Content + PartialOrd> ResultCollection<O, BestNeighb
     #[cfg(feature = "buffered_result_collection")]
     fn add_all<I>(&mut self, entries: I)
     where
-        I: IntoIterator<Item = BestNeighbour<O, T>>,
+        I: IntoIterator<Item = BestQueryResultItem<(), T, O>>,
     {
         #[cfg(feature = "result_collection_stats")]
         {
@@ -760,11 +759,11 @@ impl<O: Axis<Coord = O>, T: Content + PartialOrd> ResultCollection<O, BestNeighb
         None
     }
 
-    fn into_vec(self) -> Vec<BestNeighbour<O, T>> {
+    fn into_vec(self) -> Vec<BestQueryResultItem<(), T, O>> {
         self.inner.into_vec()
     }
 
-    fn into_sorted_vec(self) -> Vec<BestNeighbour<O, T>> {
+    fn into_sorted_vec(self) -> Vec<BestQueryResultItem<(), T, O>> {
         let mut vec = self.inner.into_vec();
         vec.sort();
         vec
@@ -773,7 +772,7 @@ impl<O: Axis<Coord = O>, T: Content + PartialOrd> ResultCollection<O, BestNeighb
 
 #[cfg(feature = "small_n_result_collectors")]
 impl<O: Axis<Coord = O>, T: Content + PartialOrd> BestNeighbourResultCollection<O, T>
-    for SmallBinaryHeapResultCollection<BestNeighbour<O, T>>
+    for SmallBinaryHeapResultCollection<BestQueryResultItem<(), T, O>>
 {
     #[inline(always)]
     fn threshold_item(&self) -> Option<T> {
@@ -786,8 +785,8 @@ impl<O: Axis<Coord = O>, T: Content + PartialOrd> BestNeighbourResultCollection<
 }
 
 #[cfg(feature = "small_n_result_collectors")]
-impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
-    for SmallSortedVecResultCollection<NearestNeighbour<O, T>>
+impl<O: Axis<Coord = O>, T> ResultCollection<O, QueryResultItem<(), T, O>>
+    for SmallSortedVecResultCollection<QueryResultItem<(), T, O>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
         debug_assert!(max_qty <= SMALL_RESULT_COLLECTION_MAX_QTY);
@@ -805,7 +804,7 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
         self.inner.len()
     }
 
-    fn add(&mut self, entry: NearestNeighbour<O, T>) {
+    fn add(&mut self, entry: QueryResultItem<(), T, O>) {
         #[cfg(feature = "result_collection_stats")]
         crate::results::result_collection_stats::record_collector_add_call();
         small_sorted_insert(&mut self.inner, self.max_qty, entry);
@@ -815,7 +814,7 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
     #[cfg(feature = "buffered_result_collection")]
     fn add_all<I>(&mut self, entries: I)
     where
-        I: IntoIterator<Item = NearestNeighbour<O, T>>,
+        I: IntoIterator<Item = QueryResultItem<(), T, O>>,
     {
         #[cfg(feature = "result_collection_stats")]
         {
@@ -857,11 +856,11 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, NearestNeighbour<O, T>>
         result
     }
 
-    fn into_vec(self) -> Vec<NearestNeighbour<O, T>> {
+    fn into_vec(self) -> Vec<QueryResultItem<(), T, O>> {
         self.inner.into_vec()
     }
 
-    fn into_sorted_vec(self) -> Vec<NearestNeighbour<O, T>> {
+    fn into_sorted_vec(self) -> Vec<QueryResultItem<(), T, O>> {
         self.inner.into_vec()
     }
 }
@@ -873,166 +872,166 @@ pub mod cargo_asm {
 
     const MAX_QTY: usize = 16;
 
-    const SORTED_NEAREST_INPUTS: [NearestNeighbour<f64, u32>; MAX_QTY] = [
-        NearestNeighbour {
+    const SORTED_NEAREST_INPUTS: [QueryResultItem<(), u32, f64>; MAX_QTY] = [
+        QueryResultItem {
             point: (),
             distance: 0.91,
             item: 91,
         },
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: 0.12,
             item: 12,
         },
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: 0.54,
             item: 54,
         },
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: 0.07,
             item: 7,
         },
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: 0.63,
             item: 63,
         },
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: 0.33,
             item: 33,
         },
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: 0.88,
             item: 88,
         },
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: 0.19,
             item: 19,
         },
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: 0.41,
             item: 41,
         },
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: 0.02,
             item: 2,
         },
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: 0.76,
             item: 76,
         },
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: 0.27,
             item: 27,
         },
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: 0.69,
             item: 69,
         },
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: 0.58,
             item: 58,
         },
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: 0.15,
             item: 15,
         },
-        NearestNeighbour {
+        QueryResultItem {
             point: (),
             distance: 0.47,
             item: 47,
         },
     ];
 
-    const BEST_INPUTS: [BestNeighbour<f64, u32>; MAX_QTY] = [
-        BestNeighbour {
+    const BEST_INPUTS: [BestQueryResultItem<(), u32, f64>; MAX_QTY] = [
+        BestQueryResultItem {
             point: (),
             distance: 0.91,
             item: 91,
         },
-        BestNeighbour {
+        BestQueryResultItem {
             point: (),
             distance: 0.12,
             item: 12,
         },
-        BestNeighbour {
+        BestQueryResultItem {
             point: (),
             distance: 0.54,
             item: 54,
         },
-        BestNeighbour {
+        BestQueryResultItem {
             point: (),
             distance: 0.07,
             item: 7,
         },
-        BestNeighbour {
+        BestQueryResultItem {
             point: (),
             distance: 0.63,
             item: 63,
         },
-        BestNeighbour {
+        BestQueryResultItem {
             point: (),
             distance: 0.33,
             item: 33,
         },
-        BestNeighbour {
+        BestQueryResultItem {
             point: (),
             distance: 0.88,
             item: 88,
         },
-        BestNeighbour {
+        BestQueryResultItem {
             point: (),
             distance: 0.19,
             item: 19,
         },
-        BestNeighbour {
+        BestQueryResultItem {
             point: (),
             distance: 0.41,
             item: 41,
         },
-        BestNeighbour {
+        BestQueryResultItem {
             point: (),
             distance: 0.02,
             item: 2,
         },
-        BestNeighbour {
+        BestQueryResultItem {
             point: (),
             distance: 0.76,
             item: 76,
         },
-        BestNeighbour {
+        BestQueryResultItem {
             point: (),
             distance: 0.27,
             item: 27,
         },
-        BestNeighbour {
+        BestQueryResultItem {
             point: (),
             distance: 0.69,
             item: 69,
         },
-        BestNeighbour {
+        BestQueryResultItem {
             point: (),
             distance: 0.58,
             item: 58,
         },
-        BestNeighbour {
+        BestQueryResultItem {
             point: (),
             distance: 0.15,
             item: 15,
         },
-        BestNeighbour {
+        BestQueryResultItem {
             point: (),
             distance: 0.47,
             item: 47,
@@ -1040,7 +1039,7 @@ pub mod cargo_asm {
     ];
 
     #[inline(always)]
-    fn checksum_nearest(results: &[NearestNeighbour<f64, u32>]) -> (usize, u64, u64) {
+    fn checksum_nearest(results: &[QueryResultItem<(), u32, f64>]) -> (usize, u64, u64) {
         let mut checksum_item = 0u64;
         let mut checksum_dist = 0u64;
 
@@ -1053,7 +1052,7 @@ pub mod cargo_asm {
     }
 
     #[inline(always)]
-    fn checksum_best(results: &[BestNeighbour<f64, u32>]) -> (usize, u64, u64) {
+    fn checksum_best(results: &[BestQueryResultItem<(), u32, f64>]) -> (usize, u64, u64) {
         let mut checksum_item = 0u64;
         let mut checksum_dist = 0u64;
 
@@ -1069,7 +1068,7 @@ pub mod cargo_asm {
     #[unsafe(no_mangle)]
     pub fn v6_sorted_vec_result_collection_add_cargo_asm_hook() -> (usize, u64, u64) {
         let mut results =
-            SortedVecResultCollection::<NearestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+            SortedVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(MAX_QTY);
         for entry in SORTED_NEAREST_INPUTS {
             results.add(entry);
         }
@@ -1082,7 +1081,7 @@ pub mod cargo_asm {
     #[unsafe(no_mangle)]
     pub fn v6_sorted_vec_result_collection_add_all_cargo_asm_hook() -> (usize, u64, u64) {
         let mut results =
-            SortedVecResultCollection::<NearestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+            SortedVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(MAX_QTY);
         results.add_all(SORTED_NEAREST_INPUTS);
         let vec = results.into_sorted_vec();
         checksum_nearest(&vec)
@@ -1092,7 +1091,7 @@ pub mod cargo_asm {
     #[unsafe(no_mangle)]
     pub fn v6_binary_heap_result_collection_add_cargo_asm_hook() -> (usize, u64, u64) {
         let mut results =
-            BinaryHeapResultCollection::<BestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+            BinaryHeapResultCollection::<BestQueryResultItem<(), u32, f64>>::with_max_qty(MAX_QTY);
         for entry in BEST_INPUTS {
             results.add(entry);
         }
@@ -1105,7 +1104,7 @@ pub mod cargo_asm {
     #[unsafe(no_mangle)]
     pub fn v6_binary_heap_result_collection_add_all_cargo_asm_hook() -> (usize, u64, u64) {
         let mut results =
-            BinaryHeapResultCollection::<BestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+            BinaryHeapResultCollection::<BestQueryResultItem<(), u32, f64>>::with_max_qty(MAX_QTY);
         results.add_all(BEST_INPUTS);
         let vec = results.into_sorted_vec();
         checksum_best(&vec)
@@ -1116,7 +1115,7 @@ pub mod cargo_asm {
     #[unsafe(no_mangle)]
     pub fn v6_small_sorted_vec_result_collection_add_cargo_asm_hook() -> (usize, u64, u64) {
         let mut results =
-            SmallSortedVecResultCollection::<NearestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+            SmallSortedVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(MAX_QTY);
         for entry in SORTED_NEAREST_INPUTS {
             results.add(entry);
         }
@@ -1129,7 +1128,7 @@ pub mod cargo_asm {
     #[unsafe(no_mangle)]
     pub fn v6_small_sorted_vec_result_collection_add_all_cargo_asm_hook() -> (usize, u64, u64) {
         let mut results =
-            SmallSortedVecResultCollection::<NearestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+            SmallSortedVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(MAX_QTY);
         results.add_all(SORTED_NEAREST_INPUTS);
         let vec = results.into_sorted_vec();
         checksum_nearest(&vec)
@@ -1140,7 +1139,9 @@ pub mod cargo_asm {
     #[unsafe(no_mangle)]
     pub fn v6_small_binary_heap_result_collection_add_cargo_asm_hook() -> (usize, u64, u64) {
         let mut results =
-            SmallBinaryHeapResultCollection::<BestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+            SmallBinaryHeapResultCollection::<BestQueryResultItem<(), u32, f64>>::with_max_qty(
+                MAX_QTY,
+            );
         for entry in BEST_INPUTS {
             results.add(entry);
         }
@@ -1153,7 +1154,9 @@ pub mod cargo_asm {
     #[unsafe(no_mangle)]
     pub fn v6_small_binary_heap_result_collection_add_all_cargo_asm_hook() -> (usize, u64, u64) {
         let mut results =
-            SmallBinaryHeapResultCollection::<BestNeighbour<f64, u32>>::with_max_qty(MAX_QTY);
+            SmallBinaryHeapResultCollection::<BestQueryResultItem<(), u32, f64>>::with_max_qty(
+                MAX_QTY,
+            );
         results.add_all(BEST_INPUTS);
         let vec = results.into_sorted_vec();
         checksum_best(&vec)

@@ -1,7 +1,7 @@
 use crate::dist::KdTreeDistanceMetric;
 use crate::leaf_view::{LeafArena, LeafView, TlsLeafScratch};
 use crate::results::result_collection::BestNeighbourResultCollection;
-use crate::{Axis, BestNeighbour, Content};
+use crate::{Axis, BestQueryResultItem, Content};
 
 #[inline(always)]
 pub(crate) fn best_n_within_with_query_wide_fallback<
@@ -91,7 +91,7 @@ pub(crate) fn best_n_within_with_query_wide_arena_fallback<
                 #[cfg(feature = "result_collection_stats")]
                 crate::results::result_collection_stats::record_candidate_emitted();
 
-                let candidate = BestNeighbour {
+                let candidate = BestQueryResultItem {
                     point: (),
                     distance: candidate_dist,
                     item,

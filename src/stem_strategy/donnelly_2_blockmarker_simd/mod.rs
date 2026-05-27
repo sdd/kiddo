@@ -16,10 +16,6 @@ impl<const K: usize> ValidBlock3Config64 for DonnellyMarkerSimd<Block3, 64, 8, K
 trait ValidBlock4Config64 {}
 impl<const K: usize> ValidBlock4Config64 for DonnellyMarkerSimd<Block4, 64, 4, K> {}
 
-// Architecture-specific modules
-#[cfg(all(feature = "simd", target_arch = "x86_64"))]
-pub mod x86_64;
-
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
 pub mod aarch64;
 

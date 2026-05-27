@@ -12,7 +12,7 @@ pub(crate) mod neon;
 use crate::dist::KdTreeDistanceMetric;
 use crate::leaf_view::{LeafArena, LeafView, TlsLeafScratch};
 use crate::results::result_collection::ResultCollection;
-use crate::{Axis, Content, NearestNeighbour};
+use crate::{Axis, Content, QueryResultItem};
 
 pub(crate) use fallback::{
     nearest_n_within_with_query_wide_arena_fallback, nearest_n_within_with_query_wide_fallback,
@@ -36,7 +36,7 @@ pub(crate) fn nearest_n_within_with_query_wide_arena<
     T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
-    R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
+    R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
     if unsafe {
@@ -89,7 +89,7 @@ pub(crate) fn nearest_n_within_with_query_wide<
     T: Content + PartialOrd,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
-    R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
+    R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
     if unsafe {
@@ -138,7 +138,7 @@ where
     T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
-    R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
+    R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
     D::try_nearest_n_within_leaf_avx512::<T, R, EXCLUSIVE, K, B>(leaf, query_wide, dist, results)
 }
@@ -156,7 +156,7 @@ where
     T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
-    R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
+    R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
     D::try_nearest_n_within_arena_avx512::<T, R, EXCLUSIVE, K>(arena, query_wide, dist, results)
 }
@@ -182,7 +182,7 @@ where
     T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
-    R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
+    R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
     D::try_nearest_n_within_leaf_avx2::<T, R, EXCLUSIVE, K, B>(leaf, query_wide, dist, results)
 }
@@ -200,7 +200,7 @@ where
     T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
-    R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
+    R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
     D::try_nearest_n_within_arena_avx2::<T, R, EXCLUSIVE, K>(arena, query_wide, dist, results)
 }
@@ -226,7 +226,7 @@ where
     T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
-    R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
+    R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
     D::try_nearest_n_within_leaf_neon::<T, R, EXCLUSIVE, K, B>(leaf, query_wide, dist, results)
 }
@@ -244,7 +244,7 @@ where
     T: Content,
     D: KdTreeDistanceMetric<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
-    R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
+    R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
     D::try_nearest_n_within_arena_neon::<T, R, EXCLUSIVE, K>(arena, query_wide, dist, results)
 }

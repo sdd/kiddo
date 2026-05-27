@@ -9,8 +9,7 @@ use fixed::FixedU16;
 use rand::distr::{Distribution, StandardUniform};
 
 use kiddo::batch_benches;
-use kiddo::mutable::fixed::kdtree::KdTree as FixedKdTree;
-use kiddo::mutable::float::kdtree::KdTree;
+use kiddo::{Eytzinger, KdTree, VecOfArrays};
 use kiddo::test_utils::rand_data_fixed_u16_entry;
 use kiddo::traits::{Axis, AxisFixed, Content, Index};
 
@@ -18,6 +17,10 @@ const BUCKET_SIZE: usize = 32;
 const QTY_TO_ADD_TO_POPULATED: u64 = 100;
 
 type Fxd = U16; // FixedU16<U16>;
+type MutableTree<A, T, const K: usize, const B: usize> =
+    KdTree<A, T, Eytzinger<K>, VecOfArrays<A, T, K, B>, K, B>;
+type FixedTree<A, T, const K: usize, const B: usize> =
+    KdTree<FixedU16<A>, T, Eytzinger<K>, VecOfArrays<FixedU16<A>, T, K, B>, K, B>;
 
 macro_rules! bench_empty_float {
     ($group:ident, $a:ty, $t:ty, $k:tt, $idx: ty, $size:tt, $subtype: expr) => {
@@ -132,7 +135,7 @@ fn bench_add_to_empty_float<A: Axis, T: Content, const K: usize, IDX: Index<T = 
                         (0..size).map(|_| rand::random::<([A; K], T)>()).collect();
 
                     let kdtree =
-                        KdTree::<A, T, K, BUCKET_SIZE, IDX>::with_capacity(points_to_add.len());
+                        MutableTree::<A, T, K, BUCKET_SIZE>::with_capacity(points_to_add.len());
 
                     (kdtree, points_to_add)
                 },
@@ -170,7 +173,7 @@ fn bench_add_to_populated_float<A: Axis, T: Content, const K: usize, IDX: Index<
                     for _ in 0..size {
                         initial_points.push(rand::random::<([A; K], T)>());
                     }
-                    let mut kdtree = KdTree::<A, T, K, BUCKET_SIZE, IDX>::with_capacity(
+                    let mut kdtree = MutableTree::<A, T, K, BUCKET_SIZE>::with_capacity(
                         size + points_to_add.len(),
                     );
 
@@ -211,7 +214,7 @@ fn bench_add_to_empty_fixed_u16<A: Unsigned, T: Content, const K: usize, IDX: In
                     for _ in 0..size {
                         points_to_add.push(rand_data_fixed_u16_entry::<A, T, K>());
                     }
-                    let kdtree = FixedKdTree::<FixedU16<A>, T, K, BUCKET_SIZE, IDX>::with_capacity(
+                    let kdtree = FixedTree::<A, T, K, BUCKET_SIZE>::with_capacity(
                         size + points_to_add.len(),
                     );
 

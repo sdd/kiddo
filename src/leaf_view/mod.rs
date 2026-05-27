@@ -4,7 +4,7 @@ use std::mem::MaybeUninit;
 
 use crate::dist::DistanceMetricUnified;
 use crate::results::result_collection::{BestNeighbourResultCollection, ResultCollection};
-use crate::{Axis, BestNeighbour, Content, NearestNeighbour};
+use crate::{Axis, BestQueryResultItem, Content, QueryResultItem};
 
 use fixed::{
     types::extra::{U0, U16, U8},
@@ -358,7 +358,7 @@ impl<'a, AX: Axis<Coord = AX>, T: Content, const K: usize, const B: usize>
         results: &mut R,
     ) where
         O: Axis<Coord = O>,
-        R: ResultCollection<O, NearestNeighbour<O, T>>,
+        R: ResultCollection<O, QueryResultItem<(), T, O>>,
     {
         dists.iter().zip(items).for_each(|(&d, &i)| {
             let is_within_dist = if EXCLUSIVE { d < dist } else { d <= dist };
@@ -366,7 +366,7 @@ impl<'a, AX: Axis<Coord = AX>, T: Content, const K: usize, const B: usize>
             if is_within_dist {
                 #[cfg(feature = "result_collection_stats")]
                 crate::results::result_collection_stats::record_candidate_emitted();
-                results.add(NearestNeighbour {
+                results.add(QueryResultItem {
                     point: (),
                     distance: d,
                     item: i,
@@ -543,7 +543,7 @@ impl<'a, AX: Axis<Coord = AX>, T: Content + PartialOrd, const K: usize, const B:
                 }
                 #[cfg(feature = "result_collection_stats")]
                 crate::results::result_collection_stats::record_candidate_emitted();
-                results.add(BestNeighbour {
+                results.add(BestQueryResultItem {
                     point: (),
                     distance: d,
                     item,
@@ -581,10 +581,10 @@ mod tests {
 
     #[derive(Default)]
     struct TestNearestResults {
-        entries: Vec<NearestNeighbour<f32, u32>>,
+        entries: Vec<QueryResultItem<(), u32, f32>>,
     }
 
-    impl ResultCollection<f32, NearestNeighbour<f32, u32>> for TestNearestResults {
+    impl ResultCollection<f32, QueryResultItem<(), u32, f32>> for TestNearestResults {
         fn with_max_qty(_max_qty: usize) -> Self {
             Self::default()
         }
@@ -597,7 +597,7 @@ mod tests {
             self.entries.len()
         }
 
-        fn add(&mut self, entry: NearestNeighbour<f32, u32>) {
+        fn add(&mut self, entry: QueryResultItem<(), u32, f32>) {
             self.entries.push(entry);
         }
 
@@ -605,11 +605,11 @@ mod tests {
             None
         }
 
-        fn into_vec(self) -> Vec<NearestNeighbour<f32, u32>> {
+        fn into_vec(self) -> Vec<QueryResultItem<(), u32, f32>> {
             self.entries
         }
 
-        fn into_sorted_vec(mut self) -> Vec<NearestNeighbour<f32, u32>> {
+        fn into_sorted_vec(mut self) -> Vec<QueryResultItem<(), u32, f32>> {
             self.entries
                 .sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
             self.entries
@@ -618,11 +618,11 @@ mod tests {
 
     #[derive(Default)]
     struct TestBestResults {
-        entries: Vec<BestNeighbour<f32, u32>>,
+        entries: Vec<BestQueryResultItem<(), u32, f32>>,
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
-    impl ResultCollection<f32, BestNeighbour<f32, u32>> for TestBestResults {
+    impl ResultCollection<f32, BestQueryResultItem<(), u32, f32>> for TestBestResults {
         fn with_max_qty(_max_qty: usize) -> Self {
             Self::default()
         }
@@ -635,7 +635,7 @@ mod tests {
             self.entries.len()
         }
 
-        fn add(&mut self, entry: BestNeighbour<f32, u32>) {
+        fn add(&mut self, entry: BestQueryResultItem<(), u32, f32>) {
             self.entries.push(entry);
         }
 
@@ -643,11 +643,11 @@ mod tests {
             None
         }
 
-        fn into_vec(self) -> Vec<BestNeighbour<f32, u32>> {
+        fn into_vec(self) -> Vec<BestQueryResultItem<(), u32, f32>> {
             self.entries
         }
 
-        fn into_sorted_vec(mut self) -> Vec<BestNeighbour<f32, u32>> {
+        fn into_sorted_vec(mut self) -> Vec<BestQueryResultItem<(), u32, f32>> {
             self.entries.sort_by(|a, b| {
                 a.item
                     .partial_cmp(&b.item)

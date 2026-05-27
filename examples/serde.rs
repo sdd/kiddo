@@ -13,14 +13,11 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use std::time::Instant;
 
-use kiddo::immutable::float::kdtree::ImmutableKdTree;
-use kiddo::mutable::float::kdtree::KdTree;
-
 use serde::Deserialize;
 
 use cities::{degrees_lat_lng_to_unit_sphere, parse_csv_file};
-use kiddo::distance::float::SquaredEuclidean;
-use kiddo::Eytzinger;
+use kiddo::dist::SquaredEuclidean;
+use kiddo::{Eytzinger, KdTree, VecOfArenas, VecOfArrays};
 
 /// Each `CityCsvRecord` corresponds to 1 row in our city source data CSV.
 ///
@@ -48,7 +45,7 @@ impl CityCsvRecord {
 // on some axes. All values that are the same in one axis must fit in one bucket.
 const BUCKET_SIZE: usize = 1024;
 
-type Tree = KdTree<f32, usize, 3, BUCKET_SIZE, u32>;
+type Tree = KdTree<f32, usize, Eytzinger<3>, VecOfArrays<f32, usize, 3, BUCKET_SIZE>, 3, BUCKET_SIZE>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Load in the cities data from the CSV and use it to populate a k-d tree, as per
@@ -74,7 +71,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Test query on the newly created tree
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let nearest_neighbour = kdtree.nearest_one::<SquaredEuclidean>(&query);
+    let nearest_neighbour = kdtree
+        .query(&query)
+        .nearest_one::<SquaredEuclidean<f32>>()
+        .execute();
     let nearest_city = &cities[nearest_neighbour.item as usize];
     println!("\nNearest city to 52.5N, 1.9W: {nearest_city:?}");
 
@@ -99,7 +99,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Test that the deserialization worked
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let nearest_neighbour = deserialized_tree.nearest_one::<SquaredEuclidean>(&query);
+    let nearest_neighbour = deserialized_tree
+        .query(&query)
+        .nearest_one::<SquaredEuclidean<f32>>()
+        .execute();
     let nearest_city = &cities[nearest_neighbour.item as usize];
     println!("\nNearest city to 52.5N, 1.9W: {nearest_city:?}");
 
@@ -107,8 +110,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Building an ImmutableKdTree...");
     // Build an ImmutableKdTree
     let start = Instant::now();
-    let kdtree: ImmutableKdTree<f32, u32, Eytzinger<3>, 3, 32> =
-        ImmutableKdTree::new_from_slice(&city_points);
+    let kdtree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
+        KdTree::new_from_slice(&city_points).unwrap();
     println!(
         "Built an ImmutableKdTree ({})",
         ElapsedDuration::new(start.elapsed())
@@ -126,7 +129,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     let file = File::open("./examples/geonames-immutable-tree.bincode.gz")?;
     let mut decompressor = GzDecoder::new(file);
-    let deserialized_tree: ImmutableKdTree<f32, u32, Eytzinger<3>, 3, 32> =
+    let deserialized_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
         bincode::serde::decode_from_std_read(&mut decompressor, bincode::config::standard())?;
     println!(
         "Deserialized gzipped bincode file back into a k-d tree ({})",
@@ -135,7 +138,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Test that the deserialization worked
     let query = degrees_lat_lng_to_unit_sphere(52.5f32, -1.9f32);
-    let nearest_neighbour_result = deserialized_tree.nearest_one::<SquaredEuclidean>(&query);
+    let nearest_neighbour_result = deserialized_tree
+        .query(&query)
+        .nearest_one::<SquaredEuclidean<f32>>()
+        .execute();
     let nearest = &cities[nearest_neighbour_result.item as usize];
     println!("\nNearest city to 52.5N, 1.9W: {nearest:?}");
 

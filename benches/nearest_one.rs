@@ -10,8 +10,7 @@ use fixed::{FixedU16, FixedU32};
 use kiddo::batch_benches;
 use kiddo::distance::fixed::SquaredEuclidean as SquaredEuclideanFixed;
 use kiddo::distance::float::SquaredEuclidean;
-use kiddo::mutable::fixed::kdtree::KdTree as KdTreeFixed;
-use kiddo::mutable::float::kdtree::KdTree;
+use kiddo::{Eytzinger, KdTree, VecOfArrays};
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_fixed, build_populated_tree_and_query_points_float,
     process_queries_fixed, process_queries_float,
@@ -25,6 +24,10 @@ const QUERY_POINTS_PER_LOOP: usize = 1000;
 
 type Fxd = U8; // FixedU16<U8>;
 type FxdR = FixedU32<U8>;
+type MutableTree<A, T, const K: usize, const B: usize> =
+    KdTree<A, T, Eytzinger<K>, VecOfArrays<A, T, K, B>, K, B>;
+type FixedTree<A, T, const K: usize, const B: usize> =
+    KdTree<FixedU16<A>, T, Eytzinger<K>, VecOfArrays<FixedU16<A>, T, K, B>, K, B>;
 
 macro_rules! bench_float {
     ($group:ident, $a:ty, $t:ty, $k:tt, $idx: ty, $size:tt, $subtype: expr) => {
@@ -98,12 +101,15 @@ fn perform_query_float<
     const B: usize,
     IDX: Index<T = IDX> + 'static,
 >(
-    kdtree: &KdTree<A, T, K, BUCKET_SIZE, IDX>,
+    kdtree: &MutableTree<A, T, K, BUCKET_SIZE>,
     point: &[A; K],
 ) where
     usize: Cast<IDX>,
 {
-    kdtree.nearest_one::<SquaredEuclidean>(point);
+    let _ = kdtree
+        .query(point)
+        .nearest_one::<SquaredEuclidean<A>>()
+        .execute();
 }
 
 fn perform_query_fixed<
@@ -113,13 +119,16 @@ fn perform_query_fixed<
     const B: usize,
     IDX: Index<T = IDX> + 'static,
 >(
-    kdtree: &KdTreeFixed<FixedU16<A>, T, K, BUCKET_SIZE, IDX>,
+    kdtree: &FixedTree<A, T, K, BUCKET_SIZE>,
     point: &[FixedU16<A>; K],
 ) where
     usize: Cast<IDX>,
     FixedU16<A>: AxisFixed,
 {
-    kdtree.nearest_one::<SquaredEuclideanFixed, FxdR>(point);
+    let _ = kdtree
+        .query(point)
+        .nearest_one::<SquaredEuclideanFixed>()
+        .execute();
 }
 
 fn bench_query_nearest_one_float<

@@ -2,10 +2,6 @@
     all(kiddo_nightly, target_arch = "aarch64"),
     feature(stdarch_aarch64_prefetch)
 )]
-#![cfg_attr(
-    all(kiddo_nightly, feature = "simd"),
-    feature(target_feature_inline_always)
-)]
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 #![warn(rustdoc::missing_crate_level_docs)]
 #![deny(rustdoc::invalid_codeblock_attributes)]
@@ -122,7 +118,7 @@
 //!
 //! use kiddo::leaf_strategy::VecOfArrays;
 //! use kiddo::SquaredEuclidean;
-//! use kiddo::NearestNeighbour;
+//! use kiddo::QueryResultItem;
 //! use kiddo::{Eytzinger, ImmutableKdTree};
 //!
 //! let entries = vec![
@@ -152,9 +148,9 @@
 //!         .nearest_n::<SquaredEuclidean<f64>>(NonZero::new(3usize).unwrap())
 //!         .execute(),
 //!     vec![
-//!         NearestNeighbour { point: (), distance: 0f64, item: 0 },
-//!         NearestNeighbour { point: (), distance: 2f64, item: 1 },
-//!         NearestNeighbour { point: (), distance: 8f64, item: 2 }
+//!         QueryResultItem { point: (), distance: 0f64, item: 0 },
+//!         QueryResultItem { point: (), distance: 2f64, item: 1 },
+//!         QueryResultItem { point: (), distance: 8f64, item: 2 }
 //!     ]
 //! );
 //! ```
@@ -237,8 +233,7 @@ mod mirror_select_nth_unstable_by;
 /// Structs that are returned as query results
 pub mod results;
 pub use results::{
-    best_neighbour::BestNeighbour, best_query_result_item::BestQueryResultItem,
-    nearest_neighbour::NearestNeighbour, query_result_item::QueryResultItem,
+    best_query_result_item::BestQueryResultItem, query_result_item::QueryResultItem,
 };
 
 #[cfg(feature = "rkyv_08")]

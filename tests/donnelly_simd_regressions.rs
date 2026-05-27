@@ -9,7 +9,7 @@ use kiddo::leaf_strategy::FlatVec;
 #[cfg(feature = "simd")]
 use kiddo::stem_strategy::{Block3, Block4, Donnelly, DonnellyMarkerSimd};
 #[cfg(feature = "simd")]
-use kiddo::BestNeighbour;
+use kiddo::BestQueryResultItem;
 #[cfg(feature = "simd")]
 use kiddo::SquaredEuclidean;
 #[cfg(feature = "simd")]
@@ -82,7 +82,7 @@ fn linear_best_n_within_f32(
     query: &[f32; 2],
     max_dist: f32,
     max_qty: usize,
-) -> Vec<BestNeighbour<f32, usize>> {
+) -> Vec<BestQueryResultItem<(), usize, f32>> {
     let mut best_items = Vec::with_capacity(max_qty);
 
     for (item, point) in points.iter().enumerate() {
@@ -90,14 +90,14 @@ fn linear_best_n_within_f32(
             <kiddo::SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, point);
         if distance <= max_dist {
             if best_items.len() < max_qty {
-                best_items.push(BestNeighbour {
+                best_items.push(BestQueryResultItem {
                     point: (),
                     distance,
                     item,
                 });
             } else if item < best_items.last().unwrap().item {
                 best_items.pop();
-                best_items.push(BestNeighbour {
+                best_items.push(BestQueryResultItem {
                     point: (),
                     distance,
                     item,
@@ -116,7 +116,7 @@ fn linear_best_n_within_f64(
     query: &[f64; 2],
     max_dist: f64,
     max_qty: usize,
-) -> Vec<BestNeighbour<f64, usize>> {
+) -> Vec<BestQueryResultItem<(), usize, f64>> {
     let mut best_items = Vec::with_capacity(max_qty);
 
     for (item, point) in points.iter().enumerate() {
@@ -124,14 +124,14 @@ fn linear_best_n_within_f64(
             <kiddo::SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, point);
         if distance <= max_dist {
             if best_items.len() < max_qty {
-                best_items.push(BestNeighbour {
+                best_items.push(BestQueryResultItem {
                     point: (),
                     distance,
                     item,
                 });
             } else if item < best_items.last().unwrap().item {
                 best_items.pop();
-                best_items.push(BestNeighbour {
+                best_items.push(BestQueryResultItem {
                     point: (),
                     distance,
                     item,

@@ -19,7 +19,7 @@ use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits::leaf_strategy::LeafProjection;
-use crate::{Axis, Content, KdTree, LeafStrategy, NearestNeighbour, StemStrategy};
+use crate::{Axis, Content, KdTree, LeafStrategy, QueryResultItem, StemStrategy};
 
 #[cfg(not(feature = "small_n_result_collectors"))]
 const MAX_VEC_RESULT_SIZE: usize = 20;
@@ -41,7 +41,7 @@ where
     ) where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
-        R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
+        R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
     {
         #[cfg(feature = "result_collection_stats")]
         let was_full = results.is_full();
@@ -87,7 +87,7 @@ where
         max_dist: D::Output,
         max_qty: NonZeroUsize,
         sorted: bool,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -107,7 +107,7 @@ where
         max_dist: D::Output,
         max_qty: NonZeroUsize,
         sorted: bool,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -121,7 +121,7 @@ where
         let max_qty: usize = max_qty.get();
 
         if max_qty == usize::MAX {
-            self.nearest_n_within_inner::<D, Vec<NearestNeighbour<D::Output, T>>, EXCLUSIVE>(
+            self.nearest_n_within_inner::<D, Vec<QueryResultItem<(), T, D::Output>>, EXCLUSIVE>(
                 query, max_dist, max_qty, sorted,
             )
         } else if sorted {
@@ -129,7 +129,7 @@ where
             if max_qty <= SMALL_RESULT_COLLECTION_MAX_QTY {
                 return self.nearest_n_within_inner::<
                     D,
-                    SmallSortedVecResultCollection<NearestNeighbour<D::Output, T>>,
+                    SmallSortedVecResultCollection<QueryResultItem<(), T, D::Output>>,
                     EXCLUSIVE,
                 >(query, max_dist, max_qty, sorted);
             }
@@ -138,20 +138,20 @@ where
             if max_qty <= MAX_VEC_RESULT_SIZE {
                 return self.nearest_n_within_inner::<
                     D,
-                    SortedVecResultCollection<NearestNeighbour<D::Output, T>>,
+                    SortedVecResultCollection<QueryResultItem<(), T, D::Output>>,
                     EXCLUSIVE,
                 >(query, max_dist, max_qty, sorted);
             }
 
             self.nearest_n_within_inner::<
                 D,
-                BinaryHeapResultCollection<NearestNeighbour<D::Output, T>>,
+                BinaryHeapResultCollection<QueryResultItem<(), T, D::Output>>,
                 EXCLUSIVE,
             >(query, max_dist, max_qty, sorted)
         } else {
             self.nearest_n_within_inner::<
                 D,
-                BinaryHeapResultCollection<NearestNeighbour<D::Output, T>>,
+                BinaryHeapResultCollection<QueryResultItem<(), T, D::Output>>,
                 EXCLUSIVE,
             >(query, max_dist, max_qty, sorted)
         }
@@ -163,7 +163,7 @@ where
         max_dist: D::Output,
         max_qty: usize,
         sorted: bool,
-    ) -> Vec<NearestNeighbour<D::Output, T>>
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         D: KdTreeDistanceMetric<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
@@ -172,7 +172,7 @@ where
             + BacktrackBlock4
             + TlsLeafScratch
             + 'static,
-        R: ResultCollection<D::Output, NearestNeighbour<D::Output, T>>,
+        R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
         let mut req_ctx = NearestNWithinReqCtx::<A, T, D::Output, R, EXCLUSIVE, K> {
@@ -283,7 +283,7 @@ impl<A, T, O, R, const EXCLUSIVE: bool, const K: usize> QueryContext<A, O, K>
     for NearestNWithinReqCtx<'_, A, T, O, R, EXCLUSIVE, K>
 where
     O: Axis<Coord = O>,
-    R: ResultCollection<O, NearestNeighbour<O, T>>,
+    R: ResultCollection<O, QueryResultItem<(), T, O>>,
 {
     fn query(&self) -> &[A; K] {
         self.query

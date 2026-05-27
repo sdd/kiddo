@@ -1,8 +1,6 @@
 //! A projected result item returned by nearest/range queries.
 use std::cmp::Ordering;
 
-use crate::Content;
-
 /// Represents an entry in the results of a nearest or radius query.
 #[derive(Debug, Copy, Clone)]
 pub struct QueryResultItem<P, T, D> {
@@ -35,11 +33,5 @@ impl<P, T, D: PartialEq> Eq for QueryResultItem<P, T, D> {}
 impl<P, T, D: PartialEq> PartialEq for QueryResultItem<P, T, D> {
     fn eq(&self, other: &Self) -> bool {
         self.distance == other.distance
-    }
-}
-
-impl<T: Content, D> From<QueryResultItem<(), T, D>> for (D, T) {
-    fn from(elem: QueryResultItem<(), T, D>) -> Self {
-        (elem.distance, elem.item)
     }
 }

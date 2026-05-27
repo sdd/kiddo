@@ -37,9 +37,3 @@ impl<P, T: Content + PartialOrd, D: PartialEq> PartialEq for BestQueryResultItem
         self.distance == other.distance && self.item == other.item
     }
 }
-
-impl<T: Content + PartialOrd, D> From<BestQueryResultItem<(), T, D>> for (D, T) {
-    fn from(elem: BestQueryResultItem<(), T, D>) -> Self {
-        (elem.distance, elem.item)
-    }
-}

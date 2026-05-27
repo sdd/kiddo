@@ -19,11 +19,11 @@ unsafe fn emit_results_avx2_f64<T, F, const EXCLUSIVE: bool>(
     T: Content,
     F: FnMut(f64, T),
 {
-    let mask = _mm256_movemask_pd(_mm256_cmp_pd(
-        dists,
-        _mm256_set1_pd(max_dist),
-        if EXCLUSIVE { _CMP_LT_OQ } else { _CMP_LE_OQ },
-    )) as u32;
+    let mask = if EXCLUSIVE {
+        _mm256_movemask_pd(_mm256_cmp_pd(dists, _mm256_set1_pd(max_dist), _CMP_LT_OQ)) as u32
+    } else {
+        _mm256_movemask_pd(_mm256_cmp_pd(dists, _mm256_set1_pd(max_dist), _CMP_LE_OQ)) as u32
+    };
     if mask == 0 {
         return;
     }
@@ -251,11 +251,11 @@ unsafe fn emit_results_avx2_f32<T, F, const EXCLUSIVE: bool>(
     T: Content,
     F: FnMut(f32, T),
 {
-    let mask = _mm256_movemask_ps(_mm256_cmp_ps(
-        dists,
-        _mm256_set1_ps(max_dist),
-        if EXCLUSIVE { _CMP_LT_OQ } else { _CMP_LE_OQ },
-    )) as u32;
+    let mask = if EXCLUSIVE {
+        _mm256_movemask_ps(_mm256_cmp_ps(dists, _mm256_set1_ps(max_dist), _CMP_LT_OQ)) as u32
+    } else {
+        _mm256_movemask_ps(_mm256_cmp_ps(dists, _mm256_set1_ps(max_dist), _CMP_LE_OQ)) as u32
+    };
     if mask == 0 {
         return;
     }
@@ -285,11 +285,11 @@ unsafe fn emit_results_sse_f32<T, F, const EXCLUSIVE: bool>(
     T: Content,
     F: FnMut(f32, T),
 {
-    let mask = _mm_movemask_ps(_mm_cmp_ps(
-        dists,
-        _mm_set1_ps(max_dist),
-        if EXCLUSIVE { _CMP_LT_OQ } else { _CMP_LE_OQ },
-    )) as u32;
+    let mask = if EXCLUSIVE {
+        _mm_movemask_ps(_mm_cmp_ps(dists, _mm_set1_ps(max_dist), _CMP_LT_OQ)) as u32
+    } else {
+        _mm_movemask_ps(_mm_cmp_ps(dists, _mm_set1_ps(max_dist), _CMP_LE_OQ)) as u32
+    };
     if mask == 0 {
         return;
     }

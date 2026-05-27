@@ -5,7 +5,7 @@ use codspeed_criterion_compat::{
 };
 use kiddo::batch_benches_parameterized;
 use kiddo::distance::float::SquaredEuclidean;
-use kiddo::immutable::float::kdtree::ImmutableKdTree;
+use kiddo::{Eytzinger, KdTree, VecOfArenas};
 use kiddo::test_utils::{
     build_populated_tree_and_query_points_float,
     process_queries_fixed_parameterized, process_queries_float_parameterized,
@@ -19,6 +19,8 @@ const QUERY_POINTS_PER_LOOP: usize = 100;
 const RADIUS_SMALL: f64 = 0.01;
 const RADIUS_MEDIUM: f64 = 0.05;
 const RADIUS_LARGE: f64 = 0.25;
+type ImmutableTree<A, T, const K: usize, const B: usize> =
+    KdTree<A, T, Eytzinger<K>, VecOfArenas<A, T, K, B>, K, B>;
 
 macro_rules! bench_float {
     ($group:ident, $a:ty, $t:ty, $k:tt, $idx: ty, $size:tt, $radius:tt,  $subtype: expr) => {
@@ -69,14 +71,17 @@ fn perform_query_float<
     const B: usize,
     IDX: Index<T = IDX> + 'static,
 >(
-    kdtree: &ImmutableKdTree<A, T, K, BUCKET_SIZE, IDX>,
+    kdtree: &ImmutableTree<A, T, K, BUCKET_SIZE>,
     point: &[A; K],
     radius: f64,
 ) where
     usize: Cast<IDX>,
     f64: Cast<A>,
 {
-    let _res = kdtree.within::<SquaredEuclidean>(point, radius.az::<A>());
+    let _res = kdtree
+        .query(point)
+        .within::<SquaredEuclidean<A>>(radius.az::<A>())
+        .execute();
 }
 
 fn bench_query_float<

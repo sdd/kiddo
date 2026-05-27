@@ -113,12 +113,12 @@ fn run_nearest_queries_donnelly_simd(tree: &DonnellySimdTree, queries: &[[f64; K
     let mut checksum_item = 0u64;
 
     for query in queries {
-        let (dist, item) = tree
+        let result = tree
             .query(black_box(query))
             .nearest_one::<SquaredEuclidean<f64>>()
             .execute();
-        checksum_dist += dist;
-        checksum_item = checksum_item.wrapping_add(item as u64);
+        checksum_dist += result.distance;
+        checksum_item = checksum_item.wrapping_add(result.item as u64);
     }
 
     (checksum_dist, checksum_item)

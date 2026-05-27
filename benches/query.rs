@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use kiddo::distance::squared_euclidean;
+use kiddo::dist::SquaredEuclidean;
 use kiddo::KdTree;
 use rayon::prelude::*;
 
@@ -39,9 +39,12 @@ fn criterion_benchmark(c: &mut Criterion) {
                     let v: Vec<_> = black_box(&query)
                         .par_iter()
                         .map_with(black_box(&kdtree), |t, q| {
-                            let (dist, idx) = t.nearest_one(black_box(&q), &squared_euclidean).unwrap();
-                            drop(dist);
-                            drop(idx);
+                            let result = t
+                                .query(black_box(q))
+                                .nearest_one::<SquaredEuclidean<f32>>()
+                                .execute();
+                            drop(result.distance);
+                            drop(result.item);
                         })
                         .collect();
                     drop(v)

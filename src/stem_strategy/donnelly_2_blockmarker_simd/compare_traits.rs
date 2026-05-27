@@ -108,22 +108,34 @@ impl CompareBlock3 for f64 {
             #[cfg(target_feature = "avx512f")]
             {
                 unsafe {
-                    crate::stem_strategy::donnelly_2_blockmarker_simd::x86_64::compare_block3_f64_avx512(
-                        stems_ptr,
-                        block_base_idx,
-                        query_val,
-                    )
+                    use std::arch::x86_64::*;
+
+                    let ptr = stems_ptr.as_ptr().add(block_base_idx * 8) as *const f64;
+                    let pivots = _mm512_loadu_pd(ptr);
+                    let query_vec = _mm512_set1_pd(query_val);
+                    let mask = _mm512_cmp_pd_mask(query_vec, pivots, _CMP_GE_OQ);
+                    _popcnt32(mask as i32) as u8
                 }
             }
 
             #[cfg(not(target_feature = "avx512f"))]
             {
                 unsafe {
-                    crate::stem_strategy::donnelly_2_blockmarker_simd::x86_64::compare_block3_f64_avx2(
-                        stems_ptr,
-                        block_base_idx,
-                        query_val,
-                    )
+                    use std::arch::x86_64::*;
+
+                    let ptr = stems_ptr.as_ptr().add(block_base_idx * 8) as *const f64;
+                    let pivots_low = _mm256_loadu_pd(ptr);
+                    let pivots_high = _mm256_loadu_pd(ptr.add(4));
+                    let query_vec = _mm256_set1_pd(query_val);
+
+                    let cmp_low = _mm256_cmp_pd(query_vec, pivots_low, _CMP_GE_OQ);
+                    let cmp_high = _mm256_cmp_pd(query_vec, pivots_high, _CMP_GE_OQ);
+
+                    let mask_low = _mm256_movemask_pd(cmp_low) as u32;
+                    let mask_high = _mm256_movemask_pd(cmp_high) as u32;
+                    let mask = mask_low | (mask_high << 4);
+
+                    _popcnt32(mask as i32) as u8
                 }
             }
         }
@@ -181,22 +193,29 @@ impl CompareBlock3 for f32 {
             #[cfg(target_feature = "avx512f")]
             {
                 unsafe {
-                    crate::stem_strategy::donnelly_2_blockmarker_simd::x86_64::compare_block3_f32_avx512(
-                        stems_ptr,
-                        block_base_idx,
-                        query_val,
-                    )
+                    use std::arch::x86_64::*;
+
+                    let ptr = stems_ptr.as_ptr().add(block_base_idx * 4) as *const f32;
+                    let pivots = _mm256_loadu_ps(ptr);
+                    let query_vec = _mm256_set1_ps(query_val);
+                    let mask = _mm256_cmp_ps_mask(query_vec, pivots, _CMP_GE_OQ);
+                    _popcnt32(mask as i32) as u8
                 }
             }
 
             #[cfg(not(target_feature = "avx512f"))]
             {
                 unsafe {
-                    crate::stem_strategy::donnelly_2_blockmarker_simd::x86_64::compare_block3_f32_avx2(
-                        stems_ptr,
-                        block_base_idx,
-                        query_val,
-                    )
+                    use std::arch::x86_64::*;
+
+                    let ptr = stems_ptr.as_ptr().add(block_base_idx * 4) as *const f32;
+                    let pivots = _mm256_loadu_ps(ptr);
+                    let query_vec = _mm256_set1_ps(query_val);
+
+                    let cmp = _mm256_cmp_ps(query_vec, pivots, _CMP_GE_OQ);
+                    let mask = _mm256_movemask_ps(cmp) as u32;
+
+                    _popcnt32(mask as i32) as u8
                 }
             }
         }
@@ -236,22 +255,35 @@ impl CompareBlock4 for f32 {
             #[cfg(target_feature = "avx512f")]
             {
                 unsafe {
-                    crate::stem_strategy::donnelly_2_blockmarker_simd::x86_64::compare_block4_f32_avx512(
-                        stems_ptr,
-                        block_base_idx,
-                        query_val,
-                    )
+                    use std::arch::x86_64::*;
+
+                    let ptr = stems_ptr.as_ptr().add(block_base_idx * 4) as *const f32;
+                    let pivots = _mm512_loadu_ps(ptr);
+                    let query_vec = _mm512_set1_ps(query_val);
+
+                    let mask = _mm512_cmp_ps_mask(query_vec, pivots, _CMP_GE_OQ);
+                    _popcnt32(mask as i32) as u8
                 }
             }
 
             #[cfg(not(target_feature = "avx512f"))]
             {
                 unsafe {
-                    crate::stem_strategy::donnelly_2_blockmarker_simd::x86_64::compare_block4_f32_avx2(
-                        stems_ptr,
-                        block_base_idx,
-                        query_val,
-                    )
+                    use std::arch::x86_64::*;
+
+                    let ptr = stems_ptr.as_ptr().add(block_base_idx * 4) as *const f32;
+                    let pivots_low = _mm256_loadu_ps(ptr);
+                    let pivots_high = _mm256_loadu_ps(ptr.add(8));
+                    let query_vec = _mm256_set1_ps(query_val);
+
+                    let cmp_low = _mm256_cmp_ps(query_vec, pivots_low, _CMP_GE_OQ);
+                    let cmp_high = _mm256_cmp_ps(query_vec, pivots_high, _CMP_GE_OQ);
+
+                    let mask_low = _mm256_movemask_ps(cmp_low) as u32;
+                    let mask_high = _mm256_movemask_ps(cmp_high) as u32;
+                    let mask = mask_low | (mask_high << 8);
+
+                    _popcnt32(mask as i32) as u8
                 }
             }
         }

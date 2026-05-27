@@ -2,12 +2,6 @@
 pub mod best_query_result_item;
 
 #[doc(hidden)]
-pub mod best_neighbour;
-
-#[doc(hidden)]
-pub mod nearest_neighbour;
-
-#[doc(hidden)]
 pub mod query_result_item;
 
 pub(crate) mod result_collection;
