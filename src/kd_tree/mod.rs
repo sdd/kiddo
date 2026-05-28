@@ -63,6 +63,67 @@ impl std::fmt::Display for ConstructionError {
 
 impl std::error::Error for ConstructionError {}
 
+/// Errors returned when converting one `KdTree` variant into another.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum KdTreeConversionError {
+    /// Converting an item failed.
+    ItemConversion {
+        /// Index of the failing logical entry in iterator order.
+        point_index: usize,
+        /// Debug-formatted source conversion error.
+        source: String,
+    },
+    /// Converting one coordinate in a point failed.
+    AxisConversion {
+        /// Index of the failing logical entry in iterator order.
+        point_index: usize,
+        /// Coordinate dimension that failed to convert.
+        dim: usize,
+        /// Debug-formatted source conversion error.
+        source: String,
+    },
+    /// Rebuilding the destination tree failed.
+    Construction(ConstructionError),
+}
+
+impl std::fmt::Display for KdTreeConversionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ItemConversion {
+                point_index,
+                source,
+            } => write!(
+                f,
+                "failed to convert item at point_index {point_index}: {source}"
+            ),
+            Self::AxisConversion {
+                point_index,
+                dim,
+                source,
+            } => write!(
+                f,
+                "failed to convert axis value at point_index {point_index}, dim {dim}: {source}"
+            ),
+            Self::Construction(err) => write!(f, "failed to rebuild converted kd-tree: {err}"),
+        }
+    }
+}
+
+impl std::error::Error for KdTreeConversionError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Construction(err) => Some(err),
+            _ => None,
+        }
+    }
+}
+
+impl From<ConstructionError> for KdTreeConversionError {
+    fn from(value: ConstructionError) -> Self {
+        Self::Construction(value)
+    }
+}
+
 /// Query-facing interface for resolving stem indices to leaf indices during traversal.
 pub trait StemLeafResolution {
     /// Returns true if this resolution strategy uses arithmetic (fast path).
@@ -428,6 +489,23 @@ where
         KdTreeIter::new(self)
     }
 
+    /// Converts this tree into another `KdTree` variant by rebuilding from its
+    /// logical entries.
+    #[inline]
+    pub fn try_convert<A2, T2, SS2, LS2, const B2: usize>(
+        self,
+    ) -> Result<KdTree<A2, T2, SS2, LS2, K, B2>, KdTreeConversionError>
+    where
+        A2: Axis<Coord = A2> + TryFrom<A>,
+        <A2 as TryFrom<A>>::Error: std::fmt::Debug,
+        T2: Content + TryFrom<T>,
+        <T2 as TryFrom<T>>::Error: std::fmt::Debug,
+        SS2: StemStrategy,
+        LS2: ConstructibleLeafStrategy<A2, T2, SS2, K, B2>,
+    {
+        KdTree::<A2, T2, SS2, LS2, K, B2>::try_from(&self)
+    }
+
     /// Find which leaf contains a specific item.
     /// Returns `Some((leaf_idx, position_in_leaf))` if found, `None` if not found.
     pub fn find_leaf_for_item(&self, target_item: T) -> Option<(usize, usize)>
@@ -459,6 +537,50 @@ where
     fn from_iter<I: IntoIterator<Item = (usize, [A; K])>>(_iter: I) -> Self {
         // TODO: Proper impl
         Self::default()
+    }
+}
+
+impl<'a, A1, T1, SS1, LS1, A2, T2, SS2, LS2, const K: usize, const B1: usize, const B2: usize>
+    TryFrom<&'a KdTree<A1, T1, SS1, LS1, K, B1>> for KdTree<A2, T2, SS2, LS2, K, B2>
+where
+    A1: Axis<Coord = A1>,
+    T1: Content,
+    SS1: StemStrategy,
+    LS1: LeafStrategy<A1, T1, SS1, K, B1>,
+    A2: Axis<Coord = A2> + TryFrom<A1>,
+    <A2 as TryFrom<A1>>::Error: std::fmt::Debug,
+    T2: Content + TryFrom<T1>,
+    <T2 as TryFrom<T1>>::Error: std::fmt::Debug,
+    SS2: StemStrategy,
+    LS2: ConstructibleLeafStrategy<A2, T2, SS2, K, B2>,
+{
+    type Error = KdTreeConversionError;
+
+    fn try_from(source: &'a KdTree<A1, T1, SS1, LS1, K, B1>) -> Result<Self, Self::Error> {
+        let mut entries = Vec::with_capacity(source.size());
+
+        for (point_index, (item, point)) in source.iter().enumerate() {
+            let converted_item =
+                T2::try_from(item).map_err(|err| KdTreeConversionError::ItemConversion {
+                    point_index,
+                    source: format!("{err:?}"),
+                })?;
+
+            let mut converted_point = [A2::zero(); K];
+            for dim in 0..K {
+                converted_point[dim] = A2::try_from(point[dim]).map_err(|err| {
+                    KdTreeConversionError::AxisConversion {
+                        point_index,
+                        dim,
+                        source: format!("{err:?}"),
+                    }
+                })?;
+            }
+
+            entries.push((converted_item, converted_point));
+        }
+
+        Self::new_from_entries(&entries).map_err(Into::into)
     }
 }
 
@@ -580,10 +702,23 @@ mod tests {
     #[cfg(all(feature = "rkyv_08", feature = "simd", target_arch = "x86_64"))]
     use crate::stem_strategy::{Block4, DonnellyMarkerSimd};
     use crate::Eytzinger;
-    #[cfg(feature = "rkyv_08")]
     use crate::SquaredEuclidean;
     #[cfg(feature = "rkyv_08")]
     use std::num::NonZeroUsize;
+
+    fn sort_entries_u32<A: Copy, const K: usize>(
+        mut entries: Vec<(u32, [A; K])>,
+    ) -> Vec<(u32, [A; K])> {
+        entries.sort_by_key(|(item, _)| *item);
+        entries
+    }
+
+    fn sort_entries_u16<A: Copy, const K: usize>(
+        mut entries: Vec<(u16, [A; K])>,
+    ) -> Vec<(u16, [A; K])> {
+        entries.sort_by_key(|(item, _)| *item);
+        entries
+    }
 
     #[test]
     fn test_default() {
@@ -989,5 +1124,127 @@ mod tests {
         let kd_tree = Tree::new_from_slice_no_items(&points).unwrap();
 
         assert_eq!(kd_tree.size, 1);
+    }
+
+    #[test]
+    fn new_from_entries_preserves_explicit_items() {
+        type Tree = KdTree<f32, u32, Eytzinger<2>, FlatVec<f32, u32, 2, 4>, 2, 4>;
+
+        let entries = vec![
+            (42u32, [0.0f32, 0.0f32]),
+            (7u32, [5.0f32, 5.0f32]),
+            (99u32, [10.0f32, 10.0f32]),
+        ];
+
+        let tree = Tree::new_from_entries(&entries).unwrap();
+
+        assert_eq!(tree.size(), entries.len());
+        assert_eq!(
+            sort_entries_u32(tree.iter().collect()),
+            sort_entries_u32(entries)
+        );
+
+        let nearest = tree
+            .query(&[5.1f32, 4.9f32])
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .execute();
+        assert_eq!(nearest.item, 7);
+    }
+
+    #[test]
+    fn try_from_kdtree_converts_across_variants() {
+        type SourceTree = KdTree<f32, u16, Eytzinger<2>, VecOfArrays<f32, u16, 2, 4>, 2, 4>;
+        type DestTree = KdTree<f64, u32, Donnelly<2, 64, 4, 2>, FlatVec<f64, u32, 2, 8>, 2, 8>;
+
+        let entries = vec![
+            (10u16, [1.0f32, 2.0f32]),
+            (20u16, [8.0f32, 3.0f32]),
+            (30u16, [2.0f32, 9.0f32]),
+            (40u16, [6.0f32, 7.0f32]),
+            (50u16, [4.0f32, 4.0f32]),
+        ];
+
+        let source = SourceTree::new_from_entries(&entries).unwrap();
+        let nearest_source = source
+            .query(&[4.0f32, 4.0f32])
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .execute();
+
+        let converted: DestTree = source.try_convert().unwrap();
+
+        assert_eq!(converted.size(), entries.len());
+        assert_eq!(
+            sort_entries_u32(converted.iter().collect()),
+            sort_entries_u32(vec![
+                (10u32, [1.0f64, 2.0f64]),
+                (20u32, [8.0f64, 3.0f64]),
+                (30u32, [2.0f64, 9.0f64]),
+                (40u32, [6.0f64, 7.0f64]),
+                (50u32, [4.0f64, 4.0f64]),
+            ])
+        );
+
+        let nearest_converted = converted
+            .query(&[4.0f64, 4.0f64])
+            .nearest_one::<SquaredEuclidean<f64>>()
+            .execute();
+        assert_eq!(nearest_converted.item, nearest_source.item as u32);
+    }
+
+    #[test]
+    fn try_from_kdtree_reports_item_conversion_failure() {
+        type SourceTree = KdTree<u16, u16, Eytzinger<2>, FlatVec<u16, u16, 2, 4>, 2, 4>;
+        type DestTree = KdTree<u16, u8, Eytzinger<2>, FlatVec<u16, u8, 2, 4>, 2, 4>;
+
+        let source = SourceTree::new_from_entries(&[(300u16, [1u16, 2u16])]).unwrap();
+        let err = match DestTree::try_from(&source) {
+            Ok(_) => panic!("expected item conversion to fail"),
+            Err(err) => err,
+        };
+
+        assert!(matches!(
+            err,
+            KdTreeConversionError::ItemConversion { point_index: 0, .. }
+        ));
+    }
+
+    #[test]
+    fn try_from_kdtree_reports_axis_conversion_failure() {
+        type SourceTree = KdTree<u16, u16, Eytzinger<2>, FlatVec<u16, u16, 2, 4>, 2, 4>;
+        type DestTree = KdTree<u8, u16, Eytzinger<2>, FlatVec<u8, u16, 2, 4>, 2, 4>;
+
+        let source = SourceTree::new_from_entries(&[(7u16, [300u16, 2u16])]).unwrap();
+        let err = match DestTree::try_from(&source) {
+            Ok(_) => panic!("expected axis conversion to fail"),
+            Err(err) => err,
+        };
+
+        assert!(matches!(
+            err,
+            KdTreeConversionError::AxisConversion {
+                point_index: 0,
+                dim: 0,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn try_from_kdtree_converts_mutable_to_immutable() {
+        type SourceTree = KdTree<u16, u16, Eytzinger<2>, VecOfArrays<u16, u16, 2, 4>, 2, 4>;
+        type DestTree = KdTree<u16, u16, Eytzinger<2>, FlatVec<u16, u16, 2, 4>, 2, 4>;
+
+        let entries = vec![
+            (1u16, [1u16, 1u16]),
+            (2u16, [9u16, 9u16]),
+            (3u16, [4u16, 5u16]),
+        ];
+        let source = SourceTree::new_from_entries(&entries).unwrap();
+        let converted: DestTree = source.try_convert().unwrap();
+
+        assert_eq!(
+            sort_entries_u16(converted.iter().collect()),
+            sort_entries_u16(entries)
+        );
     }
 }

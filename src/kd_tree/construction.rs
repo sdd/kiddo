@@ -256,6 +256,23 @@ where
         })
     }
 
+    /// Creates a `KdTree` from explicit item/point pairs.
+    ///
+    /// This is the preferred ingress when callers already have items rather
+    /// than wanting `new_from_slice` to auto-generate them from source indices.
+    #[cfg_attr(not(feature = "no_inline"), inline)]
+    pub fn new_from_entries(source: &[(T, [A; K])]) -> Result<Self, ConstructionError> {
+        let points: Vec<[A; K]> = source.iter().map(|(_, point)| *point).collect();
+
+        Self::new_from_slice_with(
+            points.as_slice(),
+            |leaf_items: &mut Vec<T>, src_idx: usize| {
+                leaf_items.push(source[src_idx].0);
+                Ok(())
+            },
+        )
+    }
+
     /// Inner constructor shared by all variants. The `push_item` callback
     /// is invoked wherever we would normally push an item for a source index.
     ///
