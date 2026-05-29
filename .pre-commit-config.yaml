@@ -8,7 +8,7 @@ repos:
     hooks:
       # File checking hooks
       - id: check-added-large-files
-        args: ['--maxkb=500']
+        args: ["--maxkb=500"]
       - id: check-case-conflict
       - id: check-json
         exclude: '^renovate\.json$'
@@ -26,15 +26,15 @@ repos:
       - id: end-of-file-fixer
       - id: fix-byte-order-marker
       - id: mixed-line-ending
-        args: ['--fix=lf']
+        args: ["--fix=lf"]
       - id: trailing-whitespace
-        args: ['--markdown-linebreak-ext=md']
+        args: ["--markdown-linebreak-ext=md"]
 
   - repo: https://github.com/ComPWA/taplo-pre-commit
     rev: v0.9.3
     hooks:
       - id: taplo-format
-        args: ['--check']
+        args: ["--check"]
         files: '^[^/]+\.toml$'
         stages: [pre-commit, pre-push]
 
@@ -50,7 +50,7 @@ repos:
     hooks:
       - id: commitlint
         stages: [commit-msg]
-        additional_dependencies: ['@commitlint/config-conventional']
+        additional_dependencies: ["@commitlint/config-conventional"]
 
   - repo: local
     hooks:
@@ -59,11 +59,11 @@ repos:
       - id: commitlint-last
         name: commitlint --last --verbose
         entry: commitlint
-        args: ['--config', '.commitlintrc.yaml', '--last', '--verbose']
+        args: ["--config", ".commitlintrc.yaml", "--last", "--verbose"]
         language: node
         additional_dependencies:
-          - '@commitlint/cli'
-          - '@commitlint/config-conventional'
+          - "@commitlint/cli"
+          - "@commitlint/config-conventional"
         pass_filenames: false
         always_run: true
         stages: [pre-commit, pre-push]
@@ -71,7 +71,7 @@ repos:
       - id: prettier-check-text
         name: prettier --check (yaml, markdown)
         entry: prettier
-        args: ['--check']
+        args: ["--check"]
         language: node
         additional_dependencies:
           - prettier

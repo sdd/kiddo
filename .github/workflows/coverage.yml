@@ -2,9 +2,12 @@ name: Coverage
 
 on:
   push:
-    branches: [ "**" ]
+    branches:
+      - master
+      - v5.x.x
   pull_request:
-    branches: [ "**" ]
+    branches:
+      - "**"
   workflow_dispatch:
 
 env:

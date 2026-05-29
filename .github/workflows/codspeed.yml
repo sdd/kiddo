@@ -4,6 +4,17 @@ on:
   push:
     branches:
       - "master"
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - ".cargo/**"
+  pull_request:
+    branches:
+      - "master"
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - ".cargo/**"
   # `workflow_dispatch` allows CodSpeed to trigger backtest
   # performance analysis in order to generate initial data.
   workflow_dispatch:
@@ -31,3 +42,4 @@ jobs:
         with:
           run: cargo codspeed run
           token: ${{ secrets.CODSPEED_TOKEN }}
+          mode: walltime

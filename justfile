@@ -3,6 +3,12 @@
 default:
   just --list
 
+fmt:
+    cargo fmt --all
+    cargo sort -wg
+    taplo format *.toml
+    npx --yes prettier --write ".github/workflows/*.{yml,yaml}" "*.yml" "*.yaml" ".*.yml" ".*.yaml" "**/*.md"
+
 test-donnelly:
     cargo test donnelly
 

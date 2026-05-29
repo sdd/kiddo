@@ -14,5 +14,3 @@ pub mod leaf_strategy;
 
 ///Trait implemented by stem strategie (determines tree stem ordering and traversal)
 pub mod stem_strategy;
-
-// pub mod traits_unified_2;

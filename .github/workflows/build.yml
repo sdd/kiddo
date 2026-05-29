@@ -2,9 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [ "**" ]
+    branches:
+      - master
+      - v5.x.x
   pull_request:
-    branches: [ "**" ]
+    branches:
+      - "**"
   workflow_dispatch:
 
 concurrency:
@@ -50,8 +53,44 @@ jobs:
         with:
           components: rustfmt,clippy
 
+      - name: Install cargo-sort
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-sort
+          version: "^2"
+
+      - name: Install taplo
+        uses: taiki-e/install-action@v2
+        with:
+          tool: taplo-cli
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
       - name: Rustfmt Check
         uses: actions-rust-lang/rustfmt@v1
+
+      - name: Cargo sort check
+        run: cargo sort -cwg
+
+      - name: Taplo format check
+        run: taplo format --check ./*.toml
+
+      - name: Prettier check
+        run: npx --yes prettier --check ".github/workflows/*.{yml,yaml}" "*.yml" "*.yaml" ".*.yml" ".*.yaml" "**/*.md"
+
+  github-actions-lint:
+    name: GitHub Actions Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          show-progress: false
+
+      - name: Lint GitHub Actions workflows
+        uses: docker://rhysd/actionlint:latest
 
   lint:
     name: Lint (Stable)
@@ -87,7 +126,6 @@ jobs:
 
       - name: Check Rustdoc Links
         run: RUSTDOCFLAGS="--deny broken_intra_doc_links" cargo doc --verbose --workspace --no-deps --document-private-items
-
 
   lint-unstable:
     name: Lint (Nightly)
@@ -197,7 +235,6 @@ jobs:
 
       - name: Cargo check all targets and features
         run: cargo hack check --workspace --each-feature --all-targets
-
 
   test-basic:
     name: Run Tests (Stable, no crate features enabled that require unstable Rust)
