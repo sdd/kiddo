@@ -1152,6 +1152,80 @@ mod tests {
     }
 
     #[test]
+    fn new_from_source_accepts_custom_source_structs() {
+        type Tree = KdTree<f64, u32, Eytzinger<2>, FlatVec<f64, u32, 2, 4>, 2, 4>;
+
+        #[derive(Clone, Copy)]
+        struct SourcePoint {
+            id: u32,
+            x: f64,
+            y: f64,
+        }
+
+        let source = [
+            SourcePoint {
+                id: 11u32,
+                x: 0.0f64,
+                y: 0.0f64,
+            },
+            SourcePoint {
+                id: 22u32,
+                x: 3.0f64,
+                y: 3.0f64,
+            },
+            SourcePoint {
+                id: 33u32,
+                x: 9.0f64,
+                y: 1.0f64,
+            },
+        ];
+
+        let tree = Tree::new_from_source(
+            &source,
+            |point, dim| match dim {
+                0 => point.x,
+                1 => point.y,
+                _ => unreachable!(),
+            },
+            |_src_idx, point| point.id,
+        )
+        .unwrap();
+
+        assert_eq!(tree.size(), source.len());
+        assert_eq!(
+            sort_entries_u32(tree.iter().collect()),
+            sort_entries_u32(vec![
+                (11u32, [0.0f64, 0.0f64]),
+                (22u32, [3.0f64, 3.0f64]),
+                (33u32, [9.0f64, 1.0f64]),
+            ])
+        );
+    }
+
+    #[test]
+    fn new_from_source_can_use_indices_for_items() {
+        type Tree = KdTree<f64, u32, Eytzinger<2>, FlatVec<f64, u32, 2, 4>, 2, 4>;
+
+        let source = [[0.0f64, 0.0f64], [3.0f64, 3.0f64], [9.0f64, 1.0f64]];
+
+        let tree = Tree::new_from_source(
+            &source,
+            |point, dim| point[dim],
+            |src_idx, _| src_idx as u32 + 100,
+        )
+        .unwrap();
+
+        assert_eq!(
+            sort_entries_u32(tree.iter().collect()),
+            sort_entries_u32(vec![
+                (100u32, [0.0f64, 0.0f64]),
+                (101u32, [3.0f64, 3.0f64]),
+                (102u32, [9.0f64, 1.0f64]),
+            ])
+        );
+    }
+
+    #[test]
     fn try_from_kdtree_converts_across_variants() {
         type SourceTree = KdTree<f32, u16, Eytzinger<2>, VecOfArrays<f32, u16, 2, 4>, 2, 4>;
         type DestTree = KdTree<f64, u32, Donnelly<2, 64, 4, 2>, FlatVec<f64, u32, 2, 8>, 2, 8>;

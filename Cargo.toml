@@ -252,6 +252,11 @@ name = "v6_result_collection_focus"
 harness = false
 required-features = ["test_utils"]
 
+[[bench]]
+name = "v6_construction"
+harness = false
+required-features = ["test_utils"]
+
 #[[example]]
 #name = "avx2-check"
 #path = "examples/avx2-check.rs"
