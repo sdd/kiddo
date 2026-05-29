@@ -2,7 +2,9 @@ name: Pre-release
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - master
+      - v5.x.x
 
 jobs:
   pre-release:

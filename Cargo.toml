@@ -17,8 +17,60 @@ resolver = "2"
 [package.metadata.docs.rs]
 all-features = true
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
+[[bin]]
+name = "fuzz-case-repro"
+path = "src/bin/fuzz-case-repro.rs"
+required-features = ["fuzz"]
+
+[[bin]]
+name = "profile_v6_nearest_one_eytzinger"
+path = "src/bin/profile_v6_nearest_one_eytzinger.rs"
+required-features = ["test_utils"]
+
+[[bin]]
+name = "profile_v6_leaf_strategies"
+path = "src/bin/profile_v6_leaf_strategies.rs"
+required-features = ["test_utils"]
+
+[[bin]]
+name = "profile_v6_stem_exact_stats"
+path = "src/bin/profile_v6_stem_exact_stats.rs"
+required-features = ["simd", "test_utils"]
+
+[[bin]]
+name = "repro_donnelly_block3_exact_divergence"
+path = "src/bin/repro_donnelly_block3_exact_divergence.rs"
+required-features = ["simd", "test_utils"]
+
+[[bin]]
+name = "profile_v6_result_collection_stats"
+path = "src/bin/profile_v6_result_collection_stats.rs"
+required-features = ["rkyv_08", "simd", "test_utils", "result_collection_stats"]
+
+[[bin]]
+name = "build_v6_profile_archives"
+path = "src/bin/build_v6_profile_archives.rs"
+required-features = ["rkyv_08", "simd", "test_utils"]
+
+[[bin]]
+name = "build_v6_hugepage_archives"
+path = "src/bin/build_v6_hugepage_archives.rs"
+required-features = ["rkyv_08", "test_utils"]
+
+[[bin]]
+name = "build_v6_query_focus_archives"
+path = "src/bin/build_v6_query_focus_archives.rs"
+required-features = ["rkyv_08", "test_utils"]
+
+[[bin]]
+name = "profile_v6_archived_huge_pages"
+path = "src/bin/profile_v6_archived_huge_pages.rs"
+required-features = ["rkyv_08", "huge_pages"]
+
+[[bin]]
+name = "profile_v6_archived_query_focus"
+path = "src/bin/profile_v6_archived_query_focus.rs"
+required-features = ["rkyv_08", "huge_pages"]
 
 [features]
 cargo_asm = ["dep:rand", "dep:rand_chacha"]
@@ -33,22 +85,17 @@ f16 = ["dep:half"]
 fixed = ["dep:fixed"]
 fuzz = ["test_utils"]
 logging_off = [
-    "dep:log",
-    "tracing/max_level_off",
-    "tracing/release_max_level_off",
-    "log/max_level_off",
-    "log/release_max_level_off",
+  "dep:log",
+  "tracing/max_level_off",
+  "tracing/release_max_level_off",
+  "log/max_level_off",
+  "log/release_max_level_off",
 ]
 no_inline = []
 las = ["dep:las"]
 profile_v5 = ["dep:kiddo_v5", "dep:rand", "dep:rand_chacha"]
 result_collection_stats = []
-serde = [
-    "dep:serde",
-    "serde/derive",
-    "fixed/serde",
-    "aligned-vec/serde",
-]
+serde = ["dep:serde", "serde/derive", "fixed/serde", "aligned-vec/serde"]
 simd = []
 simulator = []
 rkyv_08 = ["dep:rkyv_08", "dep:ptr_meta", "dep:bytecheck"]
@@ -56,6 +103,9 @@ small_n_result_collectors = ["dep:smallvec"]
 test_utils = ["dep:rand", "dep:rand_chacha", "dep:rayon", "dep:fixed"]
 tracing = ["dep:tracing", "dep:tracing-subscriber"]
 unreliable_select_nth_unstable = []
+
+[target.'cfg(any(target_arch = "x86_64", target_arch = "aarch64"))'.dependencies]
+generator = "0.8.4"
 
 [dependencies]
 aligned-vec = "0.6.1"
@@ -70,32 +120,9 @@ ordered-float = "5"
 sorted-vec = "0.8"
 test-log = { version = "0.2.19", features = ["trace"] }
 
-[dev-dependencies]
-assert_float_eq = "1.2"
-bincode = {  version = "2", features = ["serde"] }
-codspeed-criterion-compat = "4.0"
-criterion = "0.7"
-elapsed = "0.1.2"
-flate2 = { version = "1", features = ["zlib-ng-compat"], default-features = false }
-itertools = "0.14"
-las = { version = "0.9", features = ["laz-parallel"] }
-memmap = "0.7"
-proc-macro2 = { version = "1", features=["default", "proc-macro"] }
-radians = "0.3"
-rand = "0.9"
-rand_distr = "0.5"
-rayon = "1"
-rstest = "0.26"
-serde = { version = "1", features = ["derive", "rc"] }
-serde_json = "1"
-ubyte = "0.10"
-zzz = "0.3.2"
-# required to be able to run tests without specifying --features=test_utils
-# see https://github.com/rust-lang/cargo/issues/2911#issuecomment-749580481
-kiddo = { path = ".", features = ["test_utils"] }
-
-[target.'cfg(any(target_arch = "x86_64", target_arch = "aarch64"))'.dependencies]
-generator = "0.8.4"
+[dependencies.bytecheck]
+version = "0.8"
+optional = true
 
 [dependencies.csv]
 version = "1"
@@ -112,27 +139,27 @@ version = "2.5.0"
 optional = true
 features = ["num-traits"]
 
+[dependencies.kiddo_v5]
+package = "kiddo"
+#path = "../kiddo-v5"
+version = "5"
+optional = true
+
 [dependencies.las]
 version = "0.9"
 optional = true
 features = ["laz-parallel"]
 
-[dependencies.log]
-version = "0.4"
-optional = true
-
 [dependencies.libc]
 version = "0.2"
 optional = true
 
-[dependencies.smallvec]
-version = "1"
+[dependencies.log]
+version = "0.4"
 optional = true
 
-[dependencies.kiddo_v5]
-package = "kiddo"
-#path = "../kiddo-v5"
-version = "5"
+[dependencies.ptr_meta]
+version = "0.3"
 optional = true
 
 [dependencies.rand]
@@ -152,15 +179,11 @@ package = "rkyv"
 version = "0.8.9"
 optional = true
 
-[dependencies.ptr_meta]
-version = "0.3"
-optional = true
-
-[dependencies.bytecheck]
-version = "0.8"
-optional = true
-
 [dependencies.serde]
+version = "1"
+optional = true
+
+[dependencies.smallvec]
 version = "1"
 optional = true
 
@@ -171,6 +194,38 @@ optional = true
 [dependencies.tracing-subscriber]
 version = "0.3"
 optional = true
+
+[build-dependencies]
+yep-cache-line-size = "0.9"
+
+[dev-dependencies]
+assert_float_eq = "1.2"
+bincode = { version = "2", features = ["serde"] }
+codspeed-criterion-compat = "4.0"
+criterion = "0.7"
+elapsed = "0.1.2"
+flate2 = { version = "1", features = [
+  "zlib-ng-compat",
+], default-features = false }
+itertools = "0.14"
+# required to be able to run tests without specifying --features=test_utils
+# see https://github.com/rust-lang/cargo/issues/2911#issuecomment-749580481
+kiddo = { path = ".", features = ["test_utils"] }
+las = { version = "0.9", features = ["laz-parallel"] }
+memmap = "0.7"
+proc-macro2 = { version = "1", features = ["default", "proc-macro"] }
+radians = "0.3"
+rand = "0.9"
+rand_distr = "0.5"
+rayon = "1"
+rstest = "0.26"
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+ubyte = "0.10"
+zzz = "0.3.2"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
 
 [profile.release]
 debug = true
@@ -561,61 +616,6 @@ name = "immutable-large-ann-donnelly-swpre-deserialize-and-query"
 path = "examples/immutable-large-ann-donnelly-swpre-deserialize-and-query.rs"
 required-features = ["rkyv_08"]
 
-[[bin]]
-name = "fuzz-case-repro"
-path = "src/bin/fuzz-case-repro.rs"
-required-features = ["fuzz"]
-
-[[bin]]
-name = "profile_v6_nearest_one_eytzinger"
-path = "src/bin/profile_v6_nearest_one_eytzinger.rs"
-required-features = ["test_utils"]
-
-[[bin]]
-name = "profile_v6_leaf_strategies"
-path = "src/bin/profile_v6_leaf_strategies.rs"
-required-features = ["test_utils"]
-
-[[bin]]
-name = "profile_v6_stem_exact_stats"
-path = "src/bin/profile_v6_stem_exact_stats.rs"
-required-features = ["simd", "test_utils"]
-
-[[bin]]
-name = "repro_donnelly_block3_exact_divergence"
-path = "src/bin/repro_donnelly_block3_exact_divergence.rs"
-required-features = ["simd", "test_utils"]
-
-[[bin]]
-name = "profile_v6_result_collection_stats"
-path = "src/bin/profile_v6_result_collection_stats.rs"
-required-features = ["rkyv_08", "simd", "test_utils", "result_collection_stats"]
-
-[[bin]]
-name = "build_v6_profile_archives"
-path = "src/bin/build_v6_profile_archives.rs"
-required-features = ["rkyv_08", "simd", "test_utils"]
-
-[[bin]]
-name = "build_v6_hugepage_archives"
-path = "src/bin/build_v6_hugepage_archives.rs"
-required-features = ["rkyv_08", "test_utils"]
-
-[[bin]]
-name = "build_v6_query_focus_archives"
-path = "src/bin/build_v6_query_focus_archives.rs"
-required-features = ["rkyv_08", "test_utils"]
-
-[[bin]]
-name = "profile_v6_archived_huge_pages"
-path = "src/bin/profile_v6_archived_huge_pages.rs"
-required-features = ["rkyv_08", "huge_pages"]
-
-[[bin]]
-name = "profile_v6_archived_query_focus"
-path = "src/bin/profile_v6_archived_query_focus.rs"
-required-features = ["rkyv_08", "huge_pages"]
-
 [[test]]
 name = "donnelly_simd_regressions"
 path = "tests/donnelly_simd_regressions.rs"
@@ -628,6 +628,3 @@ required-features = ["fuzz"]
 [[test]]
 name = "string_data_test"
 path = "tests/string_data_test.rs"
-
-[build-dependencies]
-yep-cache-line-size = "0.9"

@@ -12,7 +12,6 @@ pub mod distance_metric;
 /// Trait implemented by leaf strategies (determines how leaf storage is laid out)
 pub mod leaf_strategy;
 
-mod query_context;
 ///Trait implemented by stem strategie (determines tree stem ordering and traversal)
 pub mod stem_strategy;
 

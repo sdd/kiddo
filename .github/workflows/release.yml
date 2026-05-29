@@ -7,12 +7,14 @@ on:
 
 jobs:
   release-and-publish:
-    if: ${{ github.event.pull_request.merged && contains(github.event.pull_request.labels.*.name, 'release') }}
+    if: ${{ github.event.pull_request.merged && contains(github.event.pull_request.labels.*.name, 'release') && (github.event.pull_request.base.ref == 'master' || github.event.pull_request.base.ref == 'v5.x.x') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
           show-progress: false
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
 
       - name: Get latest stable Rust version
         run: |

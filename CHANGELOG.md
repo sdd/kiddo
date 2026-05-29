@@ -31,7 +31,7 @@ I'm hoping to have v6 available soon, which will include both these changes as w
 - Update ad-m/github-push-action action to v1
 - Update rust crate rstest to 0.26
 - Update rust crate codspeed-criterion-compat to v4
- 
+
 ### Ci
 
 - Update CI workflow triggers to include PR and workflow_dispatch

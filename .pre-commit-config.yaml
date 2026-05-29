@@ -1,3 +1,8 @@
+default_install_hook_types:
+  - pre-commit
+  - pre-push
+  - commit-msg
+
 repos:
   - repo: builtin
     hooks:
@@ -24,3 +29,75 @@ repos:
         args: ['--fix=lf']
       - id: trailing-whitespace
         args: ['--markdown-linebreak-ext=md']
+
+  - repo: https://github.com/ComPWA/taplo-pre-commit
+    rev: v0.9.3
+    hooks:
+      - id: taplo-format
+        args: ['--check']
+        files: '^[^/]+\.toml$'
+        stages: [pre-commit, pre-push]
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+        files: '^\.github/workflows/.*\.ya?ml$'
+        stages: [pre-commit, pre-push]
+
+  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
+    rev: v7.0.0
+    hooks:
+      - id: commitlint
+        stages: [commit-msg]
+        additional_dependencies: ['@commitlint/config-conventional']
+
+  - repo: local
+    hooks:
+      # commitlint officially supports commit-msg hooks, but we also lint the
+      # latest existing commit on pre-commit/pre-push as a best-effort check.
+      - id: commitlint-last
+        name: commitlint --last --verbose
+        entry: commitlint
+        args: ['--config', '.commitlintrc.yaml', '--last', '--verbose']
+        language: node
+        additional_dependencies:
+          - '@commitlint/cli'
+          - '@commitlint/config-conventional'
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
+
+      - id: prettier-check-text
+        name: prettier --check (yaml, markdown)
+        entry: prettier
+        args: ['--check']
+        language: node
+        additional_dependencies:
+          - prettier
+        files: '(^\.github/workflows/.*\.ya?ml$|^[^/]+\.ya?ml$|\.md$)'
+        stages: [pre-commit, pre-push]
+
+      - id: cargo-fmt-check
+        name: cargo fmt --all -- --check
+        entry: cargo fmt --all -- --check
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
+
+      - id: cargo-sort-check
+        name: cargo sort -cwg
+        entry: cargo sort -cwg
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
+
+      - id: cargo-clippy
+        name: cargo clippy --features=serde,test_utils --no-deps
+        entry: cargo clippy --features=serde,test_utils --no-deps
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
