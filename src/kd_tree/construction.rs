@@ -3,9 +3,9 @@ use std::ptr::NonNull;
 use aligned_vec::{avec, AVec, ConstAlign, CACHELINE_ALIGN};
 use nonmax::NonMaxUsize;
 
-use crate::kd_tree::{ConstructionError, KdTreeQueryOps, OwnedStemLeafResolution};
+use crate::kd_tree::{ConstructionError, KdTreeQueryOps, MutationError, OwnedStemLeafResolution};
 use crate::traits::leaf_strategy::{
-    BucketLimitType, ConstructibleLeafStrategy, Mutability, MutableLeafStrategy,
+    BucketLimitType, ConstructibleLeafStrategy, LeafStrategy, Mutability, MutableLeafStrategy,
 };
 use crate::{Axis, Content, KdTree, StemStrategy};
 
@@ -199,6 +199,32 @@ where
         self.leaves.remove_from_leaf(leaf_idx, point, item);
 
         // TODO: attempt to prune leaf if now empty
+    }
+}
+
+impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
+where
+    A: Axis<Coord = A>,
+    T: Content + PartialEq,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+{
+    /// Replaces the first exact `(point, old_item)` match with `new_item`.
+    ///
+    /// Returns [`MutationError::EntryNotFound`] if the target leaf contains no
+    /// entry whose point and item both match exactly.
+    pub fn replace_item(
+        &mut self,
+        point: &[A; K],
+        old_item: T,
+        new_item: T,
+    ) -> Result<(), MutationError> {
+        let leaf_idx = self.get_leaf_idx(point);
+
+        self.leaves
+            .replace_item_in_leaf(leaf_idx, point, old_item, new_item)
+            .then_some(())
+            .ok_or(MutationError::EntryNotFound)
     }
 }
 
@@ -971,6 +997,8 @@ where
 mod tests {
     use super::*;
     use crate::leaf_strategy::FlatVec;
+    use crate::leaf_strategy::VecOfArenas;
+    use crate::leaf_strategy::VecOfArrays;
     use crate::Eytzinger;
 
     #[test]
@@ -999,5 +1027,63 @@ mod tests {
         assert_eq!(sort_index, [0, 1, 2, 3, 4]);
         assert_eq!(source[sort_index[pivot - 1]][0], 1.0);
         assert_eq!(source[sort_index[pivot]][0], 2.0);
+    }
+
+    #[test]
+    fn replace_item_updates_flat_vec_tree_without_changing_size() {
+        type TestTree = KdTree<f32, u32, Eytzinger<2>, FlatVec<f32, u32, 2, 32>, 2, 32>;
+
+        let entries = [
+            (10u32, [1.0f32, 10.0]),
+            (11u32, [2.0, 20.0]),
+            (12u32, [1.0, 10.0]),
+        ];
+        let mut tree = TestTree::new_from_entries(&entries).unwrap();
+
+        assert_eq!(tree.size(), 3);
+        tree.replace_item(&[1.0, 10.0], 10, 99).unwrap();
+        assert_eq!(tree.size(), 3);
+
+        let iterated = tree.iter().collect::<Vec<_>>();
+        assert_eq!(iterated[0], (99, [1.0, 10.0]));
+        assert_eq!(iterated[1], (11, [2.0, 20.0]));
+        assert_eq!(iterated[2], (12, [1.0, 10.0]));
+    }
+
+    #[test]
+    fn replace_item_returns_entry_not_found_when_exact_match_is_missing() {
+        type TestTree = KdTree<f32, u32, Eytzinger<2>, VecOfArrays<f32, u32, 2, 32>, 2, 32>;
+
+        let entries = [(10u32, [1.0f32, 10.0]), (11u32, [2.0, 20.0])];
+        let mut tree = TestTree::new_from_entries(&entries).unwrap();
+
+        assert_eq!(
+            tree.replace_item(&[1.0, 10.0], 99, 100),
+            Err(MutationError::EntryNotFound)
+        );
+        assert_eq!(
+            tree.replace_item(&[9.0, 90.0], 10, 100),
+            Err(MutationError::EntryNotFound)
+        );
+    }
+
+    #[test]
+    fn replace_item_updates_vec_of_arenas_tree() {
+        type TestTree = KdTree<f64, u32, Eytzinger<2>, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
+
+        let entries = [
+            (20u32, [1.0f64, 10.0]),
+            (21u32, [2.0, 20.0]),
+            (22u32, [3.0, 30.0]),
+        ];
+        let mut tree = TestTree::new_from_entries(&entries).unwrap();
+
+        tree.replace_item(&[2.0, 20.0], 21, 77).unwrap();
+
+        let iterated = tree.iter().collect::<Vec<_>>();
+        assert_eq!(
+            iterated,
+            vec![(20, [1.0, 10.0]), (77, [2.0, 20.0]), (22, [3.0, 30.0])]
+        );
     }
 }

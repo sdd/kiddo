@@ -58,6 +58,31 @@ where
 
         LeafView::new(leaf_points_view, leaf_items_view)
     }
+
+    fn replace_item_in_leaf(
+        &mut self,
+        leaf_idx: usize,
+        point: &[AX; K],
+        old_item: T,
+        new_item: T,
+    ) -> bool
+    where
+        T: PartialEq,
+    {
+        let (start, end) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
+        let start = start as usize;
+        let end = end as usize;
+
+        for idx in start..end {
+            let point_matches = (0..K).all(|dim| self.leaf_points[dim][idx] == point[dim]);
+            if point_matches && self.leaf_items[idx] == old_item {
+                self.leaf_items[idx] = new_item;
+                return true;
+            }
+        }
+
+        false
+    }
 }
 
 #[cfg(feature = "rkyv_08")]

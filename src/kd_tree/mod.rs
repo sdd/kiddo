@@ -66,6 +66,23 @@ impl std::fmt::Display for ConstructionError {
 
 impl std::error::Error for ConstructionError {}
 
+/// Errors returned by in-place owned-tree mutation operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MutationError {
+    /// No entry exactly matched the requested point and item.
+    EntryNotFound,
+}
+
+impl std::fmt::Display for MutationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EntryNotFound => write!(f, "entry not found"),
+        }
+    }
+}
+
+impl std::error::Error for MutationError {}
+
 /// Errors returned when converting one `KdTree` variant into another.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KdTreeConversionError {

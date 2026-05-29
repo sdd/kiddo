@@ -72,6 +72,29 @@ where
 
         LeafView::new(points, leaf_items_view)
     }
+
+    fn replace_item_in_leaf(
+        &mut self,
+        leaf_idx: usize,
+        point: &[AX; K],
+        old_item: T,
+        new_item: T,
+    ) -> bool
+    where
+        T: PartialEq,
+    {
+        let leaf = &mut self.leaves[leaf_idx];
+
+        for item_idx in 0..leaf.size {
+            let point_matches = (0..K).all(|dim| leaf.content_points[dim][item_idx] == point[dim]);
+            if point_matches && leaf.content_items[item_idx] == old_item {
+                leaf.content_items[item_idx] = new_item;
+                return true;
+            }
+        }
+
+        false
+    }
 }
 
 #[cfg(feature = "rkyv_08")]
@@ -782,6 +805,36 @@ mod test {
         assert_eq!(leaves.leaves[0].content_points[0][1], 1.0);
         assert_eq!(leaves.leaves[0].content_points[1][1], 10.0);
         assert_eq!(leaves.leaves[0].content_items[1], 7);
+    }
+
+    #[test]
+    fn vec_of_arrays_replace_item_in_leaf_replaces_only_first_exact_match() {
+        let mut leaves = <VecOfArrays<f32, u32, 2, 4> as ConstructibleLeafStrategy<
+            f32,
+            u32,
+            Eytzinger<2>,
+            2,
+            4,
+        >>::new_with_empty_leaf();
+        <VecOfArrays<f32, u32, 2, 4> as MutableLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::add_to_leaf(&mut leaves, 0, &[1.0, 10.0], 5);
+        <VecOfArrays<f32, u32, 2, 4> as MutableLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::add_to_leaf(&mut leaves, 0, &[1.0, 10.0], 5);
+        <VecOfArrays<f32, u32, 2, 4> as MutableLeafStrategy<f32, u32, Eytzinger<2>, 2, 4>>::add_to_leaf(&mut leaves, 0, &[2.0, 20.0], 6);
+
+        assert!(<VecOfArrays<f32, u32, 2, 4> as LeafStrategy<
+            f32,
+            u32,
+            Eytzinger<2>,
+            2,
+            4,
+        >>::replace_item_in_leaf(
+            &mut leaves, 0, &[1.0, 10.0], 5, 9
+        ));
+
+        assert_eq!(leaves.leaves[0].content_items[0], 9);
+        assert_eq!(leaves.leaves[0].content_items[1], 5);
+        assert_eq!(leaves.leaves[0].content_items[2], 6);
+        assert_eq!(leaves.size, 3);
+        assert_eq!(leaves.leaves[0].size, 3);
     }
 
     #[test]

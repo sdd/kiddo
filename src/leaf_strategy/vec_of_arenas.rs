@@ -160,6 +160,61 @@ where
         LeafArena::new(unsafe { self.leaf_bytes.as_ptr().add(offset) }, len)
     }
 
+    fn replace_item_in_leaf(
+        &mut self,
+        leaf_idx: usize,
+        point: &[AX; K],
+        old_item: T,
+        new_item: T,
+    ) -> bool
+    where
+        T: PartialEq,
+    {
+        debug_assert!(leaf_idx < self.leaf_extents.len());
+        let (offset, len) = unsafe { *self.leaf_extents.get_unchecked(leaf_idx) };
+        let mut byte_offset = offset;
+        let mut remaining = len;
+
+        while remaining != 0 {
+            let tile_len = crate::leaf_view::leaf_arena_tile_len(remaining);
+            let tile: LeafArena<'_, AX, T, K> = LeafArena::new(
+                unsafe { self.leaf_bytes.as_ptr().add(byte_offset) },
+                tile_len,
+            );
+
+            for tile_idx in 0..tile_len {
+                let stored_point = tile.point_item(tile_idx).0;
+                let point_matches = (0..K).all(|dim| stored_point[dim] == point[dim]);
+                if point_matches {
+                    let item_offset = byte_offset
+                        + K * tile_len * std::mem::size_of::<AX>()
+                        + tile_idx * std::mem::size_of::<T>();
+                    let current_item = unsafe {
+                        std::ptr::read_unaligned(
+                            self.leaf_bytes.as_ptr().add(item_offset) as *const T
+                        )
+                    };
+
+                    if current_item == old_item {
+                        unsafe {
+                            std::ptr::write_unaligned(
+                                self.leaf_bytes.as_mut_ptr().add(item_offset) as *mut T,
+                                new_item,
+                            );
+                        }
+                        return true;
+                    }
+                }
+            }
+
+            byte_offset +=
+                K * tile_len * std::mem::size_of::<AX>() + tile_len * std::mem::size_of::<T>();
+            remaining -= tile_len;
+        }
+
+        false
+    }
+
     #[inline]
     fn maybe_enable_huge_pages(&self) {
         crate::huge_pages::maybe_collapse_slice_huge_pages(
@@ -364,5 +419,166 @@ mod tests {
         extend_bytes_from_slice(&mut bytes, &values);
 
         assert_eq!(bytes.len(), std::mem::size_of_val(&values));
+    }
+
+    #[test]
+    fn vec_of_arenas_replace_item_in_leaf_replaces_first_exact_match() {
+        let mut leaves = <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
+            f64,
+            u32,
+            Eytzinger<2>,
+            2,
+            32,
+        >>::new_with_capacity(64);
+        let x = [1.0, 1.0, 2.0];
+        let y = [10.0, 10.0, 20.0];
+        let items = [5u32, 5, 6];
+
+        <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
+            f64,
+            u32,
+            Eytzinger<2>,
+            2,
+            32,
+        >>::append_leaf(&mut leaves, &[&x, &y], &items);
+
+        assert!(<VecOfArenas<f64, u32, 2, 32> as LeafStrategy<
+            f64,
+            u32,
+            Eytzinger<2>,
+            2,
+            32,
+        >>::replace_item_in_leaf(
+            &mut leaves, 0, &[1.0, 10.0], 5, 9
+        ));
+
+        let arena =
+            <VecOfArenas<f64, u32, 2, 32> as LeafStrategy<f64, u32, Eytzinger<2>, 2, 32>>::leaf_arena(
+                &leaves, 0,
+            );
+        assert_eq!(arena.point_item(0), ([1.0, 10.0], 9));
+        assert_eq!(arena.point_item(1), ([1.0, 10.0], 5));
+        assert_eq!(arena.point_item(2), ([2.0, 20.0], 6));
+        assert_eq!(leaves.size, 3);
+    }
+
+    #[test]
+    fn vec_of_arenas_replace_item_in_leaf_returns_false_when_point_does_not_match() {
+        let mut leaves = <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
+            f64,
+            u32,
+            Eytzinger<2>,
+            2,
+            32,
+        >>::new_with_capacity(64);
+        let x = [1.0, 2.0, 3.0];
+        let y = [10.0, 20.0, 30.0];
+        let items = [5u32, 6, 7];
+
+        <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
+            f64,
+            u32,
+            Eytzinger<2>,
+            2,
+            32,
+        >>::append_leaf(&mut leaves, &[&x, &y], &items);
+
+        assert!(!<VecOfArenas<f64, u32, 2, 32> as LeafStrategy<
+            f64,
+            u32,
+            Eytzinger<2>,
+            2,
+            32,
+        >>::replace_item_in_leaf(
+            &mut leaves, 0, &[9.0, 90.0], 5, 9
+        ));
+
+        let arena =
+            <VecOfArenas<f64, u32, 2, 32> as LeafStrategy<f64, u32, Eytzinger<2>, 2, 32>>::leaf_arena(
+                &leaves, 0,
+            );
+        assert_eq!(arena.point_item(0), ([1.0, 10.0], 5));
+        assert_eq!(arena.point_item(1), ([2.0, 20.0], 6));
+        assert_eq!(arena.point_item(2), ([3.0, 30.0], 7));
+    }
+
+    #[test]
+    fn vec_of_arenas_replace_item_in_leaf_returns_false_when_item_does_not_match() {
+        let mut leaves = <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
+            f64,
+            u32,
+            Eytzinger<2>,
+            2,
+            32,
+        >>::new_with_capacity(64);
+        let x = [1.0, 2.0, 3.0];
+        let y = [10.0, 20.0, 30.0];
+        let items = [5u32, 6, 7];
+
+        <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
+            f64,
+            u32,
+            Eytzinger<2>,
+            2,
+            32,
+        >>::append_leaf(&mut leaves, &[&x, &y], &items);
+
+        assert!(!<VecOfArenas<f64, u32, 2, 32> as LeafStrategy<
+            f64,
+            u32,
+            Eytzinger<2>,
+            2,
+            32,
+        >>::replace_item_in_leaf(
+            &mut leaves, 0, &[2.0, 20.0], 99, 9
+        ));
+
+        let arena =
+            <VecOfArenas<f64, u32, 2, 32> as LeafStrategy<f64, u32, Eytzinger<2>, 2, 32>>::leaf_arena(
+                &leaves, 0,
+            );
+        assert_eq!(arena.point_item(0), ([1.0, 10.0], 5));
+        assert_eq!(arena.point_item(1), ([2.0, 20.0], 6));
+        assert_eq!(arena.point_item(2), ([3.0, 30.0], 7));
+    }
+
+    #[test]
+    fn vec_of_arenas_replace_item_in_leaf_replaces_match_in_later_tile() {
+        let mut leaves = <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
+            f64,
+            u32,
+            Eytzinger<2>,
+            2,
+            32,
+        >>::new_with_capacity(64);
+        let x: Vec<f64> = (0..40).map(|v| v as f64).collect();
+        let y: Vec<f64> = (100..140).map(|v| v as f64).collect();
+        let items: Vec<u32> = (1000..1040).collect();
+
+        <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
+            f64,
+            u32,
+            Eytzinger<2>,
+            2,
+            32,
+        >>::append_leaf(&mut leaves, &[&x, &y], &items);
+
+        assert!(<VecOfArenas<f64, u32, 2, 32> as LeafStrategy<
+            f64,
+            u32,
+            Eytzinger<2>,
+            2,
+            32,
+        >>::replace_item_in_leaf(
+            &mut leaves, 0, &[35.0, 135.0], 1035, 9999
+        ));
+
+        let arena =
+            <VecOfArenas<f64, u32, 2, 32> as LeafStrategy<f64, u32, Eytzinger<2>, 2, 32>>::leaf_arena(
+                &leaves, 0,
+            );
+        assert_eq!(arena.point_item(31), ([31.0, 131.0], 1031));
+        assert_eq!(arena.point_item(35), ([35.0, 135.0], 9999));
+        assert_eq!(arena.point_item(39), ([39.0, 139.0], 1039));
     }
 }

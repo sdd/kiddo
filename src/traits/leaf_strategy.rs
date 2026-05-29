@@ -200,6 +200,23 @@ where
     /// call into crate-internal huge-page hints after construction.
     #[inline]
     fn maybe_enable_huge_pages(&self) {}
+
+    /// Replaces the first exact `(point, old_item)` match in the specified leaf.
+    ///
+    /// Returns `true` if a replacement happened, `false` otherwise.
+    #[inline]
+    fn replace_item_in_leaf(
+        &mut self,
+        _leaf_idx: usize,
+        _point: &[AX; K],
+        _old_item: T,
+        _new_item: T,
+    ) -> bool
+    where
+        T: PartialEq,
+    {
+        false
+    }
 }
 
 /// Leaf strategies that can be constructed by `KdTree` builders.
