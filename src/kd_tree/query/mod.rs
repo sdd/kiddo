@@ -4,7 +4,10 @@ mod builder;
 pub use builder::{
     ApproxNearestOneQuery, BestNWithinQuery, Exclude, Include, NearestNQuery,
     NearestNUnsortedQuery, NearestNWithinQuery, NearestNWithinUnsortedQuery, NearestOneQuery,
-    Projected, Projection, QueryBuilder, WithinQuery, WithinUnsortedQuery,
+    PeriodicNearestNQuery, PeriodicNearestNWithinQuery, PeriodicNearestNWithinUnsortedQuery,
+    PeriodicNearestOneQuery, PeriodicQueryBuilder, PeriodicWithinQuery,
+    PeriodicWithinUnsortedQuery, Projected, Projection, QueryBuilder, WithinQuery,
+    WithinUnsortedQuery,
 };
 mod nearest_n;
 mod nearest_n_within;

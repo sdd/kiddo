@@ -16,7 +16,10 @@ pub use orchestrator::KdTreeQueryOps;
 pub use query::{
     ApproxNearestOneQuery, BestNWithinQuery, Exclude, Include, NearestNQuery,
     NearestNUnsortedQuery, NearestNWithinQuery, NearestNWithinUnsortedQuery, NearestOneQuery,
-    Projected, Projection, QueryBuilder, WithinQuery, WithinUnsortedQuery,
+    PeriodicNearestNQuery, PeriodicNearestNWithinQuery, PeriodicNearestNWithinUnsortedQuery,
+    PeriodicNearestOneQuery, PeriodicQueryBuilder, PeriodicWithinQuery,
+    PeriodicWithinUnsortedQuery, Projected, Projection, QueryBuilder, WithinQuery,
+    WithinUnsortedQuery,
 };
 pub use stem_leaf_resolution::OwnedStemLeafResolution;
 
