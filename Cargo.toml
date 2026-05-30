@@ -201,7 +201,7 @@ yep-cache-line-size = "0.9"
 
 [dev-dependencies]
 assert_float_eq = "1.2"
-bincode = { version = "2", features = ["serde"] }
+bincode = { version = "3", features = ["serde"] }
 codspeed-criterion-compat = "4.0"
 criterion = "0.7"
 elapsed = "0.1.2"
