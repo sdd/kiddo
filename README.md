@@ -8,6 +8,7 @@ Built with an aggressive focus on query performance, including cache-aware layou
 - [Documentation](https://docs.rs/kiddo)
 - [Usage](#usage)
 - [Examples](https://github.com/sdd/kiddo/blob/master/examples/Readme.md)
+- [What's New In v6](#whats-new-in-v6)
 - [Benchmarks](#benchmarks)
 - [Change Log](https://github.com/sdd/kiddo/blob/master/CHANGELOG.md)
 - [License](#license)
@@ -24,28 +25,66 @@ If you need to add or remove points after construction, start with [`MutableKdTr
 
 Kiddo is not intended as a library for high-dimensional vector search or feature matching over hundreds or thousands of dimensions, where plain k-d trees are usually the wrong data structure and other approaches are more appropriate. The API does not impose a hard dimensional limit, but Kiddo is primarily intended for low-dimensional workloads.
 
-Kiddo supports the following query types:
+Kiddo supports the following query types through its fluent builder API, starting from [`KdTree::query`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.query):
 
-- [`KdTree::nearest_one`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.nearest_one) finds the single nearest item to a query point.
+- `.nearest_one()` finds the single nearest item to a query point.
   Useful for tasks like finding the nearest airport to a given location, or finding the nearest catalogued star to a sky position.
 
-- [`KdTree::best_n_within`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.best_n_within) finds the "best" `n` items within a specified distance of a query point, for some definition of "best".
+- `.best_n_within(radius, n)` finds the "best" `n` items within a specified distance of a query point, for some definition of "best".
   For example, "give me the 5 largest settlements within 50km of a given point, ordered by descending population", or "the 5 brightest stars within a degree of a point on the sky, ordered brightest first".
 
-- [`KdTree::approx_nearest_one`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.approx_nearest_one) performs approximate nearest-neighbour (ANN) search, returning a good approximate nearest item, often much faster than exact nearest-neighbour search.
+- `.nearest_one().approx()` performs approximate nearest-neighbour (ANN) search, returning a good approximate nearest item, often much faster than exact nearest-neighbour search.
   Useful for latency-sensitive workloads like interactive point-cloud picking, or mapping image pixels to a palette colour during colour quantization.
 
-- [`KdTree::nearest_n`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.nearest_n) performs k-nearest-neighbour (k-NN) search, finding the `n` nearest items to a query point ordered by distance.
+- `.nearest_n(n)` performs k-nearest-neighbour (k-NN) search, finding the `n` nearest items to a query point ordered by distance.
   Useful for finding the nearest weather stations or sensors to a location, or generating candidate correspondences for point-cloud registration.
 
-- [`KdTree::nearest_n_within`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.nearest_n_within) finds up to `n` nearest items within a specified radius of a query point, ordered by distance.
+- `.nearest_n(n).within(radius)` finds up to `n` nearest items within a specified radius of a query point, ordered by distance.
   Useful when you want the closest local neighbours inside a meaningful cutoff, such as the nearest shops within 5 miles, or nearby atoms within an interaction radius.
 
-- [`KdTree::within`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.within) finds all items within a specified radius of a query point, ordered by distance.
+- `.within(radius)` finds all items within a specified radius of a query point, ordered by distance.
   Useful for radial catalogue searches in astronomy, or collision and proximity queries where the full neighbourhood is needed in sorted order.
 
-- [`KdTree::within_unsorted`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.within_unsorted) finds all items within a specified radius of a query point without sorting the results.
-  This is often faster than [`KdTree::within`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.within) when result order does not matter, such as finding all customers within 5 miles of a store, or collecting point-cloud neighbourhoods for clustering or normal estimation.
+- `.within(radius).unsorted()` finds all items within a specified radius of a query point without sorting the results.
+  This is often faster than `.within(radius)` when result order does not matter, such as finding all customers within 5 miles of a store, or collecting point-cloud neighbourhoods for clustering or normal estimation.
+
+The builder API also supports boundary exclusivity, result projection, and periodic boundary conditions where applicable.
+
+## What's New In v6
+
+Version 6 is a substantial API and architecture refresh. The biggest user-facing changes are:
+
+- A single generic [`KdTree`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html) now underpins both mutable and immutable usage patterns.
+- Queries now go through a fluent builder API starting from [`KdTree::query`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.query).
+- Query results now use explicit structs such as [`QueryResultItem`](https://docs.rs/kiddo/latest/kiddo/struct.QueryResultItem.html) and [`BestQueryResultItem`](https://docs.rs/kiddo/latest/kiddo/struct.BestQueryResultItem.html).
+- Radius-bounded queries support exclusive boundaries.
+- Periodic boundary conditions are supported through the query builder.
+- Owned trees now support in-place item replacement via `replace_item`.
+- Support for `rkyv` 0.7 has been removed; v6 uses `rkyv_08`.
+
+### Migration from v5
+
+The largest source-level breaking changes when moving from v5 are:
+
+- Direct query methods such as `nearest_one`, `nearest_n`, `nearest_n_within`, `within`, and `within_unsorted` have been replaced by builder chains beginning with `.query(&point)`.
+- Query results are no longer returned as tuples or `NearestNeighbour` / `BestNeighbour`; use `.distance`, `.item`, and `.point` on `QueryResultItem` / `BestQueryResultItem`.
+- `rkyv` support is now exposed through the `rkyv_08` crate feature.
+- The old `kiddo::mutable::*` and `kiddo::immutable::*` module-based public API is gone; use [`KdTree`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html), [`ImmutableKdTree`](https://docs.rs/kiddo/latest/kiddo/type.ImmutableKdTree.html), and [`MutableKdTree`](https://docs.rs/kiddo/latest/kiddo/type.MutableKdTree.html) from the crate root.
+
+In practice, code like this in v5:
+
+```rust
+let result = kdtree.nearest_one::<SquaredEuclidean<f64>>(&query);
+```
+
+becomes this in v6:
+
+```rust
+let result = kdtree
+    .query(&query)
+    .nearest_one::<SquaredEuclidean<f64>>()
+    .execute();
+```
 
 ## Usage
 
@@ -56,12 +95,12 @@ Add `kiddo` to `Cargo.toml`
 kiddo = "6.0.0-alpha.1"
 ```
 
-Add points to k-d tree and query nearest n points with distance function
+Add points to a k-d tree and query the nearest points with a distance metric:
 
 ```rust
 use std::num::NonZero;
 
-use kiddo::{ImmutableKdTree, NearestNeighbour, SquaredEuclidean};
+use kiddo::{ImmutableKdTree, QueryResultItem, SquaredEuclidean};
 
 let entries = vec![
     [0f64, 0f64],
@@ -70,42 +109,68 @@ let entries = vec![
     [3f64, 3f64]
 ];
 
-let kdtree = ImmutableKdTree::new_from_slice(&entries);
+let kdtree = ImmutableKdTree::new_from_slice(&entries).unwrap();
 
 // How many items are in tree?
 assert_eq!(kdtree.size(), 4);
 
-// find the nearest item to [0f64, 0f64].
-// returns a tuple of (dist, index)
-assert_eq!(
-    kdtree.nearest_one::<SquaredEuclidean<f64>>(&[0f64, 0f64]),
-    (0f64, 0)
-);
+// Find the nearest item to [0f64, 0f64].
+let nearest = kdtree
+    .query(&[0f64, 0f64])
+    .nearest_one::<SquaredEuclidean<f64>>()
+    .execute();
+
+assert_eq!(nearest.distance, 0f64);
+assert_eq!(nearest.item, 0);
 
 assert_eq!(
-    kdtree.nearest_n::<SquaredEuclidean<f64>>(
-        &[0f64, 0f64],
-        NonZero::new(3usize).unwrap(),
-        true
-    ),
+    kdtree
+        .query(&[0f64, 0f64])
+        .nearest_n::<SquaredEuclidean<f64>>(NonZero::new(3usize).unwrap())
+        .execute(),
     vec![
-        NearestNeighbour {
-            distance: 0f64,
-            item: 0
-        },
-        NearestNeighbour {
-            distance: 2f64,
-            item: 1
-        },
-        NearestNeighbour {
-            distance: 8f64,
-            item: 2
-        }
+        QueryResultItem { point: (), distance: 0f64, item: 0 },
+        QueryResultItem { point: (), distance: 2f64, item: 1 },
+        QueryResultItem { point: (), distance: 8f64, item: 2 }
     ]
 );
 ```
 
 See the [examples documentation](https://github.com/sdd/kiddo/tree/master/examples) for some more detailed examples.
+
+The same builder can be used to select unsorted range queries, approximate nearest-neighbour search, exclusive radius boundaries, result projection, and periodic boundary conditions. For example:
+
+```rust
+use std::num::NonZero;
+
+use kiddo::{ImmutableKdTree, SquaredEuclidean};
+
+let entries = vec![
+    [0.05f64, 0.50],
+    [0.95f64, 0.50],
+    [0.40f64, 0.40],
+];
+
+let kdtree = ImmutableKdTree::new_from_slice(&entries).unwrap();
+let box_size = [1.0f64, 1.0];
+
+let wrapped = kdtree
+    .query(&[0.99, 0.50])
+    .periodic_boundary_condition(&box_size)
+    .nearest_one::<SquaredEuclidean<f64>>()
+    .execute();
+
+assert_eq!(wrapped.item, 1);
+
+let neighbours = kdtree
+    .query(&[0.99, 0.50])
+    .periodic_boundary_condition(&box_size)
+    .nearest_n::<SquaredEuclidean<f64>>(NonZero::new(2).unwrap())
+    .within(0.10)
+    .execute();
+
+assert_eq!(neighbours.len(), 2);
+```
 
 ## Optional Features
 
@@ -133,23 +198,23 @@ Kiddo also contains a number of additional feature flags used for internal exper
 
 ## v5.x
 
-Version 5 bundles a complete re-write of [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) alongside some rationalization of feature names and a change of type of the `max_qty` parameter present in some query methods from `usize` to `NonZero<usize>`.
+Version 5 bundled a complete re-write of [`ImmutableKdTree`](https://docs.rs/kiddo/5.0.0/kiddo/type.ImmutableKdTree.html) alongside some rationalization of feature names and a change of type of the `max_qty` parameter present in some query methods from `usize` to `NonZero<usize>`.
 
 ### `ImmutableKdTree` rewrite
 
-Many people had previously unsuccessfully tried to use `ImmutableKdTree` with data containing many points that have the same value on one or more of their axes, for example point cloud data containing many points on a flat axis-aligned plane.
-The v5 rewrite of `ImmutableKdTree` experiences none of these kinds of problems and can be safely used no matter what your data looks like.
-Query performance is in many cases faster than the prior version, but sometimes slightly slower - your mileage may vary but differences in query performance is pretty small.
-Construction performance is considerably improved, with up to a 2x speedup, with the improvement becoming more pronounced as the tree size increases.
-Memory efficiency is slightly better also.
+Many people had previously unsuccessfully tried to use [`ImmutableKdTree`](https://docs.rs/kiddo/5.0.0/kiddo/type.ImmutableKdTree.html) with data containing many points that had the same value on one or more of their axes, for example point cloud data containing many points on a flat axis-aligned plane.
+The v5 rewrite of [`ImmutableKdTree`](https://docs.rs/kiddo/5.0.0/kiddo/type.ImmutableKdTree.html) experienced none of these kinds of problems and could be safely used no matter what your data looked like.
+Query performance was in many cases faster than the prior version, but sometimes slightly slower - your mileage may vary but differences in query performance were pretty small.
+Construction performance was considerably improved, with up to a 2x speedup, with the improvement becoming more pronounced as the tree size increased.
+Memory efficiency was slightly better also.
 
 ### Modified van Emde Boas Stem Ordering
 
-The experimental `modified_van_emde_boas` feature allows an alternative stem node ordering mode to be enabled. This mode is more cache-friendly. Under the standard Eytzinger ordering, a new cache line will be fetched for almost every level traversed within the stem nodes beyond the third level. The Modified van Emde Boas ordering is more cache efficient - meaning that on CPU architectures with a 64-byte cache line (ie almost all of them in servers, desktops and laptops), a cache line needs fetching only once every 3 stem levels for f64, and every 4 levels for f32.
+The experimental `modified_van_emde_boas` feature allowed an alternative stem node ordering mode to be enabled. This mode was more cache-friendly. Under the standard Eytzinger ordering, a new cache line would be fetched for almost every level traversed within the stem nodes beyond the third level. The Modified van Emde Boas ordering was more cache efficient - meaning that on CPU architectures with a 64-byte cache line (ie almost all of them in servers, desktops and laptops), a cache line needed fetching only once every 3 stem levels for f64, and every 4 levels for f32.
 On architectures with a 128-byte cache lines (some Apple M3 and newer at the moment), this is every 4 levels for f64 and every 5 levels for f32.
-The downside is that logic to calculate the next stem index is significantly more complex than with the Eytzinger layout, requiring around 10 integer ops (one being a divide) vs just one integer op (a shift) for Eytzinger.
-Right now the performance when using `modified_van_emde_boas` is between 1% faster and 5% slower than standard, at least on the machines that I've tested it on.
-I'd love to hear how it fares on a machine with a 128-byte cache line width, if anyone cares to try it. I'm continuing to work on the performance of this and perhaps one day it may end up faster than Eytzinger if I can optimise the logic well enough - the initial implementation required 24 operations, so progress has been made.
+The downside was that logic to calculate the next stem index was significantly more complex than with the Eytzinger layout, requiring around 10 integer ops (one being a divide) vs just one integer op (a shift) for Eytzinger.
+At the time, performance when using `modified_van_emde_boas` was between 1% faster and 5% slower than standard, at least on the machines that I'd tested it on.
+I'd have loved to hear how it fared on a machine with a 128-byte cache line width, if anyone cared to try it. I continued to work on the performance of this and perhaps one day it may end up faster than Eytzinger if I can optimise the logic well enough - the initial implementation required 24 operations, so progress had been made.
 
 ### Feature name changes
 
@@ -164,38 +229,38 @@ It was noted by [@ezrasingh](https://github.com/sdd/kiddo/issues/168#issuecommen
 
 ### `ImmutableKdTree` + `rkyv`
 
-The v5 `ImmutableKdTree` uses an Aligned Vec internally for storing stem nodes. It is not possible to zero-copy deserialize
+The v5 [`ImmutableKdTree`](https://docs.rs/kiddo/5.0.0/kiddo/type.ImmutableKdTree.html) used an Aligned Vec internally for storing stem nodes. It was not possible to zero-copy deserialize
 into an Aligned Vec with `rkyv` as there is no guarantee that the stem vec in the underlying buffer respects the alignment.
-As such, unfortunately this means that `ImmutableKdTree` itself can't be fully zero-copy serialized / deserialized, but there
-are some related types that are provided that allow zero-copy deserialization to be performed for all other parts of the tree
-except for the stems, which themselves get copied into an aligned array from the buffer.
-In practice this is still very fast as the stems are only a very small part of the overall tree.
+As such, unfortunately this meant that [`ImmutableKdTree`](https://docs.rs/kiddo/5.0.0/kiddo/type.ImmutableKdTree.html) itself couldn't be fully zero-copy serialized / deserialized, but there
+were some related types that were provided that allowed zero-copy deserialization to be performed for all other parts of the tree
+except for the stems, which themselves got copied into an aligned array from the buffer.
+In practice this was still very fast as the stems were only a very small part of the overall tree.
 
 See `immutable-rkyv-serialize` and `immutable-rkyv-deserialize` in the examples for how to do this.
 
 ## v3.x
 
 Version 3.x changed the distance metrics syntax, switching from function pointers to a trait-based
-approach that permitted some ergonomics and performance improvements. This is a breaking change though:
-whereas prior to v3, you may have had queries that look like this:
+approach that permitted some ergonomics and performance improvements. This was a breaking change though:
+whereas prior to v3, you may have had queries that looked like this:
 
 ```
 use kiddo::distance::squared_euclidean;
 let result = kdtree.nearest_one(&[0f64, 0f64], &squared_euclidean);
 ```
 
-Now for v3 onwards, you'll need to switch to this syntax:
+For v3 onwards, you needed to switch to this syntax:
 
 ```
 use kiddo::SquaredEuclidean;
 let result = kdtree.nearest_one::<SquaredEuclidean>(&[0f64, 0f64]);
 ```
 
-V3 also introduces the [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) variant. Designed for use cases where all the points that you need to add
-to the tree are known up-front, and no modifications need to be made after the tree is initially populated.
-[`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) balances and optimises the tree at construction time, ensuring much more efficient
+V3 also introduced the [`ImmutableKdTree`](https://docs.rs/kiddo/3.0.0/kiddo/type.ImmutableKdTree.html) variant. It was designed for use cases where all the points that you needed to add
+to the tree were known up-front, and no modifications needed to be made after the tree was initially populated.
+[`ImmutableKdTree`](https://docs.rs/kiddo/3.0.0/kiddo/type.ImmutableKdTree.html) balanced and optimised the tree at construction time, ensuring much more efficient
 memory usage (and a correspondingly smaller size on-disk for serialized trees). Since the interior
-nodes of the [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) also take up less space in memory, more of them can fit in the CPU cache, potentially
+nodes of the [`ImmutableKdTree`](https://docs.rs/kiddo/3.0.0/kiddo/type.ImmutableKdTree.html) also took up less space in memory, more of them could fit in the CPU cache, potentially
 improving performance in some cases.
 
 ## v2.x
