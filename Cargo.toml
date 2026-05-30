@@ -217,7 +217,7 @@ memmap = "0.7"
 proc-macro2 = { version = "1", features = ["default", "proc-macro"] }
 radians = "0.3"
 rand = "0.9"
-rand_distr = "0.5"
+rand_distr = "0.6"
 rayon = "1"
 rstest = "0.26"
 serde = { version = "1", features = ["derive", "rc"] }
