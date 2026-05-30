@@ -14,6 +14,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   LATEST_STABLE_RUST_VERSION: "TBD"
 
@@ -21,6 +24,9 @@ jobs:
   commitlint:
     name: Commit Lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v6
       - uses: wagoid/commitlint-github-action@v6
@@ -90,11 +96,14 @@ jobs:
           show-progress: false
 
       - name: Lint GitHub Actions workflows
-        uses: docker://rhysd/actionlint:latest
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
 
   lint:
     name: Lint (Stable)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
 
     steps:
       - uses: actions/checkout@v6
@@ -118,7 +127,7 @@ jobs:
         with:
           components: rustfmt,clippy
 
-      - uses: LoliGothick/clippy-check@master
+      - uses: LoliGothick/clippy-check@28bc947aedf0daa770644a7d335f47c95f1dc68c
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           options: --features=serde,rkyv_08,test_utils --no-deps
@@ -130,6 +139,9 @@ jobs:
   lint-unstable:
     name: Lint (Nightly)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     env:
       RUSTFLAGS: "-C target-feature=+avx2"
 
@@ -156,7 +168,7 @@ jobs:
           toolchain: nightly
           components: rustfmt,clippy
 
-      - uses: LoliGothick/clippy-check@master
+      - uses: LoliGothick/clippy-check@28bc947aedf0daa770644a7d335f47c95f1dc68c
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           options: --features tracing,fixed,rkyv_08,serde --no-deps

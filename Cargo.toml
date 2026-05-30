@@ -2,6 +2,7 @@
 name = "kiddo"
 version = "6.0.0-alpha.1"
 edition = "2021"
+rust-version = "1.89"
 authors = ["Scott Donnelly <scott@donnel.ly>"]
 description = "A high-performance, flexible, ergonomic k-d tree library. Ideal for geo- and astro- nearest-neighbour and k-nearest-neighbor queries"
 keywords = ["kd-tree", "kdtree", "kd", "nearest-neighbor", "knn"]
@@ -237,7 +238,7 @@ opt-level = 3
 debug = true
 lto = true
 codegen-units = 1
-opt-level = 3
+opt-level = 2
 
 # Fast iteration profile for test/dev loops that still want near-release perf.
 [profile.fast-tests]
@@ -288,32 +289,7 @@ incremental = true
 #required-features = ["test_utils"]
 
 [[bench]]
-name = "v6_leaf_strategies"
-harness = false
-required-features = ["test_utils"]
-
-[[bench]]
-name = "v6_stem_strategies"
-harness = false
-required-features = ["test_utils"]
-
-[[bench]]
-name = "v6_stem_strategies_focus"
-harness = false
-required-features = ["test_utils"]
-
-[[bench]]
-name = "v6_result_collection_focus"
-harness = false
-required-features = ["test_utils"]
-
-[[bench]]
-name = "v6_periodic_queries"
-harness = false
-required-features = ["test_utils"]
-
-[[bench]]
-name = "v6_construction"
+name = "v6_codspeed_queries"
 harness = false
 required-features = ["test_utils"]
 
