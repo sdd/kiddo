@@ -203,7 +203,7 @@ yep-cache-line-size = "0.9"
 assert_float_eq = "1.2"
 bincode = { version = "2", features = ["serde"] }
 codspeed-criterion-compat = "4.0"
-criterion = "0.7"
+criterion = "0.8"
 elapsed = "0.1.2"
 flate2 = { version = "1", features = [
   "zlib-ng-compat",
