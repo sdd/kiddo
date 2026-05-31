@@ -8,20 +8,17 @@ This example uses the World Cities Database dataset, created by SimpleMaps.com a
 
 These examples demonstrate the creation of a k-d tree, populated by data on world cities. It demonstrates the following:
 
-* Conversion of lat/long co-ordinates into 3D unit sphere co-ordinates
-* Construction and population of a Kiddo k-d tree containing the positions of the cities in the dataset
-* Serde-based deserialization from CSV
-* Querying the nearest single city to a specific point on Earth using `nearest_one`
-* Finding the nearest five cities to a specific pint on Earth, ordered by distance, using `nearest_n`
-* Using `within` to find all cities within a specified radius of a certain point on Earth
-* Finding the three most populous cities within 1000km of a certain point o Earth by using `best_n_within`
-
-
-
+- Conversion of lat/long co-ordinates into 3D unit sphere co-ordinates
+- Construction and population of a Kiddo k-d tree containing the positions of the cities in the dataset
+- Serde-based deserialization from CSV
+- Querying the nearest single city to a specific point on Earth using `nearest_one`
+- Finding the nearest five cities to a specific pint on Earth, ordered by distance, using `nearest_n`
+- Using `within` to find all cities within a specified radius of a certain point on Earth
+- Finding the three most populous cities within 1000km of a certain point o Earth by using `best_n_within`
 
 ## Example 2: High-speed zero-copy serialization and deserialization with Rkyv ([rkyv.rs](./rkyv.rs))
 
-* Rkyv-based blazingly fast serialization / deserialization
+- Rkyv-based blazingly fast serialization / deserialization
 
 The output below was from the same machine as the serde example above -
 you can see the tremendous speed improvement that can be had by switching to
@@ -48,9 +45,10 @@ total elapsed: 50.53 μs
 
 ## Example 3: Serde Serialization to binary formats ([serde.rs](./serde.rs))
 
-* Serde-based serialization to gzipped bincode
-* Serde-based deserialization from gzipped bincode
-* 
+- Serde-based serialization to gzipped bincode
+- Serde-based deserialization from gzipped bincode
+-
+
 ### Prerequisites
 
 This example uses the larger GeoNames database, created by geonames and downloadable from Kaggle. You'll need to download it into this `examples` folder and unzip it in order to use these examples. You can find it here: [https://www.kaggle.com/datasets/geonames/geonames-database](https://www.kaggle.com/datasets/geonames/geonames-database).

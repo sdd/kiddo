@@ -75,8 +75,8 @@ jobs:
         with:
           node-version: 24
 
-      - name: Rustfmt Check
-        uses: actions-rust-lang/rustfmt@v1
+      - name: Cargo fmt check
+        run: cargo fmt --all --check
 
       - name: Cargo sort check
         run: cargo sort -cwg
@@ -140,7 +140,6 @@ jobs:
 
       - name: Check Rustdoc Links
         run: RUSTDOCFLAGS="--deny broken_intra_doc_links" cargo doc --verbose --workspace --no-deps --document-private-items
-
 
   lint-unstable:
     name: Lint (Nightly)
@@ -259,7 +258,6 @@ jobs:
       - name: Cargo check all targets and features
         run: cargo hack check --workspace --each-feature --all-targets
 
-
   test-basic:
     name: Run Tests (Stable, no crate features enabled that require unstable Rust)
     runs-on: ubuntu-latest
@@ -331,7 +329,7 @@ jobs:
 
       - name: Cargo test (release build)
         env:
-          RUSTFLAGS: '-C target-cpu=native'
+          RUSTFLAGS: "-C target-cpu=native"
         run: |
           cargo run --example build-float-doctest-tree --features="rkyv"
           cargo run --example build-immutable-doctest-tree --features="rkyv"

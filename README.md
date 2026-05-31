@@ -2,35 +2,40 @@
 
 > A high-performance, flexible, ergonomic [k-d tree](https://en.wikipedia.org/wiki/K-d_tree) library. Possibly the fastest k-d tree library in the world? [See for yourself](https://sdd.github.io/kd-tree-comparison-webapp/).
 
-* [Crate](https://crates.io/crates/kiddo)
-* [Documentation](https://docs.rs/kiddo)
-* [Usage](#usage)
-* [Examples](https://github.com/sdd/kiddo/blob/master/examples/Readme.md)
-* [Benchmarks](#benchmarks)
-* [Change Log](https://github.com/sdd/kiddo/blob/master/CHANGELOG.md)
-* [License](#license)
+- [Crate](https://crates.io/crates/kiddo)
+- [Documentation](https://docs.rs/kiddo)
+- [Usage](#usage)
+- [Examples](https://github.com/sdd/kiddo/blob/master/examples/Readme.md)
+- [Benchmarks](#benchmarks)
+- [Change Log](https://github.com/sdd/kiddo/blob/master/CHANGELOG.md)
+- [License](#license)
 
 Kiddo is ideal for superfast spatial / geospatial lookups and nearest-neighbour / KNN queries for low-ish numbers of dimensions, where you want to ask questions such as:
- - Find the [nearest_n](https://docs.rs/kiddo/latest/kiddo/float/kdtree/struct.KdTree.html#method.nearest_n) item(s) to a query point, ordered by distance;
- - Find all items [within](https://docs.rs/kiddo/latest/kiddo/float/kdtree/struct.KdTree.html#method.within) a specified radius of a query point;
- - Find the ["best" n item(s) within](https://docs.rs/kiddo/latest/kiddo/float/kdtree/struct.KdTree.html#method.best_n_within) a specified distance of a query point, for some definition of "best".
+
+- Find the [nearest_n](https://docs.rs/kiddo/latest/kiddo/float/kdtree/struct.KdTree.html#method.nearest_n) item(s) to a query point, ordered by distance;
+- Find all items [within](https://docs.rs/kiddo/latest/kiddo/float/kdtree/struct.KdTree.html#method.within) a specified radius of a query point;
+- Find the ["best" n item(s) within](https://docs.rs/kiddo/latest/kiddo/float/kdtree/struct.KdTree.html#method.best_n_within) a specified distance of a query point, for some definition of "best".
 
 Kiddo provides:
- - Its standard floating point k-d tree, exposed as [`kiddo::KdTree`](`crate::KdTree`)
- - An [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) with space and performance advantages over the standard
-   k-d tree, for situations where the tree does not need to be modified after creation
- - **Integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) crate;
- - **`f16` support** via the [`half`](https://docs.rs/half/latest/half/) crate; 
- - **Instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
+
+- Its standard floating point k-d tree, exposed as [`kiddo::KdTree`](`crate::KdTree`)
+- An [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) with space and performance advantages over the standard
+  k-d tree, for situations where the tree does not need to be modified after creation
+- **Integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) crate;
+- **`f16` support** via the [`half`](https://docs.rs/half/latest/half/) crate;
+- **Instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
 
 ## Usage
+
 Add `kiddo` to `Cargo.toml`
+
 ```toml
 [dependencies]
 kiddo = "5.3.1"
 ```
 
 Add points to k-d tree and query nearest n points with distance function
+
 ```rust
 use kiddo::{KdTree, SquaredEuclidean};
 
@@ -62,20 +67,21 @@ assert_eq!(
     vec![(0f64, 0), (2f64, 1), (8f64, 2)]
 );
 ```
+
 See the [examples documentation](https://github.com/sdd/kiddo/tree/master/examples) for some more detailed examples.
 
 ## Optional Features
 
 The Kiddo crate exposes the following features. Any labelled as **(NIGHTLY)** are not available on `stable` Rust as they require some unstable features. You'll need to build with `nightly` in order to user them.
-* `fixed`: enables the fixed module, which provides a version of KdTree that supports fixed-point types via the [`fixed`](https://docs.rs/fixed/latest/fixed) crate
-* `rkyv` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.7. 
-* `rkyv_08` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.8.
-* `serde` - serialization / deserialization via [`Serde`](https://docs.rs/serde/latest/serde/)
-* `simd` **(NIGHTLY)** - enables some handwritten SIMD intrinsic code within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) that may improve performance (currently only on the nearest_one method when using `f64`)
-* `tracing` feature is enabled by default and adds some tracing output.
-* `modified_van_emde_boas`: disabled by default. Enabling will switch the stem node ordering from Eytzinger to a modified Van Emde Boas ordering that may in some circumstances be slightly faster.
-* The `f16`, `csv` and `las` features are only required for building some of the examples and are not required to support any features by consumers of this crate
 
+- `fixed`: enables the fixed module, which provides a version of KdTree that supports fixed-point types via the [`fixed`](https://docs.rs/fixed/latest/fixed) crate
+- `rkyv` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.7.
+- `rkyv_08` - zero-copy serialization / deserialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) version 0.8.
+- `serde` - serialization / deserialization via [`Serde`](https://docs.rs/serde/latest/serde/)
+- `simd` **(NIGHTLY)** - enables some handwritten SIMD intrinsic code within [`ImmutableKdTree`](`immutable::float::kdtree::ImmutableKdTree`) that may improve performance (currently only on the nearest_one method when using `f64`)
+- `tracing` feature is enabled by default and adds some tracing output.
+- `modified_van_emde_boas`: disabled by default. Enabling will switch the stem node ordering from Eytzinger to a modified Van Emde Boas ordering that may in some circumstances be slightly faster.
+- The `f16`, `csv` and `las` features are only required for building some of the examples and are not required to support any features by consumers of this crate
 
 ## v5.x
 
@@ -147,11 +153,11 @@ improving performance in some cases.
 ## v2.x
 
 Version 2.x was a complete rewrite, providing:
+
 - a new internal architecture for **much-improved performance**;
 - Added **integer / fixed point support** via the [`Fixed`](https://docs.rs/fixed/latest/fixed/) library;
 - **instant zero-copy deserialization** and serialization via [`Rkyv`](https://docs.rs/rkyv/latest/rkyv/) ([`Serde`](https://docs.rs/serde/latest/serde/) still available).
 - See the [changelog](https://github.com/sdd/kiddo/blob/master/CHANGELOG.md) for a detailed run-down on all the changes made in v2.
-
 
 ## Benchmarks
 
@@ -160,33 +166,33 @@ The results of all the below benchmarks are viewable in an interactive webapp ov
 The comparative benchmark suite is located in another project, [https://github.com/sdd/kd-tree-comparison](https://github.com/sdd/kd-tree-comparison).
 
 Criterion was used to perform a series of benchmarks. We compare Kiddo v3 to:
-* Kiddo v2.x
-* [Kiddo v1.x / v0.2.x](https://github.com/sdd/kiddo_v1)
-* [FNNTW](https://crates.io/crates/fnntw) v0.2.3
-* [nabo-rs](https://crates.io/crates/nabo) v0.2.1
-* [pykdtree](https://github.com/storpipfugl/pykdtree) v1.3.4
-* [sklearn.neighbours.KDTree](https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KDTree.html) v1.2.2
-* [scipy.spatial.KDTree](https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.KDTree.html) v1.10.1
+
+- Kiddo v2.x
+- [Kiddo v1.x / v0.2.x](https://github.com/sdd/kiddo_v1)
+- [FNNTW](https://crates.io/crates/fnntw) v0.2.3
+- [nabo-rs](https://crates.io/crates/nabo) v0.2.1
+- [pykdtree](https://github.com/storpipfugl/pykdtree) v1.3.4
+- [sklearn.neighbours.KDTree](https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KDTree.html) v1.2.2
+- [scipy.spatial.KDTree](https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.KDTree.html) v1.10.1
 
 The following activities are benchmarked (where implemented):
-* Construction of a k-d tree from a list of points and indexes
-* Querying the nearest one, ten, or one hundred points to a given query point
-* Querying all points within a set radius of a given point (both unsorted results, and results sorted by distance)
-* Querying the nearest n items within a specified radius (sorted and unsorted)
-* 
-Each action is benchmarked against trees that contain 100, 1,000, 10,000, 100,000, 1,000,000 and in some cases 10,000,000 nodes.
+
+- Construction of a k-d tree from a list of points and indexes
+- Querying the nearest one, ten, or one hundred points to a given query point
+- Querying all points within a set radius of a given point (both unsorted results, and results sorted by distance)
+- Querying the nearest n items within a specified radius (sorted and unsorted)
+- Each action is benchmarked against trees that contain 100, 1,000, 10,000, 100,000, 1,000,000 and in some cases 10,000,000 nodes.
 
 The benchmarks are repeated against 2d, 3d and 4d trees, as well as with points that are both of type `f32` and of type `f64`, as well as a 16-bit fixed point use case for Kiddo v2.
 
 The trees are populated with random source data whose points are all on a unit sphere. This use case is representative of common k-d tree usages in geospatial and astronomical contexts.
 
-
 ## License
 
 Licensed under either of
 
-* Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
-* MIT License ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
+- MIT License ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 at your option.
 
