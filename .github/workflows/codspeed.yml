@@ -4,12 +4,29 @@ on:
   push:
     branches:
       - "master"
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - ".cargo/**"
+  pull_request:
+    branches:
+      - "master"
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - ".cargo/**"
   # `workflow_dispatch` allows CodSpeed to trigger backtest
   # performance analysis in order to generate initial data.
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+env:
+  KIDDO_BENCH_LOG2_POINTS: ${{ github.event_name == 'pull_request' && '16' || '26' }}
+
 jobs:
-  benchmarks:
+  walltime_benchmarks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -17,17 +34,41 @@ jobs:
           show-progress: false
 
       - name: Setup rust toolchain, cache and cargo-codspeed binary
-        uses: moonrepo/setup-rust@v0
+        uses: moonrepo/setup-rust@v1
         with:
           channel: stable
           cache-target: release
           bins: cargo-codspeed
 
-      - name: Build the benchmark target(s)
-        run: cargo codspeed build
+      - name: Build Benchmark Targets (Walltime)
+        run: cargo codspeed build -m walltime
 
-      - name: Run the benchmarks
+      - name: Run Benchmarks (Walltime)
         uses: CodSpeedHQ/action@v4
         with:
           run: cargo codspeed run
           token: ${{ secrets.CODSPEED_TOKEN }}
+          mode: walltime
+  simulation_benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          show-progress: false
+
+      - name: Setup rust toolchain, cache and cargo-codspeed binary
+        uses: moonrepo/setup-rust@v1
+        with:
+          channel: stable
+          cache-target: release
+          bins: cargo-codspeed
+
+      - name: Build Benchmark Targets (Simulation)
+        run: cargo codspeed build -m simulation
+
+      - name: Run Benchmarks (Simulation)
+        uses: CodSpeedHQ/action@v4
+        with:
+          run: cargo codspeed run
+          token: ${{ secrets.CODSPEED_TOKEN }}
+          mode: simulation
