@@ -128,10 +128,15 @@ jobs:
           components: rustfmt,clippy
 
       - uses: LoliGothick/clippy-check@28bc947aedf0daa770644a7d335f47c95f1dc68c
+        if: github.actor != 'dependabot[bot]'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           options: --features=serde,rkyv_08,test_utils --no-deps
           name: Clippy (stable)
+
+      - name: Clippy (stable, dependabot fallback)
+        if: github.actor == 'dependabot[bot]'
+        run: cargo clippy --features=serde,rkyv_08,test_utils --no-deps
 
       - name: Check Rustdoc Links
         run: RUSTDOCFLAGS="--deny broken_intra_doc_links" cargo doc --verbose --workspace --no-deps --document-private-items
@@ -169,10 +174,15 @@ jobs:
           components: rustfmt,clippy
 
       - uses: LoliGothick/clippy-check@28bc947aedf0daa770644a7d335f47c95f1dc68c
+        if: github.actor != 'dependabot[bot]'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           options: --features tracing,fixed,rkyv_08,serde --no-deps
           name: Clippy nightly
+
+      - name: Clippy nightly (dependabot fallback)
+        if: github.actor == 'dependabot[bot]'
+        run: cargo clippy --features tracing,fixed,rkyv_08,serde --no-deps
 
       - name: Check Rustdoc Links
         run: RUSTDOCFLAGS="--deny broken_intra_doc_links" cargo doc --verbose --workspace --no-deps --document-private-items

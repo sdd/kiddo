@@ -5,9 +5,13 @@ on:
     branches:
       - master
       - v5.x.x
+    paths:
+      - "src/**"
   pull_request:
     branches:
       - "**"
+    paths:
+      - "src/**"
   workflow_dispatch:
 
 permissions:
