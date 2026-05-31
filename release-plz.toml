@@ -1,5 +1,4 @@
 [workspace]
 changelog_config = "git-cliff.toml" # use a custom git-cliff configuration
-dependencies_update = true # update dependencies with `cargo update`
-pr_labels = ["release"] # add the `release` label to the release Pull Request
-
+dependencies_update = true          # update dependencies with `cargo update`
+pr_labels = ["release"]             # add the `release` label to the release Pull Request
