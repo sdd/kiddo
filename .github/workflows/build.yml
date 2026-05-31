@@ -2,14 +2,20 @@ name: CI
 
 on:
   push:
-    branches: [ "**" ]
+    branches:
+      - master
+      - v5.x.x
   pull_request:
-    branches: [ "**" ]
+    branches:
+      - "**"
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 env:
   LATEST_STABLE_RUST_VERSION: "TBD"
@@ -18,6 +24,9 @@ jobs:
   commitlint:
     name: Commit Lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v6
       - uses: wagoid/commitlint-github-action@v6
@@ -40,7 +49,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.rustup
           key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
@@ -50,12 +59,51 @@ jobs:
         with:
           components: rustfmt,clippy
 
+      - name: Install cargo-sort
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-sort
+          version: "^2"
+
+      - name: Install taplo
+        uses: taiki-e/install-action@v2
+        with:
+          tool: taplo-cli
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
       - name: Rustfmt Check
         uses: actions-rust-lang/rustfmt@v1
+
+      - name: Cargo sort check
+        run: cargo sort -cwg
+
+      - name: Taplo format check
+        run: taplo format --check ./*.toml
+
+      - name: Prettier check
+        run: npx --yes prettier --check ".github/workflows/*.{yml,yaml}" "*.yml" "*.yaml" ".*.yml" ".*.yaml" "**/*.md"
+
+  github-actions-lint:
+    name: GitHub Actions Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          show-progress: false
+
+      - name: Lint GitHub Actions workflows
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
 
   lint:
     name: Lint (Stable)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
 
     steps:
       - uses: actions/checkout@v6
@@ -69,7 +117,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.rustup
           key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
@@ -79,11 +127,16 @@ jobs:
         with:
           components: rustfmt,clippy
 
-      - uses: LoliGothick/clippy-check@master
+      - uses: LoliGothick/clippy-check@28bc947aedf0daa770644a7d335f47c95f1dc68c
+        if: github.actor != 'dependabot[bot]'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           options: --features=serde,rkyv,rkyv_08,test_utils --no-deps
           name: Clippy (stable)
+
+      - name: Clippy (stable, dependabot fallback)
+        if: github.actor == 'dependabot[bot]'
+        run: cargo clippy --features=serde,rkyv,rkyv_08,test_utils --no-deps
 
       - name: Check Rustdoc Links
         run: RUSTDOCFLAGS="--deny broken_intra_doc_links" cargo doc --verbose --workspace --no-deps --document-private-items
@@ -92,6 +145,11 @@ jobs:
   lint-unstable:
     name: Lint (Nightly)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    env:
+      RUSTFLAGS: "-C target-feature=+avx2"
 
     steps:
       - uses: actions/checkout@v6
@@ -105,7 +163,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.rustup
           key: toolchain-x86-64-nightly-${{ env.TODAY_DATE }}
@@ -116,11 +174,16 @@ jobs:
           toolchain: nightly
           components: rustfmt,clippy
 
-      - uses: LoliGothick/clippy-check@master
+      - uses: LoliGothick/clippy-check@28bc947aedf0daa770644a7d335f47c95f1dc68c
+        if: github.actor != 'dependabot[bot]'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           options: --features tracing,fixed,rkyv,rkyv_08,serde --no-deps
           name: Clippy nightly
+
+      - name: Clippy nightly (dependabot fallback)
+        if: github.actor == 'dependabot[bot]'
+        run: cargo clippy --features tracing,fixed,rkyv,rkyv_08,serde --no-deps
 
       - name: Check Rustdoc Links
         run: RUSTDOCFLAGS="--deny broken_intra_doc_links" cargo doc --verbose --workspace --no-deps --document-private-items
@@ -140,7 +203,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.rustup
           key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
@@ -162,6 +225,8 @@ jobs:
   check-unstable:
     name: Cargo Check (Nightly)
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-C target-feature=+avx2"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -174,7 +239,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.rustup
           key: toolchain-x86-64-nightly-${{ env.TODAY_DATE }}
@@ -210,7 +275,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.rustup
           key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
@@ -231,6 +296,8 @@ jobs:
   test-all-features:
     name: Run Tests (Nightly, all features enabled)
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-C target-feature=+avx2"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -243,7 +310,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.rustup
           key: toolchain-x86-64-nightly-${{ env.TODAY_DATE }}
