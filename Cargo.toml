@@ -11,6 +11,7 @@ documentation = "https://docs.rs/kiddo"
 license = "MIT OR Apache-2.0"
 autobenches = false
 resolver = "2"
+rust-version = "1.85.0"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -26,7 +27,6 @@ serde = [
   "dep:serde",
   "serde/derive",
   "dep:serde_derive",
-  "dep:serde_with",
   "fixed/serde",
   "aligned-vec/serde",
 ]
@@ -41,8 +41,8 @@ generator = "0.8.4"
 
 [dependencies]
 aligned-vec = "0.6.1"
-array-init = "2.1.0"
-az = "1"
+array-init = "2.1"
+az = "1.2"
 cmov = "0.5"
 divrem = "1"
 num-traits = "0.2"
@@ -54,7 +54,7 @@ version = "1"
 optional = true
 
 [dependencies.fixed]
-version = "1"
+version = "=1.29"
 features = ["num-traits"]
 optional = true
 
@@ -65,7 +65,7 @@ optional = true
 features = ["num-traits"]
 
 [dependencies.las]
-version = "0.9"
+version = "=0.9.3"
 optional = true
 features = ["laz-parallel"]
 
@@ -98,10 +98,6 @@ optional = true
 
 [dependencies.serde_derive]
 version = "1"
-optional = true
-
-[dependencies.serde_with]
-version = "3"
 optional = true
 
 [dependencies.tracing]

@@ -76,7 +76,7 @@ impl<A: Axis, T: Content> ResultCollection<A, T> for SortedVec<NearestNeighbour<
             self.insert(entry);
         } else if entry < *self.last().unwrap() {
             self.pop();
-            self.push(entry);
+            self.insert(entry);
         }
     }
 
