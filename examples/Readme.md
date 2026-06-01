@@ -45,8 +45,8 @@ total elapsed: 50.53 μs
 
 ## Example 3: Serde Serialization to binary formats ([serde.rs](./serde.rs))
 
-- Serde-based serialization to gzipped bincode
-- Serde-based deserialization from gzipped bincode
+- Serde-based serialization to gzipped postcard
+- Serde-based deserialization from gzipped postcard
 -
 
 ### Prerequisites
@@ -56,7 +56,7 @@ This example uses the larger GeoNames database, created by geonames and download
 The output below was run on a Ryzen 5900X with 32Gb DDR4-3600.
 
 ```
-> cargo run --release --example serde --features="serde"
+> cargo run --release --example serde --features="csv,serde"
    Compiling kiddo v2.0.2 (~/kiddo)
     Finished release [optimized + debuginfo] target(s) in 5.18s
      Running `target/release/examples/serde`
@@ -65,8 +65,8 @@ Parsed 11061987 rows from the CSV: (3.35 s)
 Populated k-d tree with 11061987 items (2.74 s)
 
 Nearest city to 52.5N, 1.9W: CityCsvRecord { name: "Aston", lat: 52.5, lng: -1.88333 }
-Serialized k-d tree to gzipped bincode file (5.72 s)
-Deserialized gzipped bincode file back into a k-d tree (2.71 s)
+Serialized k-d tree to gzipped postcard file (5.72 s)
+Deserialized gzipped postcard file back into a k-d tree (2.71 s)
 
 Nearest city to 52.5N, 1.9W: CityCsvRecord { name: "Aston", lat: 52.5, lng: -1.88333 }
 ```

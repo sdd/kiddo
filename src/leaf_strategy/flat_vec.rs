@@ -12,7 +12,16 @@ use crate::{Axis, Content, LeafStrategy, StemStrategy};
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
 )]
 #[cfg_attr(feature = "rkyv_08", rkyv(crate = rkyv_08))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "A: serde::Serialize, T: serde::Serialize",
+        deserialize = "A: serde::Deserialize<'de> + Copy + Default, T: serde::Deserialize<'de>"
+    ))
+)]
 pub struct FlatVec<A, T, const K: usize, const B: usize> {
+    #[cfg_attr(feature = "serde", serde(with = "crate::custom_serde::array_of_vecs"))]
     leaf_points: [Vec<A>; K],
     leaf_items: Vec<T>,
     leaf_extents: Vec<(u32, u32)>,
