@@ -265,3 +265,30 @@ pub(crate) mod array_of_vecs {
         deserializer.deserialize_tuple(N, ArrayVecVisitor::<T, N>(PhantomData))
     }
 }
+
+#[cfg(feature = "serde")]
+pub(crate) mod option_nonmax_usize_vec {
+    use nonmax::NonMaxUsize;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(
+        data: &[Option<NonMaxUsize>],
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let mapped: Vec<Option<usize>> = data
+            .iter()
+            .map(|item| item.map(|value| value.get()))
+            .collect();
+        mapped.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Vec<Option<NonMaxUsize>>, D::Error> {
+        let mapped = Vec::<Option<usize>>::deserialize(deserializer)?;
+        Ok(mapped
+            .into_iter()
+            .map(|item| item.and_then(NonMaxUsize::new))
+            .collect())
+    }
+}

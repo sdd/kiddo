@@ -15,6 +15,14 @@ use crate::{Axis, Content, LeafStrategy, StemStrategy};
 )]
 #[cfg_attr(feature = "rkyv_08", rkyv(crate = rkyv_08))]
 #[cfg_attr(feature = "rkyv_08", rkyv(attr(allow(missing_docs))))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "A: serde::Serialize, T: serde::Serialize",
+        deserialize = "A: serde::Deserialize<'de> + Copy + Default, T: serde::Deserialize<'de> + Copy + Default"
+    ))
+)]
 pub struct VecOfArrays<A, T, const K: usize, const B: usize> {
     leaves: Vec<LeafNode<A, T, K, B>>,
     size: usize,
@@ -27,12 +35,25 @@ pub struct VecOfArrays<A, T, const K: usize, const B: usize> {
 )]
 #[cfg_attr(feature = "rkyv_08", rkyv(crate = rkyv_08))]
 #[cfg_attr(feature = "rkyv_08", rkyv(attr(allow(missing_docs))))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "A: serde::Serialize, T: serde::Serialize",
+        deserialize = "A: serde::Deserialize<'de> + Copy + Default, T: serde::Deserialize<'de> + Copy + Default"
+    ))
+)]
 #[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeafNode<A, T, const K: usize, const B: usize> {
     /// Point coordinates organized by dimension
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "crate::custom_serde::array_of_arrays")
+    )]
     pub content_points: [[A; B]; K],
     /// Items associated with each point
+    #[cfg_attr(feature = "serde", serde(with = "crate::custom_serde::array"))]
     pub content_items: [T; B],
     /// Number of points currently stored
     pub size: usize,

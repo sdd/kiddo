@@ -13,6 +13,7 @@ examples/*.csv
 examples/*.json
 examples/*.rkyv
 examples/*.bincode.gz
+examples/*.postcard.gz
 .DS_Store
 .vscode
 kd_tree_fuzz_report.txt

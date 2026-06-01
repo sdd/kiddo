@@ -8,6 +8,7 @@ use crate::{Axis, Content, LeafStrategy, StemStrategy};
 ///
 /// This strategy provides no-op implementations and is not meant for production use.
 #[allow(dead_code)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default)]
 pub struct DummyLeafStrategy {}
 

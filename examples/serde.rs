@@ -1,11 +1,12 @@
 /// Kiddo example 3: Serde
 ///
 /// This example extends the Serde deserialization from Example 1
-/// by demonstrating serialization to/from JSON and gzipped Bincode
+/// by demonstrating serialization to/from gzipped Postcard.
 mod cities;
 
 use std::error::Error;
 use std::fs::File;
+use std::io::{Read, Write};
 
 use elapsed::ElapsedDuration;
 use flate2::read::GzDecoder;
@@ -39,13 +40,12 @@ impl CityCsvRecord {
     }
 }
 
-// We need a large bucket size for this dataset as there are 11m items but
-// the positional precision of the source dataset is only 4DP in degrees
-// of lat / lon and so there are large numbers of points with the same value
-// on some axes. All values that are the same in one axis must fit in one bucket.
+// We use a larger bucket size for the mutable tree in this example because the
+// GeoNames dataset contains many near-duplicate coordinates.
 const BUCKET_SIZE: usize = 1024;
 
-type Tree = KdTree<f32, usize, Eytzinger<3>, VecOfArrays<f32, usize, 3, BUCKET_SIZE>, 3, BUCKET_SIZE>;
+type Tree =
+    KdTree<f32, usize, Eytzinger<3>, VecOfArrays<f32, usize, 3, BUCKET_SIZE>, 3, BUCKET_SIZE>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Load in the cities data from the CSV and use it to populate a k-d tree, as per
@@ -58,11 +58,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         ElapsedDuration::new(start.elapsed())
     );
 
+    let city_entries: Vec<(usize, [f32; 3])> = cities
+        .iter()
+        .enumerate()
+        .map(|(idx, city)| (idx, city.as_xyz()))
+        .collect();
+
     let start = Instant::now();
-    let mut kdtree: Tree = KdTree::with_capacity(cities.len());
-    cities.iter().enumerate().for_each(|(idx, city)| {
-        kdtree.add(&city.as_xyz(), idx).unwrap();
-    });
+    let kdtree: Tree = KdTree::new_from_entries(&city_entries)?;
     println!(
         "Populated k-d tree with {} items ({})",
         kdtree.size(),
@@ -79,21 +82,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("\nNearest city to 52.5N, 1.9W: {nearest_city:?}");
 
     let start = Instant::now();
-    let file = File::create("./examples/geonames-tree.bincode.gz")?;
+    let file = File::create("./examples/geonames-tree.postcard.gz")?;
     let mut encoder = GzEncoder::new(file, Compression::default());
-    bincode::serde::encode_into_std_write(&kdtree, &mut encoder, bincode::config::standard())?;
+    let serialized = postcard::to_allocvec(&kdtree)?;
+    encoder.write_all(&serialized)?;
+    encoder.finish()?;
     println!(
-        "Serialized k-d tree to gzipped bincode file ({})",
+        "Serialized k-d tree to gzipped postcard file ({})",
         ElapsedDuration::new(start.elapsed())
     );
 
     let start = Instant::now();
-    let file = File::open("./examples/geonames-tree.bincode.gz")?;
+    let file = File::open("./examples/geonames-tree.postcard.gz")?;
     let mut decompressor = GzDecoder::new(file);
-    let deserialized_tree: Tree =
-        bincode::serde::decode_from_std_read(&mut decompressor, bincode::config::standard())?;
+    let mut bytes = Vec::new();
+    decompressor.read_to_end(&mut bytes)?;
+    let deserialized_tree: Tree = postcard::from_bytes(&bytes)?;
     println!(
-        "Deserialized gzipped bincode file back into a k-d tree ({})",
+        "Deserialized gzipped postcard file back into a k-d tree ({})",
         ElapsedDuration::new(start.elapsed())
     );
 
@@ -117,22 +123,31 @@ fn main() -> Result<(), Box<dyn Error>> {
         ElapsedDuration::new(start.elapsed())
     );
 
+    let original_nearest_neighbour_result = kdtree
+        .query(&query)
+        .nearest_one::<SquaredEuclidean<f32>>()
+        .execute();
+
     let start = Instant::now();
-    let file = File::create("./examples/geonames-immutable-tree.bincode.gz")?;
+    let file = File::create("./examples/geonames-immutable-tree.postcard.gz")?;
     let mut encoder = GzEncoder::new(file, Compression::default());
-    bincode::serde::encode_into_std_write(&kdtree, &mut encoder, bincode::config::standard())?;
+    let serialized = postcard::to_allocvec(&kdtree)?;
+    encoder.write_all(&serialized)?;
+    encoder.finish()?;
     println!(
-        "Serialized k-d tree to gzipped bincode file ({})",
+        "Serialized k-d tree to gzipped postcard file ({})",
         ElapsedDuration::new(start.elapsed())
     );
 
     let start = Instant::now();
-    let file = File::open("./examples/geonames-immutable-tree.bincode.gz")?;
+    let file = File::open("./examples/geonames-immutable-tree.postcard.gz")?;
     let mut decompressor = GzDecoder::new(file);
+    let mut bytes = Vec::new();
+    decompressor.read_to_end(&mut bytes)?;
     let deserialized_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
-        bincode::serde::decode_from_std_read(&mut decompressor, bincode::config::standard())?;
+        postcard::from_bytes(&bytes)?;
     println!(
-        "Deserialized gzipped bincode file back into a k-d tree ({})",
+        "Deserialized gzipped postcard file back into a k-d tree ({})",
         ElapsedDuration::new(start.elapsed())
     );
 
@@ -142,6 +157,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         .query(&query)
         .nearest_one::<SquaredEuclidean<f32>>()
         .execute();
+    assert_eq!(
+        nearest_neighbour_result.distance,
+        original_nearest_neighbour_result.distance
+    );
+    assert_eq!(
+        nearest_neighbour_result.item,
+        original_nearest_neighbour_result.item
+    );
     let nearest = &cities[nearest_neighbour_result.item as usize];
     println!("\nNearest city to 52.5N, 1.9W: {nearest:?}");
 

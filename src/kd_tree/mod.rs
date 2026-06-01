@@ -211,6 +211,7 @@ fn resolve_mapped_terminal_stem_idx(
 )]
 #[cfg_attr(feature = "rkyv_08", rkyv(crate = rkyv_08))]
 #[cfg_attr(feature = "rkyv_08", rkyv(attr(allow(missing_docs))))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct KdTree<
     A,              // Axis

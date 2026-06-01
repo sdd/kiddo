@@ -22,6 +22,7 @@ use super::{
     feature = "rkyv_08",
     rkyv(archived = ArchivedStemLeafResolution)
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum OwnedStemLeafResolution {
@@ -54,6 +55,10 @@ pub enum OwnedStemLeafResolution {
         min_stem_leaf_idx: usize,
         /// Maps stem indices to leaf indices.
         /// `None` means the stem has children, `Some(idx)` means it points to leaf `idx`.
+        #[cfg_attr(
+            feature = "serde",
+            serde(with = "crate::custom_serde::option_nonmax_usize_vec")
+        )]
         #[cfg_attr(
             feature = "rkyv_08",
             rkyv(with = rkyv_08::with::Map<crate::rkyv::adapters::OptionNonMaxUsizeAsUsize>)

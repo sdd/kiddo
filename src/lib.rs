@@ -195,10 +195,10 @@
 //!
 //! **NOTE**: Support for rkyv 0.7 was removed in Kiddo v6.
 
-// #[doc(hidden)]
-// #[cfg(feature = "serde")]
-// #[doc(hidden)]
-// mod custom_serde;
+#[doc(hidden)]
+#[cfg(feature = "serde")]
+#[doc(hidden)]
+mod custom_serde;
 
 /// Distance metrics
 pub mod dist;
