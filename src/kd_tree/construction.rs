@@ -442,9 +442,20 @@ where
         }
         let root_stem_strat = stem_strat.clone();
 
-        // Traverse to the right-most leaf to determine the max used stem index
-        let rightmost_leaf_idx = leaf_node_count - 1;
-        for bit_idx in (1..stems_depth).rev() {
+        let soft_leaf_budget = if LS::BUCKET_LIMIT_TYPE == BucketLimitType::Soft {
+            1usize << stems_depth
+        } else {
+            leaf_node_count
+        };
+
+        // Traverse to the right-most represented leaf to determine the max used stem index
+        let rightmost_leaf_idx = soft_leaf_budget - 1;
+        let rightmost_leaf_bit_range = if LS::BUCKET_LIMIT_TYPE == BucketLimitType::Soft {
+            0..stems_depth
+        } else {
+            1..stems_depth
+        };
+        for bit_idx in rightmost_leaf_bit_range.rev() {
             let is_right = rightmost_leaf_idx & (1 << bit_idx) != 0;
             stem_strat.traverse(is_right);
         }
@@ -457,33 +468,55 @@ where
         let mut leaves = LS::new_with_capacity(item_count);
         let mut terminal_stem_indices = Vec::with_capacity(leaf_node_count);
         let mut actual_max_stem_level: i32 = -1;
+        let mut max_leaf_len = 0usize;
         let mut sort_index = Vec::from_iter(0..item_count);
 
-        Self::populate_recursive_with(
-            &mut stems,
-            source,
-            &axis_at,
-            &mut sort_index,
-            root_stem_strat,
-            stems_depth as i32 - 1,
-            leaf_node_count * B,
-            &mut leaves,
-            &mut terminal_stem_indices,
-            &mut actual_max_stem_level,
-            &mut item_at,
-        )?;
+        match LS::BUCKET_LIMIT_TYPE {
+            BucketLimitType::Hard => Self::populate_recursive_hard(
+                &mut stems,
+                source,
+                &axis_at,
+                &mut sort_index,
+                root_stem_strat,
+                stems_depth as i32 - 1,
+                leaf_node_count * B,
+                &mut leaves,
+                &mut terminal_stem_indices,
+                &mut actual_max_stem_level,
+                &mut max_leaf_len,
+                &mut item_at,
+            )?,
+            BucketLimitType::Soft => Self::populate_recursive_soft(
+                &mut stems,
+                source,
+                &axis_at,
+                &mut sort_index,
+                root_stem_strat,
+                stems_depth as i32 - 1,
+                soft_leaf_budget,
+                &mut leaves,
+                &mut actual_max_stem_level,
+                &mut max_leaf_len,
+                &mut item_at,
+            )?,
+        }
 
         let initial_max_stem_level = stems_depth as i32 - 1;
-        let stem_leaf_resolution = if LS::Mutability::is_mutable()
-            || actual_max_stem_level > initial_max_stem_level
-            || padding_level_count != 0
-        {
+        let requires_mapped_resolution = LS::Mutability::is_mutable()
+            || LS::BUCKET_LIMIT_TYPE == BucketLimitType::Hard
+                && (actual_max_stem_level > initial_max_stem_level
+                    || padding_level_count != 0
+                    || !Self::terminal_stem_indices_match_arithmetic_layout(
+                        &terminal_stem_indices,
+                        actual_max_stem_level,
+                    ));
+
+        let stem_leaf_resolution = if requires_mapped_resolution {
             Self::mapped_stem_leaf_resolution_from_terminals(&terminal_stem_indices)
         } else {
-            LS::Mutability::initial_stem_leaf_resolution::<SS>(stems_depth, leaf_node_count)
+            LS::Mutability::initial_stem_leaf_resolution::<SS>(stems_depth, leaves.leaf_count())
         };
 
-        let max_leaf_len = Self::initial_max_leaf_len();
         crate::leaf_view::assert_leaf_scratch_capacity(max_leaf_len);
 
         let tree = Self {
@@ -532,9 +565,7 @@ where
         let stem_leaf_resolution =
             LS::Mutability::initial_stem_leaf_resolution::<SS>(0, leaves.leaf_count());
 
-        let max_leaf_len = Self::initial_max_leaf_len();
-        // TODO: if we keep max_leaf_len, populate this from the actual constructed leaf sizes
-        // rather than the current B / (B * 2) heuristic.
+        let max_leaf_len = item_count;
         crate::leaf_view::assert_leaf_scratch_capacity(max_leaf_len);
 
         let tree = Self {
@@ -601,23 +632,61 @@ where
     SS: StemStrategy,
     LS: ConstructibleLeafStrategy<A, T, SS, K, B>,
 {
-    fn at_leaf_level(
-        current_stem_level: i32,
-        max_stem_level: i32,
-        bucket_limit_type: BucketLimitType,
-        chunk_length: usize,
-        capacity: usize,
-    ) -> bool {
-        match bucket_limit_type {
-            // TODO: check that this is the behaviour that we want
-            BucketLimitType::Soft => current_stem_level > max_stem_level || capacity <= B,
-            BucketLimitType::Hard => chunk_length <= B,
+    fn write_leaf_from_sort_index<X, FA, FI>(
+        source: &[X],
+        axis_at: &FA,
+        sort_index: &[usize],
+        leaves: &mut LS,
+        max_leaf_len: &mut usize,
+        item_at: &mut FI,
+    ) -> Result<(), ConstructionError>
+    where
+        FA: Fn(&X, usize) -> A,
+        FI: FnMut(usize, &X) -> Result<T, ConstructionError>,
+    {
+        let leaf_len = sort_index.len();
+        *max_leaf_len = (*max_leaf_len).max(leaf_len);
+
+        let mut leaf_points: [Vec<A>; K] = array_init::array_init(|_| Vec::with_capacity(leaf_len));
+        let mut leaf_items: Vec<T> = Vec::with_capacity(leaf_len);
+
+        for &src_idx in sort_index {
+            for d in 0..K {
+                leaf_points[d].push(axis_at(&source[src_idx], d));
+            }
+            leaf_items.push(item_at(src_idx, &source[src_idx])?);
         }
+
+        let leaf_points_refs: [&[A]; K] = array_init::array_init(|d| leaf_points[d].as_slice());
+        leaves.append_leaf(&leaf_points_refs, leaf_items.as_slice());
+
+        Ok(())
     }
 
-    /// Shared recursive tree construction helper
+    #[inline(always)]
+    fn soft_left_leaf_budget(leaf_budget: usize) -> usize {
+        debug_assert!(leaf_budget > 1);
+        1usize << ((usize::BITS - 1 - (leaf_budget - 1).leading_zeros()) as usize)
+    }
+
+    #[inline(always)]
+    fn soft_ideal_pivot(chunk_length: usize, left_leaf_budget: usize, leaf_budget: usize) -> usize {
+        debug_assert!(leaf_budget > 0);
+        debug_assert!(left_leaf_budget < leaf_budget);
+
+        if chunk_length == 0 {
+            return 0;
+        }
+
+        chunk_length
+            .saturating_mul(left_leaf_budget)
+            .div_ceil(leaf_budget)
+            .clamp(1, chunk_length)
+    }
+
+    /// Hard-bucket recursive construction helper.
     #[allow(clippy::too_many_arguments)]
-    fn populate_recursive_with<X, FA, FI>(
+    fn populate_recursive_hard<X, FA, FI>(
         stems: &mut AVec<A, ConstAlign<{ CACHELINE_ALIGN }>>,
         source: &[X],
         axis_at: &FA,
@@ -628,6 +697,7 @@ where
         leaves: &mut LS,
         terminal_stem_indices: &mut Vec<usize>,
         actual_max_stem_level: &mut i32,
+        max_leaf_len: &mut usize,
         item_at: &mut FI,
     ) -> Result<(), ConstructionError>
     where
@@ -646,38 +716,15 @@ where
             capacity,
         );
 
-        if Self::at_leaf_level(
-            stem_ordering.level(),
-            max_stem_level,
-            LS::BUCKET_LIMIT_TYPE,
-            chunk_length,
-            capacity,
-        ) {
-            // Write leaf and terminate recursion
-            let leaf_len = sort_index.len();
-
-            debug_assert!(
-                leaf_len > 0,
-                "attempted to construct an empty leaf (stem_idx={}, level={}, capacity={})",
-                stem_ordering.stem_idx(),
-                stem_ordering.level(),
-                capacity
-            );
-            let mut leaf_points: [Vec<A>; K] =
-                array_init::array_init(|_| Vec::with_capacity(leaf_len));
-            let mut leaf_items: Vec<T> = Vec::with_capacity(leaf_len);
-
-            for &src_idx in sort_index.iter() {
-                for d in 0..K {
-                    leaf_points[d].push(axis_at(&source[src_idx], d));
-                }
-                leaf_items.push(item_at(src_idx, &source[src_idx])?);
-            }
-
-            // Convert [Vec<A>; K] -> [&[A]; K]
-            let leaf_points_refs: [&[A]; K] = array_init::array_init(|d| leaf_points[d].as_slice());
-
-            leaves.append_leaf(&leaf_points_refs, leaf_items.as_slice());
+        if chunk_length <= B {
+            Self::write_leaf_from_sort_index(
+                source,
+                axis_at,
+                sort_index,
+                leaves,
+                max_leaf_len,
+                item_at,
+            )?;
             terminal_stem_indices.push(stem_ordering.stem_idx());
             return Ok(());
         }
@@ -775,7 +822,7 @@ where
         let right_stem_ordering = stem_ordering.branch();
         let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
 
-        Self::populate_recursive_with(
+        Self::populate_recursive_hard(
             stems,
             source,
             axis_at,
@@ -786,11 +833,12 @@ where
             leaves,
             terminal_stem_indices,
             actual_max_stem_level,
+            max_leaf_len,
             item_at,
         )?;
 
         if !upper_sort_index.is_empty() {
-            Self::populate_recursive_with(
+            Self::populate_recursive_hard(
                 stems,
                 source,
                 axis_at,
@@ -801,9 +849,114 @@ where
                 leaves,
                 terminal_stem_indices,
                 actual_max_stem_level,
+                max_leaf_len,
                 item_at,
             )?;
         }
+
+        Ok(())
+    }
+
+    /// Soft-bucket recursive construction helper preserving arithmetic layout.
+    #[allow(clippy::too_many_arguments)]
+    fn populate_recursive_soft<X, FA, FI>(
+        stems: &mut AVec<A, ConstAlign<{ CACHELINE_ALIGN }>>,
+        source: &[X],
+        axis_at: &FA,
+        sort_index: &mut [usize],
+        mut stem_ordering: SS,
+        max_stem_level: i32,
+        leaf_budget: usize,
+        leaves: &mut LS,
+        actual_max_stem_level: &mut i32,
+        max_leaf_len: &mut usize,
+        item_at: &mut FI,
+    ) -> Result<(), ConstructionError>
+    where
+        FA: Fn(&X, usize) -> A,
+        FI: FnMut(usize, &X) -> Result<T, ConstructionError>,
+    {
+        if leaf_budget == 0 {
+            return Ok(());
+        }
+
+        if stem_ordering.level() > max_stem_level {
+            Self::write_leaf_from_sort_index(
+                source,
+                axis_at,
+                sort_index,
+                leaves,
+                max_leaf_len,
+                item_at,
+            )?;
+            return Ok(());
+        }
+
+        let chunk_length = sort_index.len();
+        let dim = stem_ordering.construction_dim();
+        let stem_index = stem_ordering.stem_idx();
+        *actual_max_stem_level = (*actual_max_stem_level).max(stem_ordering.level());
+
+        if stem_index >= stems.len() {
+            tracing::warn!(
+                %stem_index,
+                existing_stem_vec_len = %stems.len(),
+                "encountered a stem index beyond the end of the stem vec. Growing the vec to fit"
+            );
+            stems.resize(stem_index + 1, A::max_value());
+        }
+
+        let (left_leaf_budget, right_leaf_budget, pivot) = if leaf_budget == 1 {
+            (1usize, 0usize, chunk_length)
+        } else {
+            let left_leaf_budget = Self::soft_left_leaf_budget(leaf_budget);
+            let right_leaf_budget = leaf_budget - left_leaf_budget;
+            let mut pivot = Self::soft_ideal_pivot(chunk_length, left_leaf_budget, leaf_budget);
+            if pivot < chunk_length {
+                pivot = Self::update_pivot(source, axis_at, sort_index, dim, pivot)?;
+            }
+            (left_leaf_budget, right_leaf_budget, pivot)
+        };
+
+        if pivot < chunk_length {
+            debug_assert!(
+                A::Coord::is_max_value(stems[stem_index]),
+                "Wrote to stem #{stem_index:?} for a second time",
+            );
+            stems[stem_index] = axis_at(&source[sort_index[pivot]], dim);
+        }
+
+        let right_stem_ordering = stem_ordering.branch();
+        let split_idx = pivot.min(chunk_length);
+        let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(split_idx);
+
+        Self::populate_recursive_soft(
+            stems,
+            source,
+            axis_at,
+            lower_sort_index,
+            stem_ordering,
+            max_stem_level,
+            left_leaf_budget,
+            leaves,
+            actual_max_stem_level,
+            max_leaf_len,
+            item_at,
+        )?;
+
+        Self::populate_recursive_soft(
+            stems,
+            source,
+            axis_at,
+            upper_sort_index,
+            right_stem_ordering,
+            max_stem_level,
+            right_leaf_budget,
+            leaves,
+            actual_max_stem_level,
+            max_leaf_len,
+            item_at,
+        )?;
 
         Ok(())
     }
@@ -847,6 +1000,27 @@ where
             min_stem_leaf_idx: 0,
             leaf_idx_map,
         }
+    }
+
+    fn terminal_stem_indices_match_arithmetic_layout(
+        terminal_stem_indices: &[usize],
+        actual_max_stem_level: i32,
+    ) -> bool {
+        let depth = (actual_max_stem_level + 1) as usize;
+
+        for (leaf_idx, &terminal_stem_idx) in terminal_stem_indices.iter().enumerate() {
+            let mut stem_ordering = SS::new_no_ptr();
+            for bit_idx in (0..depth).rev() {
+                let is_right = leaf_idx & (1 << bit_idx) != 0;
+                stem_ordering.traverse(is_right);
+            }
+
+            if stem_ordering.stem_idx() != terminal_stem_idx {
+                return false;
+            }
+        }
+
+        true
     }
 
     fn calc_pivot(
@@ -966,6 +1140,8 @@ where
                 if LS::BUCKET_LIMIT_TYPE == BucketLimitType::Hard {
                     return Err(ConstructionError::UnsplittableBucket { split_dim: dim });
                 }
+
+                pivot = sort_index.len();
             } else {
                 // Avoid empty-left splits: place the boundary after the run.
                 pivot += 1;
@@ -996,6 +1172,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dist::SquaredEuclidean;
     use crate::leaf_strategy::FlatVec;
     use crate::leaf_strategy::VecOfArenas;
     use crate::leaf_strategy::VecOfArrays;
@@ -1085,5 +1262,77 @@ mod tests {
             iterated,
             vec![(20, [1.0, 10.0]), (77, [2.0, 20.0]), (22, [3.0, 30.0])]
         );
+    }
+
+    #[test]
+    fn irregular_immutable_soft_layout_preserves_arithmetic_resolution() {
+        type TestTree = KdTree<f32, u32, Eytzinger<2>, FlatVec<f32, u32, 2, 2>, 2, 2>;
+
+        let points = vec![
+            [3.0, 0.0],
+            [1.0, 0.6],
+            [1.0, 1.4],
+            [3.0, 3.3],
+            [3.0, 3.8],
+            [0.0, 1.8],
+            [3.0, 1.5],
+            [3.0, 2.7],
+            [1.0, 3.3],
+        ];
+        let query = [2.9142656, 5.220647];
+
+        let tree = TestTree::new_from_slice(&points).unwrap();
+        assert!(tree.stem_leaf_resolution.uses_arithmetic());
+        assert_eq!(tree.leaf_count(), 8);
+        assert_eq!(tree.max_leaf_len(), 3);
+        assert_eq!(
+            (0..tree.leaf_count())
+                .map(|leaf_idx| {
+                    <FlatVec<f32, u32, 2, 2> as LeafStrategy<f32, u32, Eytzinger<2>, 2, 2>>::leaf_len(
+                        &tree.leaves,
+                        leaf_idx,
+                    )
+                })
+                .collect::<Vec<_>>(),
+            vec![2, 0, 1, 1, 3, 0, 2, 0]
+        );
+
+        let result = tree
+            .query(&query)
+            .nearest_one::<SquaredEuclidean<f32>>()
+            .execute();
+        assert_eq!(result.item, 4);
+        assert!((result.distance - 2.025588).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn irregular_hard_terminal_layout_is_detected_and_mapped() {
+        type TestTree = KdTree<f32, u32, Eytzinger<2>, VecOfArrays<f32, u32, 2, 2>, 2, 2>;
+
+        let terminal_stem_indices = vec![8usize, 10, 3];
+
+        assert!(!TestTree::terminal_stem_indices_match_arithmetic_layout(
+            &terminal_stem_indices,
+            2,
+        ));
+
+        let stem_leaf_resolution =
+            TestTree::mapped_stem_leaf_resolution_from_terminals(&terminal_stem_indices);
+        assert!(!stem_leaf_resolution.uses_arithmetic());
+        assert_eq!(stem_leaf_resolution.resolve_terminal_stem_idx(8, 0), 0);
+        assert_eq!(stem_leaf_resolution.resolve_terminal_stem_idx(10, 0), 1);
+        assert_eq!(stem_leaf_resolution.resolve_terminal_stem_idx(3, 0), 2);
+    }
+
+    #[test]
+    fn unsplittable_immutable_hard_bucket_returns_error() {
+        type TestTree = KdTree<f32, u32, Eytzinger<2>, VecOfArrays<f32, u32, 2, 2>, 2, 2>;
+
+        let points = vec![[1.0, 1.0], [1.0, 1.0], [1.0, 1.0]];
+
+        assert!(matches!(
+            TestTree::new_from_slice(&points),
+            Err(ConstructionError::UnsplittableBucket { split_dim: 0 })
+        ));
     }
 }
