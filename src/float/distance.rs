@@ -7,6 +7,57 @@
 use crate::float::kdtree::Axis;
 use crate::traits::DistanceMetric;
 
+const F64_SIGN_MASK: u64 = 1 << 63;
+const F64_EXP_MASK: u64 = 0x7ff0_0000_0000_0000;
+const F64_FRAC_MASK: u64 = 0x000f_ffff_ffff_ffff;
+const F64_ONE_BITS: u64 = 0x3ff0_0000_0000_0000;
+const F64_TWO_BITS: u64 = 0x4000_0000_0000_0000;
+
+const fn is_zero_f64_bits(bits: u64) -> bool {
+    bits & !F64_SIGN_MASK == 0
+}
+
+const fn is_integer_f64_bits(bits: u64) -> bool {
+    if is_zero_f64_bits(bits) {
+        return true;
+    }
+
+    let exponent_bits = ((bits & F64_EXP_MASK) >> 52) as i32;
+    let fraction_bits = bits & F64_FRAC_MASK;
+
+    // Subnormals and infinities/NaNs are never integers here.
+    if exponent_bits == 0 || exponent_bits == 0x7ff {
+        return false;
+    }
+
+    let exponent = exponent_bits - 1023;
+    if exponent < 0 {
+        return false;
+    }
+    if exponent >= 52 {
+        return true;
+    }
+
+    let fractional_width = 52 - exponent as u32;
+    (fraction_bits & ((1_u64 << fractional_width) - 1)) == 0
+}
+
+const fn is_nonnegative_u32_f64_bits(bits: u64) -> bool {
+    if (bits & F64_SIGN_MASK) != 0 {
+        return false;
+    }
+    if !is_integer_f64_bits(bits) {
+        return false;
+    }
+    if is_zero_f64_bits(bits) {
+        return true;
+    }
+
+    let exponent_bits = ((bits & F64_EXP_MASK) >> 52) as i32;
+    let exponent = exponent_bits - 1023;
+    exponent <= 31
+}
+
 /// Returns the Manhattan / "taxi cab" distance between two points.
 ///
 /// Faster than squared Euclidean, and just as effective if not more so in higher-dimensional spaces
@@ -250,21 +301,20 @@ pub struct MinkowskiF64<const P_BITS: u64> {}
 
 impl<const P_BITS: u64> MinkowskiF64<P_BITS> {
     const CHECK_P: () = {
-        let p = f64::from_bits(P_BITS);
-        if (p - 1.0).abs() < f64::EPSILON {
+        if P_BITS == F64_ONE_BITS {
             panic!(
                 "MinkowskiF64<P=1.0> is not recommended. Use `kiddo::Manhattan` metric instead."
             );
         }
-        if (p - 2.0).abs() < f64::EPSILON {
+        if P_BITS == F64_TWO_BITS {
             panic!(
                 "MinkowskiF64<P=2.0> is not recommended. Use `kiddo::SquaredEuclidean` metric instead."
             );
         }
-        // Check if P is an integer. Then suggest to use Minkowski<P> instead.
-        if p.fract() < f64::EPSILON {
+        // Check if P is exactly a non-negative integer representable as `u32`.
+        if is_nonnegative_u32_f64_bits(P_BITS) {
             panic!(
-                "MinkowskiF64<P as F64> with power that is basically integer. Consider using Minkowski<P as u32> instead.",
+                "MinkowskiF64<P as F64> with integer power. Consider using Minkowski<P as u32> instead.",
             );
         }
     };
@@ -871,9 +921,9 @@ mod tests {
                         let normal = Normal::new(1.0, 10.0).unwrap();
                         let n_samples = 2000;
                         let mut data = vec![vec![0.0; d]; n_samples];
-                        for i in 0..n_samples {
-                            for j in 0..d {
-                                data[i][j] = normal.sample(&mut rng);
+                        for item in data.iter_mut().take(n_samples) {
+                            for item in item.iter_mut().take(d) {
+                                *item = normal.sample(&mut rng);
                             }
                         }
                         data
