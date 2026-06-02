@@ -1,5 +1,20 @@
 # Kiddo Changelog
 
+## [5.3.2] - 2026-06-02
+
+### Ci
+
+- Backport workflow and repo config updates
+- Backport build and coverage workflow updates
+
+### 🐛 Bug Fixes
+
+- Add msrv, use algernative to f64::fract
+
+### 💄 Styling
+
+- Formatting and clean up unneeded md file
+
 ## Unreleased
 
 I've kept back these changes for now as, whilst extremely welcome, the change to the return type of `size()` would be breaking.
