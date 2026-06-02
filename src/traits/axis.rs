@@ -299,7 +299,7 @@ macro_rules! impl_axis_uint {
 
             #[inline(always)]
             fn is_max_value(coord: Self::Coord) -> bool {
-                coord == <$t>::max_value()
+                coord == <$t>::MAX
             }
 
             #[inline(always)]
