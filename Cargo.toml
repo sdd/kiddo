@@ -2,7 +2,7 @@
 name = "kiddo"
 version = "6.0.0-alpha.1"
 edition = "2021"
-rust-version = "1.89"
+rust-version = "1.89.0"
 authors = ["Scott Donnelly <scott@donnel.ly>"]
 description = "A high-performance, flexible, ergonomic k-d tree library. Ideal for geo- and astro- nearest-neighbour and k-nearest-neighbor queries"
 keywords = ["kd-tree", "kdtree", "kd", "nearest-neighbor", "knn"]

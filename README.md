@@ -9,6 +9,7 @@ Built with an aggressive focus on query performance, including cache-aware layou
 - [Usage](#usage)
 - [Examples](https://github.com/sdd/kiddo/blob/master/examples/Readme.md)
 - [What's New In v6](#whats-new-in-v6)
+- [MSRV](#msrv)
 - [Benchmarks](#benchmarks)
 - [Change Log](https://github.com/sdd/kiddo/blob/master/CHANGELOG.md)
 - [License](#license)
@@ -299,6 +300,16 @@ The following activities are benchmarked (where implemented):
 The benchmarks are repeated against 2d, 3d and 4d trees, as well as with points that are both of type `f32` and of type `f64`, as well as a 16-bit fixed point use case for Kiddo v2.
 
 The trees are populated with random source data whose points are all on a unit sphere. This use case is representative of common k-d tree usages in geospatial and astronomical contexts.
+
+## MSRV
+
+Kiddo v6's current minimum supported Rust version (MSRV) is **1.89.0** (**1.85.0** for `v5.x.x`).
+
+Kiddo will aim to support at least **N-4** stable Rust releases, which is roughly six months of stable compiler history, when used with the **default crate features**.
+
+Kiddo will also endeavour to increase MSRV only when doing so would provide a material improvement for users, rather than simply for the sake of using a newer compiler.
+
+Optional features may require a newer toolchain than the default-feature MSRV if their dependency stack requires it. The `simd` feature is nightly-only and is outside the stable MSRV policy.
 
 ## License
 

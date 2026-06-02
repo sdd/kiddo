@@ -1,0 +1,79 @@
+name: CI / MSRV
+
+on:
+  push:
+    branches:
+      - master
+      - v5.x.x
+  pull_request:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  MSRV_RUST_VERSION: "TBD"
+
+jobs:
+  msrv:
+    name: MSRV Checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          show-progress: false
+
+      - name: Get MSRV
+        run: |
+          echo "MSRV_RUST_VERSION=$(grep '^rust-version' Cargo.toml | sed 's/.*= *"\(.*\)".*/\1/')" >> "$GITHUB_ENV"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Toolchain
+        uses: actions/cache@v5
+        with:
+          path: ~/.rustup
+          key: toolchain-x86-64-${{ env.MSRV_RUST_VERSION }}
+
+      - name: Install MSRV Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy
+          toolchain: ${{ env.MSRV_RUST_VERSION }}
+
+      - name: Clippy (MSRV)
+        uses: LoliGothick/clippy-check@28bc947aedf0daa770644a7d335f47c95f1dc68c
+        if: github.actor != 'dependabot[bot]'
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          options: --features=serde,rkyv_08,test_utils --no-deps
+          name: Clippy (MSRV)
+
+      - name: Clippy (MSRV, dependabot fallback)
+        if: github.actor == 'dependabot[bot]'
+        run: cargo clippy --features=serde,rkyv_08,test_utils --no-deps
+
+      - name: Install cargo-hack
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-hack
+          version: "^0.6"
+
+      - name: Cargo check all targets and features (MSRV)
+        run: cargo hack check --workspace --each-feature --all-targets --exclude-features simd
+
+      - name: Run tests (MSRV)
+        run: |
+          cargo run --example build-float-doctest-tree-rkyv_08 --features="rkyv_08"
+          cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
+          cargo test --workspace --features=serde,rkyv_08,test_utils

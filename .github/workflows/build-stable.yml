@@ -1,0 +1,103 @@
+name: CI / Stable
+
+on:
+  push:
+    branches:
+      - master
+      - v5.x.x
+  pull_request:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  LATEST_STABLE_RUST_VERSION: "TBD"
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          show-progress: false
+
+      - name: Get latest stable Rust version
+        run: |
+          echo "LATEST_STABLE_RUST_VERSION=$(gh api /repos/rust-lang/rust/releases --jq ".[0].tag_name")" >> "$GITHUB_ENV"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Toolchain
+        uses: actions/cache@v5
+        with:
+          path: ~/.rustup
+          key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
+
+      - name: Install `stable` Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt, clippy
+
+      - name: Clippy (stable)
+        uses: LoliGothick/clippy-check@28bc947aedf0daa770644a7d335f47c95f1dc68c
+        if: github.actor != 'dependabot[bot]'
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          options: --features=serde,rkyv_08,test_utils --no-deps
+          name: Clippy (stable)
+
+      - name: Clippy (stable, dependabot fallback)
+        if: github.actor == 'dependabot[bot]'
+        run: cargo clippy --features=serde,rkyv_08,test_utils --no-deps
+
+      - name: Install cargo-hack
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-hack
+          version: "^0.6"
+
+      - name: Cargo check all stable targets and features
+        run: cargo hack check --workspace --each-feature --all-targets --exclude-features simd
+
+  test:
+    name: Run Tests (Stable, no crate features enabled that require unstable Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          show-progress: false
+
+      - name: Get latest stable Rust version
+        run: |
+          echo "LATEST_STABLE_RUST_VERSION=$(gh api /repos/rust-lang/rust/releases --jq ".[0].tag_name")" >> "$GITHUB_ENV"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Toolchain
+        uses: actions/cache@v5
+        with:
+          path: ~/.rustup
+          key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
+
+      - name: Install `stable` Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt, clippy
+
+      - name: Cargo test
+        run: |
+          cargo run --example build-float-doctest-tree-rkyv_08 --features="rkyv_08"
+          cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
+          cargo test --workspace --features=serde,rkyv_08,test_utils
