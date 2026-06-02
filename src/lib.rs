@@ -193,6 +193,23 @@
 //! experimentation, benchmarking, simulation, and specialized tuning. Most
 //! users will not need them.
 //!
+//! ## MSRV
+//!
+//! Kiddo v6's current minimum supported Rust version (MSRV) is **1.89.0**
+//! (**1.85.0** for `v5.x.x`).
+//!
+//! Kiddo will aim to support at least **N-4** stable Rust releases, which is
+//! roughly six months of stable compiler history, when used with the default
+//! crate features.
+//!
+//! Kiddo will also endeavour to increase MSRV only when doing so would provide
+//! a material improvement for users, rather than simply for the sake of using
+//! a newer compiler.
+//!
+//! Optional features may require a newer toolchain than the default-feature
+//! MSRV if their dependency stack requires it. The `simd` feature is
+//! nightly-only and is outside the stable MSRV policy.
+//!
 //! **NOTE**: Support for rkyv 0.7 was removed in Kiddo v6.
 
 #[doc(hidden)]
