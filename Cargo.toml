@@ -293,6 +293,11 @@ name = "v6_codspeed_queries"
 harness = false
 required-features = ["test_utils"]
 
+[[bench]]
+name = "v6_periodic_queries"
+harness = false
+required-features = ["test_utils"]
+
 #[[example]]
 #name = "avx2-check"
 #path = "examples/avx2-check.rs"
