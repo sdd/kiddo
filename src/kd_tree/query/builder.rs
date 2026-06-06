@@ -2,7 +2,6 @@
 
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
-use std::hash::Hash;
 use std::marker::PhantomData;
 use std::num::NonZero;
 use std::num::NonZeroUsize;
@@ -11,14 +10,14 @@ use crate::dist::KdTreeDistanceMetric;
 use crate::kd_tree::query_stack::StackTrait;
 #[cfg(feature = "rkyv_08")]
 use crate::kd_tree::ArchivedKdTree;
-use crate::kd_tree::{KdTree, KdTreeAccessor, KdTreeIter, WithinUnsortedIter};
+use crate::kd_tree::{KdTree, KdTreeAccessor, KdTreeIter, KdTreeQueryOps, WithinUnsortedIter};
 use crate::leaf_view::TlsLeafScratch;
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::{Axis, BestQueryResultItem, Content, LeafStrategy, QueryResultItem, StemStrategy};
 
-use super::periodic::{periodic_nearest_one_result, periodic_nearest_results_by_item};
+use super::periodic::{periodic_nearest_one_result, periodic_nearest_results};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum BoundaryMode {
@@ -1474,22 +1473,16 @@ impl<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize>
     PeriodicNearestNQuery<'a, Tree, A, T, SS, LS, D, K, B>
 where
     A: PeriodicAxis + 'static,
-    T: Content + Eq + Hash + PartialOrd,
+    T: Content + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
-    Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B>,
+    Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeQueryOps<A, T, SS, LS, K, B>,
     D: KdTreeDistanceMetric<A, K>,
-    D::Output: crate::stem_strategy::SimdPrune
-        + SimdSelectBestChildBlock3
-        + BacktrackBlock3
-        + BacktrackBlock4
-        + TlsLeafScratch
-        + 'static,
-    SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    D::Output: Axis<Coord = D::Output>,
 {
     #[inline]
     pub fn execute(self) -> Vec<QueryResultItem<(), T, D::Output>> {
-        periodic_nearest_results_by_item::<Tree, A, T, SS, LS, D, false, K, B>(
+        periodic_nearest_results::<Tree, A, T, SS, LS, D, false, K, B>(
             self.tree,
             self.query,
             self.box_size,
@@ -1548,24 +1541,18 @@ impl<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize>
     PeriodicNearestNWithinQuery<'a, Tree, A, T, SS, LS, D, K, B>
 where
     A: PeriodicAxis + 'static,
-    T: Content + Eq + Hash + PartialOrd,
+    T: Content + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
-    Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B>,
+    Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeQueryOps<A, T, SS, LS, K, B>,
     D: KdTreeDistanceMetric<A, K>,
-    D::Output: crate::stem_strategy::SimdPrune
-        + SimdSelectBestChildBlock3
-        + BacktrackBlock3
-        + BacktrackBlock4
-        + TlsLeafScratch
-        + 'static,
-    SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    D::Output: Axis<Coord = D::Output>,
 {
     #[inline]
     pub fn execute(self) -> Vec<QueryResultItem<(), T, D::Output>> {
         match self.boundary {
             BoundaryMode::Inclusive => {
-                periodic_nearest_results_by_item::<Tree, A, T, SS, LS, D, false, K, B>(
+                periodic_nearest_results::<Tree, A, T, SS, LS, D, false, K, B>(
                     self.tree,
                     self.query,
                     self.box_size,
@@ -1575,7 +1562,7 @@ where
                 )
             }
             BoundaryMode::Exclusive => {
-                periodic_nearest_results_by_item::<Tree, A, T, SS, LS, D, true, K, B>(
+                periodic_nearest_results::<Tree, A, T, SS, LS, D, true, K, B>(
                     self.tree,
                     self.query,
                     self.box_size,
@@ -1623,24 +1610,18 @@ impl<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize>
     PeriodicNearestNWithinUnsortedQuery<'a, Tree, A, T, SS, LS, D, K, B>
 where
     A: PeriodicAxis + 'static,
-    T: Content + Eq + Hash + PartialOrd,
+    T: Content + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
-    Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B>,
+    Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeQueryOps<A, T, SS, LS, K, B>,
     D: KdTreeDistanceMetric<A, K>,
-    D::Output: crate::stem_strategy::SimdPrune
-        + SimdSelectBestChildBlock3
-        + BacktrackBlock3
-        + BacktrackBlock4
-        + TlsLeafScratch
-        + 'static,
-    SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    D::Output: Axis<Coord = D::Output>,
 {
     #[inline]
     pub fn execute(self) -> Vec<QueryResultItem<(), T, D::Output>> {
         match self.boundary {
             BoundaryMode::Inclusive => {
-                periodic_nearest_results_by_item::<Tree, A, T, SS, LS, D, false, K, B>(
+                periodic_nearest_results::<Tree, A, T, SS, LS, D, false, K, B>(
                     self.tree,
                     self.query,
                     self.box_size,
@@ -1650,7 +1631,7 @@ where
                 )
             }
             BoundaryMode::Exclusive => {
-                periodic_nearest_results_by_item::<Tree, A, T, SS, LS, D, true, K, B>(
+                periodic_nearest_results::<Tree, A, T, SS, LS, D, true, K, B>(
                     self.tree,
                     self.query,
                     self.box_size,
@@ -1710,24 +1691,18 @@ impl<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize>
     PeriodicWithinQuery<'a, Tree, A, T, SS, LS, D, K, B>
 where
     A: PeriodicAxis + 'static,
-    T: Content + Eq + Hash + PartialOrd,
+    T: Content + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
-    Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B>,
+    Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeQueryOps<A, T, SS, LS, K, B>,
     D: KdTreeDistanceMetric<A, K>,
-    D::Output: crate::stem_strategy::SimdPrune
-        + SimdSelectBestChildBlock3
-        + BacktrackBlock3
-        + BacktrackBlock4
-        + TlsLeafScratch
-        + 'static,
-    SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    D::Output: Axis<Coord = D::Output>,
 {
     #[inline]
     pub fn execute(self) -> Vec<QueryResultItem<(), T, D::Output>> {
         match self.boundary {
             BoundaryMode::Inclusive => {
-                periodic_nearest_results_by_item::<Tree, A, T, SS, LS, D, false, K, B>(
+                periodic_nearest_results::<Tree, A, T, SS, LS, D, false, K, B>(
                     self.tree,
                     self.query,
                     self.box_size,
@@ -1737,7 +1712,7 @@ where
                 )
             }
             BoundaryMode::Exclusive => {
-                periodic_nearest_results_by_item::<Tree, A, T, SS, LS, D, true, K, B>(
+                periodic_nearest_results::<Tree, A, T, SS, LS, D, true, K, B>(
                     self.tree,
                     self.query,
                     self.box_size,
@@ -1785,24 +1760,18 @@ impl<'a, Tree, A, T, SS, LS, D, const K: usize, const B: usize>
     PeriodicWithinUnsortedQuery<'a, Tree, A, T, SS, LS, D, K, B>
 where
     A: PeriodicAxis + 'static,
-    T: Content + Eq + Hash + PartialOrd,
+    T: Content + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
-    Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B>,
+    Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeQueryOps<A, T, SS, LS, K, B>,
     D: KdTreeDistanceMetric<A, K>,
-    D::Output: crate::stem_strategy::SimdPrune
-        + SimdSelectBestChildBlock3
-        + BacktrackBlock3
-        + BacktrackBlock4
-        + TlsLeafScratch
-        + 'static,
-    SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    D::Output: Axis<Coord = D::Output>,
 {
     #[inline]
     pub fn execute(self) -> Vec<QueryResultItem<(), T, D::Output>> {
         match self.boundary {
             BoundaryMode::Inclusive => {
-                periodic_nearest_results_by_item::<Tree, A, T, SS, LS, D, false, K, B>(
+                periodic_nearest_results::<Tree, A, T, SS, LS, D, false, K, B>(
                     self.tree,
                     self.query,
                     self.box_size,
@@ -1812,7 +1781,7 @@ where
                 )
             }
             BoundaryMode::Exclusive => {
-                periodic_nearest_results_by_item::<Tree, A, T, SS, LS, D, true, K, B>(
+                periodic_nearest_results::<Tree, A, T, SS, LS, D, true, K, B>(
                     self.tree,
                     self.query,
                     self.box_size,
@@ -2760,25 +2729,19 @@ impl<'a, Tree, A, T, SS, LS, D, P, I, Dp, const K: usize, const B: usize>
     Projected<PeriodicNearestNQuery<'a, Tree, A, T, SS, LS, D, K, B>, Projection<P, I, Dp>>
 where
     A: PeriodicAxis + 'static,
-    T: Content + Copy + Eq + Hash + PartialOrd,
+    T: Content + Copy + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
-    Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B>,
+    Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeQueryOps<A, T, SS, LS, K, B>,
     D: KdTreeDistanceMetric<A, K>,
-    D::Output: crate::stem_strategy::SimdPrune
-        + SimdSelectBestChildBlock3
-        + BacktrackBlock3
-        + BacktrackBlock4
-        + TlsLeafScratch
-        + 'static,
-    SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    D::Output: Axis<Coord = D::Output>,
     P: PointProjectionField<A, K>,
     I: ProjectionField<T>,
     Dp: ProjectionField<D::Output>,
 {
     #[inline]
     pub fn execute(self) -> Vec<QueryResultItem<P::Output, I::Output, Dp::Output>> {
-        periodic_nearest_results_by_item::<Tree, A, T, SS, LS, D, false, K, B>(
+        periodic_nearest_results::<Tree, A, T, SS, LS, D, false, K, B>(
             self.inner.tree,
             self.inner.query,
             self.inner.box_size,
@@ -3238,18 +3201,12 @@ macro_rules! impl_projected_periodic_radius_execute {
             Projected<$wrapper<'a, Tree, A, T, SS, LS, D, K, B>, Projection<P, I, Dp>>
         where
             A: PeriodicAxis + 'static,
-            T: Content + Copy + Eq + Hash + PartialOrd,
+            T: Content + Copy + PartialOrd,
             SS: StemStrategy,
             LS: LeafStrategy<A, T, SS, K, B>,
-            Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B>,
+            Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeQueryOps<A, T, SS, LS, K, B>,
             D: KdTreeDistanceMetric<A, K>,
-            D::Output: crate::stem_strategy::SimdPrune
-                + SimdSelectBestChildBlock3
-                + BacktrackBlock3
-                + BacktrackBlock4
-                + TlsLeafScratch
-                + 'static,
-            SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+            D::Output: Axis<Coord = D::Output>,
             P: PointProjectionField<A, K>,
             I: ProjectionField<T>,
             Dp: ProjectionField<D::Output>,
@@ -3258,7 +3215,7 @@ macro_rules! impl_projected_periodic_radius_execute {
             pub fn execute(self) -> Vec<QueryResultItem<P::Output, I::Output, Dp::Output>> {
                 let results = match self.inner.boundary {
                     BoundaryMode::Inclusive => {
-                        periodic_nearest_results_by_item::<Tree, A, T, SS, LS, D, false, K, B>(
+                        periodic_nearest_results::<Tree, A, T, SS, LS, D, false, K, B>(
                             self.inner.tree,
                             self.inner.query,
                             self.inner.box_size,
@@ -3268,7 +3225,7 @@ macro_rules! impl_projected_periodic_radius_execute {
                         )
                     }
                     BoundaryMode::Exclusive => {
-                        periodic_nearest_results_by_item::<Tree, A, T, SS, LS, D, true, K, B>(
+                        periodic_nearest_results::<Tree, A, T, SS, LS, D, true, K, B>(
                             self.inner.tree,
                             self.inner.query,
                             self.inner.box_size,
@@ -3378,7 +3335,7 @@ mod tests {
     type WrapTree = KdTree<f64, u32, EytzingerPf<2, 8>, FlatVec<f64, u32, 2, 32>, 2, 32>;
 
     #[test]
-    fn periodic_nearest_one_wraps_and_returns_points() {
+    fn periodic_nearest_one_wraps_and_supports_non_point_projection() {
         let points = [(1u32, [0.95, 0.5]), (2u32, [0.40, 0.5])];
         let tree = WrapTree::new_from_entries(&points).unwrap();
         let query = [0.05, 0.5];
@@ -3404,7 +3361,7 @@ mod tests {
     }
 
     #[test]
-    fn periodic_radius_queries_dedup_and_respect_boundary_mode() {
+    fn periodic_radius_queries_use_per_entry_semantics_and_respect_boundary_mode() {
         let points = [
             (1u32, [0.95, 0.5]),
             (2u32, [0.85, 0.5]),
@@ -3451,6 +3408,31 @@ mod tests {
             .collect();
         items.sort_unstable();
         assert_eq!(items, vec![1, 2]);
+    }
+
+    #[test]
+    fn periodic_plural_queries_do_not_dedup_duplicate_items() {
+        let points = [
+            (7u32, [0.95, 0.5]),
+            (7u32, [0.96, 0.5]),
+            (9u32, [0.85, 0.5]),
+        ];
+        let tree = WrapTree::new_from_entries(&points).unwrap();
+        let query = [0.05, 0.5];
+        let box_size = [1.0, 1.0];
+
+        let mut results: Vec<_> = tree
+            .query(&query)
+            .periodic_boundary_condition(&box_size)
+            .within::<SquaredEuclidean<f64>>(0.02)
+            .unsorted()
+            .execute()
+            .into_iter()
+            .map(|result| result.item)
+            .collect();
+        results.sort_unstable();
+
+        assert_eq!(results, vec![7, 7]);
     }
 
     #[cfg(feature = "rkyv_08")]
