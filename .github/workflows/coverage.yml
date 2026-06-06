@@ -5,13 +5,9 @@ on:
     branches:
       - master
       - v5.x.x
-    paths:
-      - "src/**"
   pull_request:
     branches:
       - "**"
-    paths:
-      - "src/**"
   workflow_dispatch:
 
 permissions:
@@ -30,35 +26,55 @@ jobs:
         with:
           show-progress: false
 
+      - name: Detect source changes
+        # Coverage is relevant when library code or integration tests change.
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            coverage:
+              - 'src/**'
+              - 'tests/**'
+
       - name: Get date
+        if: steps.changes.outputs.coverage == 'true'
         run: |
           echo "TODAY_DATE=$(date -Idate)" >> "$GITHUB_ENV"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Toolchain
+        if: steps.changes.outputs.coverage == 'true'
         uses: actions/cache@v5
         with:
           path: ~/.rustup
           key: toolchain-x86-64-nightly-${{ env.TODAY_DATE }}
 
       - name: Install `nightly` Toolchain
+        if: steps.changes.outputs.coverage == 'true'
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly
           components: rustfmt,clippy,llvm-tools-preview
 
       - name: Install cargo-llvm-cov
+        if: steps.changes.outputs.coverage == 'true'
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-llvm-cov
 
       - name: Generate Coverage
+        if: steps.changes.outputs.coverage == 'true'
         run: |
           cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
           cargo llvm-cov --features "csv,las,serde,simd,rkyv_08,test_utils,tracing" --tests --ignore-run-fail --workspace --codecov --output-path codecov.json
 
+      - name: Skip coverage
+        if: steps.changes.outputs.coverage != 'true'
+        run: echo "No changes under src/** or tests/**; skipping coverage generation."
+
       - uses: codecov/codecov-action@v6
+        if: steps.changes.outputs.coverage == 'true'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: codecov.json

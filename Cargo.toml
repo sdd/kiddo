@@ -15,6 +15,9 @@ autotests = false
 autoexamples = false
 resolver = "2"
 
+[package.metadata.cargo-machete]
+ignored = ["log"]
+
 [package.metadata.docs.rs]
 all-features = true
 
@@ -94,7 +97,6 @@ logging_off = [
 ]
 no_inline = []
 las = ["dep:las"]
-profile_v5 = ["dep:kiddo_v5", "dep:rand", "dep:rand_chacha"]
 result_collection_stats = []
 serde = ["dep:serde", "serde/derive", "fixed/serde", "aligned-vec/serde"]
 simd = []
@@ -113,11 +115,8 @@ aligned-vec = "0.6.1"
 array-init = "2.1.0"
 az = "1"
 cmov = "0.5"
-divrem = "1"
-doc-comment = "0.3"
 nonmax = "0.5.5"
 num-traits = "0.2"
-ordered-float = "5"
 sorted-vec = "0.8"
 test-log = { version = "0.2.19", features = ["trace"] }
 
@@ -139,12 +138,6 @@ optional = true
 version = "2.5.0"
 optional = true
 features = ["num-traits"]
-
-[dependencies.kiddo_v5]
-package = "kiddo"
-#path = "../kiddo-v5"
-version = "5"
-optional = true
 
 [dependencies.las]
 version = "0.9"

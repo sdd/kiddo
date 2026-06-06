@@ -21,8 +21,8 @@ env:
   LATEST_STABLE_RUST_VERSION: "TBD"
 
 jobs:
-  lint:
-    name: Lint
+  lint-stable:
+    name: Lint (Stable)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -51,7 +51,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Clippy (stable)
-        uses: LoliGothick/clippy-check@28bc947aedf0daa770644a7d335f47c95f1dc68c
+        uses: LoliGothick/clippy-check@64e6994d113977f9f5c7dc687a830f0ab5893393
         if: github.actor != 'dependabot[bot]'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -68,11 +68,11 @@ jobs:
           crate: cargo-hack
           version: "^0.6"
 
-      - name: Cargo check all stable targets and features
+      - name: Cargo Hack (check all stable targets and features)
         run: cargo hack check --workspace --each-feature --all-targets --exclude-features simd
 
-  test:
-    name: Run Tests (Stable, no crate features enabled that require unstable Rust)
+  test-stable:
+    name: Test (Stable)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -96,8 +96,15 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Cargo test
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      - name: Cargo nextest
         run: |
           cargo run --example build-float-doctest-tree-rkyv_08 --features="rkyv_08"
           cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
-          cargo test --workspace --features=serde,rkyv_08,test_utils
+          cargo nextest run --workspace --profile ci --features=serde,rkyv_08,test_utils
+
+      - name: Cargo test (Doctests)
+        run: |
+          cargo test --workspace --doc --features=serde,rkyv_08,test_utils
