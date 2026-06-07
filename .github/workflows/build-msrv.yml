@@ -21,8 +21,8 @@ env:
   MSRV_RUST_VERSION: "TBD"
 
 jobs:
-  msrv:
-    name: MSRV Checks
+  lint-msrv:
+    name: Lint (MSRV)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -72,8 +72,45 @@ jobs:
       - name: Cargo check all targets and features (MSRV)
         run: cargo hack check --workspace --each-feature --all-targets --exclude-features simd
 
-      - name: Run tests (MSRV)
+  test-msrv:
+    name: Test (MSRV)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          show-progress: false
+
+      - name: Get MSRV
+        run: |
+          echo "MSRV_RUST_VERSION=$(grep '^rust-version' Cargo.toml | sed 's/.*= *"\(.*\)".*/\1/')" >> "$GITHUB_ENV"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Toolchain
+        uses: actions/cache@v5
+        with:
+          path: ~/.rustup
+          key: toolchain-x86-64-${{ env.MSRV_RUST_VERSION }}
+
+      - name: Install MSRV Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy
+          toolchain: ${{ env.MSRV_RUST_VERSION }}
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      - name: Cargo nextest
         run: |
           cargo run --example build-float-doctest-tree-rkyv_08 --features="rkyv_08"
           cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
-          cargo test --workspace --features=serde,rkyv_08,test_utils
+          cargo nextest run --workspace --profile ci --features=serde,rkyv_08,test_utils
+
+      - name: Cargo test (Doctests)
+        run: |
+          cargo test --workspace --doc --features=serde,rkyv_08,test_utils

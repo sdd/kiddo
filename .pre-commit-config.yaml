@@ -45,29 +45,16 @@ repos:
         files: '^\.github/workflows/.*\.ya?ml$'
         stages: [pre-commit, pre-push]
 
-  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
-    rev: v7.0.0
-    hooks:
-      - id: commitlint
-        stages: [commit-msg]
-        additional_dependencies: ["@commitlint/config-conventional"]
-
   - repo: local
     hooks:
-      # commitlint officially supports commit-msg hooks, but we also lint the
-      # latest existing commit on pre-commit/pre-push as a best-effort check.
-      - id: commitlint-last
-        name: commitlint --last --verbose
-        entry: commitlint
-        args: ["--config", ".commitlintrc.yaml", "--last", "--verbose"]
+      - id: commitlint
+        name: commitlint
+        entry: commitlint --config .commitlintrc.yaml --edit
         language: node
         additional_dependencies:
           - "@commitlint/cli"
           - "@commitlint/config-conventional"
-        pass_filenames: false
-        always_run: true
-        stages: [pre-commit, pre-push]
-
+        stages: [commit-msg]
       - id: prettier-check-text
         name: prettier --check (yaml, markdown)
         entry: prettier
@@ -89,6 +76,14 @@ repos:
       - id: cargo-sort-check
         name: cargo sort -cwg
         entry: cargo sort -cwg
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
+
+      - id: cargo-machete
+        name: cargo machete
+        entry: cargo machete
         language: system
         pass_filenames: false
         always_run: true
