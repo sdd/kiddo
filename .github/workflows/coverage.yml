@@ -73,7 +73,7 @@ jobs:
         if: steps.changes.outputs.coverage != 'true'
         run: echo "No changes under src/** or tests/**; skipping coverage generation."
 
-      - uses: codecov/codecov-action@v6
+      - uses: codecov/codecov-action@v7
         if: steps.changes.outputs.coverage == 'true'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
