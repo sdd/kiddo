@@ -129,7 +129,7 @@ version = "1"
 optional = true
 
 [dependencies.fixed]
-version = "1,<1.31.0"     # 1.31.0 requires rust-version 1.93.0
+version = "1, <1.32.0"     # 1.31.0 requires rust-version 1.93.0
 features = ["num-traits"]
 optional = true
 
@@ -157,11 +157,11 @@ version = "0.3"
 optional = true
 
 [dependencies.rand]
-version = "0.9"
+version = "0.10"
 optional = true
 
 [dependencies.rand_chacha]
-version = "0.9"
+version = "0.10"
 optional = true
 
 [dependencies.rayon]
@@ -195,7 +195,7 @@ yep-cache-line-size = "0.9"
 [dev-dependencies]
 assert_float_eq = "1.2"
 codspeed-criterion-compat = "4.0"
-criterion = "0.7"
+criterion = "0.8"
 elapsed = "0.1.2"
 flate2 = { version = "1", features = [
   "zlib-ng-compat",
@@ -209,8 +209,8 @@ memmap = "0.7"
 postcard = { version = "1", features = ["alloc"] }
 proc-macro2 = { version = "1", features = ["default", "proc-macro"] }
 radians = "0.3"
-rand = "0.9"
-rand_distr = "0.5"
+rand = "0.10"
+rand_distr = "0.6"
 rayon = "1"
 rstest = "0.26"
 serde = { version = "1", features = ["derive", "rc"] }
