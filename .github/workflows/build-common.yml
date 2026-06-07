@@ -66,6 +66,12 @@ jobs:
           crate: cargo-sort
           version: "^2"
 
+      - name: Install cargo-machete
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-machete
+          version: "^0.8"
+
       - name: Install taplo
         uses: taiki-e/install-action@v2
         with:
@@ -81,6 +87,9 @@ jobs:
 
       - name: Cargo sort check
         run: cargo sort -cwg
+
+      - name: Cargo machete
+        run: cargo machete
 
       - name: Toml format check
         run: taplo format --check ./*.toml

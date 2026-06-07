@@ -18,3 +18,6 @@ examples/*.postcard.gz
 .vscode
 kd_tree_fuzz_report.txt
 kd_tree_fuzz_v6_report.txt
+node_modules
+package.json
+package-lock.json
