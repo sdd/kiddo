@@ -353,8 +353,7 @@ where
 #[cfg(test)]
 mod tests {
     use assert_float_eq::assert_float_relative_eq;
-    use rand::Rng;
-    use rand::SeedableRng;
+    use rand::{RngExt, SeedableRng};
     use test_log::test;
 
     use crate::dist::{Chebyshev, DistanceMetricCore, Minkowski, SquaredEuclidean};

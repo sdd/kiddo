@@ -7,8 +7,7 @@ use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::stem_strategy::{Block3, Donnelly, DonnellyMarkerScalar, DonnellyMarkerSimd};
 use kiddo::test_utils::exact_query_stats::{reset, snapshot, ExactQueryStats};
 use kiddo::test_utils::exact_query_trace;
-use rand::Rng;
-use rand::SeedableRng;
+use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
 const K: usize = 3;

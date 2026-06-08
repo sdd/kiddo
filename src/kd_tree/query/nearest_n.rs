@@ -42,8 +42,7 @@ where
 mod tests {
     use az::{Az, Cast};
     use rand::rngs::StdRng;
-    use rand::Rng;
-    use rand::SeedableRng;
+    use rand::{RngExt, SeedableRng};
     use std::array;
     use std::fmt::Debug;
     use std::num::NonZero;

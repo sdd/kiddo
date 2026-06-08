@@ -67,7 +67,7 @@ fn generate_calls(
     let mut rng = StdRng::seed_from_u64(RNG_SEED);
     (0..traversal_count)
         .map(|_| {
-            let selections = (0..depth).map(|_| rng.gen_bool(0.5)).collect();
+            let selections = (0..depth).map(|_| rng.random_bool(0.5)).collect();
             (selections, DonnellyFullArith::new_query())
         })
         .collect()

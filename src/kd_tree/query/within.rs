@@ -37,8 +37,7 @@ where
 #[cfg(test)]
 mod tests {
     use rand::rngs::StdRng;
-    use rand::Rng;
-    use rand::SeedableRng;
+    use rand::{RngExt, SeedableRng};
     use std::cmp::Ordering;
 
     use crate::dist::Manhattan;

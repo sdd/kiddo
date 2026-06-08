@@ -675,11 +675,11 @@ fn test_mirror_select_nth_unstable_by() {
     use core::cmp::Ordering::{Equal, Greater, Less};
     use rand::prelude::IndexedRandom;
     use rand::rngs::StdRng;
-    use rand::{Rng, SeedableRng};
+    use rand::{RngExt, SeedableRng};
 
     const LEN: usize = 32;
 
-    let mut rng = StdRng::from_os_rng();
+    let mut rng = StdRng::seed_from_u64(0x5eed_fade);
 
     let mut orig = [0; LEN];
     let mut orig_mirror = [0; LEN];

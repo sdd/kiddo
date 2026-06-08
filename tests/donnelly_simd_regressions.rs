@@ -15,7 +15,7 @@ use kiddo::SquaredEuclidean;
 #[cfg(feature = "simd")]
 use rand::rngs::StdRng;
 #[cfg(feature = "simd")]
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 #[cfg(feature = "simd")]
 use std::cmp::Ordering;
 #[cfg(feature = "simd")]

@@ -14,8 +14,7 @@ use kiddo::stem_strategy::eytzinger_pf_far::EytzingerPfFar;
 use kiddo::stem_strategy::{Block3, DonnellyMarkerSimd};
 use kiddo::stem_strategy::{Donnelly, DonnellySimdDescent, Eytzinger, EytzingerPf};
 use kiddo::{LeafStrategy, StemStrategy};
-use rand::Rng;
-use rand::SeedableRng;
+use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use std::num::NonZeroUsize;
 

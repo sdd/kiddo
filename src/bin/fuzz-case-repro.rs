@@ -21,7 +21,7 @@ use kiddo::stem_strategy::{Block3, Block4, DonnellyMarkerSimd};
 
 use kiddo::Axis;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 const DEFAULT_MIN_POW: u32 = 10;
 const DEFAULT_MAX_POW: u32 = 24;

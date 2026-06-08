@@ -113,7 +113,7 @@ where
     /// Returns a streaming iterator over all points within a given distance, unsorted.
     ///
     /// This avoids materializing the full result set returned by
-    /// [`within_unsorted`](Self::within_unsorted). The iterator keeps traversal state and
+    /// within + unsorted queries. The iterator keeps traversal state and
     /// per-leaf matches inline in the common case, spilling to heap allocation only if the
     /// tree depth or a single leaf's match count exceeds the inline capacities.
     ///
@@ -211,8 +211,7 @@ where
 #[cfg(test)]
 mod tests {
     use rand::rngs::StdRng;
-    use rand::Rng;
-    use rand::SeedableRng;
+    use rand::{RngExt, SeedableRng};
     use std::cmp::Ordering;
 
     use crate::dist::SquaredEuclidean;

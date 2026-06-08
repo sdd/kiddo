@@ -310,8 +310,7 @@ mod tests {
     use std::num::{NonZero, NonZeroUsize};
 
     use rand::rngs::StdRng;
-    use rand::Rng;
-    use rand::SeedableRng;
+    use rand::{RngExt, SeedableRng};
     use test_log::test;
 
     use crate::dist::SquaredEuclidean;

@@ -5,7 +5,7 @@ use std::time::Instant;
 use elapsed::ElapsedDuration;
 use kiddo::dist::SquaredEuclidean;
 use kiddo::{Donnelly, KdTree, VecOfArenas};
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 use kiddo::test_utils::build_query_points_float;
 

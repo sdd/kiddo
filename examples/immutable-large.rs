@@ -8,7 +8,7 @@ use std::time::Instant;
 use elapsed::ElapsedDuration;
 use kiddo::dist::SquaredEuclidean;
 use kiddo::{Eytzinger, KdTree, VecOfArenas};
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 
