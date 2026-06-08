@@ -280,7 +280,7 @@ where
 mod tests {
     use crate::float_sss::distance::manhattan;
     use crate::float_sss::kdtree::{Axis, KdTree};
-    use rand::Rng;
+    use rand::RngExt;
 
     type AX = f32;
 

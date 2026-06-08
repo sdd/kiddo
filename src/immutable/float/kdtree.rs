@@ -663,7 +663,7 @@ mod tests {
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use crate::SquaredEuclidean;
     use ordered_float::OrderedFloat;
-    use rand::{Rng, SeedableRng};
+    use rand::{RngExt, SeedableRng};
 
     #[test]
     fn can_construct_an_empty_tree() {

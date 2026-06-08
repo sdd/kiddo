@@ -104,7 +104,7 @@ mod tests {
     use crate::float::distance::SquaredEuclidean;
     use crate::float::kdtree::{Axis, KdTree};
     use crate::traits::DistanceMetric;
-    use rand::Rng;
+    use rand::RngExt;
     use std::cmp::Ordering;
     use std::num::NonZero;
 

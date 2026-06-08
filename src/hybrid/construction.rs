@@ -441,7 +441,7 @@ mod tests {
         float_sss::kdtree::{FloatLSB, KdTree},
         types::Index,
     };
-    use rand::Rng;
+    use rand::RngExt;
 
     type Flt = f32;
 

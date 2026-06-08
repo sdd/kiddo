@@ -104,7 +104,7 @@ mod tests {
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use crate::traits::DistanceMetric;
     use az::{Az, Cast};
-    use rand::Rng;
+    use rand::RngExt;
     use std::num::NonZero;
 
     #[test]

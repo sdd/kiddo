@@ -109,7 +109,7 @@ mod tests {
     use crate::float::distance::SquaredEuclidean;
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use crate::traits::DistanceMetric;
-    use rand::Rng;
+    use rand::RngExt;
     use std::num::NonZero;
 
     type AX = f64;

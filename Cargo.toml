@@ -70,11 +70,11 @@ optional = true
 features = ["laz-parallel"]
 
 [dependencies.rand]
-version = "0.9"
+version = "0.10"
 optional = true
 
 [dependencies.rand_chacha]
-version = "0.9"
+version = "0.10"
 optional = true
 
 [dependencies.rayon]
@@ -124,8 +124,8 @@ las = { version = "0.9", features = ["laz-parallel"] }
 memmap = "0.7"
 proc-macro2 = { version = "1", features = ["default", "proc-macro"] }
 radians = "0.3"
-rand = "0.9"
-rand_distr = "0.5"
+rand = "0.10"
+rand_distr = "0.6"
 rayon = "1"
 rstest = "0.26"
 serde = { version = "1", features = ["derive", "rc"] }

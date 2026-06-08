@@ -144,7 +144,7 @@ where
 mod tests {
     use crate::float::distance::squared_euclidean;
     use crate::float::kdtree::{Axis, KdTree};
-    use rand::Rng;
+    use rand::RngExt;
 
     type AX = f32;
 

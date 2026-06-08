@@ -1,6 +1,5 @@
 use elapsed::ElapsedDuration;
-use rand::Rng;
-use rand_chacha::rand_core::SeedableRng;
+use rand::{RngExt, SeedableRng};
 use rkyv_08::{rancor::Error as RkyvError, to_bytes};
 use std::error::Error;
 use std::fs::File;

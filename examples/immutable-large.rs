@@ -7,7 +7,7 @@ use std::time::Instant;
 
 use elapsed::ElapsedDuration;
 use kiddo::float::distance::SquaredEuclidean;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 
@@ -42,7 +42,7 @@ const QUERY_POINT_QTY: usize = 10_000_000;
 */
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut rng = rand_chacha::ChaCha8Rng::from_os_rng();
+    let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
     let content_to_add: Vec<[f64; 4]> = (0..TREE_SIZE).map(|_| rng.random::<[f64; 4]>()).collect();
 
     let start = Instant::now();

@@ -339,7 +339,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::float::kdtree::KdTree;
-    use rand::Rng;
+    use rand::RngExt;
 
     type Flt = f32;
 

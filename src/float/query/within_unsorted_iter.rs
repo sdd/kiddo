@@ -115,7 +115,7 @@ mod tests {
     use crate::float::kdtree::{Axis, KdTree};
     use crate::nearest_neighbour::NearestNeighbour;
     use crate::traits::DistanceMetric;
-    use rand::Rng;
+    use rand::RngExt;
     use std::cmp::Ordering;
 
     type AX = f32;
