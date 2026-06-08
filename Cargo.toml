@@ -129,7 +129,7 @@ version = "1"
 optional = true
 
 [dependencies.fixed]
-version = "1,<1.31.0"     # 1.31.0 requires rust-version 1.93.0
+version = "1, <1.32.0"     # 1.31.0 requires rust-version 1.93.0
 features = ["num-traits"]
 optional = true
 
@@ -195,7 +195,7 @@ yep-cache-line-size = "0.9"
 [dev-dependencies]
 assert_float_eq = "1.2"
 codspeed-criterion-compat = "4.0"
-criterion = "0.7"
+criterion = "0.8"
 elapsed = "0.1.2"
 flate2 = { version = "1", features = [
   "zlib-ng-compat",
