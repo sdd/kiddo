@@ -1,6 +1,10 @@
 [package]
 name = "kiddo"
+<<<<<<< Updated upstream
 version = "6.0.0-alpha.1"
+=======
+version = "5.3.3"
+>>>>>>> Stashed changes
 edition = "2021"
 rust-version = "1.89.0"
 authors = ["Scott Donnelly <scott@donnel.ly>"]

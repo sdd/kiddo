@@ -1,5 +1,34 @@
 # Kiddo Changelog
 
+<<<<<<< Updated upstream
+=======
+## [5.3.3] - 2026-06-08
+
+### Ci
+
+- Don't run comitlint for dependabot PRs
+
+### 🧹 Chore
+
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump rand deps
+
+## [5.3.2] - 2026-06-02
+
+### Ci
+
+- Backport workflow and repo config updates
+- Backport build and coverage workflow updates
+
+### 🐛 Bug Fixes
+
+- Add msrv, use algernative to f64::fract
+
+### 💄 Styling
+
+- Formatting and clean up unneeded md file
+
+>>>>>>> Stashed changes
 ## Unreleased
 
 I've kept back these changes for now as, whilst extremely welcome, the change to the return type of `size()` would be breaking.
