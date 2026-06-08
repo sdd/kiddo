@@ -1,5 +1,17 @@
 # Kiddo Changelog
 
+## [5.3.3] - 2026-06-08
+
+### Ci
+
+- Don't run comitlint for dependabot PRs
+
+### 🧹 Chore
+
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump rand deps
+- Bump criterion deps
+
 ## [5.3.2] - 2026-06-02
 
 ### Ci
