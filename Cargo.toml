@@ -111,7 +111,7 @@ optional = true
 [dev-dependencies]
 bincode = { version = "2", features = ["serde"] }
 codspeed-criterion-compat = "4.0"
-criterion = "0.6"
+criterion = "0.7" # 0.8 blocked by MSRV
 elapsed = "0.1.2"
 flate2 = { version = "1", features = [
   "zlib-ng-compat",
