@@ -52,7 +52,7 @@ mod tests {
     use crate::traits::DistanceMetric;
     use fixed::types::extra::U14;
     use fixed::FixedU16;
-    use rand::Rng;
+    use rand::RngExt;
     use std::cmp::Ordering;
 
     type Fxd = FixedU16<U14>;

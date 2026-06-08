@@ -597,7 +597,7 @@ mod tests {
     use crate::float_sss::kdtree::KdTree;
     use num_traits::Pow;
     use ordered_float::OrderedFloat;
-    use rand::{Rng, SeedableRng};
+    use rand::{RngExt, SeedableRng};
     use std::panic;
     type AX = f64;
 

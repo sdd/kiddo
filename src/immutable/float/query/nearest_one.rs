@@ -103,7 +103,7 @@ mod tests {
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use crate::nearest_neighbour::NearestNeighbour;
     use crate::traits::DistanceMetric;
-    use rand::{Rng, SeedableRng};
+    use rand::{RngExt, SeedableRng};
 
     #[test]
     fn can_query_nearest_one_item_f64() {

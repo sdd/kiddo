@@ -112,7 +112,7 @@ mod tests {
     use crate::float::kdtree::Axis;
     use crate::immutable::float::kdtree::ImmutableKdTree;
     use crate::traits::DistanceMetric;
-    use rand::Rng;
+    use rand::RngExt;
     use std::cmp::Ordering;
     use std::num::NonZero;
 

@@ -49,7 +49,7 @@ mod tests {
     use crate::traits::DistanceMetric;
     use fixed::types::extra::U14;
     use fixed::FixedU16;
-    use rand::Rng;
+    use rand::RngExt;
     use rstest::rstest;
     use std::cmp::Ordering;
 

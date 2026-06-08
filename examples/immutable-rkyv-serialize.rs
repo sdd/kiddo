@@ -1,7 +1,6 @@
 use elapsed::ElapsedDuration;
 // use memmap::MmapOptions;
-use rand::Rng;
-use rand_chacha::rand_core::SeedableRng;
+use rand::{RngExt, SeedableRng};
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
