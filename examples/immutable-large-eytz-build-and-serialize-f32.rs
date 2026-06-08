@@ -7,7 +7,7 @@ use elapsed::ElapsedDuration;
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::stem_strategy::EytzingerPf;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use rkyv_08::{rancor::Error as RkyvError, to_bytes};
 use ubyte::ToByteUnit;
 

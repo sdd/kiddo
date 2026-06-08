@@ -46,7 +46,7 @@ fn generate_flattened_calls(depth: usize, traversal_count: usize) -> Vec<(u32, b
         let mut level = 0u32;
 
         for _ in 0..depth {
-            let is_right_child = rng.gen_bool(0.5);
+            let is_right_child = rng.random_bool(0.5);
             calls.push((current_idx, is_right_child, level));
             // Pre-compute next state for realistic progression
             current_idx = donnelly_get_idx_v2(current_idx, is_right_child, level);

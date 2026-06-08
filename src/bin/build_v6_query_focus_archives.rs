@@ -4,8 +4,7 @@
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::stem_strategy::eytzinger_pf_far::EytzingerPfFar;
-use rand::Rng;
-use rand::SeedableRng;
+use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use rkyv_08::api::high::to_bytes_in;
 use rkyv_08::rancor::Error as RkyvError;

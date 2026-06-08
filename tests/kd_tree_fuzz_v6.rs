@@ -20,7 +20,7 @@ use kiddo::{Axis, LeafStrategy, QueryResultItem, StemStrategy};
 use kiddo::stem_strategy::{Block3, Block4, DonnellyMarkerSimd};
 
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use zzz::ProgressBar;
 
 const DEFAULT_CASES: usize = 5;

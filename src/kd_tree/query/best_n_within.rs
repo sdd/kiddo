@@ -233,8 +233,7 @@ mod tests {
     use std::num::{NonZero, NonZeroUsize};
 
     use rand::rngs::StdRng;
-    use rand::Rng;
-    use rand::SeedableRng;
+    use rand::{RngExt, SeedableRng};
 
     use crate::dist::SquaredEuclidean;
     use crate::kd_tree::KdTree;

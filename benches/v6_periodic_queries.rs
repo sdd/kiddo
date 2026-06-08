@@ -3,8 +3,7 @@ use kiddo::dist::SquaredEuclidean;
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::stem_strategy::EytzingerPf;
-use rand::Rng;
-use rand::SeedableRng;
+use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use std::num::NonZeroUsize;
 

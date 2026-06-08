@@ -152,8 +152,7 @@ pub mod cargo_asm {
 #[cfg(test)]
 mod tests {
     use rand::rngs::StdRng;
-    use rand::Rng;
-    use rand::SeedableRng;
+    use rand::{RngExt, SeedableRng};
 
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};

@@ -8,8 +8,7 @@ use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::stem_strategy::EytzingerPf;
 use kiddo::SquaredEuclidean;
-use rand::Rng;
-use rand_chacha::rand_core::SeedableRng;
+use rand::{RngExt, SeedableRng};
 use rkyv_08::{rancor::Error as RkyvError, to_bytes};
 #[cfg(feature = "tracing")]
 use tracing::Level;

@@ -541,7 +541,7 @@ where
 #[cfg(test)]
 mod test {
     use fixed::{types::extra::U8, FixedU16};
-    use rand::Rng;
+    use rand::RngExt;
 
     use crate::dist::SquaredEuclidean;
     use crate::kd_tree::KdTreeAccessor;
