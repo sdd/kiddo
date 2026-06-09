@@ -17,6 +17,13 @@ mod avx512;
 mod neon;
 
 /// Chebyshev / L-infinity distance metric, parameterized by output type `R`.
+///
+/// Defined as the maximum distance along any of the dimensions. AKA "chessboard distance".
+///
+/// Ref: <https://en.wikipedia.org/wiki/Chebyshev_distance>
+#[doc(alias = "chessboard")]
+#[doc(alias = "warehouse")]
+#[doc(alias = "L∞")]
 pub struct Chebyshev<R>(core::marker::PhantomData<R>);
 
 impl<A, R> DistanceMetricCore<A> for Chebyshev<R>

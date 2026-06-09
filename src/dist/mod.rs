@@ -1175,10 +1175,9 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     }
 }
 
-/// Unified distance metric trait (V3 umbrella).
+/// Unified distance metric trait
 ///
-/// Public query APIs can bind to this single trait while architecture-specific
-/// hooks remain implementation details selected via monomorphization + cfg.
+/// Avoids the need to constantly refer to all of its constituent traits separately internally
 pub trait DistanceMetricUnified<A: Copy>:
     DistanceMetricCore<A> + DistanceMetricAvx512<A> + DistanceMetricAvx2<A> + DistanceMetricNeon<A>
 {
@@ -1192,10 +1191,7 @@ impl<T, A: Copy> DistanceMetricUnified<A> for T where
 {
 }
 
-/// V3-facing metric contract used by kd-tree query paths.
-///
-/// This bridges the new `crate::dist` traits to legacy internal query plumbing
-/// while keeping query modules free of direct legacy trait references.
+/// Distance metric contract used by [`KdTree`] query paths.
 pub trait KdTreeDistanceMetric<A: Copy, const K: usize>:
     DistanceMetricUnified<A>
     + DistanceMetricSimdBlock3<A, K, <Self as DistanceMetricCore<A>>::Output>

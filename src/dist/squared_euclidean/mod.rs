@@ -20,6 +20,10 @@ mod avx512;
 mod neon;
 
 /// Squared Euclidean distance metric, parameterized by output type `R`.
+///
+/// Ref: <https://en.wikipedia.org/wiki/Euclidean_distance#Squared_Euclidean_distance>
+#[doc(alias = "L2")]
+#[doc(alias = "Pythagorean")]
 pub struct SquaredEuclidean<R>(core::marker::PhantomData<R>);
 
 impl<A, R> DistanceMetricCore<A> for SquaredEuclidean<R>

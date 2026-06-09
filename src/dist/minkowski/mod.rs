@@ -23,9 +23,11 @@ mod neon;
 /// `sum(|dx|^P)`, rather than taking the final `1/P` root. That preserves
 /// nearest-neighbour ordering while avoiding an unnecessary root in query hot
 /// paths, just like [`crate::SquaredEuclidean`] does for `P = 2`.
+///
+/// Ref: <https://en.wikipedia.org/wiki/Minkowski_distance>
 #[doc(alias = "taxicab")]
-#[doc(alias = "l1")]
-#[doc(alias = "l2")]
+#[doc(alias = "L1")]
+#[doc(alias = "L2")]
 #[doc(alias = "euclidean")]
 pub struct Minkowski<const P: u32, R>(core::marker::PhantomData<R>);
 

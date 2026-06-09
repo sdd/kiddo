@@ -11,6 +11,16 @@ use crate::dist::distance_metric_core::DistanceMetricCore;
 use crate::dist::{DistanceMetricAvx2, DistanceMetricAvx512, DistanceMetricNeon};
 
 /// Dot product similarity metric, parameterized by output type `R`.
+///
+/// Only really useful when the points in the tree are all on the surface of a K-dimensional unit
+/// hypersphere. When this is the case though, this metric can be faster to compute than others.
+/// Returns the cosine of the angle between the two points.
+///
+/// Since the cosine increases towards 1 with decreased angle between the points being compared,
+/// unlike the other metrics, the sorted results from a query using it are sorted greatest-first
+/// rather than least-first.
+///
+/// Ref: <https://en.wikipedia.org/wiki/Cosine_similarity>
 pub struct DotProduct<R>(core::marker::PhantomData<R>);
 
 impl<A, R> DistanceMetricCore<A> for DotProduct<R>

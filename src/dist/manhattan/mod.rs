@@ -17,6 +17,12 @@ mod avx512;
 mod neon;
 
 /// Manhattan / L1 distance metric, parameterized by output type `R`.
+///
+/// Defined as the sum of the distances along each axis.
+///
+/// Ref <https://en.wikipedia.org/wiki/Manhattan_distance>
+#[doc(alias = "taxicab")]
+#[doc(alias = "L1")]
 pub struct Manhattan<R>(core::marker::PhantomData<R>);
 
 impl<A, R> DistanceMetricCore<A> for Manhattan<R>
