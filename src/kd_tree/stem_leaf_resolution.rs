@@ -24,6 +24,7 @@ use super::{
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(missing_docs)]
+#[doc(hidden)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum OwnedStemLeafResolution {
     /// Immutable strategies: leaf index can be calculated arithmetically.

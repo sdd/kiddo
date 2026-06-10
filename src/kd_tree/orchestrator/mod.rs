@@ -146,6 +146,7 @@ where
 }
 
 #[allow(missing_docs, private_bounds)]
+#[doc(hidden)]
 pub trait KdTreeQueryOps<A, T, SS, LS, const K: usize, const B: usize>:
     KdTreeAccessor<A, T, SS, LS, K, B> + Sized
 where

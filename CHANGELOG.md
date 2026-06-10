@@ -1,14 +1,48 @@
 # Kiddo Changelog
 
-## Unreleased
+## [6.0.0-alpha.1] - 2026-06-09
 
-I've kept back these changes for now as, whilst extremely welcome, the change to the return type of `size()` would be breaking.
-I'm hoping to have v6 available soon, which will include both these changes as well as addressing quite a few other long-running feature requests.
+This is the first public alpha for Kiddo v6.
+
+Version 6 is a substantial API and architecture refresh. The largest user-facing changes are:
+
+- A single generic `KdTree` now underpins all usage patterns: mutable/immutable, float/fixed point/int, storage variants and traversal variants.
+- Queries now go through a fluent builder API starting from `KdTree::query(...)`.
+- Query results now use explicit `QueryResultItem` or `BestQueryResultItem` structs.
+- Support for `rkyv` 0.7 has been removed; v6 supports `rkyv_08` only.
+
+This is a breaking release. Code written against the v5 query API and result types will require source changes, but the migration
+process should not be too difficult.
+
+Artifacts persisted via rkyv from v5.x.x cannot be deserialized into v6 trees and will need to be regenerated.
+
+### 💥 Breaking Changes
+
+- v6 is a complete big-bang re-imagining of the entire type structure and API surface to address long-standing issues
+- The previously separate structs for mutable / immutable and float / fixed trees are now unified into a single `KdTree` struct
+- Replace direct query methods such as `nearest_one`, `nearest_n`, `nearest_n_within`, `within`, and `within_unsorted` with builder chains beginning at `.query(&point)`
+- Unify legacy tuple-style and `NearestNeighbour` / `BestNeighbour` result handling with consistent `QueryResultItem` / `BestQueryResultItem`
+- Remove support for `rkyv` 0.7
 
 ### ✨ Features
 
-- Improve the flexibility of T type, KdTree.size. Add generate nearest_one_point (@pjkundert)
-- Fix broken test of custom struct as T. Add test for () as T (@pjkundert)
+- Introduce the unified v6 `KdTree` API, with `ImmutableKdTree` and `MutableKdTree` convenience aliases
+- Replace the old direct query API with a fluent builder-based query interface
+- Pluggable stem strategies to allow experimentation with alternate stem orderings and traversal methods
+- Pluggable leaf strategies to allow experimentation with alternate leaf node storage layouts
+- Flexible result projection - select whether you need distances, items, and/or the points themselves in your query results
+- Exclusive boundary support for radius-bounded queries
+- Periodic boundary condition queries
+- `new_from_source` flexible accessor-based constructor
+- `TryFrom` conversions between compatible `KdTree` variants
+- `replace_item` for owned trees
+- Experimental huge-page support for usage with transparent huge pages
+- distance metrics now include Chebyshev and Minkowski distance metrics and Dot Product similarity metric
+
+### Ci
+
+- Split build workflows by stable / nightly / MSRV
+- Add an MSRV CI build and tighten general workflow / repo automation
 
 ## [5.2.2] - 2025-12-08
 

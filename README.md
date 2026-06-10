@@ -16,7 +16,7 @@ Built with an aggressive focus on query performance, including cache-aware layou
 
 Kiddo v6 provides a single generic [`KdTree`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html) that supports floating-point (`f64`, `f32`, `f16`), selected fixed-point (via the `fixed` crate), and unsigned-integer (`u8`, `u16`, `u32`) types as coordinates, along with both mutable and immutable usage patterns.
 
-Kiddo is designed for low-dimensional search problems, especially 2D, 3D, and 4D workloads. Typical use cases include point-cloud analysis, astronomical catalogue crossmatching, colour quantization and palette lookup, local neighbourhood queries in simulations, and other nearest-neighbour and radius-search tasks. Kiddo has been used for diverse geographical and scientific workloads including geocoding, astronomy, cosmology, computer-aided drug discovery, crystallography, and computational neuroscience.
+Kiddo is designed for low-dimensional (< ~10D) search problems, especially 2D, 3D, and 4D workloads. Typical use cases include point-cloud analysis, astronomical catalogue crossmatching, colour quantization and palette lookup, local neighbourhood queries in simulations, and other nearest-neighbour and radius-search tasks. Kiddo has been used for diverse geographical and scientific workloads including geocoding, astronomy, cosmology, computer-aided drug discovery, crystallography, and computational neuroscience.
 
 If your points are known up front and the tree will be built once and then queried, start with [`ImmutableKdTree`](https://docs.rs/kiddo/latest/kiddo/type.ImmutableKdTree.html). It offers the best query performance and pairs well with `rkyv` for zero-copy loading of prebuilt trees from disk; when used with memory-mapped files, loading can be effectively instant.
 
@@ -24,32 +24,34 @@ If you need to add or remove points after construction, start with [`MutableKdTr
 
 [`ImmutableKdTree`](https://docs.rs/kiddo/latest/kiddo/type.ImmutableKdTree.html) and [`MutableKdTree`](https://docs.rs/kiddo/latest/kiddo/type.MutableKdTree.html) are convenience aliases for [`KdTree`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html) with sensible defaults for these common read-heavy and mutable workloads.
 
-Kiddo is not intended as a library for high-dimensional vector search or feature matching over hundreds or thousands of dimensions, where plain k-d trees are usually the wrong data structure and other approaches are more appropriate. The API does not impose a hard dimensional limit, but Kiddo is primarily intended for low-dimensional workloads.
+Kiddo is not intended as a library for high-dimensional vector search or feature matching over hundreds or thousands of dimensions, where k-d trees are usually the wrong data structure and other approaches are more appropriate. The API does not impose a hard dimensional limit, but Kiddo is primarily intended for low-dimensional workloads.
 
 Kiddo supports the following query types through its fluent builder API, starting from [`KdTree::query`](https://docs.rs/kiddo/latest/kiddo/struct.KdTree.html#method.query):
 
-- `.nearest_one()` finds the single nearest item to a query point.
-  Useful for tasks like finding the nearest airport to a given location, or finding the nearest catalogued star to a sky position.
+- **Exact Nearest Neighbour**: Useful for tasks like finding the nearest airport to a given location, or finding the nearest catalogued star to a sky position.
+  `tree.query(&point).nearest_one().execute()`
 
-- `.best_n_within(radius, n)` finds the "best" `n` items within a specified distance of a query point, for some definition of "best".
-  For example, "give me the 5 largest settlements within 50km of a given point, ordered by descending population", or "the 5 brightest stars within a degree of a point on the sky, ordered brightest first".
+- **k-nearest-neighbour (k-NN)** search, finding the `k` nearest items to a query point:
+  - ordered by distance: `tree.query(&point).nearest_n(5).execute()`.
+    Useful for finding the nearest weather stations or sensors to a location, or generating candidate correspondences for point-cloud registration.
+  - `k` items within a max radius: `tree.query(&point).nearest_n(5).within(max_dist).execute()`.
+    Useful when you want the closest local neighbours inside a meaningful cutoff, such as the nearest shops within 5 miles, or nearby atoms within an interaction radius.
+  - All items within a radius: `tree.query(&point).within(max_dist).execute()`.
+    Finds all items within a specified radius of a query point, ordered by distance. Useful for radial catalogue searches in astronomy, or collision and proximity queries where the full neighbourhood is needed in sorted order.
+  - Unsorted, e.g. `tree.query(&point).nearest_n(5).within(max_dist).unsorted().execute()`.
+    This is often faster than the sorted radius-query form when result order does not matter, such as finding all customers within 5 miles of a store, or collecting point-cloud neighbourhoods for clustering or normal estimation.
 
-- `.nearest_one().approx()` performs approximate nearest-neighbour (ANN) search, returning a good approximate nearest item, often much faster than exact nearest-neighbour search.
-  Useful for latency-sensitive workloads like interactive point-cloud picking, or mapping image pixels to a palette colour during colour quantization.
+- **Approximate nearest-neighbour** (ANN) search: `tree.query(&point).nearest_one().approx().execute()`
+  Returns a good approximate nearest item. Generally much faster than exact nearest-neighbour search. Useful for latency-sensitive workloads like interactive point-cloud picking, or mapping image pixels to a palette colour during colour quantization.
 
-- `.nearest_n(n)` performs k-nearest-neighbour (k-NN) search, finding the `n` nearest items to a query point ordered by distance.
-  Useful for finding the nearest weather stations or sensors to a location, or generating candidate correspondences for point-cloud registration.
+- **"best" `n` items**: `tree.query(&point).best_n(5, max_dist).execute()`.
+  Finds the "best" n items within a specified distance of a query point, for some definition of "best". For example, "give me the 5 largest settlements within 50km of a given point, ordered by descending population", or "the 5 brightest stars within a degree of a point on the sky, ordered brightest first". This only makes semantic sense when your item type has meaningful ordering; for points-only trees with `T = ()`, the query is allowed but not useful.
 
-- `.nearest_n(n).within(radius)` finds up to `n` nearest items within a specified radius of a query point, ordered by distance.
-  Useful when you want the closest local neighbours inside a meaningful cutoff, such as the nearest shops within 5 miles, or nearby atoms within an interaction radius.
+- **[Periodic Boundary Conditions](https://en.wikipedia.org/wiki/Periodic_boundary_conditions) (PBC)**, whereby the points in the tree are considered to represent a single subunit that repeats across space. Useful primarily for simulations, such as within cosmology or molecular dynamics simulations:
+  `tree.query(&point).periodic_boundary_condition(&box_size).within(max_dist).execute()`
 
-- `.within(radius)` finds all items within a specified radius of a query point, ordered by distance.
-  Useful for radial catalogue searches in astronomy, or collision and proximity queries where the full neighbourhood is needed in sorted order.
-
-- `.within(radius).unsorted()` finds all items within a specified radius of a query point without sorting the results.
-  This is often faster than `.within(radius)` when result order does not matter, such as finding all customers within 5 miles of a store, or collecting point-cloud neighbourhoods for clustering or normal estimation.
-
-The builder API also supports boundary exclusivity, result projection, and periodic boundary conditions where applicable.
+- **Exclusive Boundary Queries**, where the query radius filter is an exclusive boundary (`< max_dist`), rather than the default inclusive boundary (`<= max_dist`):
+  `tree.query(&point).within(max_dist).exclusive_boundaries().execute()`
 
 ## What's New In v6
 

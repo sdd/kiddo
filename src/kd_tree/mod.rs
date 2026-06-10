@@ -145,6 +145,7 @@ impl From<ConstructionError> for KdTreeConversionError {
 }
 
 /// Query-facing interface for resolving stem indices to leaf indices during traversal.
+#[doc(hidden)]
 pub trait StemLeafResolution {
     /// Returns true if this resolution strategy uses arithmetic (fast path).
     fn uses_arithmetic(&self) -> bool;
@@ -236,6 +237,7 @@ pub struct KdTree<
 }
 
 /// Read-only query access over owned and archived kd-tree storage.
+#[doc(hidden)]
 pub trait KdTreeAccessor<A, T, SS, LS, const K: usize, const B: usize>
 where
     A: Axis<Coord = A>,
