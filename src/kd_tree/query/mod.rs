@@ -1,6 +1,6 @@
 mod approx_nearest_one;
 mod best_n_within;
-mod builder;
+pub mod builder;
 mod periodic;
 pub use builder::{Exclude, Include, Projection, QueryBuilder};
 mod nearest_n;
