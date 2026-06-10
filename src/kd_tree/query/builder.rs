@@ -738,6 +738,15 @@ where
     type Output = D::Output;
 }
 
+/// A fluent query builder created by [`KdTree::query`](crate::KdTree::query).
+///
+/// Chain one of the query selectors such as [`nearest_one`](Self::nearest_one),
+/// [`nearest_n`](Self::nearest_n), [`within`](Self::within), or
+/// [`best_n_within`](Self::best_n_within), optionally refine the query, and
+/// then call a terminal method such as [`execute`](Self::execute).
+///
+/// The concrete generic parameters on this type encode the current builder
+/// state and are considered an implementation detail of the fluent API.
 pub struct QueryBuilder<
     'a,
     Tree,
@@ -864,6 +873,351 @@ where
             radius,
             _phantom: PhantomData,
         }
+    }
+}
+
+#[doc(hidden)]
+pub trait ExecuteQueryBuilder {
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn execute(self) -> Self::Output;
+}
+
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        Pj,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > QueryBuilder<'a, Tree, A, T, SS, LS, D, Family, Space, Pj, SORTED, EXCLUSIVE, K, B>
+where
+    D: BuilderMetric<A, K>,
+    Self: ExecuteQueryBuilder,
+{
+    /// Executes the configured query and returns the query-specific result type.
+    #[inline]
+    pub fn execute(self) -> <Self as ExecuteQueryBuilder>::Output {
+        <Self as ExecuteQueryBuilder>::execute(self)
+    }
+}
+
+#[doc(hidden)]
+pub trait WithoutPointsQueryBuilder {
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn without_points(self) -> Self::Output;
+}
+
+#[doc(hidden)]
+pub trait WithItemsQueryBuilder {
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn with_items(self) -> Self::Output;
+}
+
+#[doc(hidden)]
+pub trait WithoutItemsQueryBuilder {
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn without_items(self) -> Self::Output;
+}
+
+#[doc(hidden)]
+pub trait WithDistancesQueryBuilder {
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn with_distances(self) -> Self::Output;
+}
+
+#[doc(hidden)]
+pub trait WithoutDistancesQueryBuilder {
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn without_distances(self) -> Self::Output;
+}
+
+#[doc(hidden)]
+pub trait WithPointsQueryBuilder {
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn with_points(self) -> Self::Output;
+}
+
+#[doc(hidden)]
+pub trait PeriodicBoundaryConditionQueryBuilder<'a, A, const K: usize> {
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn periodic_boundary_condition(self, box_size: &'a [A; K]) -> Self::Output;
+}
+
+#[doc(hidden)]
+pub trait NearestOneQueryBuilder<A: Copy, const K: usize, D>
+where
+    D: KdTreeDistanceMetric<A, K>,
+{
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn nearest_one(self) -> Self::Output;
+}
+
+#[doc(hidden)]
+pub trait NearestNQueryBuilder<A: Copy, const K: usize, D>
+where
+    D: KdTreeDistanceMetric<A, K>,
+{
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn nearest_n(self, max_qty: NonZeroUsize) -> Self::Output;
+}
+
+#[doc(hidden)]
+pub trait WithinQueryBuilder<A: Copy, const K: usize, D>
+where
+    D: KdTreeDistanceMetric<A, K>,
+{
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn within(self, radius: D::Output) -> Self::Output;
+}
+
+#[doc(hidden)]
+pub trait BestNWithinQueryBuilder<A: Copy, const K: usize, D>
+where
+    D: KdTreeDistanceMetric<A, K>,
+{
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn best_n_within(self, radius: D::Output, max_qty: NonZero<usize>) -> Self::Output;
+}
+
+#[doc(hidden)]
+pub trait ApproxQueryBuilder {
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn approx(self) -> Self::Output;
+}
+
+#[doc(hidden)]
+pub trait UnsortedQueryBuilder {
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn unsorted(self) -> Self::Output;
+}
+
+#[doc(hidden)]
+pub trait ExclusiveBoundariesQueryBuilder {
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn exclusive_boundaries(self) -> Self::Output;
+}
+
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        Pj,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > QueryBuilder<'a, Tree, A, T, SS, LS, D, Family, Space, Pj, SORTED, EXCLUSIVE, K, B>
+where
+    D: BuilderMetric<A, K>,
+{
+    /// Excludes stored point coordinates from the eventual query results.
+    #[inline]
+    pub fn without_points(self) -> <Self as WithoutPointsQueryBuilder>::Output
+    where
+        Self: WithoutPointsQueryBuilder,
+    {
+        <Self as WithoutPointsQueryBuilder>::without_points(self)
+    }
+
+    /// Includes stored items in the eventual query results.
+    #[inline]
+    pub fn with_items(self) -> <Self as WithItemsQueryBuilder>::Output
+    where
+        Self: WithItemsQueryBuilder,
+    {
+        <Self as WithItemsQueryBuilder>::with_items(self)
+    }
+
+    /// Excludes stored items from the eventual query results.
+    #[inline]
+    pub fn without_items(self) -> <Self as WithoutItemsQueryBuilder>::Output
+    where
+        Self: WithoutItemsQueryBuilder,
+    {
+        <Self as WithoutItemsQueryBuilder>::without_items(self)
+    }
+
+    /// Includes distances in the eventual query results.
+    #[inline]
+    pub fn with_distances(self) -> <Self as WithDistancesQueryBuilder>::Output
+    where
+        Self: WithDistancesQueryBuilder,
+    {
+        <Self as WithDistancesQueryBuilder>::with_distances(self)
+    }
+
+    /// Excludes distances from the eventual query results.
+    #[inline]
+    pub fn without_distances(self) -> <Self as WithoutDistancesQueryBuilder>::Output
+    where
+        Self: WithoutDistancesQueryBuilder,
+    {
+        <Self as WithoutDistancesQueryBuilder>::without_distances(self)
+    }
+
+    /// Includes stored point coordinates in the eventual query results.
+    ///
+    /// This is available only for non-periodic queries.
+    #[inline]
+    pub fn with_points(self) -> <Self as WithPointsQueryBuilder>::Output
+    where
+        Self: WithPointsQueryBuilder,
+    {
+        <Self as WithPointsQueryBuilder>::with_points(self)
+    }
+
+    /// Interprets subsequent queries using periodic boundary conditions.
+    ///
+    /// `box_size` gives the period along each axis and every value must be
+    /// strictly positive.
+    #[inline]
+    pub fn periodic_boundary_condition(
+        self,
+        box_size: &'a [A; K],
+    ) -> <Self as PeriodicBoundaryConditionQueryBuilder<'a, A, K>>::Output
+    where
+        Self: PeriodicBoundaryConditionQueryBuilder<'a, A, K>,
+    {
+        <Self as PeriodicBoundaryConditionQueryBuilder<'a, A, K>>::periodic_boundary_condition(
+            self, box_size,
+        )
+    }
+
+    /// Selects an exact nearest-neighbour query.
+    #[inline]
+    pub fn nearest_one<Dq>(self) -> <Self as NearestOneQueryBuilder<A, K, Dq>>::Output
+    where
+        A: Copy,
+        Dq: KdTreeDistanceMetric<A, K>,
+        Self: NearestOneQueryBuilder<A, K, Dq>,
+    {
+        <Self as NearestOneQueryBuilder<A, K, Dq>>::nearest_one(self)
+    }
+
+    /// Selects a k-nearest-neighbours query.
+    #[inline]
+    pub fn nearest_n<Dq>(
+        self,
+        max_qty: NonZeroUsize,
+    ) -> <Self as NearestNQueryBuilder<A, K, Dq>>::Output
+    where
+        A: Copy,
+        Dq: KdTreeDistanceMetric<A, K>,
+        Self: NearestNQueryBuilder<A, K, Dq>,
+    {
+        <Self as NearestNQueryBuilder<A, K, Dq>>::nearest_n(self, max_qty)
+    }
+
+    /// Selects a radius query or adds a radius bound to a k-nearest-neighbours query.
+    #[inline]
+    pub fn within<Dq>(self, radius: Dq::Output) -> <Self as WithinQueryBuilder<A, K, Dq>>::Output
+    where
+        A: Copy,
+        Dq: KdTreeDistanceMetric<A, K>,
+        Self: WithinQueryBuilder<A, K, Dq>,
+    {
+        <Self as WithinQueryBuilder<A, K, Dq>>::within(self, radius)
+    }
+
+    /// Selects a radius query that keeps the best `max_qty` entries by item ordering.
+    #[inline]
+    pub fn best_n_within<Dq>(
+        self,
+        radius: Dq::Output,
+        max_qty: NonZero<usize>,
+    ) -> <Self as BestNWithinQueryBuilder<A, K, Dq>>::Output
+    where
+        A: Copy,
+        Dq: KdTreeDistanceMetric<A, K>,
+        Self: BestNWithinQueryBuilder<A, K, Dq>,
+    {
+        <Self as BestNWithinQueryBuilder<A, K, Dq>>::best_n_within(self, radius, max_qty)
+    }
+
+    /// Switches exact nearest-neighbour search to approximate descent-only mode.
+    #[inline]
+    pub fn approx(self) -> <Self as ApproxQueryBuilder>::Output
+    where
+        Self: ApproxQueryBuilder,
+    {
+        <Self as ApproxQueryBuilder>::approx(self)
+    }
+
+    /// Returns results in traversal order instead of sorted-by-distance order.
+    #[inline]
+    pub fn unsorted(self) -> <Self as UnsortedQueryBuilder>::Output
+    where
+        Self: UnsortedQueryBuilder,
+    {
+        <Self as UnsortedQueryBuilder>::unsorted(self)
+    }
+
+    /// Uses strict `< radius` semantics instead of inclusive `<= radius`.
+    #[inline]
+    pub fn exclusive_boundaries(self) -> <Self as ExclusiveBoundariesQueryBuilder>::Output
+    where
+        Self: ExclusiveBoundariesQueryBuilder,
+    {
+        <Self as ExclusiveBoundariesQueryBuilder>::exclusive_boundaries(self)
     }
 }
 
@@ -1118,7 +1472,6 @@ where
     }
 }
 
-#[allow(missing_docs)]
 impl<
         'a,
         Tree,
@@ -1157,8 +1510,9 @@ where
     D: BuilderMetric<A, K>,
     Family: ResultFamily,
 {
+    /// Excludes stored point coordinates from the eventual query results.
     #[inline]
-    pub fn without_points(
+    fn without_points_impl(
         self,
     ) -> QueryBuilder<
         'a,
@@ -1183,8 +1537,9 @@ where
         )
     }
 
+    /// Includes stored items in the eventual query results.
     #[inline]
-    pub fn with_items(
+    fn with_items_impl(
         self,
     ) -> QueryBuilder<
         'a,
@@ -1209,8 +1564,9 @@ where
         )
     }
 
+    /// Excludes stored items from the eventual query results.
     #[inline]
-    pub fn without_items(
+    fn without_items_impl(
         self,
     ) -> QueryBuilder<
         'a,
@@ -1235,8 +1591,9 @@ where
         )
     }
 
+    /// Includes distances in the eventual query results.
     #[inline]
-    pub fn with_distances(
+    fn with_distances_impl(
         self,
     ) -> QueryBuilder<
         'a,
@@ -1261,8 +1618,9 @@ where
         )
     }
 
+    /// Excludes distances from the eventual query results.
     #[inline]
-    pub fn without_distances(
+    fn without_distances_impl(
         self,
     ) -> QueryBuilder<
         'a,
@@ -1288,7 +1646,311 @@ where
     }
 }
 
-#[allow(missing_docs)]
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        P,
+        I,
+        Dp,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > WithoutPointsQueryBuilder
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        Projection<P, I, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    D: BuilderMetric<A, K>,
+    Family: ResultFamily,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        Projection<Exclude, I, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn without_points(self) -> Self::Output {
+        self.without_points_impl()
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        P,
+        I,
+        Dp,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > WithItemsQueryBuilder
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        Projection<P, I, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    D: BuilderMetric<A, K>,
+    Family: ResultFamily,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        Projection<P, Include, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn with_items(self) -> Self::Output {
+        self.with_items_impl()
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        P,
+        I,
+        Dp,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > WithoutItemsQueryBuilder
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        Projection<P, I, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    D: BuilderMetric<A, K>,
+    Family: ResultFamily,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        Projection<P, Exclude, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn without_items(self) -> Self::Output {
+        self.without_items_impl()
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        P,
+        I,
+        Dp,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > WithDistancesQueryBuilder
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        Projection<P, I, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    D: BuilderMetric<A, K>,
+    Family: ResultFamily,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        Projection<P, I, Include>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn with_distances(self) -> Self::Output {
+        self.with_distances_impl()
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        P,
+        I,
+        Dp,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > WithoutDistancesQueryBuilder
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        Projection<P, I, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    D: BuilderMetric<A, K>,
+    Family: ResultFamily,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        Space,
+        Projection<P, I, Exclude>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn without_distances(self) -> Self::Output {
+        self.without_distances_impl()
+    }
+}
+
 impl<
         'a,
         Tree,
@@ -1326,8 +1988,11 @@ where
     D: BuilderMetric<A, K>,
     Family: ResultFamily,
 {
+    /// Includes stored point coordinates in the eventual query results.
+    ///
+    /// This is available only for non-periodic queries.
     #[inline]
-    pub fn with_points(
+    fn with_points_impl(
         self,
     ) -> QueryBuilder<
         'a,
@@ -1350,6 +2015,66 @@ where
             self.max_qty,
             self.radius,
         )
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        P,
+        I,
+        Dp,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > WithPointsQueryBuilder
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        CartesianSpace,
+        Projection<P, I, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    D: BuilderMetric<A, K>,
+    Family: ResultFamily,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        CartesianSpace,
+        Projection<Include, I, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn with_points(self) -> Self::Output {
+        self.with_points_impl()
     }
 }
 
@@ -1383,8 +2108,12 @@ impl<
         B,
     >
 {
+    /// Interprets subsequent queries using periodic boundary conditions.
+    ///
+    /// `box_size` gives the period along each axis and every value must be
+    /// strictly positive.
     #[inline]
-    pub fn periodic_boundary_condition(
+    fn periodic_boundary_condition_impl(
         self,
         box_size: &'a [A; K],
     ) -> QueryBuilder<
@@ -1416,8 +2145,9 @@ impl<
         >(Some(box_size), None, ())
     }
 
+    /// Selects an exact nearest-neighbour query.
     #[inline]
-    pub fn nearest_one<D>(
+    fn nearest_one_impl<D>(
         self,
     ) -> QueryBuilder<
         'a,
@@ -1448,8 +2178,9 @@ impl<
         >(None, None, D::Output::max_value())
     }
 
+    /// Selects a k-nearest-neighbours query.
     #[inline]
-    pub fn nearest_n<D>(
+    fn nearest_n_impl<D>(
         self,
         max_qty: NonZeroUsize,
     ) -> QueryBuilder<
@@ -1481,8 +2212,9 @@ impl<
         >(None, Some(max_qty), D::Output::max_value())
     }
 
+    /// Selects a radius query returning all entries within `radius`.
     #[inline]
-    pub fn within<D>(
+    fn within_impl<D>(
         self,
         radius: D::Output,
     ) -> QueryBuilder<
@@ -1514,8 +2246,9 @@ impl<
         >(None, None, radius)
     }
 
+    /// Selects a radius query that keeps the best `max_qty` entries by item ordering.
     #[inline]
-    pub fn best_n_within<D>(
+    fn best_n_within_impl<D>(
         self,
         radius: D::Output,
         max_qty: NonZero<usize>,
@@ -1562,6 +2295,284 @@ impl<
         const EXCLUSIVE: bool,
         const K: usize,
         const B: usize,
+    > PeriodicBoundaryConditionQueryBuilder<'a, A, K>
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        NoMetric,
+        RootState,
+        CartesianSpace,
+        Pj,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        NoMetric,
+        RootState,
+        PeriodicSpace,
+        Projection<Exclude, Include, Include>,
+        true,
+        false,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn periodic_boundary_condition(self, box_size: &'a [A; K]) -> Self::Output {
+        self.periodic_boundary_condition_impl(box_size)
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A: Copy,
+        T,
+        SS,
+        LS,
+        Pj,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+        Dq,
+    > NearestOneQueryBuilder<A, K, Dq>
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        NoMetric,
+        RootState,
+        CartesianSpace,
+        Pj,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    Dq: KdTreeDistanceMetric<A, K>,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<Dq>,
+        NearestOneState,
+        CartesianSpace,
+        Projection<Exclude, Include, Include>,
+        true,
+        false,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn nearest_one(self) -> Self::Output {
+        self.nearest_one_impl::<Dq>()
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A: Copy,
+        T,
+        SS,
+        LS,
+        Pj,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+        Dq,
+    > NearestNQueryBuilder<A, K, Dq>
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        NoMetric,
+        RootState,
+        CartesianSpace,
+        Pj,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    Dq: KdTreeDistanceMetric<A, K>,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<Dq>,
+        NearestNState,
+        CartesianSpace,
+        Projection<Exclude, Include, Include>,
+        true,
+        false,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn nearest_n(self, max_qty: NonZeroUsize) -> Self::Output {
+        self.nearest_n_impl::<Dq>(max_qty)
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A: Copy,
+        T,
+        SS,
+        LS,
+        Pj,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+        Dq,
+    > WithinQueryBuilder<A, K, Dq>
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        NoMetric,
+        RootState,
+        CartesianSpace,
+        Pj,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    Dq: KdTreeDistanceMetric<A, K>,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<Dq>,
+        WithinState,
+        CartesianSpace,
+        Projection<Exclude, Include, Include>,
+        true,
+        false,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn within(self, radius: Dq::Output) -> Self::Output {
+        self.within_impl::<Dq>(radius)
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A: Copy,
+        T,
+        SS,
+        LS,
+        Pj,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+        Dq,
+    > BestNWithinQueryBuilder<A, K, Dq>
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        NoMetric,
+        RootState,
+        CartesianSpace,
+        Pj,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    T: Content + PartialOrd + 'static,
+    Dq: KdTreeDistanceMetric<A, K>,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<Dq>,
+        BestNWithinState,
+        CartesianSpace,
+        Projection<Exclude, Include, Include>,
+        true,
+        false,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn best_n_within(self, radius: Dq::Output, max_qty: NonZero<usize>) -> Self::Output {
+        self.best_n_within_impl::<Dq>(radius, max_qty)
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A: Copy + PeriodicAxis,
+        T,
+        SS,
+        LS,
+        Pj,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
     >
     QueryBuilder<
         'a,
@@ -1580,8 +2591,9 @@ impl<
         B,
     >
 {
+    /// Selects an exact nearest-neighbour query under periodic boundary conditions.
     #[inline]
-    pub fn nearest_one<D>(
+    fn nearest_one_impl<D>(
         self,
     ) -> QueryBuilder<
         'a,
@@ -1612,8 +2624,9 @@ impl<
         >(self.box_size, None, D::Output::max_value())
     }
 
+    /// Selects a periodic k-nearest-neighbours query.
     #[inline]
-    pub fn nearest_n<D>(
+    fn nearest_n_impl<D>(
         self,
         max_qty: NonZeroUsize,
     ) -> QueryBuilder<
@@ -1645,8 +2658,9 @@ impl<
         >(self.box_size, Some(max_qty), D::Output::max_value())
     }
 
+    /// Selects a periodic radius query returning all entries within `radius`.
     #[inline]
-    pub fn within<D>(
+    fn within_impl<D>(
         self,
         radius: D::Output,
     ) -> QueryBuilder<
@@ -1676,6 +2690,174 @@ impl<
             true,
             false,
         >(self.box_size, None, radius)
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A: Copy + PeriodicAxis,
+        T,
+        SS,
+        LS,
+        Pj,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+        Dq,
+    > NearestOneQueryBuilder<A, K, Dq>
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        NoMetric,
+        RootState,
+        PeriodicSpace,
+        Pj,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    Dq: KdTreeDistanceMetric<A, K>,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<Dq>,
+        NearestOneState,
+        PeriodicSpace,
+        Projection<Exclude, Include, Include>,
+        true,
+        false,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn nearest_one(self) -> Self::Output {
+        self.nearest_one_impl::<Dq>()
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A: Copy + PeriodicAxis,
+        T,
+        SS,
+        LS,
+        Pj,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+        Dq,
+    > NearestNQueryBuilder<A, K, Dq>
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        NoMetric,
+        RootState,
+        PeriodicSpace,
+        Pj,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    Dq: KdTreeDistanceMetric<A, K>,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<Dq>,
+        NearestNState,
+        PeriodicSpace,
+        Projection<Exclude, Include, Include>,
+        true,
+        false,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn nearest_n(self, max_qty: NonZeroUsize) -> Self::Output {
+        self.nearest_n_impl::<Dq>(max_qty)
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A: Copy + PeriodicAxis,
+        T,
+        SS,
+        LS,
+        Pj,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+        Dq,
+    > WithinQueryBuilder<A, K, Dq>
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        NoMetric,
+        RootState,
+        PeriodicSpace,
+        Pj,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    Dq: KdTreeDistanceMetric<A, K>,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<Dq>,
+        WithinState,
+        PeriodicSpace,
+        Projection<Exclude, Include, Include>,
+        true,
+        false,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn within(self, radius: Dq::Output) -> Self::Output {
+        self.within_impl::<Dq>(radius)
     }
 }
 
@@ -1713,8 +2895,9 @@ impl<
 where
     D: KdTreeDistanceMetric<A, K>,
 {
+    /// Switches exact nearest-neighbour search to approximate descent-only mode.
     #[inline]
-    pub fn approx(
+    fn approx_impl(
         self,
     ) -> QueryBuilder<
         'a,
@@ -1754,6 +2937,63 @@ impl<
         const EXCLUSIVE: bool,
         const K: usize,
         const B: usize,
+    > ApproxQueryBuilder
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        NearestOneState,
+        Space,
+        Pj,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    D: KdTreeDistanceMetric<A, K>,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        ApproxNearestOneState,
+        CartesianSpace,
+        Pj,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn approx(self) -> Self::Output {
+        self.approx_impl()
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A: Copy,
+        T,
+        SS,
+        LS,
+        D,
+        Space,
+        Pj,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
     >
     QueryBuilder<
         'a,
@@ -1774,8 +3014,9 @@ impl<
 where
     D: KdTreeDistanceMetric<A, K>,
 {
+    /// Adds a radius bound to a k-nearest-neighbours query.
     #[inline]
-    pub fn within(
+    fn within_impl(
         self,
         radius: D::Output,
     ) -> QueryBuilder<
@@ -1799,6 +3040,63 @@ where
             self.max_qty,
             radius,
         )
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A: Copy,
+        T,
+        SS,
+        LS,
+        D,
+        Space,
+        Pj,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > WithinQueryBuilder<A, K, D>
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        NearestNState,
+        Space,
+        Pj,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    D: KdTreeDistanceMetric<A, K>,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        NearestNWithinState,
+        Space,
+        Pj,
+        SORTED,
+        false,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn within(self, radius: D::Output) -> Self::Output {
+        self.within_impl(radius)
     }
 }
 
@@ -1836,8 +3134,9 @@ where
     A: Copy,
     D: DistanceMetricCore<A>,
 {
+    /// Returns results in traversal order instead of sorted-by-distance order.
     #[inline]
-    pub fn unsorted(
+    fn unsorted_impl(
         self,
     ) -> QueryBuilder<
         'a,
@@ -1871,18 +3170,53 @@ impl<
         SS,
         LS,
         D,
-        Family,
         Space,
         Pj,
-        const SORTED: bool,
         const EXCLUSIVE: bool,
         const K: usize,
         const B: usize,
-    > QueryBuilder<'a, Tree, A, T, SS, LS, D, Family, Space, Pj, SORTED, EXCLUSIVE, K, B>
+    > UnsortedQueryBuilder
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        NearestNState,
+        Space,
+        Pj,
+        true,
+        EXCLUSIVE,
+        K,
+        B,
+    >
 where
-    D: BuilderMetric<A, K>,
-    Family: ResultFamily,
+    A: Copy,
+    D: DistanceMetricCore<A>,
 {
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        NearestNState,
+        Space,
+        Pj,
+        false,
+        EXCLUSIVE,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn unsorted(self) -> Self::Output {
+        self.unsorted_impl()
+    }
 }
 
 macro_rules! impl_exclusive_boundaries {
@@ -1900,15 +3234,31 @@ macro_rules! impl_exclusive_boundaries {
                 const EXCLUSIVE: bool,
                 const K: usize,
                 const B: usize,
-            > QueryBuilder<'a, Tree, A, T, SS, LS, D, $family, $space, Pj, SORTED, EXCLUSIVE, K, B>
+            > ExclusiveBoundariesQueryBuilder
+            for QueryBuilder<
+                'a,
+                Tree,
+                A,
+                T,
+                SS,
+                LS,
+                D,
+                $family,
+                $space,
+                Pj,
+                SORTED,
+                EXCLUSIVE,
+                K,
+                B,
+            >
         where
             D: BuilderMetric<A, K>,
         {
+            type Output =
+                QueryBuilder<'a, Tree, A, T, SS, LS, D, $family, $space, Pj, SORTED, true, K, B>;
+
             #[inline]
-            pub fn exclusive_boundaries(
-                self,
-            ) -> QueryBuilder<'a, Tree, A, T, SS, LS, D, $family, $space, Pj, SORTED, true, K, B>
-            {
+            fn exclusive_boundaries(self) -> Self::Output {
                 self.rebind::<D, $family, $space, Pj, SORTED, true>(
                     self.box_size,
                     self.max_qty,
@@ -1959,8 +3309,9 @@ where
     A: Copy,
     D: DistanceMetricCore<A>,
 {
+    /// Returns results in traversal order instead of sorted-by-distance order.
     #[inline]
-    pub fn unsorted(
+    fn unsorted_impl(
         self,
     ) -> QueryBuilder<
         'a,
@@ -1999,6 +3350,63 @@ impl<
         const EXCLUSIVE: bool,
         const K: usize,
         const B: usize,
+    > UnsortedQueryBuilder
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        NearestNWithinState,
+        Space,
+        Pj,
+        true,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    A: Copy,
+    D: DistanceMetricCore<A>,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        NearestNWithinState,
+        Space,
+        Pj,
+        false,
+        EXCLUSIVE,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn unsorted(self) -> Self::Output {
+        self.unsorted_impl()
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Space,
+        Pj,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
     >
     QueryBuilder<
         'a,
@@ -2020,8 +3428,9 @@ where
     A: Copy,
     D: DistanceMetricCore<A>,
 {
+    /// Returns results in traversal order instead of sorted-by-distance order.
     #[inline]
-    pub fn unsorted(
+    fn unsorted_impl(
         self,
     ) -> QueryBuilder<
         'a,
@@ -2055,6 +3464,63 @@ impl<
         SS,
         LS,
         D,
+        Space,
+        Pj,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > UnsortedQueryBuilder
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        WithinState,
+        Space,
+        Pj,
+        true,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    A: Copy,
+    D: DistanceMetricCore<A>,
+{
+    type Output = QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        WithinState,
+        Space,
+        Pj,
+        false,
+        EXCLUSIVE,
+        K,
+        B,
+    >;
+
+    #[inline]
+    fn unsorted(self) -> Self::Output {
+        self.unsorted_impl()
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
         P,
         I,
         Dp,
@@ -2062,8 +3528,8 @@ impl<
         const EXCLUSIVE: bool,
         const K: usize,
         const B: usize,
-    >
-    QueryBuilder<
+    > ExecuteQueryBuilder
+    for QueryBuilder<
         'a,
         Tree,
         A,
@@ -2097,8 +3563,10 @@ where
     I: ProjectionField<T>,
     Dp: ProjectionField<D::Output>,
 {
+    type Output = QueryResultItem<P::Output, I::Output, Dp::Output>;
+
     #[inline]
-    pub fn execute(self) -> QueryResultItem<P::Output, I::Output, Dp::Output> {
+    fn execute(self) -> QueryResultItem<P::Output, I::Output, Dp::Output> {
         if <Projection<P, I, Dp> as ProjectionSpec<A, T, D::Output, K>>::WANTS_POINTS {
             scan_projected_nearest_one::<Tree, A, T, SS, LS, D, Projection<P, I, Dp>, K, B>(
                 self.tree, self.query,
@@ -2125,8 +3593,8 @@ impl<
         const EXCLUSIVE: bool,
         const K: usize,
         const B: usize,
-    >
-    QueryBuilder<
+    > ExecuteQueryBuilder
+    for QueryBuilder<
         'a,
         Tree,
         A,
@@ -2153,8 +3621,10 @@ where
     I: ProjectionField<T>,
     Dp: ProjectionField<A>,
 {
+    type Output = QueryResultItem<P::Output, I::Output, Dp::Output>;
+
     #[inline]
-    pub fn execute(self) -> QueryResultItem<P::Output, I::Output, Dp::Output> {
+    fn execute(self) -> QueryResultItem<P::Output, I::Output, Dp::Output> {
         if <Projection<P, I, Dp> as ProjectionSpec<A, T, A, K>>::WANTS_POINTS {
             scan_projected_nearest_one::<Tree, A, T, SS, LS, D, Projection<P, I, Dp>, K, B>(
                 self.tree, self.query,
@@ -2181,8 +3651,8 @@ impl<
         const EXCLUSIVE: bool,
         const K: usize,
         const B: usize,
-    >
-    QueryBuilder<
+    > ExecuteQueryBuilder
+    for QueryBuilder<
         'a,
         Tree,
         A,
@@ -2216,8 +3686,10 @@ where
     I: ProjectionField<T>,
     Dp: ProjectionField<D::Output>,
 {
+    type Output = QueryResultItem<P::Output, I::Output, Dp::Output>;
+
     #[inline]
-    pub fn execute(self) -> QueryResultItem<P::Output, I::Output, Dp::Output> {
+    fn execute(self) -> QueryResultItem<P::Output, I::Output, Dp::Output> {
         let result = periodic_nearest_one_result::<Tree, A, T, SS, LS, D, K, B>(
             self.tree,
             self.query,
@@ -2243,8 +3715,8 @@ macro_rules! impl_cartesian_nearest_vec_execute {
                 const EXCLUSIVE: bool,
                 const K: usize,
                 const B: usize,
-            >
-            QueryBuilder<
+            > ExecuteQueryBuilder
+            for QueryBuilder<
                 'a,
                 Tree,
                 A,
@@ -2278,8 +3750,10 @@ macro_rules! impl_cartesian_nearest_vec_execute {
             I: ProjectionField<T>,
             Dp: ProjectionField<D::Output>,
         {
+            type Output = Vec<QueryResultItem<P::Output, I::Output, Dp::Output>>;
+
             #[inline]
-            pub fn execute(self) -> Vec<QueryResultItem<P::Output, I::Output, Dp::Output>> {
+            fn execute(self) -> Vec<QueryResultItem<P::Output, I::Output, Dp::Output>> {
                 if <Projection<P, I, Dp> as ProjectionSpec<A, T, D::Output, K>>::WANTS_POINTS {
                     scan_projected_nearest_results::<
                         Tree,
@@ -2449,8 +3923,8 @@ macro_rules! impl_cartesian_radius_vec_execute {
                 const EXCLUSIVE: bool,
                 const K: usize,
                 const B: usize,
-            >
-            QueryBuilder<
+            > ExecuteQueryBuilder
+            for QueryBuilder<
                 'a,
                 Tree,
                 A,
@@ -2484,8 +3958,10 @@ macro_rules! impl_cartesian_radius_vec_execute {
             I: ProjectionField<T>,
             Dp: ProjectionField<D::Output>,
         {
+            type Output = Vec<QueryResultItem<P::Output, I::Output, Dp::Output>>;
+
             #[inline]
-            pub fn execute(self) -> Vec<QueryResultItem<P::Output, I::Output, Dp::Output>> {
+            fn execute(self) -> Vec<QueryResultItem<P::Output, I::Output, Dp::Output>> {
                 if <Projection<P, I, Dp> as ProjectionSpec<A, T, D::Output, K>>::WANTS_POINTS {
                     scan_projected_nearest_results::<
                         Tree,
@@ -2770,6 +4246,7 @@ where
     I: ProjectionField<T> + 'a,
     Dp: ProjectionField<D::Output> + 'a,
 {
+    /// Visits each matching entry without materializing a result vector.
     #[inline]
     pub fn visit<F>(self, mut visitor: F)
     where
@@ -2813,6 +4290,7 @@ where
         }
     }
 
+    /// Returns an iterator over matching entries without first materializing a result vector.
     #[allow(clippy::type_complexity)]
     #[inline]
     pub fn iter(
@@ -2875,8 +4353,8 @@ impl<
         const EXCLUSIVE: bool,
         const K: usize,
         const B: usize,
-    >
-    QueryBuilder<
+    > ExecuteQueryBuilder
+    for QueryBuilder<
         'a,
         Tree,
         A,
@@ -2904,8 +4382,10 @@ where
     I: ProjectionField<T>,
     Dp: ProjectionField<D::Output>,
 {
+    type Output = Vec<QueryResultItem<P::Output, I::Output, Dp::Output>>;
+
     #[inline]
-    pub fn execute(self) -> Vec<QueryResultItem<P::Output, I::Output, Dp::Output>> {
+    fn execute(self) -> Vec<QueryResultItem<P::Output, I::Output, Dp::Output>> {
         periodic_nearest_results::<Tree, A, T, SS, LS, D, false, K, B>(
             self.tree,
             self.query,
@@ -2937,8 +4417,8 @@ macro_rules! impl_periodic_radius_vec_execute {
                 const EXCLUSIVE: bool,
                 const K: usize,
                 const B: usize,
-            >
-            QueryBuilder<
+            > ExecuteQueryBuilder
+            for QueryBuilder<
                 'a,
                 Tree,
                 A,
@@ -2966,8 +4446,10 @@ macro_rules! impl_periodic_radius_vec_execute {
             I: ProjectionField<T>,
             Dp: ProjectionField<D::Output>,
         {
+            type Output = Vec<QueryResultItem<P::Output, I::Output, Dp::Output>>;
+
             #[inline]
-            pub fn execute(self) -> Vec<QueryResultItem<P::Output, I::Output, Dp::Output>> {
+            fn execute(self) -> Vec<QueryResultItem<P::Output, I::Output, Dp::Output>> {
                 periodic_nearest_results::<Tree, A, T, SS, LS, D, EXCLUSIVE, K, B>(
                     self.tree,
                     self.query,
@@ -3002,8 +4484,8 @@ impl<
         const EXCLUSIVE: bool,
         const K: usize,
         const B: usize,
-    >
-    QueryBuilder<
+    > ExecuteQueryBuilder
+    for QueryBuilder<
         'a,
         Tree,
         A,
@@ -3038,8 +4520,10 @@ where
     Dp: ProjectionField<D::Output>,
     BestQueryResultItem<P::Output, I::Output, Dp::Output>: Ord,
 {
+    type Output = BinaryHeap<BestQueryResultItem<P::Output, I::Output, Dp::Output>>;
+
     #[inline]
-    pub fn execute(self) -> BinaryHeap<BestQueryResultItem<P::Output, I::Output, Dp::Output>> {
+    fn execute(self) -> BinaryHeap<BestQueryResultItem<P::Output, I::Output, Dp::Output>> {
         if <Projection<P, I, Dp> as ProjectionSpec<A, T, D::Output, K>>::WANTS_POINTS {
             scan_projected_best_results::<Tree, A, T, SS, LS, D, Projection<P, I, Dp>, K, B>(
                 self.tree,

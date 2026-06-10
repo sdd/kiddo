@@ -14,8 +14,9 @@ use nonmax::NonMaxUsize;
 pub use iter::{KdTreeIter, WithinUnsortedIter};
 #[doc(hidden)]
 pub use orchestrator::KdTreeQueryOps;
+pub use query::QueryBuilder;
 #[doc(hidden)]
-pub use query::{Exclude, Include, Projection, QueryBuilder};
+pub use query::{Exclude, Include, Projection};
 #[doc(hidden)]
 pub use stem_leaf_resolution::OwnedStemLeafResolution;
 
