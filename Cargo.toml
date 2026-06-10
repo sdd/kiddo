@@ -215,6 +215,7 @@ rayon = "1"
 rstest = "0.26"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
+trybuild = "1"
 ubyte = "0.10"
 zzz = "0.3.2"
 
@@ -602,3 +603,7 @@ required-features = ["fuzz"]
 [[test]]
 name = "string_data_test"
 path = "tests/string_data_test.rs"
+
+[[test]]
+name = "builder_ui"
+path = "tests/builder_ui.rs"

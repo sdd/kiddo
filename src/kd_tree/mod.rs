@@ -12,15 +12,11 @@ use aligned_vec::{AVec, CACHELINE_ALIGN};
 use nonmax::NonMaxUsize;
 
 pub use iter::{KdTreeIter, WithinUnsortedIter};
+#[doc(hidden)]
 pub use orchestrator::KdTreeQueryOps;
-pub use query::{
-    ApproxNearestOneQuery, BestNWithinQuery, Exclude, Include, NearestNQuery,
-    NearestNUnsortedQuery, NearestNWithinQuery, NearestNWithinUnsortedQuery, NearestOneQuery,
-    PeriodicNearestNQuery, PeriodicNearestNWithinQuery, PeriodicNearestNWithinUnsortedQuery,
-    PeriodicNearestOneQuery, PeriodicQueryBuilder, PeriodicWithinQuery,
-    PeriodicWithinUnsortedQuery, Projected, Projection, QueryBuilder, WithinQuery,
-    WithinUnsortedQuery,
-};
+#[doc(hidden)]
+pub use query::{Exclude, Include, Projection, QueryBuilder};
+#[doc(hidden)]
 pub use stem_leaf_resolution::OwnedStemLeafResolution;
 
 use crate::traits::leaf_strategy::{BucketLimitType, ConstructibleLeafStrategy, Mutability};

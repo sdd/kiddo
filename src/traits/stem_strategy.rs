@@ -264,8 +264,8 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
             let query_elem_wide = *unsafe { query_wide.get_unchecked(*dim) };
 
             let new_off = O::saturating_dist(query_elem_wide, pivot_wide);
+            #[cfg(feature = "test_utils")]
             let old_off = *unsafe { off.get_unchecked(*dim) };
-
             let rd_far = D::rect_dist_after_update(rd, off, *dim, new_off);
 
             #[cfg(feature = "test_utils")]
