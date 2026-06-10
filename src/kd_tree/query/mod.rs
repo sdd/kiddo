@@ -2,14 +2,7 @@ mod approx_nearest_one;
 mod best_n_within;
 mod builder;
 mod periodic;
-pub use builder::{
-    ApproxNearestOneQuery, BestNWithinQuery, Exclude, Include, NearestNQuery,
-    NearestNUnsortedQuery, NearestNWithinQuery, NearestNWithinUnsortedQuery, NearestOneQuery,
-    PeriodicNearestNQuery, PeriodicNearestNWithinQuery, PeriodicNearestNWithinUnsortedQuery,
-    PeriodicNearestOneQuery, PeriodicQueryBuilder, PeriodicWithinQuery,
-    PeriodicWithinUnsortedQuery, Projected, Projection, QueryBuilder, WithinQuery,
-    WithinUnsortedQuery,
-};
+pub use builder::{Exclude, Include, Projection, QueryBuilder};
 mod nearest_n;
 mod nearest_n_within;
 mod nearest_one;
