@@ -1,4 +1,4 @@
-use crate::dist::DistanceMetricUnified;
+use crate::dist::DistanceMetric;
 use crate::leaf_view::{try_identity_widen_axis, LeafArena, LeafView};
 use crate::{Axis, Content};
 
@@ -11,7 +11,7 @@ pub(crate) fn nearest_one_with_query_wide_fallback<AX, T, D, const K: usize, con
 ) where
     AX: Axis<Coord = AX> + 'static,
     T: Content,
-    D: DistanceMetricUnified<AX>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
 {
     let points = leaf.points();
@@ -74,7 +74,7 @@ pub(crate) fn nearest_one_with_query_wide_arena_fallback<AX, T, D, const K: usiz
 ) where
     AX: Axis<Coord = AX> + 'static,
     T: Content,
-    D: DistanceMetricUnified<AX>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
 {
     if arena.is_empty() {

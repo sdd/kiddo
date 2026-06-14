@@ -55,12 +55,12 @@ jobs:
         if: github.actor != 'dependabot[bot]'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          options: --features tracing,fixed,rkyv_08,serde --no-deps
+          options: --features fixed,rkyv_08,serde --no-deps
           name: Clippy nightly
 
       - name: Clippy (Nightly, dependabot fallback)
         if: github.actor == 'dependabot[bot]'
-        run: cargo clippy --features tracing,fixed,rkyv_08,serde --no-deps
+        run: cargo clippy --features fixed,rkyv_08,serde --no-deps
 
       - name: Install cargo-hack
         uses: baptiste0928/cargo-install@v3
@@ -109,12 +109,12 @@ jobs:
         run: |
           cargo run --example build-float-doctest-tree-rkyv_08 --features="rkyv_08"
           cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
-          cargo nextest run --workspace --features "csv,f16,las,serde,simd,rkyv_08,test_utils,tracing"
+          cargo nextest run --workspace --features "csv,f16,las,serde,simd,rkyv_08,test_utils"
 
       - name: Cargo nextest (release build)
         run: |
-          cargo nextest run --workspace --features "csv,f16,las,serde,simd,rkyv_08,test_utils,tracing" --release
+          cargo nextest run --workspace --features "csv,f16,las,serde,simd,rkyv_08,test_utils" --release
 
       - name: Cargo test (Doctests)
         run: |
-          cargo test --workspace --doc --features "csv,f16,las,serde,simd,rkyv_08,test_utils,tracing"
+          cargo test --workspace --doc --features "csv,f16,las,serde,simd,rkyv_08,test_utils"

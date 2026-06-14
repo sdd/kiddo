@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 use std::ptr::NonNull;
 
-use crate::dist::KdTreeDistanceMetric;
+use crate::dist::DistanceMetricSimdBlock;
 use crate::kd_tree::query_context::QueryContext;
 use crate::kd_tree::{KdTreeAccessor, KdTreeQueryOps, StemLeafResolution};
 use crate::leaf_view::LeafView;
@@ -92,7 +92,7 @@ fn periodic_image_candidates<D, A, const K: usize>(
 ) -> Vec<PeriodicImageCandidate<A, D::Output, K>>
 where
     A: PeriodicAxis + 'static,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: Axis<Coord = D::Output>,
 {
     fn recurse<D, A, const K: usize>(
@@ -107,7 +107,7 @@ where
         out: &mut Vec<PeriodicImageCandidate<A, D::Output, K>>,
     ) where
         A: PeriodicAxis + 'static,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: Axis<Coord = D::Output>,
     {
         if axis == K {
@@ -206,7 +206,7 @@ where
     SS: StemStrategy + 'static,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -376,7 +376,7 @@ fn process_periodic_leaf_view<A, T, D, R, const EXCLUSIVE: bool, const K: usize,
 ) where
     A: Axis<Coord = A> + 'static,
     T: Content,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: Axis<Coord = D::Output>,
     R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
@@ -423,7 +423,7 @@ fn process_periodic_leaf_arena<A, T, D, R, const EXCLUSIVE: bool, const K: usize
 ) where
     A: Axis<Coord = A> + 'static,
     T: Content,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: Axis<Coord = D::Output>,
     R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
@@ -484,7 +484,7 @@ fn process_periodic_leaf<
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: Axis<Coord = D::Output>,
     R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
@@ -525,7 +525,7 @@ fn periodic_backtracking_query<Tree, A, T, SS, LS, QC, O, D, F, const K: usize, 
     LS: LeafStrategy<A, T, SS, K, B>,
     QC: QueryContext<A, O, K>,
     O: Axis<Coord = O>,
-    D: KdTreeDistanceMetric<A, K, Output = O>,
+    D: DistanceMetricSimdBlock<A, K, Output = O>,
     F: FnMut(usize, &[O; K], &[O; K], &mut QC),
 {
     if tree.size() == 0 {
@@ -703,7 +703,7 @@ where
     T: Content + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: Axis<Coord = D::Output>,
     R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
@@ -762,7 +762,7 @@ where
     T: Content + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: Axis<Coord = D::Output>,
 {
     assert!(

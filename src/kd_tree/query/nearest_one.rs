@@ -1,4 +1,4 @@
-use crate::dist::KdTreeDistanceMetric;
+use crate::dist::DistanceMetricSimdBlock;
 use crate::kd_tree::query_context::QueryContext;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::KdTreeQueryOps;
@@ -25,7 +25,7 @@ where
         best_dist: &mut D::Output,
         best_item: &mut T,
     ) where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: Axis<Coord = D::Output> + 'static,
     {
         #[cfg(feature = "test_utils")]
@@ -60,7 +60,7 @@ where
     #[inline(always)]
     pub(crate) fn nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -80,7 +80,7 @@ where
     #[inline(always)]
     fn nearest_one_mapped<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -110,7 +110,7 @@ where
     #[inline(always)]
     fn nearest_one_arithmetic<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -149,7 +149,7 @@ where
         stack: &mut SS::Stack<D::Output>,
     ) -> (D::Output, T)
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -188,7 +188,7 @@ where
         stack: &mut SS::Stack<D::Output>,
     ) -> (D::Output, T)
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -211,7 +211,7 @@ where
         stack: &mut SS::Stack<D::Output>,
     ) -> (D::Output, T)
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3

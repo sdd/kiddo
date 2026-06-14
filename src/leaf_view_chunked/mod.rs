@@ -6,7 +6,7 @@ use std::mem::MaybeUninit;
 
 use array_init::array_init;
 
-use crate::dist::DistanceMetricUnified;
+use crate::dist::DistanceMetric;
 use crate::leaf_view::{try_identity_widen_axis, LeafView};
 use crate::{Axis, Content};
 
@@ -33,7 +33,7 @@ pub(crate) fn try_nearest_one_with_query_wide<AX, T, D, const K: usize, const B:
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content,
-    D: DistanceMetricUnified<AX>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
 {
     let points = leaf.points();
@@ -104,7 +104,7 @@ fn dists_for_chunk<A, D, const K: usize, const C: usize>(
 ) -> [D::Output; C]
 where
     A: Copy,
-    D: DistanceMetricUnified<A>,
+    D: DistanceMetric<A>,
 {
     let mut acc = [const { MaybeUninit::<D::Output>::uninit() }; C];
     let acc_ptr = acc.as_mut_ptr() as *mut D::Output;
@@ -150,7 +150,7 @@ pub(crate) fn try_nearest_one_with_query_wide_v3<AX, T, D, const K: usize, const
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content,
-    D: DistanceMetricUnified<AX>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
 {
     nearest_one::nearest_one_with_query_wide_fallback::<AX, T, D, K, B>(

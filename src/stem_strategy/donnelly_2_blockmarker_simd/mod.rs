@@ -1006,7 +1006,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: crate::dist::KdTreeDistanceMetric<A, K2, Output = O>
+        D: crate::dist::DistanceMetricSimdBlock<A, K2, Output = O>
             + DistanceMetricSimdBlock3<A, K2, O>
             + DistanceMetricSimdBlock4<A, K2, O>,
         QC: crate::kd_tree::query_context::QueryContext<A, O, K2>,
@@ -1474,7 +1474,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: crate::dist::KdTreeDistanceMetric<A, K2, Output = O>
+        D: crate::dist::DistanceMetricSimdBlock<A, K2, Output = O>
             + DistanceMetricSimdBlock3<A, K2, O>
             + DistanceMetricSimdBlock4<A, K2, O>,
         QC: crate::kd_tree::query_context::QueryContext<A, O, K2>,

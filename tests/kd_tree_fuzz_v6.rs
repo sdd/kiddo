@@ -861,7 +861,7 @@ where
     T: kiddo::Content + PartialOrd,
     SO: StemStrategy,
     LS: LeafStrategy<A, T, SO, K, B>,
-    D: kiddo::dist::KdTreeDistanceMetric<A, K>,
+    D: kiddo::dist::DistanceMetricSimdBlock<A, K>,
     D::Output: kiddo::stem_strategy::SimdPrune
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::SimdSelectBestChildBlock3
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::BacktrackBlock3
@@ -887,7 +887,7 @@ where
     T: kiddo::Content + PartialOrd,
     SO: StemStrategy,
     LS: LeafStrategy<A, T, SO, K, B>,
-    D: kiddo::dist::KdTreeDistanceMetric<A, K>,
+    D: kiddo::dist::DistanceMetricSimdBlock<A, K>,
     D::Output: kiddo::stem_strategy::SimdPrune
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::SimdSelectBestChildBlock3
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::BacktrackBlock3
@@ -914,7 +914,7 @@ where
     T: kiddo::Content + PartialOrd,
     SO: StemStrategy,
     LS: LeafStrategy<A, T, SO, K, B>,
-    D: kiddo::dist::KdTreeDistanceMetric<A, K>,
+    D: kiddo::dist::DistanceMetricSimdBlock<A, K>,
     D::Output: kiddo::stem_strategy::SimdPrune
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::SimdSelectBestChildBlock3
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::BacktrackBlock3
@@ -941,7 +941,7 @@ where
     T: kiddo::Content + PartialOrd,
     SO: StemStrategy,
     LS: LeafStrategy<A, T, SO, K, B>,
-    D: kiddo::dist::KdTreeDistanceMetric<A, K>,
+    D: kiddo::dist::DistanceMetricSimdBlock<A, K>,
     D::Output: kiddo::stem_strategy::SimdPrune
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::SimdSelectBestChildBlock3
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::BacktrackBlock3

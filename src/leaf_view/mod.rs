@@ -2,7 +2,7 @@ use std::any::TypeId;
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
 
-use crate::dist::DistanceMetricUnified;
+use crate::dist::DistanceMetric;
 use crate::results::result_collection::{BestNeighbourResultCollection, ResultCollection};
 use crate::{Axis, BestQueryResultItem, Content, QueryResultItem};
 
@@ -191,7 +191,7 @@ impl<'a, AX: Axis<Coord = AX>, T: Content, const K: usize, const B: usize>
         best_dist: &mut D::Output,
         best_item: &mut T,
     ) where
-        D: DistanceMetricUnified<AX>,
+        D: DistanceMetric<AX>,
         D::Output: TlsLeafScratch,
         AX: 'static,
     {
@@ -210,7 +210,7 @@ impl<'a, AX: Axis<Coord = AX>, T: Content, const K: usize, const B: usize>
         best_dist: &mut D::Output,
         best_item: &mut T,
     ) where
-        D: DistanceMetricUnified<AX>,
+        D: DistanceMetric<AX>,
         D::Output: TlsLeafScratch,
         AX: 'static,
     {
@@ -297,7 +297,7 @@ impl<'a, AX: Axis<Coord = AX>, T: Content, const K: usize, const B: usize>
         f: impl FnOnce(&[D::Output]) -> R,
     ) -> R
     where
-        D: DistanceMetricUnified<AX>,
+        D: DistanceMetric<AX>,
         D::Output: TlsLeafScratch,
         AX: 'static,
     {

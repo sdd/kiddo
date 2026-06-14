@@ -2,37 +2,47 @@
 
 /// AVX2 distance metric trait
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
+#[doc(hidden)]
 pub mod distance_metric_avx2;
 
 /// AVX512 distance metric trait
 #[cfg(all(feature = "simd", target_feature = "avx512f"))]
+#[doc(hidden)]
 pub mod distance_metric_avx512;
 
 /// Core distance metric trait
+#[doc(hidden)]
 pub mod distance_metric_core;
 
 /// NEON distance metric trait
 #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
+#[doc(hidden)]
 pub mod distance_metric_neon;
 
 /// Dot Product distance metric
+#[doc(hidden)]
 pub mod dot_product;
 
 /// Chebyshev distance metric
+#[doc(hidden)]
 pub mod chebyshev;
 
 /// Minkowski distance metric
+#[doc(hidden)]
 pub mod minkowski;
 
 /// Manhattan distance metric
+#[doc(hidden)]
 pub mod manhattan;
 
 /// Squared Euclidean distance metric
+#[doc(hidden)]
 pub mod squared_euclidean;
 
 /// Shared distance metric functions
 pub(crate) mod common;
 
+#[doc(hidden)]
 pub use distance_metric_core::DistanceMetricCore;
 #[cfg(any(
     all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
@@ -56,10 +66,15 @@ use crate::{
     BestQueryResultItem, QueryResultItem,
 };
 
+#[doc(inline)]
 pub use chebyshev::Chebyshev;
+#[doc(inline)]
 pub use dot_product::DotProduct;
+#[doc(inline)]
 pub use manhattan::Manhattan;
+#[doc(inline)]
 pub use minkowski::Minkowski;
+#[doc(inline)]
 pub use squared_euclidean::SquaredEuclidean;
 
 #[cfg(feature = "simd")]
@@ -113,6 +128,7 @@ macro_rules! with_best_result_emitter {
 ///
 /// Default behavior is "not specialized". Concrete metrics can override hook
 /// methods in arch-specific code without changing public query bounds.
+#[doc(hidden)]
 pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
     /// Type that provides implementations of the AVX512 leaf ops
     #[cfg(all(feature = "simd", target_feature = "avx512f"))]
@@ -552,6 +568,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
 }
 
 /// AVX2 extension hooks.
+#[doc(hidden)]
 pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
     /// Whether a specialized AVX2 path is provided by this metric impl.
     const HAS_AVX2_SPECIALIZATION: bool = false;
@@ -864,6 +881,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
 }
 
 /// NEON extension hooks.
+#[doc(hidden)]
 pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     /// Whether a specialized NEON path is provided by this metric impl.
     const HAS_NEON_SPECIALIZATION: bool = false;
@@ -1175,16 +1193,14 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     }
 }
 
-/// Unified distance metric trait (V3 umbrella).
-///
-/// Public query APIs can bind to this single trait while architecture-specific
-/// hooks remain implementation details selected via monomorphization + cfg.
-pub trait DistanceMetricUnified<A: Copy>:
+/// trait representing a DistanceMetric that can be used in a `KdTree` query.
+#[doc(hidden)]
+pub trait DistanceMetric<A: Copy>:
     DistanceMetricCore<A> + DistanceMetricAvx512<A> + DistanceMetricAvx2<A> + DistanceMetricNeon<A>
 {
 }
 
-impl<T, A: Copy> DistanceMetricUnified<A> for T where
+impl<T, A: Copy> DistanceMetric<A> for T where
     T: DistanceMetricCore<A>
         + DistanceMetricAvx512<A>
         + DistanceMetricAvx2<A>
@@ -1193,19 +1209,17 @@ impl<T, A: Copy> DistanceMetricUnified<A> for T where
 }
 
 /// V3-facing metric contract used by kd-tree query paths.
-///
-/// This bridges the new `crate::dist` traits to legacy internal query plumbing
-/// while keeping query modules free of direct legacy trait references.
-pub trait KdTreeDistanceMetric<A: Copy, const K: usize>:
-    DistanceMetricUnified<A>
+#[doc(hidden)]
+pub trait DistanceMetricSimdBlock<A: Copy, const K: usize>:
+    DistanceMetric<A>
     + DistanceMetricSimdBlock3<A, K, <Self as DistanceMetricCore<A>>::Output>
     + DistanceMetricSimdBlock4<A, K, <Self as DistanceMetricCore<A>>::Output>
 {
 }
 
-impl<T, A: Copy, const K: usize> KdTreeDistanceMetric<A, K> for T
+impl<T, A: Copy, const K: usize> DistanceMetricSimdBlock<A, K> for T
 where
-    T: DistanceMetricUnified<A>
+    T: DistanceMetric<A>
         + DistanceMetricSimdBlock3<A, K, <T as DistanceMetricCore<A>>::Output>
         + DistanceMetricSimdBlock4<A, K, <T as DistanceMetricCore<A>>::Output>,
     <T as DistanceMetricCore<A>>::Output: Axis<Coord = <T as DistanceMetricCore<A>>::Output>,
@@ -1215,7 +1229,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        Chebyshev, DistanceMetricCore, DistanceMetricUnified, DotProduct, Manhattan, Minkowski,
+        Chebyshev, DistanceMetric, DistanceMetricCore, DotProduct, Manhattan, Minkowski,
         SquaredEuclidean,
     };
 
@@ -1269,7 +1283,7 @@ mod tests {
 
     #[test]
     fn v3_unified_bound_is_satisfied() {
-        fn assert_unified<M: DistanceMetricUnified<f64>>() {}
+        fn assert_unified<M: DistanceMetric<f64>>() {}
         assert_unified::<SquaredEuclidean<f64>>();
         assert_unified::<Chebyshev<f64>>();
         assert_unified::<Minkowski<3, f64>>();

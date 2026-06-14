@@ -1,7 +1,7 @@
 use std::mem::MaybeUninit;
 use std::ptr::NonNull;
 
-use crate::dist::KdTreeDistanceMetric;
+use crate::dist::DistanceMetricSimdBlock;
 use crate::leaf_view::TlsLeafScratch;
 use crate::leaf_view_chunked::nearest_n_within::{
     nearest_n_within_with_query_wide, nearest_n_within_with_query_wide_arena,
@@ -311,7 +311,7 @@ pub struct WithinUnsortedIter<
     T: Content + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
 {
@@ -336,7 +336,7 @@ where
     T: Content + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
 {
@@ -493,7 +493,7 @@ where
     T: Content + PartialOrd,
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
 {
