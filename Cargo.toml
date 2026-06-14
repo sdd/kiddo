@@ -79,7 +79,7 @@ required-features = ["rkyv_08", "huge_pages"]
 [features]
 cargo_asm = ["dep:rand", "dep:rand_chacha"]
 csv = ["dep:csv"]
-default = ["tracing", "fixed"]
+default = ["fixed"]
 buffered_result_collection = ["dep:smallvec"]
 huge_pages = ["dep:libc"]
 leaf_view_chunked = []
@@ -104,7 +104,6 @@ simulator = []
 rkyv_08 = ["dep:rkyv_08", "dep:ptr_meta", "dep:bytecheck"]
 small_n_result_collectors = ["dep:smallvec"]
 test_utils = ["dep:rand", "dep:rand_chacha", "dep:rayon", "dep:fixed"]
-tracing = ["dep:tracing", "dep:tracing-subscriber"]
 unreliable_select_nth_unstable = []
 
 [target.'cfg(any(target_arch = "x86_64", target_arch = "aarch64"))'.dependencies]
@@ -183,11 +182,6 @@ optional = true
 
 [dependencies.tracing]
 version = "0.1"
-optional = true
-
-[dependencies.tracing-subscriber]
-version = "0.3"
-optional = true
 
 [build-dependencies]
 yep-cache-line-size = "0.9"
@@ -215,6 +209,7 @@ rayon = "1"
 rstest = "0.26"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
+tracing-subscriber = "0.3"
 trybuild = "1"
 ubyte = "0.10"
 zzz = "0.3.2"

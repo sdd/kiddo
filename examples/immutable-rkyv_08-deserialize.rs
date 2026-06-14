@@ -12,9 +12,7 @@ use memmap::MmapOptions;
 use rkyv_08::api::high::from_bytes;
 use rkyv_08::rancor::Error as RkyvError;
 use rkyv_08::{access, access_unchecked};
-#[cfg(feature = "tracing")]
 use tracing::Level;
-#[cfg(feature = "tracing")]
 use tracing_subscriber::fmt;
 
 type Tree = KdTree<f64, u32, EytzingerPf<3, 8>, VecOfArenas<f64, u32, 3, 256>, 3, 256>;
@@ -22,9 +20,7 @@ type ArchivedTree =
     ArchivedKdTree<f64, u32, EytzingerPf<3, 8>, VecOfArenas<f64, u32, 3, 256>, 3, 256>;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    #[cfg(feature = "tracing")]
     let subscriber = fmt().with_max_level(Level::TRACE).without_time().finish();
-    #[cfg(feature = "tracing")]
     tracing::subscriber::set_global_default(subscriber)?;
 
     let query = [0.123f64, 0.456f64, 0.789f64];

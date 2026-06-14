@@ -29,7 +29,7 @@
 //! unsigned-integer (`u8`, `u16`, `u32`) types as coordinates, along with both mutable
 //! and immutable usage patterns.
 //!
-//! Kiddo is designed for low-dimensional search problems, especially 2D, 3D,
+//! Kiddo is designed for low-dimensional (< ~10D) search problems, especially 2D, 3D,
 //! and 4D workloads. Typical use cases include point-cloud analysis,
 //! astronomical catalogue crossmatching, colour quantization and palette
 //! lookup, local neighbourhood queries in simulations, and other
@@ -37,6 +37,46 @@
 //! geographical and scientific workloads including geocoding, astronomy,
 //! cosmology, computer-aided drug discovery, crystallography, and
 //! computational neuroscience.
+//!
+//! Kiddo supports the following query types:
+//!
+//! - **Exact Nearest Neighbour**: Useful for tasks like finding the nearest airport to a given
+//!   location, or finding the nearest catalogued star to a sky position.
+//!   `tree.query(&point).nearest_one().execute()`
+//! - **k-nearest-neighbour (k-NN)** search, finding the `k` nearest items to a query point:
+//!     - ordered by distance: `tree.query(&point).nearest_n(5).execute()`.
+//!       Useful for finding the nearest weather stations or sensors to a location,
+//!       or generating candidate correspondences for point-cloud registration.
+//!     - `k` items within a max radius: `tree.query(&point).nearest_n(5).within(max_dist).execute()`.
+//!       Useful when you want the closest local neighbours inside a meaningful
+//!       cutoff, such as the nearest shops within 5 miles, or nearby atoms within
+//!       an interaction radius.
+//!     - All items within a radius: `tree.query(&point).within(max_dist).execute()`. Finds all
+//!       items within a specified radius of a query point, ordered by distance. Useful for radial
+//!       catalogue searches in astronomy, or collision and proximity queries where the full
+//!       neighbourhood is needed in sorted order.
+//!     - Unsorted, e.g. `tree.query(&point).nearest_n(5).within(max_dist).unsorted().execute()`:
+//!       This is often faster than the sorted radius-query form when result order does not
+//!       matter, such as finding all customers within 5 miles of a store, or
+//!       collecting point-cloud neighbourhoods for clustering or normal estimation.
+//! - **Approximate nearest-neighbour** (ANN) search: `tree.query(&point).nearest_one().approx().execute()`
+//!   Returns a good approximate nearest item. Generally much faster than exact nearest-neighbour
+//!   search. Useful for latency-sensitive workloads like interactive point-cloud picking, or
+//!   mapping image pixels to a palette colour during colour quantization.
+//! - **"best" `n` items**: `tree.query(&point).best_n(5, max_dist).execute()`. Finds the "best" n
+//!   items within a specified distance of a query point, for some definition of "best". For
+//!   example, "give me the 5 largest settlements within 50km of a given point, ordered by
+//!   descending population", or "the 5 brightest stars within a degree of a point on the sky,
+//!   ordered brightest first". This only makes semantic sense when your item type has meaningful
+//!   ordering; for points-only trees with `T = ()`, the query is allowed but not useful.
+//! - **[Periodic Boundary Conditions](https://en.wikipedia.org/wiki/Periodic_boundary_conditions) (PBC)**,
+//!   whereby the points in the tree are considered to represent a single subunit that repeats
+//!   across space. Useful primarily for simulations, such as within cosmology or molecular dynamics
+//!   simulations:
+//!   `tree.query(&point).periodic_boundary_condition(box_size).within(max_dist).execute()`
+//! - **Exclusive Boundary Queries**, where the query radius filter is an exclusive boundary
+//!   (< max_dist), rather than the default inclusive boundary (<= max_dist):
+//!   `tree.query(&point).within(max_dist).exclusive_boundaries().execute()`
 //!
 //! If your points are known up front and the tree will be built once and then
 //! queried, start with [`ImmutableKdTree`]. It offers the best query
@@ -55,54 +95,10 @@
 //! workloads.
 //!
 //! Kiddo is not intended as a library for high-dimensional vector search or
-//! feature matching over hundreds or thousands of dimensions, where plain
+//! feature matching over hundreds or thousands of dimensions, where
 //! k-d trees are usually the wrong data structure and other approaches are more
 //! appropriate. The API does not impose a hard dimensional limit, but Kiddo is
 //! primarily intended for low-dimensional workloads.
-//!
-//! Kiddo supports the following query types:
-//!
-//! - [`KdTree::query`] starts a fluent query builder for nearest-neighbour and
-//!   radius-search operations.
-//!   Useful for tasks like finding the nearest airport to a given location, or
-//!   finding the nearest catalogued star to a sky position.
-//!
-//! - [`KdTree::query`] can also find the "best" `n` items within a specified
-//!   distance of a query point, for some definition of "best".
-//!   For example, "give me the 5 largest settlements within 50km of a given
-//!   point, ordered by descending population", or "the 5 brightest stars
-//!   within a degree of a point on the sky, ordered brightest first".
-//!   This only makes semantic sense when your item type has meaningful ordering; for
-//!   points-only trees with `T = ()`, the query is allowed but not useful.
-//!
-//! - [`KdTree::query`] can also perform approximate nearest-neighbour
-//!   (ANN) search, returning a good approximate nearest item, often much faster
-//!   than exact nearest-neighbour search.
-//!   Useful for latency-sensitive workloads like interactive point-cloud
-//!   picking, or mapping image pixels to a palette colour during colour
-//!   quantization.
-//!
-//! - [`KdTree::query`] performs k-nearest-neighbour (k-NN) search, finding
-//!   the `n` nearest items to a query point ordered by distance.
-//!   Useful for finding the nearest weather stations or sensors to a location,
-//!   or generating candidate correspondences for point-cloud registration.
-//!
-//! - [`KdTree::query`] finds up to `n` nearest items within a
-//!   specified radius of a query point, ordered by distance.
-//!   Useful when you want the closest local neighbours inside a meaningful
-//!   cutoff, such as the nearest shops within 5 miles, or nearby atoms within
-//!   an interaction radius.
-//!
-//! - [`KdTree::query`] finds all items within a specified radius of a query
-//!   point, ordered by distance.
-//!   Useful for radial catalogue searches in astronomy, or collision and
-//!   proximity queries where the full neighbourhood is needed in sorted order.
-//!
-//! - [`KdTree::query`] finds all items within a specified radius of a
-//!   query point without sorting the results.
-//!   This is often faster than the sorted radius-query form when result order does not
-//!   matter, such as finding all customers within 5 miles of a store, or
-//!   collecting point-cloud neighbourhoods for clustering or normal estimation.
 //!
 //! ## Installation
 //!
@@ -116,7 +112,7 @@
 //! ```rust
 //! use std::num::NonZero;
 //!
-//! use kiddo::leaf_strategy::VecOfArrays;
+//! use kiddo::leaf_strategies::VecOfArrays;
 //! use kiddo::SquaredEuclidean;
 //! use kiddo::QueryResultItem;
 //! use kiddo::{Eytzinger, ImmutableKdTree};
@@ -163,9 +159,6 @@
 //!
 //! - `fixed` enables support for fixed-point coordinate
 //!   types from the [`fixed`](https://docs.rs/fixed/latest/fixed) crate.
-//!
-//! - `tracing` **(enabled by default)** enables tracing-based instrumentation
-//!   and logging.
 //!
 //! - `f16` enables support for half-precision floating-point coordinates via
 //!   the [`half`](https://docs.rs/half/latest/half) crate.
@@ -217,15 +210,26 @@
 #[doc(hidden)]
 mod custom_serde;
 
-/// Distance metrics
-pub mod dist;
-
-pub use crate::dist::{Chebyshev, DotProduct, Manhattan, Minkowski, SquaredEuclidean};
-
-pub mod huge_pages;
-
 pub mod kd_tree;
 pub use kd_tree::KdTree;
+
+/// Distance metrics
+pub mod dist;
+pub use crate::dist::{Chebyshev, DotProduct, Manhattan, Minkowski, SquaredEuclidean};
+
+/// Stem ordering strategies for the kd-tree
+#[path = "stem_strategy/mod.rs"]
+pub mod stem_strategies;
+#[doc(hidden)]
+pub use stem_strategies as stem_strategy;
+pub use stem_strategies::{Donnelly, DonnellyMarkerPf, DonnellyMarkerSimd, Eytzinger, EytzingerPf};
+
+/// Leaf storage strategies for the kd-tree
+#[path = "leaf_strategy/mod.rs"]
+pub mod leaf_strategies;
+#[doc(hidden)]
+pub use leaf_strategies as leaf_strategy;
+pub use leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
 
 /// Convenience type alias for recommended default params for an immutable KdTree
 pub type ImmutableKdTree<AX, const K: usize> =
@@ -235,11 +239,10 @@ pub type ImmutableKdTree<AX, const K: usize> =
 pub type MutableKdTree<AX, const K: usize> =
     KdTree<AX, u32, Eytzinger<K>, VecOfArrays<AX, u32, K, 32>, K, 32>;
 
-/// Leaf storage strategies for the kd-tree
-pub mod leaf_strategy;
-pub use leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
+pub mod huge_pages;
 
 /// Leaf view abstraction for accessing leaf data
+#[doc(hidden)]
 pub mod leaf_view;
 
 /// Chunked Leaf view abstraction for accessing leaf data
@@ -248,6 +251,7 @@ pub(crate) mod leaf_view_chunked;
 mod mirror_select_nth_unstable_by;
 
 /// Structs that are returned as query results
+#[doc(hidden)]
 pub mod results;
 pub use results::{
     best_query_result_item::BestQueryResultItem, query_result_item::QueryResultItem,
@@ -256,16 +260,12 @@ pub use results::{
 #[cfg(feature = "rkyv_08")]
 mod rkyv;
 
-/// Stem Orderings
-pub mod stem_strategy;
-pub use stem_strategy::{Donnelly, DonnellyMarkerPf, DonnellyMarkerSimd, Eytzinger, EytzingerPf};
-
 #[doc(hidden)]
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 
 pub mod traits;
+#[doc(hidden)]
 pub use traits::{
-    axis::Axis, content::Content, distance_metric::DistanceMetric, leaf_strategy::LeafStrategy,
-    stem_strategy::StemStrategy,
+    Axis, ConstructibleLeafStrategy, Content, LeafStrategy, MutableLeafStrategy, StemStrategy,
 };

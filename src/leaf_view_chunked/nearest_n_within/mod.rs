@@ -9,7 +9,7 @@ pub(crate) mod avx512;
 #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
 pub(crate) mod neon;
 
-use crate::dist::KdTreeDistanceMetric;
+use crate::dist::DistanceMetricSimdBlock;
 use crate::leaf_view::{LeafArena, LeafView, TlsLeafScratch};
 use crate::results::result_collection::ResultCollection;
 use crate::{Axis, Content, QueryResultItem};
@@ -34,7 +34,7 @@ pub(crate) fn nearest_n_within_with_query_wide_arena<
 ) where
     AX: Axis<Coord = AX> + 'static,
     T: Content,
-    D: KdTreeDistanceMetric<AX, K>,
+    D: DistanceMetricSimdBlock<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
@@ -87,7 +87,7 @@ pub(crate) fn nearest_n_within_with_query_wide<
 ) where
     AX: Axis<Coord = AX> + 'static,
     T: Content + PartialOrd,
-    D: KdTreeDistanceMetric<AX, K>,
+    D: DistanceMetricSimdBlock<AX, K>,
     D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
@@ -136,7 +136,7 @@ unsafe fn try_nearest_n_within_avx512<
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content,
-    D: KdTreeDistanceMetric<AX, K>,
+    D: DistanceMetricSimdBlock<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
@@ -154,7 +154,7 @@ unsafe fn try_nearest_n_within_arena_avx512<AX, T, D, R, const EXCLUSIVE: bool, 
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content,
-    D: KdTreeDistanceMetric<AX, K>,
+    D: DistanceMetricSimdBlock<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
@@ -180,7 +180,7 @@ unsafe fn try_nearest_n_within_avx2<
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content,
-    D: KdTreeDistanceMetric<AX, K>,
+    D: DistanceMetricSimdBlock<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
@@ -198,7 +198,7 @@ unsafe fn try_nearest_n_within_arena_avx2<AX, T, D, R, const EXCLUSIVE: bool, co
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content,
-    D: KdTreeDistanceMetric<AX, K>,
+    D: DistanceMetricSimdBlock<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
@@ -224,7 +224,7 @@ unsafe fn try_nearest_n_within_neon<
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content,
-    D: KdTreeDistanceMetric<AX, K>,
+    D: DistanceMetricSimdBlock<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {
@@ -242,7 +242,7 @@ unsafe fn try_nearest_n_within_arena_neon<AX, T, D, R, const EXCLUSIVE: bool, co
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content,
-    D: KdTreeDistanceMetric<AX, K>,
+    D: DistanceMetricSimdBlock<AX, K>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
 {

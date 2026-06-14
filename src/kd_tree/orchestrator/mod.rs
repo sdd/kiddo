@@ -5,7 +5,7 @@ use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::ptr::NonNull;
 
-use crate::dist::KdTreeDistanceMetric;
+use crate::dist::DistanceMetricSimdBlock;
 use crate::kd_tree::query_context::QueryContext;
 use crate::kd_tree::query_stack::{
     ScalarContinuationFar, ScalarContinuationFarStack, ScalarContinuationRestore,
@@ -240,7 +240,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: KdTreeDistanceMetric<A, K, Output = O>
+        D: DistanceMetricSimdBlock<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS> + Default + 'static,
@@ -270,7 +270,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: KdTreeDistanceMetric<A, K, Output = O>
+        D: DistanceMetricSimdBlock<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS>,
@@ -300,7 +300,7 @@ where
     ) where
         QC: QueryContext<A, O, K>,
         O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: KdTreeDistanceMetric<A, K, Output = O>
+        D: DistanceMetricSimdBlock<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS>,
@@ -385,7 +385,7 @@ where
     ) where
         QC: QueryContext<A, O, K>,
         O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: KdTreeDistanceMetric<A, K, Output = O>
+        D: DistanceMetricSimdBlock<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS> + Default + 'static,
@@ -405,7 +405,7 @@ where
     ) where
         QC: QueryContext<A, O, K>,
         O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: KdTreeDistanceMetric<A, K, Output = O>
+        D: DistanceMetricSimdBlock<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS>,
@@ -430,7 +430,7 @@ where
     ) where
         QC: QueryContext<A, O, K>,
         O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: KdTreeDistanceMetric<A, K, Output = O>
+        D: DistanceMetricSimdBlock<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS>,
@@ -602,7 +602,7 @@ where
     ) -> Option<usize>
     where
         O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: KdTreeDistanceMetric<A, K, Output = O>
+        D: DistanceMetricSimdBlock<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS::Stack<O>: StackTrait<O, SS>,
@@ -670,7 +670,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: KdTreeDistanceMetric<A, K, Output = O>
+        D: DistanceMetricSimdBlock<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS: StemStrategy
@@ -1042,7 +1042,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: KdTreeDistanceMetric<A, K, Output = O>
+        D: DistanceMetricSimdBlock<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS: StemStrategy<
@@ -1414,7 +1414,7 @@ where
     ) -> Option<usize>
     where
         O: Axis<Coord = O> + SimdSelectBestChildBlock3 + BacktrackBlock3 + BacktrackBlock4,
-        D: KdTreeDistanceMetric<A, K, Output = O>
+        D: DistanceMetricSimdBlock<A, K, Output = O>
             + DistanceMetricSimdBlock3<A, K, O>
             + DistanceMetricSimdBlock4<A, K, O>,
         SS: StemStrategy

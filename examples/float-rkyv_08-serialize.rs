@@ -10,9 +10,7 @@ use kiddo::stem_strategy::EytzingerPf;
 use kiddo::SquaredEuclidean;
 use rand::{RngExt, SeedableRng};
 use rkyv_08::{rancor::Error as RkyvError, to_bytes};
-#[cfg(feature = "tracing")]
 use tracing::Level;
-#[cfg(feature = "tracing")]
 use tracing_subscriber::fmt;
 use ubyte::ToByteUnit;
 
@@ -21,9 +19,7 @@ const NUM_ITEMS: usize = 50_000;
 type Tree = KdTree<f64, u32, EytzingerPf<3, 8>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    #[cfg(feature = "tracing")]
     let subscriber = fmt().with_max_level(Level::TRACE).without_time().finish();
-    #[cfg(feature = "tracing")]
     tracing::subscriber::set_global_default(subscriber)?;
 
     let query = [0.123f64, 0.456f64, 0.789f64];

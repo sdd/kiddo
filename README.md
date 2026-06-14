@@ -179,8 +179,6 @@ Kiddo exposes a number of optional crate features:
 
 - `fixed` enables support for fixed-point coordinate types from the [`fixed`](https://docs.rs/fixed/latest/fixed) crate.
 
-- `tracing` **(enabled by default)** enables tracing-based instrumentation and logging.
-
 - `f16` enables support for half-precision floating-point coordinates via the [`half`](https://docs.rs/half/latest/half) crate.
 
 - `serde` enables serialization and deserialization via [`Serde`](https://docs.rs/serde/latest/serde/).

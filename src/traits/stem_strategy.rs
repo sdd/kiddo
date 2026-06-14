@@ -391,7 +391,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
             + crate::stem_strategy::SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: crate::dist::KdTreeDistanceMetric<A, K2, Output = O>
+        D: crate::dist::DistanceMetricSimdBlock<A, K2, Output = O>
             + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>
             + crate::stem_strategy::DistanceMetricSimdBlock4<A, K2, O>,
         QC: crate::kd_tree::query_context::QueryContext<A, O, K2>,
@@ -419,7 +419,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
         A: Axis<Coord = A>,
         T: Content,
         O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: crate::dist::KdTreeDistanceMetric<A, K2, Output = O>
+        D: crate::dist::DistanceMetricSimdBlock<A, K2, Output = O>
             + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>
             + crate::stem_strategy::DistanceMetricSimdBlock4<A, K2, O>,
         QC: crate::kd_tree::query_context::QueryContext<A, O, K2>,

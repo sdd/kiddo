@@ -5,7 +5,7 @@ use std::collections::BinaryHeap;
 use std::marker::PhantomData;
 use std::num::{NonZero, NonZeroUsize};
 
-use crate::dist::{DistanceMetricCore, KdTreeDistanceMetric};
+use crate::dist::{DistanceMetricCore, DistanceMetricSimdBlock};
 use crate::kd_tree::query_stack::StackTrait;
 #[cfg(feature = "rkyv_08")]
 use crate::kd_tree::ArchivedKdTree;
@@ -254,7 +254,7 @@ where
 {
     fn qb_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -267,7 +267,7 @@ where
     fn qb_approx_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         T: Copy + Default + PartialOrd + PartialEq,
-        D: KdTreeDistanceMetric<A, K, Output = A>;
+        D: DistanceMetricSimdBlock<A, K, Output = A>;
 
     fn qb_nearest_n<D>(
         &self,
@@ -277,7 +277,7 @@ where
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -295,7 +295,7 @@ where
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -311,7 +311,7 @@ where
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -327,7 +327,7 @@ where
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -343,7 +343,7 @@ where
         visitor: F,
     ) where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -361,7 +361,7 @@ where
     ) -> BinaryHeap<BestQueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -382,7 +382,7 @@ where
     #[inline]
     fn qb_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -399,7 +399,7 @@ where
     fn qb_approx_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         T: Copy + Default + PartialOrd + PartialEq,
-        D: KdTreeDistanceMetric<A, K, Output = A>,
+        D: DistanceMetricSimdBlock<A, K, Output = A>,
     {
         self.approx_nearest_one::<D>(query)
     }
@@ -413,7 +413,7 @@ where
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -435,7 +435,7 @@ where
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -455,7 +455,7 @@ where
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -475,7 +475,7 @@ where
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -495,7 +495,7 @@ where
         visitor: F,
     ) where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -517,7 +517,7 @@ where
     ) -> BinaryHeap<BestQueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -544,7 +544,7 @@ where
     #[inline]
     fn qb_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -561,7 +561,7 @@ where
     fn qb_approx_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
         T: Copy + Default + PartialOrd + PartialEq,
-        D: KdTreeDistanceMetric<A, K, Output = A>,
+        D: DistanceMetricSimdBlock<A, K, Output = A>,
     {
         self.approx_nearest_one::<D>(query)
     }
@@ -575,7 +575,7 @@ where
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -597,7 +597,7 @@ where
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -617,7 +617,7 @@ where
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -637,7 +637,7 @@ where
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -657,7 +657,7 @@ where
         visitor: F,
     ) where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -679,7 +679,7 @@ where
     ) -> BinaryHeap<BestQueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -978,7 +978,7 @@ pub trait PeriodicBoundaryConditionQueryBuilder<'a, A, const K: usize> {
 #[doc(hidden)]
 pub trait NearestOneQueryBuilder<A: Copy, const K: usize, D>
 where
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
 {
     #[doc(hidden)]
     type Output;
@@ -990,7 +990,7 @@ where
 #[doc(hidden)]
 pub trait NearestNQueryBuilder<A: Copy, const K: usize, D>
 where
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
 {
     #[doc(hidden)]
     type Output;
@@ -1002,7 +1002,7 @@ where
 #[doc(hidden)]
 pub trait WithinQueryBuilder<A: Copy, const K: usize, D>
 where
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
 {
     #[doc(hidden)]
     type Output;
@@ -1014,7 +1014,7 @@ where
 #[doc(hidden)]
 pub trait BestNWithinQueryBuilder<A: Copy, const K: usize, D>
 where
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
 {
     #[doc(hidden)]
     type Output;
@@ -1147,7 +1147,7 @@ where
     pub fn nearest_one<Dq>(self) -> <Self as NearestOneQueryBuilder<A, K, Dq>>::Output
     where
         A: Copy,
-        Dq: KdTreeDistanceMetric<A, K>,
+        Dq: DistanceMetricSimdBlock<A, K>,
         Self: NearestOneQueryBuilder<A, K, Dq>,
     {
         <Self as NearestOneQueryBuilder<A, K, Dq>>::nearest_one(self)
@@ -1161,7 +1161,7 @@ where
     ) -> <Self as NearestNQueryBuilder<A, K, Dq>>::Output
     where
         A: Copy,
-        Dq: KdTreeDistanceMetric<A, K>,
+        Dq: DistanceMetricSimdBlock<A, K>,
         Self: NearestNQueryBuilder<A, K, Dq>,
     {
         <Self as NearestNQueryBuilder<A, K, Dq>>::nearest_n(self, max_qty)
@@ -1172,7 +1172,7 @@ where
     pub fn within<Dq>(self, radius: Dq::Output) -> <Self as WithinQueryBuilder<A, K, Dq>>::Output
     where
         A: Copy,
-        Dq: KdTreeDistanceMetric<A, K>,
+        Dq: DistanceMetricSimdBlock<A, K>,
         Self: WithinQueryBuilder<A, K, Dq>,
     {
         <Self as WithinQueryBuilder<A, K, Dq>>::within(self, radius)
@@ -1187,7 +1187,7 @@ where
     ) -> <Self as BestNWithinQueryBuilder<A, K, Dq>>::Output
     where
         A: Copy,
-        Dq: KdTreeDistanceMetric<A, K>,
+        Dq: DistanceMetricSimdBlock<A, K>,
         Self: BestNWithinQueryBuilder<A, K, Dq>,
     {
         <Self as BestNWithinQueryBuilder<A, K, Dq>>::best_n_within(self, radius, max_qty)
@@ -1228,7 +1228,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -1249,7 +1249,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -1309,7 +1309,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: Axis<Coord = D::Output>,
     Pj: ProjectionSpec<A, T, D::Output, K>,
 {
@@ -1352,7 +1352,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: Axis<Coord = D::Output>,
     Pj: ProjectionSpec<A, T, D::Output, K>,
 {
@@ -1397,7 +1397,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: Axis<Coord = D::Output>,
     Pj: ProjectionSpec<A, T, D::Output, K>,
     Pj::BestOut: Ord,
@@ -1975,7 +1975,7 @@ impl<
         B,
     >
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
     {
         self.rebind::<
             SelectedMetric<D>,
@@ -2010,7 +2010,7 @@ impl<
         B,
     >
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
     {
         self.rebind::<
             SelectedMetric<D>,
@@ -2045,7 +2045,7 @@ impl<
         B,
     >
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
     {
         self.rebind::<
             SelectedMetric<D>,
@@ -2082,7 +2082,7 @@ impl<
     >
     where
         T: Content + PartialOrd + 'static,
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
     {
         self.rebind::<
             SelectedMetric<D>,
@@ -2128,7 +2128,7 @@ macro_rules! impl_root_metric_selector_noarg {
                 B,
             >
         where
-            Dq: KdTreeDistanceMetric<A, K>,
+            Dq: DistanceMetricSimdBlock<A, K>,
         {
             type Output = QueryBuilder<
                 'a,
@@ -2188,7 +2188,7 @@ macro_rules! impl_root_metric_selector_qty {
                 B,
             >
         where
-            Dq: KdTreeDistanceMetric<A, K>,
+            Dq: DistanceMetricSimdBlock<A, K>,
         {
             type Output = QueryBuilder<
                 'a,
@@ -2248,7 +2248,7 @@ macro_rules! impl_root_metric_selector_radius {
                 B,
             >
         where
-            Dq: KdTreeDistanceMetric<A, K>,
+            Dq: DistanceMetricSimdBlock<A, K>,
         {
             type Output = QueryBuilder<
                 'a,
@@ -2309,7 +2309,7 @@ macro_rules! impl_root_best_n_within_query_builder {
             >
         where
             T: Content + PartialOrd + 'static,
-            Dq: KdTreeDistanceMetric<A, K>,
+            Dq: DistanceMetricSimdBlock<A, K>,
         {
             type Output = QueryBuilder<
                 'a,
@@ -2466,7 +2466,7 @@ impl<
         B,
     >
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
     {
         self.rebind::<
             SelectedMetric<D>,
@@ -2501,7 +2501,7 @@ impl<
         B,
     >
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
     {
         self.rebind::<
             SelectedMetric<D>,
@@ -2536,7 +2536,7 @@ impl<
         B,
     >
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
     {
         self.rebind::<
             SelectedMetric<D>,
@@ -2606,7 +2606,7 @@ impl<
         B,
     >
 where
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
 {
     /// Switches exact nearest-neighbour search to approximate descent-only mode.
     #[inline]
@@ -2668,7 +2668,7 @@ impl<
         B,
     >
 where
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
 {
     type Output = QueryBuilder<
         'a,
@@ -2725,7 +2725,7 @@ impl<
         B,
     >
 where
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
 {
     /// Adds a radius bound to a k-nearest-neighbours query.
     #[inline]
@@ -2788,7 +2788,7 @@ impl<
         B,
     >
 where
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
 {
     type Output = QueryBuilder<
         'a,
@@ -3160,7 +3160,7 @@ where
     SS: StemStrategy + 'static,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -3225,7 +3225,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeAccessor<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K, Output = A>,
+    D: DistanceMetricSimdBlock<A, K, Output = A>,
     P: PointProjectionField<A, K>,
     I: ProjectionField<T>,
     Dp: ProjectionField<A>,
@@ -3283,7 +3283,7 @@ where
     SS: StemStrategy + 'static,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -3345,7 +3345,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeAccessor<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -3421,7 +3421,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeAccessor<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -3497,7 +3497,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeAccessor<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -3587,7 +3587,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeAccessor<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -3677,7 +3677,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeAccessor<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -3757,7 +3757,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeAccessor<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -3839,7 +3839,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B> + 'a,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeAccessor<A, T, SS, LS, K, B> + 'a,
-    D: KdTreeDistanceMetric<A, K> + 'a,
+    D: DistanceMetricSimdBlock<A, K> + 'a,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -3981,7 +3981,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeQueryOps<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: Axis<Coord = D::Output>,
     P: PointProjectionField<A, K>,
     I: ProjectionField<T>,
@@ -4045,7 +4045,7 @@ macro_rules! impl_periodic_radius_vec_execute {
             SS: StemStrategy,
             LS: LeafStrategy<A, T, SS, K, B>,
             Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeQueryOps<A, T, SS, LS, K, B>,
-            D: KdTreeDistanceMetric<A, K>,
+            D: DistanceMetricSimdBlock<A, K>,
             D::Output: Axis<Coord = D::Output>,
             P: PointProjectionField<A, K>,
             I: ProjectionField<T>,
@@ -4112,7 +4112,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B> + KdTreeAccessor<A, T, SS, LS, K, B>,
-    D: KdTreeDistanceMetric<A, K>,
+    D: DistanceMetricSimdBlock<A, K>,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3

@@ -1,6 +1,6 @@
 use std::num::NonZero;
 
-use crate::dist::KdTreeDistanceMetric;
+use crate::dist::DistanceMetricSimdBlock;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::leaf_view::TlsLeafScratch;
 use crate::stem_strategy::donnelly_2_blockmarker_simd::{
@@ -25,7 +25,7 @@ where
         sorted: bool,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
-        D: KdTreeDistanceMetric<A, K>,
+        D: DistanceMetricSimdBlock<A, K>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3

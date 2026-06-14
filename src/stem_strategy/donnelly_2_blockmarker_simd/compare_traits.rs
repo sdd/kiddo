@@ -74,7 +74,7 @@ pub trait CompareBlock4: Copy {
 /// # Parameters
 /// * `$pivot_count` - Number of actual pivots (7 for Block3, 15 for Block4)
 /// * `$ty` - Type of values being compared
-/// * `$stems_ptr` - NonNull<u8> pointer to stems
+/// * `$stems_ptr` - `NonNull<u8>` pointer to stems
 /// * `$block_base_idx` - Cache line base index
 /// * `$query_val` - Query value to compare
 macro_rules! autovec_compare_block {
