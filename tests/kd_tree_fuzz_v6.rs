@@ -13,7 +13,7 @@ use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
 use kiddo::stem_strategy::{Donnelly, Eytzinger};
 use kiddo::traits::leaf_strategy::ConstructibleLeafStrategy;
-use kiddo::{dist::DistanceMetricCore, Manhattan, SquaredEuclidean};
+use kiddo::{dist::DistanceMetricScalar, Manhattan, SquaredEuclidean};
 use kiddo::{Axis, LeafStrategy, QueryResultItem, StemStrategy};
 
 #[cfg(feature = "simd")]
@@ -650,8 +650,8 @@ fn brute_states_f32<const K: usize>(
     let mut man = MetricState::new(max_qty, radius_manhattan);
 
     for (idx, point) in points.iter().enumerate() {
-        let dist_sq = <SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, point);
-        let dist_man = <Manhattan<f32> as DistanceMetricCore<f32>>::dist_raw(query, point);
+        let dist_sq = <SquaredEuclidean<f32> as DistanceMetricScalar<f32>>::dist_raw(query, point);
+        let dist_man = <Manhattan<f32> as DistanceMetricScalar<f32>>::dist_raw(query, point);
         sq.update(dist_sq, idx);
         man.update(dist_man, idx);
     }
@@ -670,8 +670,8 @@ fn brute_states_f64<const K: usize>(
     let mut man = MetricState::new(max_qty, radius_manhattan);
 
     for (idx, point) in points.iter().enumerate() {
-        let dist_sq = <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, point);
-        let dist_man = <Manhattan<f64> as DistanceMetricCore<f64>>::dist_raw(query, point);
+        let dist_sq = <SquaredEuclidean<f64> as DistanceMetricScalar<f64>>::dist_raw(query, point);
+        let dist_man = <Manhattan<f64> as DistanceMetricScalar<f64>>::dist_raw(query, point);
         sq.update(dist_sq, idx);
         man.update(dist_man, idx);
     }
@@ -749,7 +749,7 @@ fn assert_approx_nearest_one_f32<D, const K: usize>(
     points: &[[f32; K]],
     result: QueryResultItem<(), usize, f32>,
 ) where
-    D: DistanceMetricCore<f32, Output = f32>,
+    D: DistanceMetricScalar<f32, Output = f32>,
 {
     if result.item >= points.len() {
         log_mismatch(
@@ -808,7 +808,7 @@ fn assert_approx_nearest_one_f64<D, const K: usize>(
     points: &[[f64; K]],
     result: QueryResultItem<(), usize, f64>,
 ) where
-    D: DistanceMetricCore<f64, Output = f64>,
+    D: DistanceMetricScalar<f64, Output = f64>,
 {
     if result.item >= points.len() {
         log_mismatch(
@@ -861,7 +861,7 @@ where
     T: kiddo::Content + PartialOrd,
     SO: StemStrategy,
     LS: LeafStrategy<A, T, SO, K, B>,
-    D: kiddo::dist::DistanceMetricSimdBlock<A, K>,
+    D: kiddo::dist::DistanceMetric<A>,
     D::Output: kiddo::stem_strategy::SimdPrune
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::SimdSelectBestChildBlock3
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::BacktrackBlock3
@@ -887,7 +887,7 @@ where
     T: kiddo::Content + PartialOrd,
     SO: StemStrategy,
     LS: LeafStrategy<A, T, SO, K, B>,
-    D: kiddo::dist::DistanceMetricSimdBlock<A, K>,
+    D: kiddo::dist::DistanceMetric<A>,
     D::Output: kiddo::stem_strategy::SimdPrune
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::SimdSelectBestChildBlock3
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::BacktrackBlock3
@@ -914,7 +914,7 @@ where
     T: kiddo::Content + PartialOrd,
     SO: StemStrategy,
     LS: LeafStrategy<A, T, SO, K, B>,
-    D: kiddo::dist::DistanceMetricSimdBlock<A, K>,
+    D: kiddo::dist::DistanceMetric<A>,
     D::Output: kiddo::stem_strategy::SimdPrune
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::SimdSelectBestChildBlock3
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::BacktrackBlock3
@@ -941,7 +941,7 @@ where
     T: kiddo::Content + PartialOrd,
     SO: StemStrategy,
     LS: LeafStrategy<A, T, SO, K, B>,
-    D: kiddo::dist::DistanceMetricSimdBlock<A, K>,
+    D: kiddo::dist::DistanceMetric<A>,
     D::Output: kiddo::stem_strategy::SimdPrune
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::SimdSelectBestChildBlock3
         + kiddo::stem_strategy::donnelly_2_blockmarker_simd::BacktrackBlock3
@@ -3369,7 +3369,7 @@ fn adversarial_mutation_point_f32(size: usize, query_idx: usize) -> [f32; 2] {
 
 fn brute_ranked_entries_f32<D>(entries: &[EntryF32], query: &[f32; 2]) -> Vec<(f32, usize)>
 where
-    D: DistanceMetricCore<f32, Output = f32>,
+    D: DistanceMetricScalar<f32, Output = f32>,
 {
     let mut ranked: Vec<(f32, usize)> = entries
         .iter()
@@ -3382,7 +3382,7 @@ where
 #[cfg(feature = "simd")]
 fn brute_ranked_entries_f64<D>(entries: &[EntryF64], query: &[f64; 2]) -> Vec<(f64, usize)>
 where
-    D: DistanceMetricCore<f64, Output = f64>,
+    D: DistanceMetricScalar<f64, Output = f64>,
 {
     let mut ranked: Vec<(f64, usize)> = entries
         .iter()
@@ -3620,7 +3620,7 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
             .execute();
         let approx_sq_point = find_point_by_item_f32(entries, approx_sq.item);
         let approx_sq_dist =
-            <SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_sq_point);
+            <SquaredEuclidean<f32> as DistanceMetricScalar<f32>>::dist_raw(query, &approx_sq_point);
         assert_distance_match_for_fuzz!(
             approx_sq_dist,
             approx_sq.distance,
@@ -3658,7 +3658,7 @@ fn validate_adversarial_tree_f32<SO, LS, const B: usize>(
             .execute();
         let approx_man_point = find_point_by_item_f32(entries, approx_man.item);
         let approx_man_dist =
-            <Manhattan<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_man_point);
+            <Manhattan<f32> as DistanceMetricScalar<f32>>::dist_raw(query, &approx_man_point);
         assert_distance_match_for_fuzz!(
             approx_man_dist,
             approx_man.distance,
@@ -3882,7 +3882,7 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
             .execute();
         let approx_sq_point = find_point_by_item_f64(entries, approx_sq.item);
         let approx_sq_dist =
-            <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_sq_point);
+            <SquaredEuclidean<f64> as DistanceMetricScalar<f64>>::dist_raw(query, &approx_sq_point);
         assert_distance_match_for_fuzz!(
             approx_sq_dist,
             approx_sq.distance,
@@ -3920,7 +3920,7 @@ fn validate_adversarial_tree_f64<SO, LS, const B: usize>(
             .execute();
         let approx_man_point = find_point_by_item_f64(entries, approx_man.item);
         let approx_man_dist =
-            <Manhattan<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_man_point);
+            <Manhattan<f64> as DistanceMetricScalar<f64>>::dist_raw(query, &approx_man_point);
         assert_distance_match_for_fuzz!(
             approx_man_dist,
             approx_man.distance,
@@ -4190,7 +4190,7 @@ fn assert_approx_invariants_f32<SO, LS, const B: usize>(
         .execute();
     let approx_sq_point = find_point_by_item_f32(entries, approx_sq.item);
     let approx_sq_dist =
-        <SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_sq_point);
+        <SquaredEuclidean<f32> as DistanceMetricScalar<f32>>::dist_raw(query, &approx_sq_point);
     assert_distance_match_for_fuzz!(
         approx_sq_dist,
         approx_sq.distance,
@@ -4247,7 +4247,7 @@ fn assert_approx_invariants_f32<SO, LS, const B: usize>(
         .execute();
     let approx_man_point = find_point_by_item_f32(entries, approx_man.item);
     let approx_man_dist =
-        <Manhattan<f32> as DistanceMetricCore<f32>>::dist_raw(query, &approx_man_point);
+        <Manhattan<f32> as DistanceMetricScalar<f32>>::dist_raw(query, &approx_man_point);
     assert_distance_match_for_fuzz!(
         approx_man_dist,
         approx_man.distance,
@@ -4317,7 +4317,7 @@ fn assert_approx_invariants_f64<SO, LS, const B: usize>(
         .execute();
     let approx_sq_point = find_point_by_item_f64(entries, approx_sq.item);
     let approx_sq_dist =
-        <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_sq_point);
+        <SquaredEuclidean<f64> as DistanceMetricScalar<f64>>::dist_raw(query, &approx_sq_point);
     assert_distance_match_for_fuzz!(
         approx_sq_dist,
         approx_sq.distance,
@@ -4374,7 +4374,7 @@ fn assert_approx_invariants_f64<SO, LS, const B: usize>(
         .execute();
     let approx_man_point = find_point_by_item_f64(entries, approx_man.item);
     let approx_man_dist =
-        <Manhattan<f64> as DistanceMetricCore<f64>>::dist_raw(query, &approx_man_point);
+        <Manhattan<f64> as DistanceMetricScalar<f64>>::dist_raw(query, &approx_man_point);
     assert_distance_match_for_fuzz!(
         approx_man_dist,
         approx_man.distance,

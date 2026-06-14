@@ -39,11 +39,14 @@ pub mod manhattan;
 #[doc(hidden)]
 pub mod squared_euclidean;
 
+use std::ptr::NonNull;
+
 /// Shared distance metric functions
 pub(crate) mod common;
 
 #[doc(hidden)]
-pub use distance_metric_core::DistanceMetricCore;
+pub use distance_metric_core::DistanceMetricScalar;
+pub(crate) use distance_metric_core::DistanceMetricScalar as DistanceMetricCore;
 #[cfg(any(
     all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
     all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"),
@@ -51,9 +54,6 @@ pub use distance_metric_core::DistanceMetricCore;
 ))]
 use std::any::TypeId;
 
-use crate::stem_strategy::donnelly_2_blockmarker_simd::{
-    DistanceMetricSimdBlock3, DistanceMetricSimdBlock4,
-};
 use crate::Axis;
 #[cfg(any(
     all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
@@ -129,7 +129,7 @@ macro_rules! with_best_result_emitter {
 /// Default behavior is "not specialized". Concrete metrics can override hook
 /// methods in arch-specific code without changing public query bounds.
 #[doc(hidden)]
-pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
+pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricScalar<A> {
     /// Type that provides implementations of the AVX512 leaf ops
     #[cfg(all(feature = "simd", target_feature = "avx512f"))]
     type Avx512F64Ops: distance_metric_avx512::Avx512F64LeafOps + 'static;
@@ -569,7 +569,7 @@ pub trait DistanceMetricAvx512<A: Copy>: DistanceMetricCore<A> {
 
 /// AVX2 extension hooks.
 #[doc(hidden)]
-pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
+pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricScalar<A> {
     /// Whether a specialized AVX2 path is provided by this metric impl.
     const HAS_AVX2_SPECIALIZATION: bool = false;
 
@@ -882,7 +882,7 @@ pub trait DistanceMetricAvx2<A: Copy>: DistanceMetricCore<A> {
 
 /// NEON extension hooks.
 #[doc(hidden)]
-pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
+pub trait DistanceMetricNeon<A: Copy>: DistanceMetricScalar<A> {
     /// Whether a specialized NEON path is provided by this metric impl.
     const HAS_NEON_SPECIALIZATION: bool = false;
 
@@ -1193,43 +1193,150 @@ pub trait DistanceMetricNeon<A: Copy>: DistanceMetricCore<A> {
     }
 }
 
-/// trait representing a DistanceMetric that can be used in a `KdTree` query.
+/// Trait representing a distance metric that can be used in a `KdTree` query.
 #[doc(hidden)]
 pub trait DistanceMetric<A: Copy>:
-    DistanceMetricCore<A> + DistanceMetricAvx512<A> + DistanceMetricAvx2<A> + DistanceMetricNeon<A>
+    DistanceMetricScalar<A> + DistanceMetricAvx512<A> + DistanceMetricAvx2<A> + DistanceMetricNeon<A>
 {
+    /// Autovec/scalar Block3 backtrack mask generation.
+    #[inline(always)]
+    fn backtrack_block3<const K: usize>(
+        query_wide: Self::Output,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: Self::Output,
+        rd: Self::Output,
+        best_dist: Self::Output,
+    ) -> u8
+    where
+        A: Axis<Coord = A>,
+        Self: Sized,
+        Self::Output: Axis<Coord = Self::Output>
+            + std::ops::Add<Output = Self::Output>
+            + std::ops::Sub<Output = Self::Output>,
+    {
+        crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::autovec_backtrack_block3::<
+            Self::Output,
+            A,
+            Self,
+            K,
+        >(query_wide, stems_ptr, block_base_idx, old_off, rd, best_dist)
+    }
+
+    /// Block3 bounds-aware backtrack mask generation.
+    #[inline(always)]
+    fn backtrack_block3_with_bounds<const K: usize>(
+        query_wide: Self::Output,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        parent_lower_bound: Self::Output,
+        parent_upper_bound: Self::Output,
+        old_off: Self::Output,
+        rd: Self::Output,
+        best_dist: Self::Output,
+    ) -> u8
+    where
+        A: Axis<Coord = A>,
+        Self: Sized,
+        Self::Output: Axis<Coord = Self::Output>,
+    {
+        crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::autovec_backtrack_block3_with_bounds::<
+            A,
+            Self::Output,
+            Self,
+            K,
+        >(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            parent_lower_bound,
+            parent_upper_bound,
+            old_off,
+            rd,
+            best_dist,
+        )
+    }
+
+    /// Block3 bounds-aware backtrack state fill.
+    #[inline(always)]
+    fn fill_block3_values_and_bounds<const K: usize>(
+        query_wide: Self::Output,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        parent_lower_bound: Self::Output,
+        parent_upper_bound: Self::Output,
+        old_off: Self::Output,
+        rd: Self::Output,
+        best_dist: Self::Output,
+        new_off_values: &mut [Self::Output; 8],
+        rd_values: &mut [Self::Output; 8],
+        lower_bounds: &mut [Self::Output; 8],
+        upper_bounds: &mut [Self::Output; 8],
+    ) -> u8
+    where
+        A: Axis<Coord = A>,
+        Self: Sized,
+        Self::Output: Axis<Coord = Self::Output>,
+    {
+        crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::autovec_fill_block3_values_and_bounds::<
+            A,
+            Self::Output,
+            Self,
+            K,
+        >(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            parent_lower_bound,
+            parent_upper_bound,
+            old_off,
+            rd,
+            best_dist,
+            new_off_values,
+            rd_values,
+            lower_bounds,
+            upper_bounds,
+        )
+    }
+
+    /// Autovec/scalar Block4 backtrack mask generation.
+    #[inline(always)]
+    fn backtrack_block4<const K: usize>(
+        query_wide: Self::Output,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: Self::Output,
+        rd: Self::Output,
+        best_dist: Self::Output,
+    ) -> u16
+    where
+        A: Axis<Coord = A>,
+        Self: Sized,
+        Self::Output: Axis<Coord = Self::Output>
+            + std::ops::Add<Output = Self::Output>
+            + std::ops::Sub<Output = Self::Output>,
+    {
+        crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::autovec_backtrack_block4::<
+            Self::Output,
+            A,
+            Self,
+            K,
+        >(query_wide, stems_ptr, block_base_idx, old_off, rd, best_dist)
+    }
 }
 
 impl<T, A: Copy> DistanceMetric<A> for T where
-    T: DistanceMetricCore<A>
+    T: DistanceMetricScalar<A>
         + DistanceMetricAvx512<A>
         + DistanceMetricAvx2<A>
         + DistanceMetricNeon<A>
 {
 }
 
-/// V3-facing metric contract used by kd-tree query paths.
-#[doc(hidden)]
-pub trait DistanceMetricSimdBlock<A: Copy, const K: usize>:
-    DistanceMetric<A>
-    + DistanceMetricSimdBlock3<A, K, <Self as DistanceMetricCore<A>>::Output>
-    + DistanceMetricSimdBlock4<A, K, <Self as DistanceMetricCore<A>>::Output>
-{
-}
-
-impl<T, A: Copy, const K: usize> DistanceMetricSimdBlock<A, K> for T
-where
-    T: DistanceMetric<A>
-        + DistanceMetricSimdBlock3<A, K, <T as DistanceMetricCore<A>>::Output>
-        + DistanceMetricSimdBlock4<A, K, <T as DistanceMetricCore<A>>::Output>,
-    <T as DistanceMetricCore<A>>::Output: Axis<Coord = <T as DistanceMetricCore<A>>::Output>,
-{
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
-        Chebyshev, DistanceMetric, DistanceMetricCore, DotProduct, Manhattan, Minkowski,
+        Chebyshev, DistanceMetric, DistanceMetricScalar, DotProduct, Manhattan, Minkowski,
         SquaredEuclidean,
     };
 
@@ -1241,7 +1348,7 @@ mod tests {
 
         let aw = a.map(M::widen_coord);
         let bw = b.map(M::widen_coord);
-        let d = <M as DistanceMetricCore<f64>>::dist::<3>(&aw, &bw);
+        let d = <M as DistanceMetricScalar<f64>>::dist::<3>(&aw, &bw);
         assert_eq!(d, 25.0);
     }
 
@@ -1253,7 +1360,7 @@ mod tests {
 
         let aw = a.map(M::widen_coord);
         let bw = b.map(M::widen_coord);
-        let d = <M as DistanceMetricCore<f64>>::dist::<3>(&aw, &bw);
+        let d = <M as DistanceMetricScalar<f64>>::dist::<3>(&aw, &bw);
         assert_eq!(d, 7.0);
     }
 
@@ -1265,7 +1372,7 @@ mod tests {
 
         let aw = a.map(M::widen_coord);
         let bw = b.map(M::widen_coord);
-        let d = <M as DistanceMetricCore<f64>>::dist::<3>(&aw, &bw);
+        let d = <M as DistanceMetricScalar<f64>>::dist::<3>(&aw, &bw);
         assert_eq!(d, 4.0);
     }
 
@@ -1277,7 +1384,7 @@ mod tests {
 
         let aw = a.map(M::widen_coord);
         let bw = b.map(M::widen_coord);
-        let d = <M as DistanceMetricCore<f64>>::dist::<3>(&aw, &bw);
+        let d = <M as DistanceMetricScalar<f64>>::dist::<3>(&aw, &bw);
         assert_eq!(d, 91.125);
     }
 
@@ -1297,7 +1404,7 @@ mod tests {
 
         let aw = a.map(M::widen_coord);
         let bw = b.map(M::widen_coord);
-        let d = <M as DistanceMetricCore<f64>>::dist::<3>(&aw, &bw);
+        let d = <M as DistanceMetricScalar<f64>>::dist::<3>(&aw, &bw);
         assert_eq!(d, 5.0);
     }
 }

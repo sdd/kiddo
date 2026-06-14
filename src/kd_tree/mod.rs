@@ -186,12 +186,12 @@ fn resolve_mapped_terminal_stem_idx(
 /// A k-d tree for efficient spatial queries.
 ///
 /// # Type Parameters
-/// * `A` - Axis/coordinate type (e.g., f32, f64, or fixed-point types)
-/// * `T` - Content/item type stored at each point
-/// * `SS` - Stem ordering strategy (e.g., Eytzinger, Donnelly)
-/// * `LS` - Leaf storage strategy
-/// * `K` - Dimensionality (number of dimensions)
-/// * `B` - Bucket size (maximum items per leaf node)
+/// * `A`: [`Axis`] - coordinate type (e.g., `f32`, `f64`, or fixed-point types)
+/// * `T`: [`Content`] - item type stored at each point
+/// * `SS`: [`StemStrategy`]
+/// * `LS`: [`LeafStrategy`]
+/// * `K`: [`usize`] - Dimensionality (number of dimensions)
+/// * `B`: [`usize`] - Bucket size (maximum items per leaf node)
 #[cfg_attr(
     feature = "rkyv_08",
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
@@ -1099,6 +1099,27 @@ mod tests {
         let kd_tree = Tree::new_from_slice_no_items(&points).unwrap();
 
         assert_eq!(kd_tree.size, 1);
+    }
+
+    #[test]
+    fn can_add_to_and_remove_from_points_only_tree() {
+        // points-only tree can be created by specifying T / Item parameter as ()
+        type Tree = KdTree<f64, (), Eytzinger<3>, VecOfArrays<f64, (), 3, 256>, 3, 256>;
+
+        let points = vec![[0.0f64; 3]];
+
+        let mut kd_tree = Tree::new_from_slice_no_items(&points).unwrap();
+
+        assert_eq!(kd_tree.size, 1);
+
+        kd_tree.add(&[1.0f64; 3], ()).unwrap();
+        assert_eq!(kd_tree.size, 2);
+
+        kd_tree.remove(&[1.0f64; 3], ());
+        assert_eq!(kd_tree.size, 1);
+
+        kd_tree.remove(&[0.0f64; 3], ());
+        assert_eq!(kd_tree.size, 0);
     }
 
     #[test]

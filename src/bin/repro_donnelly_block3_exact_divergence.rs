@@ -1,7 +1,7 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 #![cfg_attr(coverage_nightly, coverage(off))]
 
-use kiddo::dist::{DistanceMetricCore, SquaredEuclidean};
+use kiddo::dist::{DistanceMetricScalar, SquaredEuclidean};
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::stem_strategy::{Block3, Donnelly, DonnellyMarkerScalar, DonnellyMarkerSimd};
@@ -41,9 +41,9 @@ fn build_queries(query_count: usize) -> Vec<[f64; K]> {
 }
 
 fn squared_euclidean_dist(a: &[f64; K], b: &[f64; K]) -> f64 {
-    let aw = (*a).map(<SquaredEuclidean<f64> as DistanceMetricCore<f64>>::widen_coord);
-    let bw = (*b).map(<SquaredEuclidean<f64> as DistanceMetricCore<f64>>::widen_coord);
-    <SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist::<K>(&aw, &bw)
+    let aw = (*a).map(<SquaredEuclidean<f64> as DistanceMetricScalar<f64>>::widen_coord);
+    let bw = (*b).map(<SquaredEuclidean<f64> as DistanceMetricScalar<f64>>::widen_coord);
+    <SquaredEuclidean<f64> as DistanceMetricScalar<f64>>::dist::<K>(&aw, &bw)
 }
 
 fn linear_search(points: &[[f64; K]], query: &[f64; K]) -> (f64, u32) {

@@ -77,7 +77,7 @@ pub fn best_10(c: &mut Criterion) {
 
 fn perform_query_float_10<
     A: Axis,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     const B: usize,
     IDX: Index<T = IDX> + 'static,
@@ -102,7 +102,7 @@ fn perform_query_float_10<
 
 fn perform_query_fixed_10<
     A: Unsigned + LeEqU16,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     const B: usize,
     IDX: Index<T = IDX> + 'static,
@@ -127,7 +127,7 @@ fn perform_query_fixed_10<
 
 fn bench_query_float_10<
     A: Axis + 'static,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(
@@ -160,7 +160,7 @@ fn bench_query_float_10<
 
 fn bench_query_fixed_10<
     A: Unsigned + LeEqU16,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(

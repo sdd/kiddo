@@ -77,7 +77,7 @@ pub fn nearest_10(c: &mut Criterion) {
 
 fn perform_query_float_10<
     A: Axis,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     const B: usize,
     IDX: Index<T = IDX> + 'static,
@@ -102,7 +102,7 @@ fn perform_query_float_10<
 
 fn perform_query_fixed_10<
     A: Unsigned,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     const B: usize,
     IDX: Index<T = IDX> + 'static,
@@ -128,7 +128,7 @@ fn perform_query_fixed_10<
 
 fn bench_query_nearest_n_float_10<
     A: Axis + 'static,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(
@@ -160,7 +160,7 @@ fn bench_query_nearest_n_float_10<
 
 fn bench_query_nearest_n_fixed_10<
     A: Unsigned,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(
@@ -239,7 +239,7 @@ pub fn nearest_100(c: &mut Criterion) {
 
 fn perform_query_float_100<
     A: Axis,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     const B: usize,
     IDX: Index<T = IDX> + 'static,
@@ -262,7 +262,7 @@ fn perform_query_float_100<
 
 fn perform_query_fixed_100<
     A: Unsigned,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     const B: usize,
     IDX: Index<T = IDX> + 'static,
@@ -286,7 +286,7 @@ fn perform_query_fixed_100<
 
 fn bench_query_nearest_n_float_100<
     A: Axis + 'static,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(
@@ -318,7 +318,7 @@ fn bench_query_nearest_n_float_100<
 
 fn bench_query_nearest_n_fixed_100<
     A: Unsigned,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(

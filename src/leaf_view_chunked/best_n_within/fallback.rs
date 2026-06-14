@@ -1,4 +1,4 @@
-use crate::dist::DistanceMetricSimdBlock;
+use crate::dist::DistanceMetric;
 use crate::leaf_view::{LeafArena, LeafView, TlsLeafScratch};
 use crate::results::result_collection::BestNeighbourResultCollection;
 use crate::{Axis, BestQueryResultItem, Content};
@@ -21,7 +21,7 @@ pub(crate) fn best_n_within_with_query_wide_fallback<
 ) where
     AX: Axis<Coord = AX> + 'static,
     T: Content + PartialOrd,
-    D: DistanceMetricSimdBlock<AX, K>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
@@ -53,7 +53,7 @@ pub(crate) fn best_n_within_with_query_wide_arena_fallback<
 ) where
     AX: Axis<Coord = AX> + 'static,
     T: Content + PartialOrd,
-    D: DistanceMetricSimdBlock<AX, K>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {

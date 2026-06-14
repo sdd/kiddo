@@ -217,9 +217,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
         Self: Sized,
         A: Axis<Coord = A>,
         O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: crate::dist::DistanceMetricCore<A, Output = O>
-            + crate::stem_strategy::DistanceMetricSimdBlock3<A, K, O>
-            + crate::stem_strategy::DistanceMetricSimdBlock4<A, K, O>,
+        D: crate::dist::DistanceMetric<A, Output = O>,
         Self::Stack<O>: StackTrait<O, Self>,
     {
         // Default implementation for scalar strategies
@@ -347,9 +345,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
             + crate::stem_strategy::SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: crate::dist::DistanceMetricCore<A, Output = O>
-            + crate::stem_strategy::DistanceMetricSimdBlock3<A, K, O>
-            + crate::stem_strategy::DistanceMetricSimdBlock4<A, K, O>,
+        D: crate::dist::DistanceMetric<A, Output = O>,
         Self::Stack<O>: StackTrait<O, Self>,
     {
         let _ = lower;
@@ -391,9 +387,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
             + crate::stem_strategy::SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: crate::dist::DistanceMetricSimdBlock<A, K2, Output = O>
-            + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>
-            + crate::stem_strategy::DistanceMetricSimdBlock4<A, K2, O>,
+        D: crate::dist::DistanceMetric<A, Output = O>,
         QC: crate::kd_tree::query_context::QueryContext<A, O, K2>,
         LS: crate::LeafStrategy<A, T, Self, K2, B>,
         Self::Stack<O>: StackTrait<O, Self>,
@@ -419,9 +413,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
         A: Axis<Coord = A>,
         T: Content,
         O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: crate::dist::DistanceMetricSimdBlock<A, K2, Output = O>
-            + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>
-            + crate::stem_strategy::DistanceMetricSimdBlock4<A, K2, O>,
+        D: crate::dist::DistanceMetric<A, Output = O>,
         QC: crate::kd_tree::query_context::QueryContext<A, O, K2>,
         LS: crate::LeafStrategy<A, T, Self, K2, B>,
         Self::Stack<O>: StackTrait<O, Self>,

@@ -3,7 +3,7 @@ mod fallback;
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 pub(crate) mod avx512;
 
-use crate::dist::DistanceMetricSimdBlock;
+use crate::dist::DistanceMetric;
 use crate::leaf_view::{LeafArena, LeafView};
 use crate::{Axis, Content};
 // #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
@@ -22,7 +22,7 @@ pub(crate) fn nearest_one_with_query_wide_arena<AX, T, D, const K: usize>(
 ) where
     AX: Axis<Coord = AX> + 'static,
     T: Content,
-    D: DistanceMetricSimdBlock<AX, K>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
 {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
@@ -46,7 +46,7 @@ pub(crate) fn nearest_one_with_query_wide<AX, T, D, const K: usize, const B: usi
 ) where
     AX: Axis<Coord = AX> + 'static,
     T: Content,
-    D: DistanceMetricSimdBlock<AX, K>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
 {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
@@ -68,7 +68,7 @@ unsafe fn try_nearest_one_avx512<AX, T, D, const K: usize, const B: usize>(
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content,
-    D: DistanceMetricSimdBlock<AX, K>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
 {
     D::try_nearest_one_leaf_avx512(leaf, query_wide, best_dist, best_item)
@@ -85,7 +85,7 @@ unsafe fn try_nearest_one_arena_avx512<AX, T, D, const K: usize>(
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content,
-    D: DistanceMetricSimdBlock<AX, K>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
 {
     D::try_nearest_one_arena_avx512(arena, query_wide, best_dist, best_item)

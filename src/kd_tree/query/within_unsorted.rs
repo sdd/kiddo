@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use crate::dist::DistanceMetricSimdBlock;
+use crate::dist::DistanceMetric;
 use crate::kd_tree::query_context::QueryContext;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::KdTreeQueryOps;
@@ -30,7 +30,7 @@ where
         max_dist: D::Output,
         visitor: &mut F,
     ) where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
         F: FnMut(QueryResultItem<(), T, D::Output>),
     {
@@ -65,7 +65,7 @@ where
         max_dist: D::Output,
         mut visitor: F,
     ) where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -98,7 +98,7 @@ where
         max_dist: D::Output,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -126,7 +126,7 @@ where
         max_dist: D::Output,
     ) -> crate::kd_tree::WithinUnsortedIter<'_, Self, A, T, SS, LS, D, false, K, B>
     where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3

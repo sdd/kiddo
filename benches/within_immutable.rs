@@ -66,7 +66,7 @@ fn within(c: &mut Criterion, radius: f64, radius_name: &str) {
 
 fn perform_query_float<
     A: Axis,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     const B: usize,
     IDX: Index<T = IDX> + 'static,
@@ -86,7 +86,7 @@ fn perform_query_float<
 
 fn bench_query_float<
     A: Axis + 'static,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(

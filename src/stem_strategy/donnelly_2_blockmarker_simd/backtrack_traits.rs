@@ -9,7 +9,8 @@
 use std::ptr::NonNull;
 
 use crate::dist::{
-    Chebyshev, DistanceMetricCore, DotProduct, Manhattan, Minkowski, SquaredEuclidean,
+    Chebyshev, DistanceMetric, DistanceMetricCore, DotProduct, Manhattan, Minkowski,
+    SquaredEuclidean,
 };
 use crate::Axis;
 
@@ -600,7 +601,7 @@ pub trait BacktrackBlock3: Axis<Coord = Self> + sealed::Sealed {
     ///
     /// # Type Parameters
     /// * `D` - Distance metric (e.g., SquaredEuclidean, Manhattan)
-    /// * `K` - Number of dimensions (required by DistanceMetricUnified)
+    /// * `K` - Number of dimensions
     fn backtrack_block3<A, D, const K: usize>(
         query_wide: Self,
         stems_ptr: NonNull<u8>,
@@ -610,8 +611,8 @@ pub trait BacktrackBlock3: Axis<Coord = Self> + sealed::Sealed {
         best_dist: Self,
     ) -> u8
     where
-        A: Copy,
-        D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>;
+        A: Axis<Coord = A>,
+        D: DistanceMetric<A, Output = Self>;
 }
 
 /// Trait for computing SIMD backtrack masks for Block4 (16 children).
@@ -628,7 +629,7 @@ pub trait BacktrackBlock4: Axis<Coord = Self> + sealed::Sealed {
     ///
     /// # Type Parameters
     /// * `D` - Distance metric (e.g., SquaredEuclidean, Manhattan)
-    /// * `K` - Number of dimensions (required by DistanceMetricUnified)
+    /// * `K` - Number of dimensions
     fn backtrack_block4<A, D, const K: usize>(
         query_wide: Self,
         stems_ptr: NonNull<u8>,
@@ -638,8 +639,8 @@ pub trait BacktrackBlock4: Axis<Coord = Self> + sealed::Sealed {
         best_dist: Self,
     ) -> u16
     where
-        A: Copy,
-        D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>;
+        A: Axis<Coord = A>,
+        D: DistanceMetric<A, Output = Self>;
 }
 
 // ====================================================================================
@@ -650,7 +651,7 @@ pub trait BacktrackBlock4: Axis<Coord = Self> + sealed::Sealed {
 ///
 /// Computes interval-based distance for each of 8 siblings and builds mask.
 #[inline(always)]
-fn autovec_backtrack_block3<A, I, D, const K: usize>(
+pub(crate) fn autovec_backtrack_block3<A, I, D, const K: usize>(
     query_wide: A,
     stems_ptr: NonNull<u8>,
     block_base_idx: usize,
@@ -707,7 +708,7 @@ where
 }
 
 #[inline(always)]
-fn autovec_fill_block3_values_and_bounds<A, O, D, const K: usize>(
+pub(crate) fn autovec_fill_block3_values_and_bounds<A, O, D, const K: usize>(
     query_wide: O,
     stems_ptr: NonNull<u8>,
     block_base_idx: usize,
@@ -779,7 +780,7 @@ where
 }
 
 #[inline(always)]
-fn autovec_backtrack_block3_with_bounds<A, O, D, const K: usize>(
+pub(crate) fn autovec_backtrack_block3_with_bounds<A, O, D, const K: usize>(
     query_wide: O,
     stems_ptr: NonNull<u8>,
     block_base_idx: usize,
@@ -840,7 +841,7 @@ where
 
 /// Autovec fallback for Block4 backtrack mask computation.
 #[inline(always)]
-fn autovec_backtrack_block4<A, I, D, const K: usize>(
+pub(crate) fn autovec_backtrack_block4<A, I, D, const K: usize>(
     query_wide: A,
     stems_ptr: NonNull<u8>,
     block_base_idx: usize,
@@ -1902,7 +1903,7 @@ where
     }
 }
 
-// DotProduct support remains autovec-only for now.
+// DotProduct support uses the generic autovec fallback for block traversal.
 impl<A, const K: usize> DistanceMetricSimdBlock3<A, K, f64> for DotProduct<f64>
 where
     A: Copy,
@@ -1910,14 +1911,21 @@ where
 {
     #[inline(always)]
     fn backtrack_block3_autovec(
-        _query_wide: f64,
-        _stems_ptr: NonNull<u8>,
-        _block_base_idx: usize,
-        _old_off: f64,
-        _rd: f64,
-        _best_dist: f64,
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
     ) -> u8 {
-        panic!("DotProduct is not currently supported with Donnelly SIMD backtracking");
+        autovec_backtrack_block3::<f64, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
     }
 }
 
@@ -1928,14 +1936,21 @@ where
 {
     #[inline(always)]
     fn backtrack_block4_autovec(
-        _query_wide: f64,
-        _stems_ptr: NonNull<u8>,
-        _block_base_idx: usize,
-        _old_off: f64,
-        _rd: f64,
-        _best_dist: f64,
+        query_wide: f64,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f64,
+        rd: f64,
+        best_dist: f64,
     ) -> u16 {
-        panic!("DotProduct is not currently supported with Donnelly SIMD backtracking");
+        autovec_backtrack_block4::<f64, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
     }
 }
 
@@ -1946,14 +1961,21 @@ where
 {
     #[inline(always)]
     fn backtrack_block3_autovec(
-        _query_wide: f32,
-        _stems_ptr: NonNull<u8>,
-        _block_base_idx: usize,
-        _old_off: f32,
-        _rd: f32,
-        _best_dist: f32,
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
     ) -> u8 {
-        panic!("DotProduct is not currently supported with Donnelly SIMD backtracking");
+        autovec_backtrack_block3::<f32, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
     }
 }
 
@@ -1964,14 +1986,21 @@ where
 {
     #[inline(always)]
     fn backtrack_block4_autovec(
-        _query_wide: f32,
-        _stems_ptr: NonNull<u8>,
-        _block_base_idx: usize,
-        _old_off: f32,
-        _rd: f32,
-        _best_dist: f32,
+        query_wide: f32,
+        stems_ptr: NonNull<u8>,
+        block_base_idx: usize,
+        old_off: f32,
+        rd: f32,
+        best_dist: f32,
     ) -> u16 {
-        panic!("DotProduct is not currently supported with Donnelly SIMD backtracking");
+        autovec_backtrack_block4::<f32, A, Self, K>(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
     }
 }
 
@@ -1992,10 +2021,10 @@ impl BacktrackBlock3 for f64 {
         best_dist: Self,
     ) -> u8
     where
-        A: Copy,
-        D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>,
+        A: Axis<Coord = A>,
+        D: DistanceMetric<A, Output = Self>,
     {
-        D::backtrack_block3(
+        D::backtrack_block3::<K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -2017,10 +2046,10 @@ impl BacktrackBlock4 for f64 {
         best_dist: Self,
     ) -> u16
     where
-        A: Copy,
-        D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>,
+        A: Axis<Coord = A>,
+        D: DistanceMetric<A, Output = Self>,
     {
-        D::backtrack_block4(
+        D::backtrack_block4::<K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -2048,10 +2077,10 @@ impl BacktrackBlock3 for f32 {
         best_dist: Self,
     ) -> u8
     where
-        A: Copy,
-        D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>,
+        A: Axis<Coord = A>,
+        D: DistanceMetric<A, Output = Self>,
     {
-        D::backtrack_block3(
+        D::backtrack_block3::<K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -2073,10 +2102,10 @@ impl BacktrackBlock4 for f32 {
         best_dist: Self,
     ) -> u16
     where
-        A: Copy,
-        D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>,
+        A: Axis<Coord = A>,
+        D: DistanceMetric<A, Output = Self>,
     {
-        D::backtrack_block4(
+        D::backtrack_block4::<K>(
             query_wide,
             stems_ptr,
             block_base_idx,
@@ -3847,7 +3876,7 @@ mod fixed_impls {
                 ) -> u8
                 where
                     A: Copy,
-                    D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>,
+                    D: DistanceMetric<A, Output = Self>,
                 {
                     // TODO: Integer SIMD for fixed-point
                     autovec_backtrack_block3::<Self, A, D, K>(
@@ -3873,7 +3902,7 @@ mod fixed_impls {
                 ) -> u16
                 where
                     A: Copy,
-                    D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>,
+                    D: DistanceMetric<A, Output = Self>,
                 {
                     // TODO: Integer SIMD for fixed-point
                     autovec_backtrack_block4::<Self, A, D, K>(
@@ -3917,7 +3946,7 @@ mod f16_impl {
         ) -> u8
         where
             A: Copy,
-            D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock3<A, K, Self>,
+            D: DistanceMetric<A, Output = Self>,
         {
             // TODO: f16 SIMD (possibly widen to f32)
             autovec_backtrack_block3::<Self, A, D, K>(
@@ -3943,7 +3972,7 @@ mod f16_impl {
         ) -> u16
         where
             A: Copy,
-            D: DistanceMetricCore<A, Output = Self> + DistanceMetricSimdBlock4<A, K, Self>,
+            D: DistanceMetric<A, Output = Self>,
         {
             // TODO: f16 SIMD (possibly widen to f32)
             autovec_backtrack_block4::<Self, A, D, K>(
@@ -3965,7 +3994,6 @@ mod tests {
     use crate::stem_strategy::donnelly_2_blockmarker_simd::{
         child_interval_bounds_block3, child_interval_bounds_block4, interval_distance_1d,
     };
-    use std::panic::{catch_unwind, AssertUnwindSafe};
 
     fn is_invalid_f64_sentinel(value: f64) -> bool {
         value == <f64 as crate::Axis>::max_value() || value == f64::INFINITY || value.is_infinite()
@@ -4711,65 +4739,117 @@ mod tests {
     }
 
     #[test]
-    fn test_dot_product_block3_autovec_wrapper_panics() {
+    fn test_dot_product_block3_autovec_wrapper_matches_generic_fallback() {
         let mut block_f64 = build_block3_pivots_f64();
         let stems_ptr_f64 = NonNull::new(block_f64.as_mut_ptr() as *mut u8).unwrap();
-        assert!(catch_unwind(AssertUnwindSafe(|| {
-            let _ = <DotProduct<f64> as DistanceMetricSimdBlock3<f64, 3, f64>>::backtrack_block3_autovec(
-                4.5, stems_ptr_f64, 0, 0.5, 1.0, 6.0,
+        let expected_f64 = autovec_backtrack_block3::<f64, f64, DotProduct<f64>, 3>(
+            4.5,
+            stems_ptr_f64,
+            0,
+            0.5,
+            1.0,
+            6.0,
+        );
+        let actual_f64 =
+            <DotProduct<f64> as DistanceMetricSimdBlock3<f64, 3, f64>>::backtrack_block3_autovec(
+                4.5,
+                stems_ptr_f64,
+                0,
+                0.5,
+                1.0,
+                6.0,
             );
-        }))
-        .is_err());
+        assert_eq!(actual_f64, expected_f64);
 
         let mut block_f32 = build_block3_pivots_f32();
         let stems_ptr_f32 = NonNull::new(block_f32.as_mut_ptr() as *mut u8).unwrap();
-        assert!(catch_unwind(AssertUnwindSafe(|| {
-            let _ = <DotProduct<f32> as DistanceMetricSimdBlock3<f32, 3, f32>>::backtrack_block3_autovec(
-                4.5, stems_ptr_f32, 0, 0.5, 1.0, 6.0,
+        let expected_f32 = autovec_backtrack_block3::<f32, f32, DotProduct<f32>, 3>(
+            4.5,
+            stems_ptr_f32,
+            0,
+            0.5,
+            1.0,
+            6.0,
+        );
+        let actual_f32 =
+            <DotProduct<f32> as DistanceMetricSimdBlock3<f32, 3, f32>>::backtrack_block3_autovec(
+                4.5,
+                stems_ptr_f32,
+                0,
+                0.5,
+                1.0,
+                6.0,
             );
-        }))
-        .is_err());
+        assert_eq!(actual_f32, expected_f32);
     }
 
     #[test]
-    fn test_dot_product_block4_autovec_wrapper_panics() {
+    fn test_dot_product_block4_autovec_wrapper_matches_generic_fallback() {
         let mut block_f64 = build_block4_pivots_f64();
         let stems_ptr_f64 = NonNull::new(block_f64.as_mut_ptr() as *mut u8).unwrap();
-        assert!(catch_unwind(AssertUnwindSafe(|| {
-            let _ = <DotProduct<f64> as DistanceMetricSimdBlock4<f64, 3, f64>>::backtrack_block4_autovec(
-                4.5, stems_ptr_f64, 0, 0.5, 1.0, 6.0,
+        let expected_f64 = autovec_backtrack_block4::<f64, f64, DotProduct<f64>, 3>(
+            4.5,
+            stems_ptr_f64,
+            0,
+            0.5,
+            1.0,
+            6.0,
+        );
+        let actual_f64 =
+            <DotProduct<f64> as DistanceMetricSimdBlock4<f64, 3, f64>>::backtrack_block4_autovec(
+                4.5,
+                stems_ptr_f64,
+                0,
+                0.5,
+                1.0,
+                6.0,
             );
-        }))
-        .is_err());
+        assert_eq!(actual_f64, expected_f64);
 
         let mut block_f32 = build_block4_pivots_f32();
         let stems_ptr_f32 = NonNull::new(block_f32.as_mut_ptr() as *mut u8).unwrap();
-        assert!(catch_unwind(AssertUnwindSafe(|| {
-            let _ = <DotProduct<f32> as DistanceMetricSimdBlock4<f32, 3, f32>>::backtrack_block4_autovec(
-                4.5, stems_ptr_f32, 0, 0.5, 1.0, 6.0,
+        let expected_f32 = autovec_backtrack_block4::<f32, f32, DotProduct<f32>, 3>(
+            4.5,
+            stems_ptr_f32,
+            0,
+            0.5,
+            1.0,
+            6.0,
+        );
+        let actual_f32 =
+            <DotProduct<f32> as DistanceMetricSimdBlock4<f32, 3, f32>>::backtrack_block4_autovec(
+                4.5,
+                stems_ptr_f32,
+                0,
+                0.5,
+                1.0,
+                6.0,
             );
-        }))
-        .is_err());
+        assert_eq!(actual_f32, expected_f32);
     }
 
     #[test]
-    fn test_dot_product_block3_and_block4_dispatch_panics() {
+    fn test_dot_product_block3_and_block4_dispatch_use_generic_fallback() {
         let mut block3 = build_block3_pivots_f64();
         let mut block4 = build_block4_pivots_f32();
         let block3_ptr = NonNull::new(block3.as_mut_ptr() as *mut u8).unwrap();
         let block4_ptr = NonNull::new(block4.as_mut_ptr() as *mut u8).unwrap();
 
-        assert!(catch_unwind(AssertUnwindSafe(|| {
-            let _ =
-                f64::backtrack_block3::<f64, DotProduct<f64>, 3>(4.5, block3_ptr, 0, 0.5, 1.0, 6.0);
-        }))
-        .is_err());
+        let expected_block3 =
+            <DotProduct<f64> as DistanceMetricSimdBlock3<f64, 3, f64>>::backtrack_block3_autovec(
+                4.5, block3_ptr, 0, 0.5, 1.0, 6.0,
+            );
+        let actual_block3 =
+            f64::backtrack_block3::<f64, DotProduct<f64>, 3>(4.5, block3_ptr, 0, 0.5, 1.0, 6.0);
+        assert_eq!(actual_block3, expected_block3);
 
-        assert!(catch_unwind(AssertUnwindSafe(|| {
-            let _ =
-                f32::backtrack_block4::<f32, DotProduct<f32>, 3>(4.5, block4_ptr, 0, 0.5, 1.0, 6.0);
-        }))
-        .is_err());
+        let expected_block4 =
+            <DotProduct<f32> as DistanceMetricSimdBlock4<f32, 3, f32>>::backtrack_block4_autovec(
+                4.5, block4_ptr, 0, 0.5, 1.0, 6.0,
+            );
+        let actual_block4 =
+            f32::backtrack_block4::<f32, DotProduct<f32>, 3>(4.5, block4_ptr, 0, 0.5, 1.0, 6.0);
+        assert_eq!(actual_block4, expected_block4);
     }
 
     #[cfg(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64")))]

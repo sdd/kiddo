@@ -5,7 +5,7 @@ use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::ptr::NonNull;
 
-use crate::dist::DistanceMetricSimdBlock;
+use crate::dist::DistanceMetric;
 use crate::kd_tree::query_context::QueryContext;
 use crate::kd_tree::query_stack::{
     ScalarContinuationFar, ScalarContinuationFarStack, ScalarContinuationRestore,
@@ -14,7 +14,7 @@ use crate::kd_tree::query_stack::{
 use crate::kd_tree::{KdTreeAccessor, StemLeafResolution};
 use crate::stem_strategy::{
     donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4},
-    DistanceMetricSimdBlock3, DistanceMetricSimdBlock4, SimdPrune, SimdSelectBestChildBlock3,
+    SimdPrune, SimdSelectBestChildBlock3,
 };
 use crate::{Axis, Content, LeafStrategy, StemStrategy};
 
@@ -240,9 +240,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: DistanceMetricSimdBlock<A, K, Output = O>
-            + DistanceMetricSimdBlock3<A, K, O>
-            + DistanceMetricSimdBlock4<A, K, O>,
+        D: DistanceMetric<A, Output = O>,
         SS::Stack<O>: StackTrait<O, SS> + Default + 'static,
     {
         if self.stem_leaf_resolution().uses_arithmetic() && SS::BLOCK_SIZE == 1 {
@@ -270,9 +268,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: DistanceMetricSimdBlock<A, K, Output = O>
-            + DistanceMetricSimdBlock3<A, K, O>
-            + DistanceMetricSimdBlock4<A, K, O>,
+        D: DistanceMetric<A, Output = O>,
         SS::Stack<O>: StackTrait<O, SS>,
     {
         if self.stem_leaf_resolution().uses_arithmetic() && SS::BLOCK_SIZE == 1 {
@@ -300,9 +296,7 @@ where
     ) where
         QC: QueryContext<A, O, K>,
         O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: DistanceMetricSimdBlock<A, K, Output = O>
-            + DistanceMetricSimdBlock3<A, K, O>
-            + DistanceMetricSimdBlock4<A, K, O>,
+        D: DistanceMetric<A, Output = O>,
         SS::Stack<O>: StackTrait<O, SS>,
         SS::StackContext<O>: ScalarStackContext<O, SS::DeferredState>,
     {
@@ -385,9 +379,7 @@ where
     ) where
         QC: QueryContext<A, O, K>,
         O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: DistanceMetricSimdBlock<A, K, Output = O>
-            + DistanceMetricSimdBlock3<A, K, O>
-            + DistanceMetricSimdBlock4<A, K, O>,
+        D: DistanceMetric<A, Output = O>,
         SS::Stack<O>: StackTrait<O, SS> + Default + 'static,
     {
         with_tls_query_stack::<SS::Stack<O>, _>(|stack| {
@@ -405,9 +397,7 @@ where
     ) where
         QC: QueryContext<A, O, K>,
         O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: DistanceMetricSimdBlock<A, K, Output = O>
-            + DistanceMetricSimdBlock3<A, K, O>
-            + DistanceMetricSimdBlock4<A, K, O>,
+        D: DistanceMetric<A, Output = O>,
         SS::Stack<O>: StackTrait<O, SS>,
         SS::StackContext<O>: ScalarStackContext<O, SS::DeferredState>,
     {
@@ -430,9 +420,7 @@ where
     ) where
         QC: QueryContext<A, O, K>,
         O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: DistanceMetricSimdBlock<A, K, Output = O>
-            + DistanceMetricSimdBlock3<A, K, O>
-            + DistanceMetricSimdBlock4<A, K, O>,
+        D: DistanceMetric<A, Output = O>,
         SS::Stack<O>: StackTrait<O, SS>,
     {
         if self.size() == 0 {
@@ -602,9 +590,7 @@ where
     ) -> Option<usize>
     where
         O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
-        D: DistanceMetricSimdBlock<A, K, Output = O>
-            + DistanceMetricSimdBlock3<A, K, O>
-            + DistanceMetricSimdBlock4<A, K, O>,
+        D: DistanceMetric<A, Output = O>,
         SS::Stack<O>: StackTrait<O, SS>,
         SS::StackContext<O>: ScalarStackContext<O, SS::DeferredState>,
     {
@@ -670,9 +656,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: DistanceMetricSimdBlock<A, K, Output = O>
-            + DistanceMetricSimdBlock3<A, K, O>
-            + DistanceMetricSimdBlock4<A, K, O>,
+        D: DistanceMetric<A, Output = O>,
         SS: StemStrategy
             + crate::stem_strategy::donnelly_2_blockmarker_simd::DeferredBlockTraversal,
         SS::StackContext<O>: crate::kd_tree::query_stack_simd::Block3ExactStackContext<O, SS, K>
@@ -1042,9 +1026,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: DistanceMetricSimdBlock<A, K, Output = O>
-            + DistanceMetricSimdBlock3<A, K, O>
-            + DistanceMetricSimdBlock4<A, K, O>,
+        D: DistanceMetric<A, Output = O>,
         SS: StemStrategy<
                 StackContext<O> = crate::kd_tree::query_stack_simd::SimdQueryStackContext<O, SS>,
             > + crate::stem_strategy::donnelly_2_blockmarker_simd::DeferredBlockTraversal,
@@ -1414,9 +1396,7 @@ where
     ) -> Option<usize>
     where
         O: Axis<Coord = O> + SimdSelectBestChildBlock3 + BacktrackBlock3 + BacktrackBlock4,
-        D: DistanceMetricSimdBlock<A, K, Output = O>
-            + DistanceMetricSimdBlock3<A, K, O>
-            + DistanceMetricSimdBlock4<A, K, O>,
+        D: DistanceMetric<A, Output = O>,
         SS: StemStrategy
             + crate::stem_strategy::donnelly_2_blockmarker_simd::DeferredBlockTraversal,
         SS::StackContext<O>: crate::kd_tree::query_stack_simd::SimdIntervalStackContext<O, SS>,

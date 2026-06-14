@@ -5,8 +5,9 @@ use num_traits::Float;
 
 use crate::Axis;
 
-use crate::dist::distance_metric_core::DistanceMetricCore;
-use crate::dist::{DistanceMetricAvx2, DistanceMetricAvx512, DistanceMetricNeon};
+use crate::dist::{
+    DistanceMetricAvx2, DistanceMetricAvx512, DistanceMetricNeon, DistanceMetricScalar,
+};
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
 mod avx2;
@@ -40,7 +41,7 @@ impl<const P: u32, R> Minkowski<P, R> {
     };
 }
 
-impl<A, R, const P: u32> DistanceMetricCore<A> for Minkowski<P, R>
+impl<A, R, const P: u32> DistanceMetricScalar<A> for Minkowski<P, R>
 where
     A: Copy,
     R: Axis<Coord = R> + LossyFrom<A> + Float,

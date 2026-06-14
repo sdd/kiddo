@@ -1,7 +1,7 @@
 use std::collections::BinaryHeap;
 use std::num::NonZeroUsize;
 
-use crate::dist::DistanceMetricSimdBlock;
+use crate::dist::DistanceMetric;
 use crate::kd_tree::query_context::QueryContext;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::KdTreeQueryOps;
@@ -25,7 +25,7 @@ use crate::{Axis, BestQueryResultItem, Content, LeafStrategy, QueryResultItem, S
 impl<A, T, SS, LS, const K: usize, const B: usize> ArchivedKdTree<A, T, SS, LS, K, B>
 where
     A: rkyv_08::Archive + Axis<Coord = A> + 'static,
-    T: Content + Copy + Default + PartialOrd + PartialEq,
+    T: Content + PartialOrd + PartialEq,
     SS: StemStrategy,
     LS: rkyv_08::Archive,
     rkyv_08::Archived<LS>: LeafStrategy<A, T, SS, K, B>,
@@ -38,7 +38,7 @@ where
         best_dist: &mut D::Output,
         best_item: &mut T,
     ) where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: Axis<Coord = D::Output> + 'static,
     {
         match <rkyv_08::Archived<LS> as LeafStrategy<A, T, SS, K, B>>::LEAF_PROJECTION {
@@ -61,7 +61,7 @@ where
     #[inline(always)]
     pub(crate) fn approx_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
-        D: DistanceMetricSimdBlock<A, K, Output = A>,
+        D: DistanceMetric<A, Output = A>,
     {
         let req_ctx = ArchivedApproxNearestOneReqCtx::<A, D::Output, K> {
             query,
@@ -82,7 +82,7 @@ where
     #[inline(always)]
     pub(crate) fn nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -127,7 +127,7 @@ where
         max_dist: D::Output,
         results: &mut R,
     ) where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
         R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
     {
@@ -162,7 +162,7 @@ where
         sorted: bool,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -182,7 +182,7 @@ where
         sorted: bool,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -213,7 +213,7 @@ where
         sorted: bool,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -255,7 +255,7 @@ where
         sorted: bool,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -273,7 +273,7 @@ where
         max_dist: D::Output,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -291,7 +291,7 @@ where
         max_dist: D::Output,
         mut visitor: F,
     ) where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -324,7 +324,7 @@ where
         max_dist: D::Output,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -351,7 +351,7 @@ where
         max_dist: D::Output,
     ) -> crate::kd_tree::WithinUnsortedIter<'_, Self, A, T, SS, rkyv_08::Archived<LS>, D, false, K, B>
     where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -380,7 +380,7 @@ where
         max_dist: D::Output,
         results: &mut R,
     ) where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
         R: BestNeighbourResultCollection<D::Output, T>,
     {
@@ -418,7 +418,7 @@ where
         max_qty: NonZeroUsize,
     ) -> BinaryHeap<BestQueryResultItem<(), T, D::Output>>
     where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3

@@ -2,6 +2,5 @@
 
 #[doc(inline)]
 pub use crate::stem_strategies::{
-    CompareBlock3, CompareBlock4, DistanceMetricSimdBlock3, DistanceMetricSimdBlock4, SimdPrune,
-    SimdSelectBestChildBlock3,
+    CompareBlock3, CompareBlock4, SimdPrune, SimdSelectBestChildBlock3,
 };
