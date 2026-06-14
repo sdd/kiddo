@@ -1,4 +1,39 @@
 //! Best-effort Transparent Huge Page helpers for owned and archived tree storage.
+//!
+//! Transparent Huge Pages (THP) let the kernel back large contiguous regions with
+//! much larger pages than the normal base page size. For large archived trees and
+//! other scan-heavy spatial indexes, that can reduce TLB pressure and sometimes
+//! improve query throughput, especially when the archive is large enough that page
+//! translation overhead starts to matter.
+//!
+//! In `kiddo`, owned trees already make best-effort internal THP requests for some
+//! large long-lived buffers when the `huge_pages` feature is enabled. You typically
+//! use this module directly when working with archived bytes, for example when
+//! memory-mapping or loading an rkyv archive and wanting to request or inspect huge
+//! page backing explicitly.
+//!
+//! The main public entrypoints are:
+//!
+//! - [`prepare_archived_bytes`] to request a huge-page policy for an archived byte slice
+//! - [`mapping_report_for_slice`] to inspect `/proc/self/smaps` coverage for that slice
+//!
+//! The helpers are best-effort. On unsupported builds or targets they return
+//! [`HugePageError::Unsupported`].
+//!
+//! # Example
+//!
+//! ```no_run
+//! use kiddo::huge_pages::{HugePageMode, mapping_report_for_slice, prepare_archived_bytes};
+//!
+//! let bytes = std::fs::read("tree.rkyv")?;
+//!
+//! let advice = prepare_archived_bytes(&bytes, HugePageMode::Collapse)?;
+//! println!("huge-page advice report: {advice:?}");
+//!
+//! let mapping = mapping_report_for_slice(&bytes)?;
+//! println!("total huge-page-backed mapping: {} KiB", mapping.total_huge_kb());
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
 
 use std::fmt;
 
@@ -27,22 +62,27 @@ pub struct HugePageReport {
     /// Requested input byte length.
     pub requested_bytes: usize,
     /// Page-aligned address passed to `madvise`, or zero when unsupported/not applicable.
+    #[doc(hidden)]
     pub aligned_addr: usize,
     /// Page-aligned byte length passed to `madvise`.
     pub aligned_bytes: usize,
     /// Operating-system base page size used for alignment.
+    #[doc(hidden)]
     pub page_size: usize,
     /// Operation requested by the caller.
     pub mode: HugePageMode,
     /// Whether a `MADV_COLLAPSE` call was attempted.
+    #[doc(hidden)]
     pub collapse_attempted: bool,
     /// Whether `MADV_COLLAPSE` succeeded.
     pub collapse_succeeded: bool,
     /// Whether a `MADV_HUGEPAGE` call was attempted.
+    #[doc(hidden)]
     pub hugepage_attempted: bool,
     /// Whether `MADV_HUGEPAGE` succeeded.
     pub hugepage_succeeded: bool,
     /// Whether a `MADV_NOHUGEPAGE` call was attempted.
+    #[doc(hidden)]
     pub nohuge_attempted: bool,
     /// Whether `MADV_NOHUGEPAGE` succeeded.
     pub nohuge_succeeded: bool,
@@ -65,6 +105,19 @@ impl HugePageReport {
             nohuge_succeeded: false,
         }
     }
+
+    /// Returns `true` when the request did not result in any OS-level action.
+    ///
+    /// This happens for unsupported targets/builds, empty inputs, or byte ranges
+    /// that are too small to be considered worthwhile THP candidates.
+    pub fn was_skipped(&self) -> bool {
+        self.aligned_bytes == 0
+    }
+
+    /// Returns `true` if the requested mode ultimately succeeded.
+    pub fn succeeded(&self) -> bool {
+        self.collapse_succeeded || self.hugepage_succeeded || self.nohuge_succeeded
+    }
 }
 
 /// `/proc/self/smaps` summary for a byte range.
@@ -81,8 +134,10 @@ pub struct HugePageMappingReport {
     /// Shmem PMD mappings reported by `smaps`, in KiB.
     pub shmem_pmd_mapped_kb: usize,
     /// Kernel page sizes seen in overlapping VMAs, in KiB.
+    #[doc(hidden)]
     pub kernel_page_size_kb: Vec<usize>,
     /// MMU page sizes seen in overlapping VMAs, in KiB.
+    #[doc(hidden)]
     pub mmu_page_size_kb: Vec<usize>,
 }
 
@@ -287,7 +342,7 @@ fn apply_huge_pages(
 ///
 /// This is primarily useful for establishing a comparative baseline on systems that promote
 /// large file mappings without an explicit application hint.
-pub fn no_huge_pages(bytes: &[u8]) -> Result<HugePageReport, HugePageError> {
+fn no_huge_pages(bytes: &[u8]) -> Result<HugePageReport, HugePageError> {
     #[cfg(all(feature = "huge_pages", target_os = "linux"))]
     {
         apply_huge_pages(bytes.as_ptr(), bytes.len(), HugePageMode::NoHuge)
@@ -304,7 +359,7 @@ pub fn no_huge_pages(bytes: &[u8]) -> Result<HugePageReport, HugePageError> {
 ///
 /// This is intended for already-loaded rkyv archive bytes, including bytes backed by a file
 /// mapping. On Linux this calls `MADV_HUGEPAGE`.
-pub fn advise_huge_pages(bytes: &[u8]) -> Result<HugePageReport, HugePageError> {
+fn advise_huge_pages(bytes: &[u8]) -> Result<HugePageReport, HugePageError> {
     #[cfg(all(feature = "huge_pages", target_os = "linux"))]
     {
         apply_huge_pages(bytes.as_ptr(), bytes.len(), HugePageMode::Advise)
@@ -320,7 +375,7 @@ pub fn advise_huge_pages(bytes: &[u8]) -> Result<HugePageReport, HugePageError> 
 /// Attempt to synchronously collapse an archived byte range into Transparent Huge Pages.
 ///
 /// On Linux this first tries `MADV_COLLAPSE` and falls back to `MADV_HUGEPAGE`.
-pub fn collapse_huge_pages(bytes: &[u8]) -> Result<HugePageReport, HugePageError> {
+fn collapse_huge_pages(bytes: &[u8]) -> Result<HugePageReport, HugePageError> {
     #[cfg(all(feature = "huge_pages", target_os = "linux"))]
     {
         apply_huge_pages(bytes.as_ptr(), bytes.len(), HugePageMode::Collapse)
