@@ -1,4 +1,4 @@
-use crate::dist::DistanceMetricSimdBlock;
+use crate::dist::DistanceMetric;
 use crate::kd_tree::query_context::QueryContext;
 use crate::kd_tree::KdTreeQueryOps;
 use crate::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
@@ -8,7 +8,7 @@ use crate::{Axis, Content, KdTree, LeafStrategy, StemStrategy};
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A> + 'static,
-    T: Content + Copy + Default + PartialOrd + PartialEq,
+    T: Content + PartialOrd + PartialEq,
     LS: LeafStrategy<A, T, SS, K, B>,
     SS: StemStrategy,
 {
@@ -20,7 +20,7 @@ where
         best_dist: &mut D::Output,
         best_item: &mut T,
     ) where
-        D: DistanceMetricSimdBlock<A, K, Output = A>,
+        D: DistanceMetric<A, Output = A>,
     {
         match LS::LEAF_PROJECTION {
             LeafProjection::LeafArena => {
@@ -48,7 +48,7 @@ where
     #[inline(always)]
     pub(crate) fn approx_nearest_one<D>(&self, query: &[A; K]) -> (D::Output, T)
     where
-        D: DistanceMetricSimdBlock<A, K, Output = A>,
+        D: DistanceMetric<A, Output = A>,
     {
         let req_ctx = ApproxNearestOneReqCtx::<A, D::Output, K> {
             query,

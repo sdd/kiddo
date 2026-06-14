@@ -290,12 +290,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
         Self: Sized,
         A: Axis<Coord = A>,
         O: Axis<Coord = O> + crate::stem_strategy::donnelly_2_blockmarker_simd::BacktrackBlock3,
-        D: crate::dist::DistanceMetricCore<A, Output = O>
-            + crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::DistanceMetricSimdBlock3<
-                A,
-                K2,
-                O,
-            >,
+        D: crate::dist::DistanceMetric<A, Output = O>,
     {
         if self.level() > max_stem_level {
             return false;

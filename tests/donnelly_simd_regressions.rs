@@ -1,7 +1,7 @@
 #[cfg(feature = "simd")]
 use assert_float_eq::assert_float_relative_eq;
 #[cfg(feature = "simd")]
-use kiddo::dist::DistanceMetricCore;
+use kiddo::dist::DistanceMetricScalar;
 #[cfg(feature = "simd")]
 use kiddo::kd_tree::KdTree;
 #[cfg(feature = "simd")]
@@ -52,7 +52,7 @@ fn linear_search(points: &[[f32; 2]], query: &[f32; 2]) -> (f32, usize) {
     let mut best_idx = 0usize;
     for (idx, point) in points.iter().enumerate() {
         let dist =
-            <kiddo::SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, point);
+            <kiddo::SquaredEuclidean<f32> as DistanceMetricScalar<f32>>::dist_raw(query, point);
         if dist < best_dist {
             best_dist = dist;
             best_idx = idx;
@@ -67,7 +67,7 @@ fn linear_search_f64(points: &[[f64; 2]], query: &[f64; 2]) -> (f64, usize) {
     let mut best_idx = 0usize;
     for (idx, point) in points.iter().enumerate() {
         let dist =
-            <kiddo::SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, point);
+            <kiddo::SquaredEuclidean<f64> as DistanceMetricScalar<f64>>::dist_raw(query, point);
         if dist < best_dist {
             best_dist = dist;
             best_idx = idx;
@@ -87,7 +87,7 @@ fn linear_best_n_within_f32(
 
     for (item, point) in points.iter().enumerate() {
         let distance =
-            <kiddo::SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, point);
+            <kiddo::SquaredEuclidean<f32> as DistanceMetricScalar<f32>>::dist_raw(query, point);
         if distance <= max_dist {
             if best_items.len() < max_qty {
                 best_items.push(BestQueryResultItem {
@@ -121,7 +121,7 @@ fn linear_best_n_within_f64(
 
     for (item, point) in points.iter().enumerate() {
         let distance =
-            <kiddo::SquaredEuclidean<f64> as DistanceMetricCore<f64>>::dist_raw(query, point);
+            <kiddo::SquaredEuclidean<f64> as DistanceMetricScalar<f64>>::dist_raw(query, point);
         if distance <= max_dist {
             if best_items.len() < max_qty {
                 best_items.push(BestQueryResultItem {
@@ -171,7 +171,7 @@ fn linear_within_f32(points: &[[f32; 2]], query: &[f32; 2], max_dist: f32) -> Ve
         .enumerate()
         .filter_map(|(idx, point)| {
             let distance =
-                <kiddo::SquaredEuclidean<f32> as DistanceMetricCore<f32>>::dist_raw(query, point);
+                <kiddo::SquaredEuclidean<f32> as DistanceMetricScalar<f32>>::dist_raw(query, point);
             (distance <= max_dist).then_some((distance, idx))
         })
         .collect();

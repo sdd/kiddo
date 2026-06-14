@@ -31,9 +31,7 @@ pub use compare_traits::{CompareBlock3, CompareBlock4};
 
 // Backtrack mask generation traits for type-specific dispatch
 pub mod backtrack_traits;
-pub use backtrack_traits::{
-    BacktrackBlock3, BacktrackBlock4, DistanceMetricSimdBlock3, DistanceMetricSimdBlock4,
-};
+pub use backtrack_traits::{BacktrackBlock3, BacktrackBlock4};
 
 pub(crate) trait DeferredBlockTraversal: StemStrategy + Copy {
     fn block_child(&self, child_idx: u8) -> Self;
@@ -51,7 +49,7 @@ pub(crate) trait DeferredBlockTraversal: StemStrategy + Copy {
     where
         A: Axis<Coord = A>,
         O: Axis<Coord = O>,
-        D: crate::dist::DistanceMetricCore<A, Output = O> + DistanceMetricSimdBlock3<A, K2, O>,
+        D: crate::dist::DistanceMetric<A, Output = O>,
     {
         let _ = (
             stems,
@@ -109,8 +107,7 @@ pub(crate) trait DeferredBlockTraversal: StemStrategy + Copy {
     where
         A: Axis<Coord = A>,
         O: Axis<Coord = O>,
-        D: crate::dist::DistanceMetricCore<A, Output = O>
-            + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>,
+        D: crate::dist::DistanceMetric<A, Output = O>,
     {
         let _ = (
             stems,
@@ -256,10 +253,9 @@ fn fill_block3_backtrack_values_and_bounds<A, O, D, const K2: usize>(
 where
     A: Axis<Coord = A>,
     O: Axis<Coord = O>,
-    D: crate::dist::DistanceMetricCore<A, Output = O>
-        + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>,
+    D: crate::dist::DistanceMetric<A, Output = O>,
 {
-    D::fill_block3_values_and_bounds(
+    D::fill_block3_values_and_bounds::<K2>(
         query_wide,
         NonNull::new(stems.as_ptr() as *mut u8).expect("stems slice pointer"),
         block_base_idx,
@@ -289,10 +285,9 @@ fn backtrack_block3_with_bounds<A, O, D, const K2: usize>(
 where
     A: Axis<Coord = A>,
     O: Axis<Coord = O>,
-    D: crate::dist::DistanceMetricCore<A, Output = O>
-        + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>,
+    D: crate::dist::DistanceMetric<A, Output = O>,
 {
-    D::backtrack_block3_with_bounds(
+    D::backtrack_block3_with_bounds::<K2>(
         query_wide,
         NonNull::new(stems.as_ptr() as *mut u8).expect("stems slice pointer"),
         block_base_idx,
@@ -776,12 +771,7 @@ where
         Self: Sized,
         A: Axis<Coord = A>,
         O: Axis<Coord = O> + SimdSelectBestChildBlock3 + BacktrackBlock3 + BacktrackBlock4,
-        D: crate::dist::DistanceMetricCore<A, Output = O>
-            + crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::DistanceMetricSimdBlock3<
-                A,
-                K2,
-                O,
-            >,
+        D: crate::dist::DistanceMetric<A, Output = O>,
     {
         #[cfg(feature = "test_utils")]
         crate::test_utils::exact_query_stats::record_block3_step_entry();
@@ -1006,9 +996,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: crate::dist::DistanceMetricSimdBlock<A, K2, Output = O>
-            + DistanceMetricSimdBlock3<A, K2, O>
-            + DistanceMetricSimdBlock4<A, K2, O>,
+        D: crate::dist::DistanceMetric<A, Output = O>,
         QC: crate::kd_tree::query_context::QueryContext<A, O, K2>,
         LS: LeafStrategy<A, T, Self, K2, B>,
     {
@@ -1047,8 +1035,7 @@ where
     where
         A: Axis<Coord = A>,
         O: Axis<Coord = O>,
-        D: crate::dist::DistanceMetricCore<A, Output = O>
-            + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>,
+        D: crate::dist::DistanceMetric<A, Output = O>,
     {
         backtrack_block3_with_bounds::<A, O, D, K2>(
             stems,
@@ -1108,8 +1095,7 @@ where
     where
         A: Axis<Coord = A>,
         O: Axis<Coord = O>,
-        D: crate::dist::DistanceMetricCore<A, Output = O>
-            + crate::stem_strategy::DistanceMetricSimdBlock3<A, K2, O>,
+        D: crate::dist::DistanceMetric<A, Output = O>,
     {
         fill_block3_backtrack_values_and_bounds::<A, O, D, K2>(
             stems,
@@ -1269,12 +1255,7 @@ where
         Self: Sized,
         A: Axis<Coord = A>,
         O: Axis<Coord = O> + BacktrackBlock4,
-        D: crate::dist::DistanceMetricCore<A, Output = O>
-            + crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::DistanceMetricSimdBlock4<
-                A,
-                K2,
-                O,
-            >,
+        D: crate::dist::DistanceMetric<A, Output = O>,
     {
         if self.level() > max_stem_level {
             return false;
@@ -1474,9 +1455,7 @@ where
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
             + BacktrackBlock4,
-        D: crate::dist::DistanceMetricSimdBlock<A, K2, Output = O>
-            + DistanceMetricSimdBlock3<A, K2, O>
-            + DistanceMetricSimdBlock4<A, K2, O>,
+        D: crate::dist::DistanceMetric<A, Output = O>,
         QC: crate::kd_tree::query_context::QueryContext<A, O, K2>,
         LS: LeafStrategy<A, T, Self, K2, B>,
     {

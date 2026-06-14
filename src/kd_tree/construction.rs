@@ -12,7 +12,7 @@ use crate::{Axis, Content, KdTree, StemStrategy};
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
     A: Axis<Coord = A>,
-    T: Content + Copy + Default + PartialOrd + PartialEq,
+    T: Content,
     SS: StemStrategy,
     LS: MutableLeafStrategy<A, T, SS, K, B>,
 {
@@ -195,8 +195,11 @@ where
     /// Note: This does not rebalance the tree.
     pub fn remove(&mut self, point: &[A; K], item: T) {
         let leaf_idx = self.get_leaf_idx(point);
+        let old_leaf_len = self.leaves.leaf_len(leaf_idx);
 
         self.leaves.remove_from_leaf(leaf_idx, point, item);
+        let new_leaf_len = self.leaves.leaf_len(leaf_idx);
+        self.size -= old_leaf_len - new_leaf_len;
 
         // TODO: attempt to prune leaf if now empty
     }

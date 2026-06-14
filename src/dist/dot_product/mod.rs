@@ -7,13 +7,14 @@ use fixed::traits::LossyFrom;
 
 use crate::Axis;
 
-use crate::dist::distance_metric_core::DistanceMetricCore;
-use crate::dist::{DistanceMetricAvx2, DistanceMetricAvx512, DistanceMetricNeon};
+use crate::dist::{
+    DistanceMetricAvx2, DistanceMetricAvx512, DistanceMetricNeon, DistanceMetricScalar,
+};
 
 /// Dot product similarity metric, parameterized by output type `R`.
 pub struct DotProduct<R>(core::marker::PhantomData<R>);
 
-impl<A, R> DistanceMetricCore<A> for DotProduct<R>
+impl<A, R> DistanceMetricScalar<A> for DotProduct<R>
 where
     A: Copy,
     R: Axis<Coord = R> + LossyFrom<A> + Mul<Output = R> + Add<Output = R>,

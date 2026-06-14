@@ -9,7 +9,7 @@ pub(crate) mod avx512;
 #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
 pub(crate) mod neon;
 
-use crate::dist::DistanceMetricSimdBlock;
+use crate::dist::DistanceMetric;
 use crate::leaf_view::{LeafArena, LeafView, TlsLeafScratch};
 use crate::results::result_collection::BestNeighbourResultCollection;
 use crate::{Axis, Content};
@@ -35,7 +35,7 @@ pub(crate) fn best_n_within_with_query_wide_arena<
 ) where
     AX: Axis<Coord = AX> + 'static,
     T: Content + PartialOrd,
-    D: DistanceMetricSimdBlock<AX, K>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
@@ -105,7 +105,7 @@ pub(crate) fn best_n_within_with_query_wide<
 ) where
     AX: Axis<Coord = AX> + 'static,
     T: Content + PartialOrd,
-    D: DistanceMetricSimdBlock<AX, K>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
@@ -177,7 +177,7 @@ unsafe fn try_best_n_within_avx512<
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content + PartialOrd,
-    D: DistanceMetricSimdBlock<AX, K>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
@@ -202,7 +202,7 @@ unsafe fn try_best_n_within_arena_avx512<AX, T, D, R, const EXCLUSIVE: bool, con
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content + PartialOrd,
-    D: DistanceMetricSimdBlock<AX, K>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
@@ -235,7 +235,7 @@ unsafe fn try_best_n_within_avx2<
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content + PartialOrd,
-    D: DistanceMetricSimdBlock<AX, K>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
@@ -260,7 +260,7 @@ unsafe fn try_best_n_within_arena_avx2<AX, T, D, R, const EXCLUSIVE: bool, const
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content + PartialOrd,
-    D: DistanceMetricSimdBlock<AX, K>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
@@ -293,7 +293,7 @@ unsafe fn try_best_n_within_neon<
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content + PartialOrd,
-    D: DistanceMetricSimdBlock<AX, K>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {
@@ -318,7 +318,7 @@ unsafe fn try_best_n_within_arena_neon<AX, T, D, R, const EXCLUSIVE: bool, const
 where
     AX: Axis<Coord = AX> + 'static,
     T: Content + PartialOrd,
-    D: DistanceMetricSimdBlock<AX, K>,
+    D: DistanceMetric<AX>,
     D::Output: Axis<Coord = D::Output> + 'static,
     R: BestNeighbourResultCollection<D::Output, T>,
 {

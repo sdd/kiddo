@@ -96,7 +96,7 @@ pub fn nearest_one(c: &mut Criterion) {
 
 fn perform_query_float<
     A: Axis,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     const B: usize,
     IDX: Index<T = IDX> + 'static,
@@ -114,7 +114,7 @@ fn perform_query_float<
 
 fn perform_query_fixed<
     A: Unsigned,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     const B: usize,
     IDX: Index<T = IDX> + 'static,
@@ -133,7 +133,7 @@ fn perform_query_fixed<
 
 fn bench_query_nearest_one_float<
     A: Axis + 'static,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(
@@ -166,7 +166,7 @@ fn bench_query_nearest_one_float<
 
 fn bench_query_nearest_one_fixed<
     A: Unsigned,
-    T: Content + 'static,
+    T: Content,
     const K: usize,
     IDX: Index<T = IDX> + 'static,
 >(

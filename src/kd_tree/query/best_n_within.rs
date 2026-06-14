@@ -1,7 +1,7 @@
 use std::collections::BinaryHeap;
 use std::num::NonZero;
 
-use crate::dist::DistanceMetricSimdBlock;
+use crate::dist::DistanceMetric;
 use crate::kd_tree::query_context::QueryContext;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::KdTreeQueryOps;
@@ -37,7 +37,7 @@ where
         max_dist: D::Output,
         results: &mut R,
     ) where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: Axis<Coord = D::Output> + TlsLeafScratch + 'static,
         R: BestNeighbourResultCollection<D::Output, T>,
     {
@@ -92,7 +92,7 @@ where
         max_qty: NonZero<usize>,
     ) -> BinaryHeap<BestQueryResultItem<(), T, D::Output>>
     where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3
@@ -129,7 +129,7 @@ where
         max_qty: usize,
     ) -> R
     where
-        D: DistanceMetricSimdBlock<A, K>,
+        D: DistanceMetric<A>,
         D::Output: crate::stem_strategy::SimdPrune
             + SimdSelectBestChildBlock3
             + BacktrackBlock3

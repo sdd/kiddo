@@ -9,7 +9,7 @@ use std::collections::HashSet;
 use std::env;
 use std::num::NonZeroUsize;
 
-use kiddo::dist::DistanceMetricCore;
+use kiddo::dist::DistanceMetricScalar;
 use kiddo::kd_tree::KdTree as V6KdTree;
 use kiddo::leaf_strategy::{FlatVec, VecOfArrays};
 use kiddo::stem_strategy::{Donnelly, Eytzinger};
@@ -805,8 +805,8 @@ fn run_checks<A, const K: usize, FNearestOne, FNearestN, FWithin>(
 ) -> Result<(), String>
 where
     A: Axis<Coord = A> + 'static,
-    V6SquaredEuclidean<A>: DistanceMetricCore<A, Output = A>,
-    V6Manhattan<A>: DistanceMetricCore<A, Output = A>,
+    V6SquaredEuclidean<A>: DistanceMetricScalar<A, Output = A>,
+    V6Manhattan<A>: DistanceMetricScalar<A, Output = A>,
     FNearestOne: Fn(Metric) -> QueryResultItem<(), usize, A>,
     FNearestN: Fn(Metric, usize) -> Result<Vec<QueryResultItem<(), usize, A>>, String>,
     FWithin: Fn(Metric, A) -> Vec<QueryResultItem<(), usize, A>>,
@@ -1371,15 +1371,15 @@ fn brute_states<A, const K: usize>(
 ) -> (MetricState<A>, MetricState<A>)
 where
     A: Axis<Coord = A> + 'static,
-    V6SquaredEuclidean<A>: DistanceMetricCore<A, Output = A>,
-    V6Manhattan<A>: DistanceMetricCore<A, Output = A>,
+    V6SquaredEuclidean<A>: DistanceMetricScalar<A, Output = A>,
+    V6Manhattan<A>: DistanceMetricScalar<A, Output = A>,
 {
     let mut sq = MetricState::new(max_qty, radius_sq);
     let mut man = MetricState::new(max_qty, radius_manhattan);
 
     for (idx, point) in points.iter().enumerate() {
-        let dist_sq = <V6SquaredEuclidean<A> as DistanceMetricCore<A>>::dist_raw(query, point);
-        let dist_man = <V6Manhattan<A> as DistanceMetricCore<A>>::dist_raw(query, point);
+        let dist_sq = <V6SquaredEuclidean<A> as DistanceMetricScalar<A>>::dist_raw(query, point);
+        let dist_man = <V6Manhattan<A> as DistanceMetricScalar<A>>::dist_raw(query, point);
         sq.update(dist_sq, idx);
         man.update(dist_man, idx);
     }

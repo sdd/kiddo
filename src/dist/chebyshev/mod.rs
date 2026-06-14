@@ -4,8 +4,9 @@ use fixed::traits::LossyFrom;
 
 use crate::Axis;
 
-use crate::dist::distance_metric_core::DistanceMetricCore;
-use crate::dist::{DistanceMetricAvx2, DistanceMetricAvx512, DistanceMetricNeon};
+use crate::dist::{
+    DistanceMetricAvx2, DistanceMetricAvx512, DistanceMetricNeon, DistanceMetricScalar,
+};
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"))]
 mod avx2;
@@ -19,7 +20,7 @@ mod neon;
 /// Chebyshev / L-infinity distance metric, parameterized by output type `R`.
 pub struct Chebyshev<R>(core::marker::PhantomData<R>);
 
-impl<A, R> DistanceMetricCore<A> for Chebyshev<R>
+impl<A, R> DistanceMetricScalar<A> for Chebyshev<R>
 where
     A: Copy,
     R: Axis<Coord = R> + LossyFrom<A>,

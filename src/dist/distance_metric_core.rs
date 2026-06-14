@@ -9,7 +9,7 @@ use crate::Axis;
 ///
 /// Dimensionality is method-generic (`const K: usize`) so callers do not need
 /// to carry `K` on the metric type itself.
-pub trait DistanceMetricCore<A: Copy> {
+pub trait DistanceMetricScalar<A: Copy> {
     /// Accumulator / distance scalar type.
     type Output: Axis<Coord = Self::Output>;
 
@@ -121,13 +121,13 @@ pub trait DistanceMetricCore<A: Copy> {
 
 #[cfg(test)]
 mod tests {
-    use super::DistanceMetricCore;
+    use super::DistanceMetricScalar;
     use std::cmp::Ordering;
 
     struct DummyLessMetric;
     struct DummyGreaterMetric;
 
-    impl DistanceMetricCore<i16> for DummyLessMetric {
+    impl DistanceMetricScalar<i16> for DummyLessMetric {
         type Output = f64;
         const ORDERING: Ordering = Ordering::Less;
 
@@ -140,7 +140,7 @@ mod tests {
         }
     }
 
-    impl DistanceMetricCore<i16> for DummyGreaterMetric {
+    impl DistanceMetricScalar<i16> for DummyGreaterMetric {
         type Output = f64;
         const ORDERING: Ordering = Ordering::Greater;
 
