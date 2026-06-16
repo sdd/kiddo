@@ -8,7 +8,32 @@ use crate::{Axis, Content, LeafStrategy, StemStrategy};
 
 /// A leaf storage strategy using vectors of fixed-size arrays.
 ///
-/// Stores each leaf as a fixed-size array for better cache locality.
+/// Each leaf is a standalone `LeafNode` containing `K` fixed-capacity coordinate
+/// arrays, one fixed-capacity item array, and a logical `size`. This is the
+/// mutable, hard-bucket layout.
+///
+/// Memory layout:
+///
+/// ```text
+/// leaves: Vec<LeafNode>
+///
+/// leaves[0]
+///   content_points[0] = [ x00 x01 x02  ..  .. ]
+///   content_points[1] = [ y00 y01 y02  ..  .. ]
+///   content_points[2] = [ z00 z01 z02  ..  .. ]
+///   content_items    = [ i00 i01 i02  ..  .. ]
+///   size = 3
+///
+/// leaves[1]
+///   content_points[0] = [ x10 x11 .. .. .. ]
+///   content_points[1] = [ y10 y11 .. .. .. ]
+///   content_points[2] = [ z10 z11 .. .. .. ]
+///   content_items    = [ i10 i11 .. .. .. ]
+///   size = 2
+/// ```
+///
+/// The unused tail of each leaf stays allocated so inserts/removals can happen
+/// in place up to bucket capacity `B`.
 #[cfg_attr(
     feature = "rkyv_08",
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
@@ -28,7 +53,20 @@ pub struct VecOfArrays<A, T, const K: usize, const B: usize> {
     size: usize,
 }
 
-/// A single leaf node storing up to B points.
+/// A single leaf node storing up to `B` points.
+///
+/// Layout within one leaf:
+///
+/// ```text
+/// content_points: [[A; B]; K]
+///
+/// dim 0 -> [ x0 x1 x2 ... ]
+/// dim 1 -> [ y0 y1 y2 ... ]
+/// dim 2 -> [ z0 z1 z2 ... ]
+///
+/// content_items: [ i0 i1 i2 ... ]
+/// size: number of live entries from the front
+/// ```
 #[cfg_attr(
     feature = "rkyv_08",
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
