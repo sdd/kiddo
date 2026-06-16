@@ -222,7 +222,9 @@ pub use crate::dist::{Chebyshev, DotProduct, Manhattan, Minkowski, SquaredEuclid
 pub mod stem_strategies;
 #[doc(hidden)]
 pub use stem_strategies as stem_strategy;
-pub use stem_strategies::{Donnelly, DonnellyMarkerPf, DonnellyMarkerSimd, Eytzinger, EytzingerPf};
+#[doc(hidden)]
+pub use stem_strategies::DonnellyMarkerSimd;
+pub use stem_strategies::{Donnelly, DonnellyMarkerPf, Eytzinger, EytzingerPf};
 
 /// Leaf storage strategies for the kd-tree
 #[path = "leaf_strategy/mod.rs"]

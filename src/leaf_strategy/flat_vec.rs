@@ -6,7 +6,27 @@ use crate::{Axis, Content, LeafStrategy, StemStrategy};
 
 /// A leaf storage strategy using flat vectors for coordinates.
 ///
-/// Stores coordinates as K separate vectors (one per dimension) and items in a separate vector.
+/// Stores coordinates as `K` separate vectors (one per dimension) and items in a
+/// separate vector. Leaves are not stored as standalone structs; instead,
+/// `leaf_extents` records the `(start, end)` range for each logical leaf within
+/// the shared per-dimension arrays.
+///
+/// Memory layout:
+///
+/// ```text
+/// leaf_extents = [(0, 2), (2, 5), (5, 6)]
+///
+/// leaf_points[0] = [ x00 x01 | x10 x11 x12 | x20 ]
+/// leaf_points[1] = [ y00 y01 | y10 y11 y12 | y20 ]
+/// leaf_points[2] = [ z00 z01 | z10 z11 z12 | z20 ]
+/// leaf_items    = [ i00 i01 | i10 i11 i12 | i20 ]
+///                  \ leaf 0 / \  leaf 1   / \l2/
+/// ```
+///
+/// This is effectively a global column-store layout with per-leaf slice ranges.
+/// It is friendly to autovectorisation and explicit SIMD because each axis is
+/// already contiguous, but processing one leaf still means touching multiple
+/// independent streams: one vector per axis plus the item vector.
 #[cfg_attr(
     feature = "rkyv_08",
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)

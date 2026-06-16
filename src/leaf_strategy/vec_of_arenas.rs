@@ -7,6 +7,43 @@ use crate::traits::leaf_strategy::{
 use crate::{Axis, Content, LeafStrategy, StemStrategy};
 
 /// Immutable leaf storage using chunk-tiled arenas encoded into a single byte buffer.
+///
+/// All leaves are encoded into one contiguous `leaf_bytes` arena. `leaf_extents`
+/// stores `(byte_offset, leaf_len)` for each logical leaf. Within a leaf, data is
+/// written as descending tile widths (`32, 8, 4, 2, 1`), with each tile laid out
+/// column-major by axis followed immediately by that tile's items.
+///
+/// Memory layout:
+///
+/// ```text
+/// leaf_extents = [(off0, len0), (off1, len1), ...]
+///
+/// leaf_bytes =
+///   [ leaf 0 tile32: x[0..32]  y[0..32]  z[0..32]  items[0..32] ]
+///   [ leaf 0 tile8 : x[32..40] y[32..40] z[32..40] items[32..40] ]
+///   [ leaf 0 tile4 : x[40..44] y[40..44] z[40..44] items[40..44] ]
+///   [ leaf 0 tile2 : x[44..46] y[44..46] z[44..46] items[44..46] ]
+///   [ leaf 0 tile1 : x[46]     y[46]     z[46]     item[46]      ]
+///   [ leaf 1 tile32: ... ]
+///   ...
+/// ```
+///
+///
+/// The main advantage over [`FlatVec`](crate::leaf_strategies::FlatVec) is not
+/// just that the leaf is self-contained. The data is laid out in the same order
+/// that the SIMD/autovec leaf kernel consumes it:
+///
+/// 1. stream one tile's `x` coordinates
+/// 2. then the same tile's `y`, `z`, ...
+/// 3. then the matching tile's items
+///
+/// That means the CPU can usually service the whole leaf with a single forward
+/// prefetch stream. By contrast, `FlatVec` pulls from several separate vectors
+/// (`K` coordinate arrays plus the item array), which is still vector-friendly
+/// but asks more of the hardware prefetcher's limited stream-tracking resources.
+///
+/// So `VecOfArenas` aims to keep the same good column-major compute shape while
+/// also matching the leaf kernel's access order more closely.
 #[cfg_attr(
     feature = "rkyv_08",
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)
