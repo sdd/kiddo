@@ -28,7 +28,7 @@ jobs:
       RUSTFLAGS: "-C target-feature=+avx2"
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           show-progress: false
 
@@ -68,7 +68,7 @@ jobs:
     env:
       RUSTFLAGS: "-C target-feature=+avx2"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           show-progress: false
 
@@ -105,7 +105,7 @@ jobs:
     env:
       RUSTFLAGS: "-C target-feature=+avx2"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           show-progress: false
 
