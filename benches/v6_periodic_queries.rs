@@ -2,7 +2,7 @@ use codspeed_criterion_compat::{black_box, criterion_group, criterion_main, Crit
 use kiddo::dist::SquaredEuclidean;
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::VecOfArenas;
-use kiddo::stem_strategy::EytzingerPf;
+use kiddo::Eytzinger;
 use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use std::num::NonZeroUsize;
@@ -18,7 +18,7 @@ const POINT_SEED: u64 = 0x5eed_0000_0000_2001;
 const QUERY_SEED: u64 = 0x5eed_0000_0000_2002;
 
 type BaselineLeaves = VecOfArenas<f64, u32, K, B>;
-type BaselineTree = KdTree<f64, u32, EytzingerPf<K, 8>, BaselineLeaves, K, B>;
+type BaselineTree = KdTree<f64, u32, Eytzinger, BaselineLeaves, K, B>;
 
 fn read_usize_env(var: &str, default: usize) -> usize {
     std::env::var(var)

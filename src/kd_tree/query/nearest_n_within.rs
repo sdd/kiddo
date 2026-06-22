@@ -207,7 +207,7 @@ pub mod cargo_asm {
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::VecOfArenas;
     use crate::stem_strategy::donnelly_2_pf::DonnellyPf;
-    use crate::stem_strategy::eytzinger_pf_far::EytzingerPfFar;
+    use crate::stem_strategy::Eytzinger;
     use std::num::NonZeroUsize;
 
     const K: usize = 3;
@@ -216,7 +216,7 @@ pub mod cargo_asm {
     const MAX_QTY: usize = 16;
 
     type ArenaLeaves = VecOfArenas<f64, u32, K, BUCKET_SIZE>;
-    type EytzingerPfFarKdT = KdTree<f64, u32, EytzingerPfFar<K, 8>, ArenaLeaves, K, BUCKET_SIZE>;
+    type EytzingerPfFarKdT = KdTree<f64, u32, Eytzinger, ArenaLeaves, K, BUCKET_SIZE>;
     type DonnellyPfKdT = KdTree<f64, u32, DonnellyPf<3, 64, 8, K>, ArenaLeaves, K, BUCKET_SIZE>;
 
     /// Hook for cargo-asm to render the sorted nearest_n_within focus path.
@@ -328,7 +328,7 @@ mod tests {
     #[test]
     fn nearest_n_within_exclusive_boundaries_exclude_exact_threshold_matches() {
         let points = vec![[0.0f64, 0.0], [1.0, 0.0], [2.0, 0.0], [0.5, 0.0]];
-        let tree: KdTree<f64, u32, Eytzinger<2>, FlatVec<f64, u32, 2, 32>, 2, 32> =
+        let tree: KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 2, 32>, 2, 32> =
             KdTree::new_from_slice(&points).unwrap();
         let query = [0.0, 0.0];
         let max_qty = NonZeroUsize::new(8).unwrap();
@@ -380,7 +380,7 @@ mod tests {
             points.push([x, y, z]);
         }
 
-        let tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+        let tree: KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
         assert!(!tree.is_empty());
@@ -412,7 +412,7 @@ mod tests {
             points.push([x, y, z]);
         }
 
-        let tree: KdTree<f32, (), Eytzinger<3>, FlatVec<f32, (), 3, 32>, 3, 32> =
+        let tree: KdTree<f32, (), Eytzinger, FlatVec<f32, (), 3, 32>, 3, 32> =
             KdTree::new_from_slice_no_items(&points).unwrap();
 
         assert!(!tree.is_empty());
@@ -447,9 +447,9 @@ mod tests {
         let max_qty = NonZeroUsize::new(5).unwrap();
         let max_dist = 0.2;
 
-        let flat_tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+        let flat_tree: KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
-        let arena_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
+        let arena_tree: KdTree<f32, u32, Eytzinger, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
         let flat_result = flat_tree
@@ -480,9 +480,9 @@ mod tests {
         let query = [0.35f32, 0.45, 0.55];
         let max_dist = 0.5;
 
-        let flat_tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+        let flat_tree: KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
-        let arena_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
+        let arena_tree: KdTree<f32, u32, Eytzinger, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
         let flat_result = flat_tree.nearest_n_within::<SquaredEuclidean<f32>>(
@@ -517,9 +517,9 @@ mod tests {
         let max_qty = NonZeroUsize::new(5).unwrap();
         let max_dist = 0.2;
 
-        let flat_tree: KdTree<f64, u32, Eytzinger<3>, FlatVec<f64, u32, 3, 32>, 3, 32> =
+        let flat_tree: KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
-        let arena_tree: KdTree<f64, u32, Eytzinger<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32> =
+        let arena_tree: KdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
         let flat_result = flat_tree
@@ -549,7 +549,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let tree: KdTree<f32, u32, Eytzinger<4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
+        let tree: KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 4, 32>, 4, 32> =
             KdTree::new_from_slice(&content_to_add).unwrap();
         assert_eq!(tree.size(), TREE_SIZE);
 
@@ -588,7 +588,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let tree: KdTree<f32, u32, Eytzinger<4>, VecOfArrays<f32, u32, 4, 32>, 4, 32> =
+        let tree: KdTree<f32, u32, Eytzinger, VecOfArrays<f32, u32, 4, 32>, 4, 32> =
             KdTree::new_from_slice(&content_to_add).unwrap();
         assert_eq!(tree.size(), TREE_SIZE);
 
@@ -627,7 +627,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let mut tree: KdTree<f32, u32, Eytzinger<4>, VecOfArrays<f32, u32, 4, 32>, 4, 32> =
+        let mut tree: KdTree<f32, u32, Eytzinger, VecOfArrays<f32, u32, 4, 32>, 4, 32> =
             KdTree::default();
 
         for (idx, point) in content_to_add.iter().enumerate() {
@@ -767,7 +767,7 @@ mod tests {
         let max_qty = NonZeroUsize::new(4).unwrap();
         let max_dist = 0.0004;
 
-        let tree: KdTree<f64, u32, Eytzinger<K>, VecOfArenas<f64, u32, K, B>, K, B> =
+        let tree: KdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, K, B>, K, B> =
             KdTree::new_from_slice(&points).unwrap();
 
         reset();

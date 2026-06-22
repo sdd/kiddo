@@ -16,7 +16,7 @@ const DEFAULT_QUERY_BATCH_REPEATS: usize = 2_000;
 const POINT_SEED: u64 = 0x5eed_0000_0000_0001;
 const QUERY_SEED: u64 = 0x5eed_0000_0000_0002;
 
-type Tree = KdTree<f64, u32, Eytzinger<3>, FlatVec<f64, u32, 3, 32>, 3, 32>;
+type Tree = KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 3, 32>, 3, 32>;
 
 fn read_usize_env(var: &str, default: usize) -> usize {
     std::env::var(var)

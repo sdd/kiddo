@@ -1428,7 +1428,13 @@ where
         .collect()
 }
 
-impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B> {
+impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
+where
+    A: Axis<Coord = A>,
+    T: Content,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+{
     /// Starts a fluent query against this tree.
     #[inline]
     pub fn query<'a>(
@@ -4172,10 +4178,10 @@ mod tests {
     use crate::leaf_strategy::FlatVec;
     #[cfg(feature = "rkyv_08")]
     use crate::leaf_strategy::VecOfArenas;
-    use crate::stem_strategy::EytzingerPf;
+    use crate::stem_strategy::Eytzinger;
     use std::num::NonZeroUsize;
 
-    type WrapTree = KdTree<f64, u32, EytzingerPf<2, 8>, FlatVec<f64, u32, 2, 32>, 2, 32>;
+    type WrapTree = KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 2, 32>, 2, 32>;
 
     #[test]
     fn periodic_nearest_one_wraps_and_supports_non_point_projection() {
@@ -4281,9 +4287,9 @@ mod tests {
     #[cfg(feature = "rkyv_08")]
     #[test]
     fn archived_periodic_queries_match_owned() {
-        type Tree = KdTree<f64, u32, EytzingerPf<2, 8>, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
+        type Tree = KdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
         type ArchivedTree =
-            ArchivedKdTree<f64, u32, EytzingerPf<2, 8>, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
+            ArchivedKdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
 
         let points = vec![
             (1u32, [0.95, 0.5]),

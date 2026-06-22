@@ -348,7 +348,7 @@ mod tests {
         let mut leaves = <VecOfArenas<f64, u32, 3, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
-            Eytzinger<3>,
+            Eytzinger,
             3,
             32,
         >>::new_with_capacity(64);
@@ -360,7 +360,7 @@ mod tests {
         <VecOfArenas<f64, u32, 3, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
-            Eytzinger<3>,
+            Eytzinger,
             3,
             32,
         >>::append_leaf(&mut leaves, &[&x, &y, &z], &items);
@@ -379,7 +379,7 @@ mod tests {
         let mut leaves = <VecOfArenas<f64, u32, 3, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
-            Eytzinger<3>,
+            Eytzinger,
             3,
             32,
         >>::new_with_capacity(64);
@@ -391,13 +391,13 @@ mod tests {
         <VecOfArenas<f64, u32, 3, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
-            Eytzinger<3>,
+            Eytzinger,
             3,
             32,
         >>::append_leaf(&mut leaves, &[&x, &y, &z], &items);
 
         let arena =
-            <VecOfArenas<f64, u32, 3, 32> as LeafStrategy<f64, u32, Eytzinger<3>, 3, 32>>::leaf_arena(
+            <VecOfArenas<f64, u32, 3, 32> as LeafStrategy<f64, u32, Eytzinger, 3, 32>>::leaf_arena(
                 &leaves, 0,
             );
 
@@ -428,7 +428,7 @@ mod tests {
         let mut leaves = <VecOfArenas<f64, u32, 3, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
-            Eytzinger<3>,
+            Eytzinger,
             3,
             32,
         >>::new_with_capacity(64);
@@ -440,13 +440,13 @@ mod tests {
         <VecOfArenas<f64, u32, 3, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
-            Eytzinger<3>,
+            Eytzinger,
             3,
             32,
         >>::append_leaf(&mut leaves, &[&x, &y, &z], &items);
 
         let arena =
-            <VecOfArenas<f64, u32, 3, 32> as LeafStrategy<f64, u32, Eytzinger<3>, 3, 32>>::leaf_arena(
+            <VecOfArenas<f64, u32, 3, 32> as LeafStrategy<f64, u32, Eytzinger, 3, 32>>::leaf_arena(
                 &leaves, 0,
             );
 
@@ -471,7 +471,7 @@ mod tests {
         let mut leaves = <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
-            Eytzinger<2>,
+            Eytzinger,
             2,
             32,
         >>::new_with_capacity(64);
@@ -482,7 +482,7 @@ mod tests {
         <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
-            Eytzinger<2>,
+            Eytzinger,
             2,
             32,
         >>::append_leaf(&mut leaves, &[&x, &y], &items);
@@ -490,7 +490,7 @@ mod tests {
         assert!(<VecOfArenas<f64, u32, 2, 32> as LeafStrategy<
             f64,
             u32,
-            Eytzinger<2>,
+            Eytzinger,
             2,
             32,
         >>::replace_item_in_leaf(
@@ -498,7 +498,7 @@ mod tests {
         ));
 
         let arena =
-            <VecOfArenas<f64, u32, 2, 32> as LeafStrategy<f64, u32, Eytzinger<2>, 2, 32>>::leaf_arena(
+            <VecOfArenas<f64, u32, 2, 32> as LeafStrategy<f64, u32, Eytzinger, 2, 32>>::leaf_arena(
                 &leaves, 0,
             );
         assert_eq!(arena.point_item(0), ([1.0, 10.0], 9));
@@ -512,7 +512,7 @@ mod tests {
         let mut leaves = <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
-            Eytzinger<2>,
+            Eytzinger,
             2,
             32,
         >>::new_with_capacity(64);
@@ -523,7 +523,7 @@ mod tests {
         <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
-            Eytzinger<2>,
+            Eytzinger,
             2,
             32,
         >>::append_leaf(&mut leaves, &[&x, &y], &items);
@@ -531,7 +531,7 @@ mod tests {
         assert!(!<VecOfArenas<f64, u32, 2, 32> as LeafStrategy<
             f64,
             u32,
-            Eytzinger<2>,
+            Eytzinger,
             2,
             32,
         >>::replace_item_in_leaf(
@@ -539,7 +539,7 @@ mod tests {
         ));
 
         let arena =
-            <VecOfArenas<f64, u32, 2, 32> as LeafStrategy<f64, u32, Eytzinger<2>, 2, 32>>::leaf_arena(
+            <VecOfArenas<f64, u32, 2, 32> as LeafStrategy<f64, u32, Eytzinger, 2, 32>>::leaf_arena(
                 &leaves, 0,
             );
         assert_eq!(arena.point_item(0), ([1.0, 10.0], 5));
@@ -552,7 +552,7 @@ mod tests {
         let mut leaves = <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
-            Eytzinger<2>,
+            Eytzinger,
             2,
             32,
         >>::new_with_capacity(64);
@@ -563,7 +563,7 @@ mod tests {
         <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
-            Eytzinger<2>,
+            Eytzinger,
             2,
             32,
         >>::append_leaf(&mut leaves, &[&x, &y], &items);
@@ -571,7 +571,7 @@ mod tests {
         assert!(!<VecOfArenas<f64, u32, 2, 32> as LeafStrategy<
             f64,
             u32,
-            Eytzinger<2>,
+            Eytzinger,
             2,
             32,
         >>::replace_item_in_leaf(
@@ -579,7 +579,7 @@ mod tests {
         ));
 
         let arena =
-            <VecOfArenas<f64, u32, 2, 32> as LeafStrategy<f64, u32, Eytzinger<2>, 2, 32>>::leaf_arena(
+            <VecOfArenas<f64, u32, 2, 32> as LeafStrategy<f64, u32, Eytzinger, 2, 32>>::leaf_arena(
                 &leaves, 0,
             );
         assert_eq!(arena.point_item(0), ([1.0, 10.0], 5));
@@ -592,7 +592,7 @@ mod tests {
         let mut leaves = <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
-            Eytzinger<2>,
+            Eytzinger,
             2,
             32,
         >>::new_with_capacity(64);
@@ -603,7 +603,7 @@ mod tests {
         <VecOfArenas<f64, u32, 2, 32> as ConstructibleLeafStrategy<
             f64,
             u32,
-            Eytzinger<2>,
+            Eytzinger,
             2,
             32,
         >>::append_leaf(&mut leaves, &[&x, &y], &items);
@@ -611,7 +611,7 @@ mod tests {
         assert!(<VecOfArenas<f64, u32, 2, 32> as LeafStrategy<
             f64,
             u32,
-            Eytzinger<2>,
+            Eytzinger,
             2,
             32,
         >>::replace_item_in_leaf(
@@ -619,7 +619,7 @@ mod tests {
         ));
 
         let arena =
-            <VecOfArenas<f64, u32, 2, 32> as LeafStrategy<f64, u32, Eytzinger<2>, 2, 32>>::leaf_arena(
+            <VecOfArenas<f64, u32, 2, 32> as LeafStrategy<f64, u32, Eytzinger, 2, 32>>::leaf_arena(
                 &leaves, 0,
             );
         assert_eq!(arena.point_item(31), ([31.0, 131.0], 1031));

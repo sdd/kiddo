@@ -72,16 +72,10 @@ mod tests {
                 })
                 .collect();
 
-            let flat_tree: KdTree<f32, usize, Eytzinger<3>, FlatVec<f32, usize, 3, 32>, 3, 32> =
+            let flat_tree: KdTree<f32, usize, Eytzinger, FlatVec<f32, usize, 3, 32>, 3, 32> =
                 KdTree::new_from_slice(&points).unwrap();
-            let arena_tree: KdTree<
-                f32,
-                usize,
-                Eytzinger<3>,
-                VecOfArenas<f32, usize, 3, 32>,
-                3,
-                32,
-            > = KdTree::new_from_slice(&points).unwrap();
+            let arena_tree: KdTree<f32, usize, Eytzinger, VecOfArenas<f32, usize, 3, 32>, 3, 32> =
+                KdTree::new_from_slice(&points).unwrap();
 
             let mut flat: Vec<(f32, usize)> = flat_tree
                 .nearest_n::<SquaredEuclidean<f32>>(&query, max_qty, true)
@@ -113,7 +107,7 @@ mod tests {
         let content_to_add: Vec<[f64; 4]> =
             (0..TREE_SIZE).map(|_| rng.random::<[f64; 4]>()).collect();
 
-        let tree: KdTree<f64, u32, Eytzinger<4>, FlatVec<f64, u32, 4, 32>, 4, 32> =
+        let tree: KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 4, 32>, 4, 32> =
             KdTree::new_from_slice(&content_to_add).unwrap();
 
         assert_eq!(tree.size(), TREE_SIZE);
@@ -146,7 +140,7 @@ mod tests {
         let content_to_add: Vec<[f64; 4]> =
             (0..TREE_SIZE).map(|_| rng.random::<[f64; 4]>()).collect();
 
-        let tree: KdTree<f64, u32, Eytzinger<4>, VecOfArrays<f64, u32, 4, 32>, 4, 32> =
+        let tree: KdTree<f64, u32, Eytzinger, VecOfArrays<f64, u32, 4, 32>, 4, 32> =
             KdTree::new_from_slice(&content_to_add).unwrap();
 
         assert_eq!(tree.size(), TREE_SIZE);
@@ -179,7 +173,7 @@ mod tests {
         let content_to_add: Vec<[f64; 4]> =
             (0..TREE_SIZE).map(|_| rng.random::<[f64; 4]>()).collect();
 
-        let mut tree: KdTree<f64, u32, Eytzinger<4>, VecOfArrays<f64, u32, 4, 32>, 4, 32> =
+        let mut tree: KdTree<f64, u32, Eytzinger, VecOfArrays<f64, u32, 4, 32>, 4, 32> =
             KdTree::default();
 
         for (idx, point) in content_to_add.iter().enumerate() {
@@ -304,7 +298,7 @@ mod tests {
             .map(|_| random_point_f32::<K>(&mut rng_content))
             .collect();
 
-        let mut tree: KdTree<f32, usize, Eytzinger<K>, VecOfArrays<f32, usize, K, B>, K, B> =
+        let mut tree: KdTree<f32, usize, Eytzinger, VecOfArrays<f32, usize, K, B>, K, B> =
             KdTree::default();
         for (idx, point) in points.iter().enumerate() {
             tree.add(point, idx).unwrap();
@@ -347,7 +341,7 @@ mod tests {
             .map(|_| random_point_f64::<K>(&mut rng_content))
             .collect();
 
-        let mut tree: KdTree<f64, usize, Eytzinger<K>, VecOfArrays<f64, usize, K, B>, K, B> =
+        let mut tree: KdTree<f64, usize, Eytzinger, VecOfArrays<f64, usize, K, B>, K, B> =
             KdTree::default();
         for (idx, point) in points.iter().enumerate() {
             tree.add(point, idx).unwrap();

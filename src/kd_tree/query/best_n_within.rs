@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn best_n_within_exclusive_boundaries_exclude_exact_threshold_matches() {
         let points = vec![[0.0f64, 0.0], [1.0, 0.0], [2.0, 0.0], [0.5, 0.0]];
-        let tree: KdTree<f64, u32, Eytzinger<2>, FlatVec<f64, u32, 2, 32>, 2, 32> =
+        let tree: KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 2, 32>, 2, 32> =
             KdTree::new_from_slice(&points).unwrap();
         let query = [0.0, 0.0];
         let max_qty = NonZero::new(8usize).unwrap();
@@ -284,7 +284,7 @@ mod tests {
             points.push([x, y, z]);
         }
 
-        let tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+        let tree: KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
         assert!(!tree.is_empty());
@@ -313,7 +313,7 @@ mod tests {
 
         let content_to_add: Vec<_> = (0..TREE_SIZE).map(|_| rng.random::<[f64; 2]>()).collect();
 
-        let tree: KdTree<f64, u32, Eytzinger<2>, FlatVec<f64, u32, 2, 32>, 2, 32> =
+        let tree: KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 2, 32>, 2, 32> =
             KdTree::new_from_slice(&content_to_add).unwrap();
 
         assert_eq!(tree.size(), TREE_SIZE);
@@ -347,7 +347,7 @@ mod tests {
 
         let content_to_add: Vec<_> = (0..TREE_SIZE).map(|_| rng.random::<[f64; 2]>()).collect();
 
-        let tree: KdTree<f64, u32, Eytzinger<2>, VecOfArrays<f64, u32, 2, 32>, 2, 32> =
+        let tree: KdTree<f64, u32, Eytzinger, VecOfArrays<f64, u32, 2, 32>, 2, 32> =
             KdTree::new_from_slice(&content_to_add).unwrap();
 
         assert_eq!(tree.size(), TREE_SIZE);
@@ -381,7 +381,7 @@ mod tests {
 
         let content_to_add: Vec<_> = (0..TREE_SIZE).map(|_| rng.random::<[f64; 2]>()).collect();
 
-        let mut tree: KdTree<f64, u32, Eytzinger<2>, VecOfArrays<f64, u32, 2, 32>, 2, 32> =
+        let mut tree: KdTree<f64, u32, Eytzinger, VecOfArrays<f64, u32, 2, 32>, 2, 32> =
             KdTree::default();
 
         for (idx, point) in content_to_add.iter().enumerate() {
@@ -419,9 +419,9 @@ mod tests {
         for len in [1usize, 2, 4, 8, 32, 33, 47] {
             let points: Vec<[f64; 2]> = (0..len).map(|_| rng.random::<[f64; 2]>()).collect();
 
-            let flat_tree: KdTree<f64, u32, Eytzinger<2>, FlatVec<f64, u32, 2, 32>, 2, 32> =
+            let flat_tree: KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 2, 32>, 2, 32> =
                 KdTree::new_from_slice(&points).unwrap();
-            let arena_tree: KdTree<f64, u32, Eytzinger<2>, VecOfArenas<f64, u32, 2, 32>, 2, 32> =
+            let arena_tree: KdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 2, 32>, 2, 32> =
                 KdTree::new_from_slice(&points).unwrap();
 
             let mut flat_results: Vec<_> = flat_tree
@@ -458,9 +458,9 @@ mod tests {
         let max_qty = NonZero::new(5).unwrap();
         let max_dist = 0.2;
 
-        let flat_tree: KdTree<f64, u32, Eytzinger<3>, FlatVec<f64, u32, 3, 32>, 3, 32> =
+        let flat_tree: KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
-        let arena_tree: KdTree<f64, u32, Eytzinger<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32> =
+        let arena_tree: KdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
         let flat_result = flat_tree
@@ -493,9 +493,9 @@ mod tests {
         let max_qty = NonZero::new(5).unwrap();
         let max_dist = 0.2f32;
 
-        let flat_tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+        let flat_tree: KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
-        let arena_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
+        let arena_tree: KdTree<f32, u32, Eytzinger, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
         let flat_result = flat_tree
@@ -528,9 +528,9 @@ mod tests {
         let max_qty = NonZero::new(5).unwrap();
         let max_dist = 0.4f64;
 
-        let flat_tree: KdTree<f64, u32, Eytzinger<3>, FlatVec<f64, u32, 3, 32>, 3, 32> =
+        let flat_tree: KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
-        let arena_tree: KdTree<f64, u32, Eytzinger<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32> =
+        let arena_tree: KdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
         let flat_result = flat_tree

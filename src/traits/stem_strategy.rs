@@ -82,54 +82,54 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
     fn level(&self) -> i32;
 
     /// Advance `self` down to a child in-place.
-    fn traverse(&mut self, is_right: bool);
+    fn traverse<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool);
 
     /// Advance `self` down to a child in-place. Specialized for use as one
     /// of the non-final stages when loop-unrolling to the level of a minor tri height
     #[inline(always)]
-    fn traverse_head(&mut self, is_right: bool) {
-        self.traverse(is_right);
+    fn traverse_head<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
+        self.traverse::<A, K>(is_right);
     }
 
     /// Advance `self` down to a child in-place. Specialized for use as the
     /// last stage when loop-unrolled to the level of a minor tri height
     #[inline(always)]
-    fn traverse_tail(&mut self, is_right: bool) {
-        self.traverse(is_right);
+    fn traverse_tail<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
+        self.traverse::<A, K>(is_right);
     }
 
     /// Advance `self` down to one child, returning the other.
     /// - `self` mutates into the left child
     /// - return value is the right child
-    fn branch(&mut self) -> Self;
+    fn branch<const K: usize>(&mut self) -> Self;
 
     /// Advance `self` to the "closer" child, returning the "further" one.
     #[inline(always)]
-    fn branch_relative(&mut self, is_right: bool) -> Self {
+    fn branch_relative<const K: usize>(&mut self, is_right: bool) -> Self {
         if is_right {
-            let mut right = self.branch();
+            let mut right = self.branch::<K>();
             std::mem::swap(self, &mut right);
             right
         } else {
-            self.branch()
+            self.branch::<K>()
         }
     }
 
     /// Split `self` into two independent child strategies (left, right).
-    fn split(mut self) -> (Self, Self)
+    fn split<const K: usize>(mut self) -> (Self, Self)
     where
         Self: Sized,
     {
-        let right = self.branch();
+        let right = self.branch::<K>();
         (self, right)
     }
 
     /// Split `self` into (closer, further) given a direction.
-    fn split_relative(self, is_right: bool) -> (Self, Self)
+    fn split_relative<const K: usize>(self, is_right: bool) -> (Self, Self)
     where
         Self: Sized,
     {
-        let (l, r) = self.split();
+        let (l, r) = self.split::<K>();
         if is_right {
             (r, l)
         } else {
@@ -164,7 +164,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
     /// Implementations should mirror `traverse` behavior but also report memory
     /// accesses via `event_tx` for the cache simulator.
     #[cfg(feature = "simulator")]
-    fn simulate_traverse(
+    fn simulate_traverse<A: Axis<Coord = A>, const K: usize>(
         &mut self,
         _is_right: bool,
         _event_tx: &std::sync::mpsc::Sender<crate::test_utils::cache_simulator::Event>,
@@ -174,7 +174,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
 
     /// Get leaf index for a query point. Default uses simple while loop.
     /// Block-based strategies override with unrolled loops.
-    fn get_leaf_idx<A: Axis, const K: usize>(
+    fn get_leaf_idx<A: Axis<Coord = A>, const K: usize>(
         stems: &[A],
         query: &[A; K],
         max_stem_level: i32,
@@ -188,7 +188,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
         while stem_strat.level() <= max_stem_level {
             let pivot = unsafe { stems.get_unchecked(stem_strat.stem_idx()) };
             let is_right = unsafe { *query.get_unchecked(stem_strat.dim()) } >= *pivot;
-            stem_strat.traverse(is_right);
+            stem_strat.traverse::<A, K>(is_right);
         }
 
         stem_strat.leaf_idx()
@@ -245,7 +245,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
             let is_right_child = query_elem >= pivot;
 
             let old_stem_idx = self.stem_idx();
-            let far_ctx = self.branch_relative(is_right_child);
+            let far_ctx = self.branch_relative::<K>(is_right_child);
 
             tracing::trace!(
                 %pivot,
@@ -312,7 +312,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
                 crate::results::result_collection_stats::record_query_scalar_far_child_reject();
             }
         } else {
-            self.traverse(false);
+            self.traverse::<A, K>(false);
         }
 
         *dim = self.dim();
@@ -492,17 +492,24 @@ mod tests {
             self.state.level
         }
 
-        fn traverse(&mut self, is_right: bool) {
+        fn traverse<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
             self.state.stem_idx = self.state.stem_idx * 2 + 1 + usize::from(is_right);
             self.state.leaf_idx = (self.state.leaf_idx << 1) | usize::from(is_right);
             self.state.dim = (self.state.dim + 1) % 2;
             self.state.level += 1;
         }
 
-        fn branch(&mut self) -> Self {
+        fn branch<const K: usize>(&mut self) -> Self {
             let mut right = self.clone();
-            self.traverse(false);
-            right.traverse(true);
+            self.state.stem_idx = self.state.stem_idx * 2 + 1;
+            self.state.leaf_idx <<= 1;
+            self.state.dim = (self.state.dim + 1) % 2;
+            self.state.level += 1;
+
+            right.state.stem_idx = right.state.stem_idx * 2 + 2;
+            right.state.leaf_idx = (right.state.leaf_idx << 1) | 1;
+            right.state.dim = (right.state.dim + 1) % 2;
+            right.state.level += 1;
             right
         }
 
@@ -517,19 +524,19 @@ mod tests {
         let stems_ptr = NonNull::new(stems.as_mut_ptr() as *mut u8).unwrap();
 
         let mut head = TestStemStrategy::new(stems_ptr);
-        head.traverse_head(true);
+        head.traverse_head::<f32, 2>(true);
         assert_eq!(head.stem_idx(), 2);
         assert_eq!(head.leaf_idx(), 1);
         assert_eq!(head.dim(), 1);
         assert_eq!(head.level(), 1);
 
-        let left_first = TestStemStrategy::new(stems_ptr).split_relative(false);
+        let left_first = TestStemStrategy::new(stems_ptr).split_relative::<2>(false);
         assert_eq!(left_first.0.stem_idx(), 1);
         assert_eq!(left_first.1.stem_idx(), 2);
         assert_eq!(left_first.0.leaf_idx(), 0);
         assert_eq!(left_first.1.leaf_idx(), 1);
 
-        let right_first = TestStemStrategy::new(stems_ptr).split_relative(true);
+        let right_first = TestStemStrategy::new(stems_ptr).split_relative::<2>(true);
         assert_eq!(right_first.0.stem_idx(), 2);
         assert_eq!(right_first.1.stem_idx(), 1);
         assert_eq!(right_first.0.leaf_idx(), 1);

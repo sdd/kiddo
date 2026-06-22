@@ -320,10 +320,10 @@ struct V6DonnellySimdBlock3StrategyF64;
 
 impl V6StrategySelectorF32 for V6EytzingerStrategyF32 {
     fn run_mutable<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
-        run_v6_mutable_case_f32::<K, B, Eytzinger<K>>(params)
+        run_v6_mutable_case_f32::<K, B, Eytzinger>(params)
     }
     fn run_immutable<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
-        run_v6_immutable_case_f32::<K, B, Eytzinger<K>>(params)
+        run_v6_immutable_case_f32::<K, B, Eytzinger>(params)
     }
 }
 
@@ -390,10 +390,10 @@ impl V6StrategySelectorF32 for V6DonnellySimdBlock4StrategyF32 {
 
 impl V6StrategySelectorF64 for V6EytzingerStrategyF64 {
     fn run_mutable<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
-        run_v6_mutable_case_f64::<K, B, Eytzinger<K>>(params)
+        run_v6_mutable_case_f64::<K, B, Eytzinger>(params)
     }
     fn run_immutable<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
-        run_v6_immutable_case_f64::<K, B, Eytzinger<K>>(params)
+        run_v6_immutable_case_f64::<K, B, Eytzinger>(params)
     }
 }
 

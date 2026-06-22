@@ -47,7 +47,7 @@ impl DistanceMetricNeon<f64> for AbsDistance {
     type NeonF32Ops = kiddo::traits::dist::UnsupportedNeonF32LeafOps;
 }
 
-type GeneralTree = KdTree<f64, u32, Eytzinger<2>, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
+type GeneralTree = KdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
 type BlockTree =
     KdTree<f64, u32, DonnellyMarkerSimd<Block3, 64, 8, 2>, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
 

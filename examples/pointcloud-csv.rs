@@ -19,7 +19,7 @@ struct Point {
     z: f64,
 }
 
-type Tree = KdTree<f64, u32, Eytzinger<3>, FlatVec<f64, u32, 3, 64>, 3, 64>;
+type Tree = KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 3, 64>, 3, 64>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();

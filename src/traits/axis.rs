@@ -33,6 +33,8 @@ pub trait Axis:
     + crate::stem_strategy::CompareBlock3
     + crate::stem_strategy::CompareBlock4
 {
+    const VALUE_WIDTH_BYTES: usize = size_of::<Self::Coord>();
+
     /// Coordinate scalar type stored in the tree and queries.
     type Coord: Copy;
 

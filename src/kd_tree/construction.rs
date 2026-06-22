@@ -72,7 +72,7 @@ where
             parent_stem_idx = Some(NonMaxUsize::new(stem_idx).unwrap());
             let pivot = unsafe { self.stems.get_unchecked(stem_idx) };
             is_right_child = unsafe { *query.get_unchecked(stem_strat.dim()) } >= *pivot;
-            stem_strat.traverse(is_right_child);
+            stem_strat.traverse::<A, K>(is_right_child);
         }
 
         (stem_strat, parent_stem_idx, is_right_child)
@@ -261,7 +261,7 @@ where
     ///     [4.0f64, 5.0f64, 6.0f64],
     /// ];
     ///
-    /// let tree: KdTree<f64, u32, Eytzinger<3>, FlatVec<f64, u32, 3, 32>, 3, 32> =
+    /// let tree: KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 3, 32>, 3, 32> =
     ///     KdTree::new_from_slice(&points).unwrap();
     ///
     /// assert_eq!(tree.size(), 2);
@@ -342,7 +342,7 @@ where
     ///     Point3D { id: 20, x: 4.0, y: 5.0, z: 6.0, w: 0.7 },
     /// ];
     ///
-    /// let tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+    /// let tree: KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 3, 32>, 3, 32> =
     ///     KdTree::new_from_source(
     ///         &points,
     ///         |point, dim| match dim {
@@ -393,7 +393,7 @@ where
     ///     (7u32, [2.0f32, 3.0f32]),
     /// ];
     ///
-    /// let tree: KdTree<f32, u32, Eytzinger<2>, FlatVec<f32, u32, 2, 32>, 2, 32> =
+    /// let tree: KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 2, 32>, 2, 32> =
     ///     KdTree::new_from_entries(&entries).unwrap();
     ///
     /// assert_eq!(tree.size(), 2);
@@ -441,7 +441,7 @@ where
         // so that stem_strat is set to the location where the true root will be
         let mut stem_strat = SS::new_no_ptr();
         for _ in 0..padding_level_count {
-            stem_strat.traverse(false);
+            stem_strat.traverse::<A, K>(false);
         }
         let root_stem_strat = stem_strat.clone();
 
@@ -460,7 +460,7 @@ where
         };
         for bit_idx in rightmost_leaf_bit_range.rev() {
             let is_right = rightmost_leaf_idx & (1 << bit_idx) != 0;
-            stem_strat.traverse(is_right);
+            stem_strat.traverse::<A, K>(is_right);
         }
         let stem_node_count = stem_strat.stem_idx() + 1;
 
@@ -517,7 +517,10 @@ where
         let stem_leaf_resolution = if requires_mapped_resolution {
             Self::mapped_stem_leaf_resolution_from_terminals(&terminal_stem_indices)
         } else {
-            LS::Mutability::initial_stem_leaf_resolution::<SS>(stems_depth, leaves.leaf_count())
+            LS::Mutability::initial_stem_leaf_resolution::<A, SS, K>(
+                stems_depth,
+                leaves.leaf_count(),
+            )
         };
 
         crate::leaf_view::assert_leaf_scratch_capacity(max_leaf_len);
@@ -566,7 +569,7 @@ where
         leaves.append_leaf(&leaf_points_refs, leaf_items.as_slice());
 
         let stem_leaf_resolution =
-            LS::Mutability::initial_stem_leaf_resolution::<SS>(0, leaves.leaf_count());
+            LS::Mutability::initial_stem_leaf_resolution::<A, SS, K>(0, leaves.leaf_count());
 
         let max_leaf_len = item_count;
         crate::leaf_view::assert_leaf_scratch_capacity(max_leaf_len);
@@ -608,7 +611,7 @@ where
     ///
     /// let points = vec![[1.0f64, 2.0f64], [3.0f64, 4.0f64]];
     ///
-    /// let tree: KdTree<f64, (), Eytzinger<2>, FlatVec<f64, (), 2, 32>, 2, 32> =
+    /// let tree: KdTree<f64, (), Eytzinger, FlatVec<f64, (), 2, 32>, 2, 32> =
     ///     KdTree::new_from_slice_no_items(&points).unwrap();
     ///
     /// assert_eq!(tree.size(), 2);
@@ -822,7 +825,7 @@ where
             }
         }
 
-        let right_stem_ordering = stem_ordering.branch();
+        let right_stem_ordering = stem_ordering.branch::<K>();
         let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
 
         Self::populate_recursive_hard(
@@ -929,7 +932,7 @@ where
             stems[stem_index] = axis_at(&source[sort_index[pivot]], dim);
         }
 
-        let right_stem_ordering = stem_ordering.branch();
+        let right_stem_ordering = stem_ordering.branch::<K>();
         let split_idx = pivot.min(chunk_length);
         let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(split_idx);
 
@@ -1015,7 +1018,7 @@ where
             let mut stem_ordering = SS::new_no_ptr();
             for bit_idx in (0..depth).rev() {
                 let is_right = leaf_idx & (1 << bit_idx) != 0;
-                stem_ordering.traverse(is_right);
+                stem_ordering.traverse::<A, K>(is_right);
             }
 
             if stem_ordering.stem_idx() != terminal_stem_idx {
@@ -1183,7 +1186,7 @@ mod tests {
 
     #[test]
     fn update_pivot_shifts_right_when_left_scan_hits_zero() {
-        type TestTree = KdTree<f32, u32, Eytzinger<2>, FlatVec<f32, u32, 2, 32>, 2, 32>;
+        type TestTree = KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 2, 32>, 2, 32>;
 
         let source = [
             [1.0f32, 10.0],
@@ -1211,7 +1214,7 @@ mod tests {
 
     #[test]
     fn replace_item_updates_flat_vec_tree_without_changing_size() {
-        type TestTree = KdTree<f32, u32, Eytzinger<2>, FlatVec<f32, u32, 2, 32>, 2, 32>;
+        type TestTree = KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 2, 32>, 2, 32>;
 
         let entries = [
             (10u32, [1.0f32, 10.0]),
@@ -1232,7 +1235,7 @@ mod tests {
 
     #[test]
     fn replace_item_returns_entry_not_found_when_exact_match_is_missing() {
-        type TestTree = KdTree<f32, u32, Eytzinger<2>, VecOfArrays<f32, u32, 2, 32>, 2, 32>;
+        type TestTree = KdTree<f32, u32, Eytzinger, VecOfArrays<f32, u32, 2, 32>, 2, 32>;
 
         let entries = [(10u32, [1.0f32, 10.0]), (11u32, [2.0, 20.0])];
         let mut tree = TestTree::new_from_entries(&entries).unwrap();
@@ -1249,7 +1252,7 @@ mod tests {
 
     #[test]
     fn replace_item_updates_vec_of_arenas_tree() {
-        type TestTree = KdTree<f64, u32, Eytzinger<2>, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
+        type TestTree = KdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
 
         let entries = [
             (20u32, [1.0f64, 10.0]),
@@ -1269,7 +1272,7 @@ mod tests {
 
     #[test]
     fn irregular_immutable_soft_layout_preserves_arithmetic_resolution() {
-        type TestTree = KdTree<f32, u32, Eytzinger<2>, FlatVec<f32, u32, 2, 2>, 2, 2>;
+        type TestTree = KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 2, 2>, 2, 2>;
 
         let points = vec![
             [3.0, 0.0],
@@ -1291,7 +1294,7 @@ mod tests {
         assert_eq!(
             (0..tree.leaf_count())
                 .map(|leaf_idx| {
-                    <FlatVec<f32, u32, 2, 2> as LeafStrategy<f32, u32, Eytzinger<2>, 2, 2>>::leaf_len(
+                    <FlatVec<f32, u32, 2, 2> as LeafStrategy<f32, u32, Eytzinger, 2, 2>>::leaf_len(
                         &tree.leaves,
                         leaf_idx,
                     )
@@ -1310,7 +1313,7 @@ mod tests {
 
     #[test]
     fn irregular_hard_terminal_layout_is_detected_and_mapped() {
-        type TestTree = KdTree<f32, u32, Eytzinger<2>, VecOfArrays<f32, u32, 2, 2>, 2, 2>;
+        type TestTree = KdTree<f32, u32, Eytzinger, VecOfArrays<f32, u32, 2, 2>, 2, 2>;
 
         let terminal_stem_indices = vec![8usize, 10, 3];
 
@@ -1329,7 +1332,7 @@ mod tests {
 
     #[test]
     fn unsplittable_immutable_hard_bucket_returns_error() {
-        type TestTree = KdTree<f32, u32, Eytzinger<2>, VecOfArrays<f32, u32, 2, 2>, 2, 2>;
+        type TestTree = KdTree<f32, u32, Eytzinger, VecOfArrays<f32, u32, 2, 2>, 2, 2>;
 
         let points = vec![[1.0, 1.0], [1.0, 1.0], [1.0, 1.0]];
 

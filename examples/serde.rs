@@ -44,8 +44,7 @@ impl CityCsvRecord {
 // GeoNames dataset contains many near-duplicate coordinates.
 const BUCKET_SIZE: usize = 1024;
 
-type Tree =
-    KdTree<f32, usize, Eytzinger<3>, VecOfArrays<f32, usize, 3, BUCKET_SIZE>, 3, BUCKET_SIZE>;
+type Tree = KdTree<f32, usize, Eytzinger, VecOfArrays<f32, usize, 3, BUCKET_SIZE>, 3, BUCKET_SIZE>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Load in the cities data from the CSV and use it to populate a k-d tree, as per
@@ -116,7 +115,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Building an ImmutableKdTree...");
     // Build an ImmutableKdTree
     let start = Instant::now();
-    let kdtree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
+    let kdtree: KdTree<f32, u32, Eytzinger, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
         KdTree::new_from_slice(&city_points).unwrap();
     println!(
         "Built an ImmutableKdTree ({})",
@@ -144,7 +143,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut decompressor = GzDecoder::new(file);
     let mut bytes = Vec::new();
     decompressor.read_to_end(&mut bytes)?;
-    let deserialized_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
+    let deserialized_tree: KdTree<f32, u32, Eytzinger, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
         postcard::from_bytes(&bytes)?;
     println!(
         "Deserialized gzipped postcard file back into a k-d tree ({})",

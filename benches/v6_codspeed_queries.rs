@@ -5,14 +5,13 @@ use kiddo::dist::SquaredEuclidean;
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
 use kiddo::stem_strategy::donnelly_2_pf::DonnellyPf;
-use kiddo::stem_strategy::eytzinger_pf_far::EytzingerPfFar;
 #[cfg(all(
     feature = "simd",
     target_arch = "x86_64",
     any(target_feature = "avx2", target_feature = "avx512f")
 ))]
 use kiddo::stem_strategy::{Block3, DonnellyMarkerSimd};
-use kiddo::stem_strategy::{Donnelly, DonnellySimdDescent, Eytzinger, EytzingerPf};
+use kiddo::stem_strategy::{Donnelly, DonnellySimdDescent, Eytzinger};
 use kiddo::{LeafStrategy, StemStrategy};
 use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
@@ -32,14 +31,14 @@ const QUERY_SEED_F32: u64 = 0x5eed_0000_0000_1004;
 type BaselineLeavesF64 = VecOfArenas<f64, u32, K, B>;
 type BaselineLeavesF32 = VecOfArenas<f32, u32, K, B>;
 
-type BaselineTreeF64 = KdTree<f64, u32, EytzingerPf<K, 8>, BaselineLeavesF64, K, B>;
-type BaselineTreeF32 = KdTree<f32, u32, EytzingerPf<K, 8>, BaselineLeavesF32, K, B>;
+type BaselineTreeF64 = KdTree<f64, u32, Eytzinger, BaselineLeavesF64, K, B>;
+type BaselineTreeF32 = KdTree<f32, u32, Eytzinger, BaselineLeavesF32, K, B>;
 
-type FlatTreeF64 = KdTree<f64, u32, EytzingerPf<K, 8>, FlatVec<f64, u32, K, B>, K, B>;
-type VecOfArraysTreeF64 = KdTree<f64, u32, EytzingerPf<K, 8>, VecOfArrays<f64, u32, K, B>, K, B>;
+type FlatTreeF64 = KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, K, B>, K, B>;
+type VecOfArraysTreeF64 = KdTree<f64, u32, Eytzinger, VecOfArrays<f64, u32, K, B>, K, B>;
 
-type EytzingerTreeF64 = KdTree<f64, u32, Eytzinger<K>, BaselineLeavesF64, K, B>;
-type EytzingerPfFarTreeF64 = KdTree<f64, u32, EytzingerPfFar<K, 8>, BaselineLeavesF64, K, B>;
+type EytzingerTreeF64 = KdTree<f64, u32, Eytzinger, BaselineLeavesF64, K, B>;
+type EytzingerPfFarTreeF64 = KdTree<f64, u32, Eytzinger, BaselineLeavesF64, K, B>;
 type DonnellyTreeF64 = KdTree<f64, u32, Donnelly<3, 64, 8, K>, BaselineLeavesF64, K, B>;
 type DonnellyPfTreeF64 = KdTree<f64, u32, DonnellyPf<3, 64, 8, K>, BaselineLeavesF64, K, B>;
 type DonnellySimdDescentTreeF64 =

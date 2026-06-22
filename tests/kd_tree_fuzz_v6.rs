@@ -2776,6 +2776,17 @@ macro_rules! run_simd_matrix_f64 {
 }
 
 macro_rules! run_immutable_matrix_f32 {
+    ($runner:ident, $cfg:expr, $meta:expr, $prefix:literal, Eytzinger) => {
+        $runner::<2, 16, Eytzinger>($cfg, concat!($prefix, " K=2 B=16"), $meta);
+        $runner::<2, 32, Eytzinger>($cfg, concat!($prefix, " K=2 B=32"), $meta);
+        $runner::<2, 64, Eytzinger>($cfg, concat!($prefix, " K=2 B=64"), $meta);
+        $runner::<3, 16, Eytzinger>($cfg, concat!($prefix, " K=3 B=16"), $meta);
+        $runner::<3, 32, Eytzinger>($cfg, concat!($prefix, " K=3 B=32"), $meta);
+        $runner::<3, 64, Eytzinger>($cfg, concat!($prefix, " K=3 B=64"), $meta);
+        $runner::<4, 16, Eytzinger>($cfg, concat!($prefix, " K=4 B=16"), $meta);
+        $runner::<4, 32, Eytzinger>($cfg, concat!($prefix, " K=4 B=32"), $meta);
+        $runner::<4, 64, Eytzinger>($cfg, concat!($prefix, " K=4 B=64"), $meta);
+    };
     ($runner:ident, $cfg:expr, $meta:expr, $prefix:literal, $strategy:ident) => {
         $runner::<2, 16, $strategy<2>>($cfg, concat!($prefix, " K=2 B=16"), $meta);
         $runner::<2, 32, $strategy<2>>($cfg, concat!($prefix, " K=2 B=32"), $meta);
@@ -2790,6 +2801,17 @@ macro_rules! run_immutable_matrix_f32 {
 }
 
 macro_rules! run_immutable_matrix_f64 {
+    ($runner:ident, $cfg:expr, $meta:expr, $prefix:literal, Eytzinger) => {
+        $runner::<2, 16, Eytzinger>($cfg, concat!($prefix, " K=2 B=16"), $meta);
+        $runner::<2, 32, Eytzinger>($cfg, concat!($prefix, " K=2 B=32"), $meta);
+        $runner::<2, 64, Eytzinger>($cfg, concat!($prefix, " K=2 B=64"), $meta);
+        $runner::<3, 16, Eytzinger>($cfg, concat!($prefix, " K=3 B=16"), $meta);
+        $runner::<3, 32, Eytzinger>($cfg, concat!($prefix, " K=3 B=32"), $meta);
+        $runner::<3, 64, Eytzinger>($cfg, concat!($prefix, " K=3 B=64"), $meta);
+        $runner::<4, 16, Eytzinger>($cfg, concat!($prefix, " K=4 B=16"), $meta);
+        $runner::<4, 32, Eytzinger>($cfg, concat!($prefix, " K=4 B=32"), $meta);
+        $runner::<4, 64, Eytzinger>($cfg, concat!($prefix, " K=4 B=64"), $meta);
+    };
     ($runner:ident, $cfg:expr, $meta:expr, $prefix:literal, $strategy:ident) => {
         $runner::<2, 16, $strategy<2>>($cfg, concat!($prefix, " K=2 B=16"), $meta);
         $runner::<2, 32, $strategy<2>>($cfg, concat!($prefix, " K=2 B=32"), $meta);
@@ -2820,27 +2842,15 @@ fn fuzz_v6_mutable_f32() {
     };
 
     if run_non_simd_paths {
-        run_mutable_case_f32::<2, 32, Eytzinger<2>>(cfg, "v6 mutable f32 Eytzinger K=2 B=32", meta);
-        run_mutable_case_f32::<2, 64, Eytzinger<2>>(cfg, "v6 mutable f32 Eytzinger K=2 B=64", meta);
-        run_mutable_case_f32::<2, 128, Eytzinger<2>>(
-            cfg,
-            "v6 mutable f32 Eytzinger K=2 B=128",
-            meta,
-        );
-        run_mutable_case_f32::<3, 32, Eytzinger<3>>(cfg, "v6 mutable f32 Eytzinger K=3 B=32", meta);
-        run_mutable_case_f32::<3, 64, Eytzinger<3>>(cfg, "v6 mutable f32 Eytzinger K=3 B=64", meta);
-        run_mutable_case_f32::<3, 128, Eytzinger<3>>(
-            cfg,
-            "v6 mutable f32 Eytzinger K=3 B=128",
-            meta,
-        );
-        run_mutable_case_f32::<4, 32, Eytzinger<4>>(cfg, "v6 mutable f32 Eytzinger K=4 B=32", meta);
-        run_mutable_case_f32::<4, 64, Eytzinger<4>>(cfg, "v6 mutable f32 Eytzinger K=4 B=64", meta);
-        run_mutable_case_f32::<4, 128, Eytzinger<4>>(
-            cfg,
-            "v6 mutable f32 Eytzinger K=4 B=128",
-            meta,
-        );
+        run_mutable_case_f32::<2, 32, Eytzinger>(cfg, "v6 mutable f32 Eytzinger K=2 B=32", meta);
+        run_mutable_case_f32::<2, 64, Eytzinger>(cfg, "v6 mutable f32 Eytzinger K=2 B=64", meta);
+        run_mutable_case_f32::<2, 128, Eytzinger>(cfg, "v6 mutable f32 Eytzinger K=2 B=128", meta);
+        run_mutable_case_f32::<3, 32, Eytzinger>(cfg, "v6 mutable f32 Eytzinger K=3 B=32", meta);
+        run_mutable_case_f32::<3, 64, Eytzinger>(cfg, "v6 mutable f32 Eytzinger K=3 B=64", meta);
+        run_mutable_case_f32::<3, 128, Eytzinger>(cfg, "v6 mutable f32 Eytzinger K=3 B=128", meta);
+        run_mutable_case_f32::<4, 32, Eytzinger>(cfg, "v6 mutable f32 Eytzinger K=4 B=32", meta);
+        run_mutable_case_f32::<4, 64, Eytzinger>(cfg, "v6 mutable f32 Eytzinger K=4 B=64", meta);
+        run_mutable_case_f32::<4, 128, Eytzinger>(cfg, "v6 mutable f32 Eytzinger K=4 B=128", meta);
 
         let meta = ReproMeta {
             strategy: "donnelly",
@@ -2932,27 +2942,15 @@ fn fuzz_v6_mutable_f64() {
     };
 
     if run_non_simd_paths {
-        run_mutable_case_f64::<2, 32, Eytzinger<2>>(cfg, "v6 mutable f64 Eytzinger K=2 B=32", meta);
-        run_mutable_case_f64::<2, 64, Eytzinger<2>>(cfg, "v6 mutable f64 Eytzinger K=2 B=64", meta);
-        run_mutable_case_f64::<2, 128, Eytzinger<2>>(
-            cfg,
-            "v6 mutable f64 Eytzinger K=2 B=128",
-            meta,
-        );
-        run_mutable_case_f64::<3, 32, Eytzinger<3>>(cfg, "v6 mutable f64 Eytzinger K=3 B=32", meta);
-        run_mutable_case_f64::<3, 64, Eytzinger<3>>(cfg, "v6 mutable f64 Eytzinger K=3 B=64", meta);
-        run_mutable_case_f64::<3, 128, Eytzinger<3>>(
-            cfg,
-            "v6 mutable f64 Eytzinger K=3 B=128",
-            meta,
-        );
-        run_mutable_case_f64::<4, 32, Eytzinger<4>>(cfg, "v6 mutable f64 Eytzinger K=4 B=32", meta);
-        run_mutable_case_f64::<4, 64, Eytzinger<4>>(cfg, "v6 mutable f64 Eytzinger K=4 B=64", meta);
-        run_mutable_case_f64::<4, 128, Eytzinger<4>>(
-            cfg,
-            "v6 mutable f64 Eytzinger K=4 B=128",
-            meta,
-        );
+        run_mutable_case_f64::<2, 32, Eytzinger>(cfg, "v6 mutable f64 Eytzinger K=2 B=32", meta);
+        run_mutable_case_f64::<2, 64, Eytzinger>(cfg, "v6 mutable f64 Eytzinger K=2 B=64", meta);
+        run_mutable_case_f64::<2, 128, Eytzinger>(cfg, "v6 mutable f64 Eytzinger K=2 B=128", meta);
+        run_mutable_case_f64::<3, 32, Eytzinger>(cfg, "v6 mutable f64 Eytzinger K=3 B=32", meta);
+        run_mutable_case_f64::<3, 64, Eytzinger>(cfg, "v6 mutable f64 Eytzinger K=3 B=64", meta);
+        run_mutable_case_f64::<3, 128, Eytzinger>(cfg, "v6 mutable f64 Eytzinger K=3 B=128", meta);
+        run_mutable_case_f64::<4, 32, Eytzinger>(cfg, "v6 mutable f64 Eytzinger K=4 B=32", meta);
+        run_mutable_case_f64::<4, 64, Eytzinger>(cfg, "v6 mutable f64 Eytzinger K=4 B=64", meta);
+        run_mutable_case_f64::<4, 128, Eytzinger>(cfg, "v6 mutable f64 Eytzinger K=4 B=128", meta);
 
         let meta = ReproMeta {
             strategy: "donnelly",
@@ -3268,16 +3266,11 @@ const ADVERSARIAL_PATTERNS: [AdversarialPattern; 4] = [
 type EntryF32 = ([f32; 2], usize);
 #[cfg(feature = "simd")]
 type EntryF64 = ([f64; 2], usize);
-type ApproxTreeF32Builder = fn(
-    &[[f32; 2]],
-) -> KdTree<
-    f32,
-    usize,
-    Eytzinger<2>,
-    FlatVec<f32, usize, 2, ADVERSARIAL_B>,
-    2,
-    ADVERSARIAL_B,
->;
+type ApproxTreeF32Builder =
+    fn(
+        &[[f32; 2]],
+    )
+        -> KdTree<f32, usize, Eytzinger, FlatVec<f32, usize, 2, ADVERSARIAL_B>, 2, ADVERSARIAL_B>;
 
 fn adversarial_queries_f32() -> [[f32; 2]; 6] {
     [
@@ -4130,11 +4123,11 @@ fn fuzz_v6_adversarial_fast_non_simd() {
         return;
     }
 
-    run_adversarial_immutable_f32::<Eytzinger<2>>("v6 adversarial non-simd f32 Eytzinger");
-    run_adversarial_immutable_f32_arenas::<Eytzinger<2>>(
+    run_adversarial_immutable_f32::<Eytzinger>("v6 adversarial non-simd f32 Eytzinger");
+    run_adversarial_immutable_f32_arenas::<Eytzinger>(
         "v6 adversarial non-simd f32 Eytzinger VecOfArenas",
     );
-    run_adversarial_mutable_f32::<Eytzinger<2>>("v6 adversarial non-simd f32 Eytzinger");
+    run_adversarial_mutable_f32::<Eytzinger>("v6 adversarial non-simd f32 Eytzinger");
     run_adversarial_immutable_f32::<DonnellyF32<2>>("v6 adversarial non-simd f32 Donnelly");
     run_adversarial_immutable_f32_arenas::<DonnellyF32<2>>(
         "v6 adversarial non-simd f32 Donnelly VecOfArenas",
@@ -4725,8 +4718,8 @@ fn record_approx_quality_case_f64<SO, const B: usize>(
 #[test]
 fn fuzz_v6_approx_nearest_one_fast_hard() {
     if should_run_non_simd_paths() {
-        run_approx_hard_immutable_f32::<Eytzinger<2>>("v6 approx hard non-simd f32 Eytzinger");
-        run_approx_hard_mutable_f32::<Eytzinger<2>>("v6 approx hard non-simd f32 Eytzinger");
+        run_approx_hard_immutable_f32::<Eytzinger>("v6 approx hard non-simd f32 Eytzinger");
+        run_approx_hard_mutable_f32::<Eytzinger>("v6 approx hard non-simd f32 Eytzinger");
         run_approx_hard_immutable_f32::<DonnellyF32<2>>("v6 approx hard non-simd f32 Donnelly");
         run_approx_hard_mutable_f32::<DonnellyF32<2>>("v6 approx hard non-simd f32 Donnelly");
     }
@@ -4805,7 +4798,7 @@ fn fuzz_v6_approx_nearest_one_quality() {
             KdTree::<
                 f32,
                 usize,
-                Eytzinger<2>,
+                Eytzinger,
                 FlatVec<f32, usize, 2, ADVERSARIAL_B>,
                 2,
                 ADVERSARIAL_B,

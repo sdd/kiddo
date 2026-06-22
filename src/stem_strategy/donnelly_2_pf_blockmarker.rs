@@ -11,7 +11,7 @@ use crate::{Axis, StemStrategy};
 /// Donnelly Strategy
 ///
 /// A block-based stem strategy with prefetching, optimized for cache sympathy.
-/// Like a non-recursive Van Emde Boas layout.
+/// Like a non-recursive Van Emde Boas layout, padded for cache alignment
 ///
 /// - BS: Block size, i.e. minor tri height.
 /// - CL: Cache line width in bytes (Most of the time, 64. Can be 128 for Apple M2+)
@@ -60,45 +60,31 @@ macro_rules! impl_donnelly_stem_strategy {
             #[inline(always)]
             fn leaf_idx(&self) -> usize { self.core.leaf_idx() }
 
-            // TODO: I temporarily changed this strat so that
-            //  it only changes dim once every 3 levels. This
-            //  meant I could compare how it processed and backtracked
-            //  to the newer SIMD variant so I could see where the
-            //  SIMD one was going wrong.
-            //  Revert these once happy with SIMD behaviour
             #[inline(always)]
             fn dim(&self) -> usize { self.core.dim() }
-            // #[inline(always)]
-            // fn dim(&self) -> usize {
-            //     self.core.level() as usize / 3 % K
-            // }
-            // #[inline(always)]
-            // fn construction_dim(&self) -> usize {
-            //     self.core.level() as usize / 3 % K
-            // }
 
             #[inline(always)]
             fn level(&self) -> i32 { self.core.level() }
 
             #[inline(always)]
-            fn traverse(&mut self, is_right: bool) {
-                self.core.traverse(is_right)
+            fn traverse<A: Axis<Coord = A>, const K2: usize>(&mut self, is_right: bool) {
+                self.core.traverse::<A, K2>(is_right)
             }
 
             #[inline(always)]
-            fn traverse_head(&mut self, is_right: bool) {
-                self.core.traverse_head(is_right)
+            fn traverse_head<A: Axis<Coord = A>, const K2: usize>(&mut self, is_right: bool) {
+                self.core.traverse_head::<A, K2>(is_right)
             }
 
             #[inline(always)]
-            fn traverse_tail(&mut self, is_right: bool) {
+            fn traverse_tail<A: Axis<Coord = A>, const K2: usize>(&mut self, is_right: bool) {
                 self.core.traverse_tail_with_block_size(is_right, $size)
             }
 
             #[inline(always)]
-            fn branch(&mut self) -> Self {
+            fn branch<const K2: usize>(&mut self) -> Self {
                 Self {
-                    core: self.core.branch(),
+                    core: self.core.branch::<K2>(),
                     _marker: PhantomData,
                 }
             }
@@ -117,7 +103,7 @@ macro_rules! impl_donnelly_stem_strategy {
 
             fn block_size() -> usize { $size }
 
-            fn get_leaf_idx<A: Axis, const K2: usize>(
+            fn get_leaf_idx<A: Axis<Coord = A>, const K2: usize>(
                 stems: &[A],
                 query: &[A; K2],
                 max_stem_level: i32,
@@ -132,7 +118,7 @@ macro_rules! impl_donnelly_stem_strategy {
                 while strat.level() <= max_stem_level {
                     let pivot = unsafe { stems.get_unchecked(strat.stem_idx()) };
                     let is_right = unsafe { *query.get_unchecked(strat.dim()) } >= *pivot;
-                    strat.traverse(is_right);
+                    strat.traverse::<A, K2>(is_right);
                 }
 
                 strat.leaf_idx()
@@ -193,24 +179,24 @@ macro_rules! impl_donnelly_stem_strategy {
             }
 
             #[inline(always)]
-            fn traverse(&mut self, is_right: bool) {
-                self.core.traverse(is_right)
+            fn traverse<A: Axis<Coord = A>, const K2: usize>(&mut self, is_right: bool) {
+                self.core.traverse::<A, K2>(is_right)
             }
 
             #[inline(always)]
-            fn traverse_head(&mut self, is_right: bool) {
-                self.core.traverse_head(is_right)
+            fn traverse_head<A: Axis<Coord = A>, const K2: usize>(&mut self, is_right: bool) {
+                self.core.traverse_head::<A, K2>(is_right)
             }
 
             #[inline(always)]
-            fn traverse_tail(&mut self, is_right: bool) {
+            fn traverse_tail<A: Axis<Coord = A>, const K2: usize>(&mut self, is_right: bool) {
                 self.core.traverse_tail_with_block_size(is_right, $size)
             }
 
             #[inline(always)]
-            fn branch(&mut self) -> Self {
+            fn branch<const K2: usize>(&mut self) -> Self {
                 Self {
-                    core: self.core.branch(),
+                    core: self.core.branch::<K2>(),
                     _marker: PhantomData,
                 }
             }
@@ -232,7 +218,7 @@ macro_rules! impl_donnelly_stem_strategy {
                 $size
             }
 
-            fn get_leaf_idx<A: Axis, const K2: usize>(
+            fn get_leaf_idx<A: Axis<Coord = A>, const K2: usize>(
                 stems: &[A],
                 query: &[A; K2],
                 max_stem_level: i32,
@@ -247,7 +233,7 @@ macro_rules! impl_donnelly_stem_strategy {
                 while strat.level() <= max_stem_level {
                     let pivot = unsafe { stems.get_unchecked(strat.stem_idx()) };
                     let is_right = unsafe { *query.get_unchecked(strat.dim()) } >= *pivot;
-                    strat.traverse(is_right);
+                    strat.traverse::<A, K2>(is_right);
                 }
 
                 strat.leaf_idx()
@@ -294,12 +280,12 @@ macro_rules! impl_donnelly_stem_strategy {
     (@head $stems:expr, $query:expr, $strat:expr) => {{
         let pivot = unsafe { $stems.get_unchecked($strat.stem_idx()) };
         let is_right = unsafe { *$query.get_unchecked($strat.dim()) } >= *pivot;
-        $strat.traverse_head(is_right);
+        $strat.traverse_head::<A, K2>(is_right);
     }};
     (@tail $stems:expr, $query:expr, $strat:expr) => {{
         let pivot = unsafe { $stems.get_unchecked($strat.stem_idx()) };
         let is_right = unsafe { *$query.get_unchecked($strat.dim()) } >= *pivot;
-        $strat.traverse_tail(is_right);
+        $strat.traverse_tail::<A, K2>(is_right);
     }};
 }
 
@@ -330,8 +316,8 @@ mod tests {
         assert_eq!(Block3Scalar::block_size(), 3);
 
         let saved = strat.deferred_state();
-        strat.traverse(true);
-        strat.traverse(false);
+        strat.traverse::<f64, 3>(true);
+        strat.traverse::<f64, 3>(false);
         assert_ne!(strat.stem_idx(), saved.stem_idx());
         assert_ne!(strat.leaf_idx(), saved.leaf_idx());
 
@@ -351,15 +337,15 @@ mod tests {
         let mut wrapper = Block3Scalar::new(stems_ptr);
         let mut core = DonnellyCore::<64, 8, 3>::new(stems_ptr);
 
-        wrapper.traverse_head(true);
-        core.traverse_head(true);
+        wrapper.traverse_head::<f64, 3>(true);
+        core.traverse_head::<f64, 3>(true);
         assert_eq!(wrapper.stem_idx(), core.stem_idx());
         assert_eq!(wrapper.leaf_idx(), core.leaf_idx());
         assert_eq!(wrapper.level(), core.level());
         assert_eq!(wrapper.dim(), core.level() as usize / 3 % 3);
         assert_eq!(wrapper.construction_dim(), core.level() as usize / 3 % 3);
 
-        wrapper.traverse_tail(false);
+        wrapper.traverse_tail::<f64, 3>(false);
         core.traverse_tail_with_block_size(false, 3);
         assert_eq!(wrapper.stem_idx(), core.stem_idx());
         assert_eq!(wrapper.leaf_idx(), core.leaf_idx());
@@ -368,8 +354,8 @@ mod tests {
 
         let mut branched_wrapper = Block3Scalar::new(stems_ptr);
         let mut branched_core = DonnellyCore::<64, 8, 3>::new(stems_ptr);
-        let right_wrapper = branched_wrapper.branch();
-        let right_core = branched_core.branch();
+        let right_wrapper = branched_wrapper.branch::<3>();
+        let right_core = branched_core.branch::<3>();
 
         assert_eq!(branched_wrapper.stem_idx(), branched_core.stem_idx());
         assert_eq!(branched_wrapper.leaf_idx(), branched_core.leaf_idx());
@@ -389,7 +375,7 @@ mod tests {
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         let mut manual = Block3Scalar::new(stems_ptr);
         while manual.level() <= 4 {
-            manual.traverse(true);
+            manual.traverse::<f64, 3>(true);
         }
 
         assert_eq!(leaf_idx, manual.leaf_idx());

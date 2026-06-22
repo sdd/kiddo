@@ -672,8 +672,6 @@ mod tests {
     use crate::leaf_strategy::VecOfArenas;
     use crate::leaf_strategy::{FlatVec, VecOfArrays};
     use crate::stem_strategy::Donnelly;
-    #[cfg(feature = "rkyv_08")]
-    use crate::stem_strategy::EytzingerPf;
     #[cfg(all(feature = "rkyv_08", feature = "simd", target_arch = "x86_64"))]
     use crate::stem_strategy::{Block4, DonnellyMarkerSimd};
     use crate::Eytzinger;
@@ -697,7 +695,7 @@ mod tests {
 
     #[test]
     fn test_default() {
-        let kd_tree: KdTree<f32, u32, Eytzinger<3>, DummyLeafStrategy, 3, 16> = Default::default();
+        let kd_tree: KdTree<f32, u32, Eytzinger, DummyLeafStrategy, 3, 16> = Default::default();
 
         assert_eq!(kd_tree.size, 0);
         assert!(kd_tree.is_empty());
@@ -707,7 +705,7 @@ mod tests {
     fn test_from_iterator_empty() {
         let points = vec![[0.0f64; 3]];
 
-        let kd_tree: KdTree<f64, u32, Eytzinger<3>, DummyLeafStrategy, 3, 16> =
+        let kd_tree: KdTree<f64, u32, Eytzinger, DummyLeafStrategy, 3, 16> =
             points.into_iter().enumerate().collect();
 
         assert_eq!(kd_tree.size, 0);
@@ -915,9 +913,9 @@ mod tests {
     #[cfg(feature = "rkyv_08")]
     #[test]
     fn rkyv_archived_vec_of_arenas_supports_queries() {
-        type Tree = KdTree<f64, u32, EytzingerPf<3, 8>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
+        type Tree = KdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
         type ArchivedTree =
-            ArchivedKdTree<f64, u32, EytzingerPf<3, 8>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
+            ArchivedKdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
 
         let points: Vec<[f64; 3]> = (0..4096)
             .map(|i| {
@@ -1092,7 +1090,7 @@ mod tests {
     #[test]
     fn can_create_points_only_tree() {
         // points-only tree can be created by specifying T / Item parameter as ()
-        type Tree = KdTree<f64, (), Eytzinger<3>, VecOfArrays<f64, (), 3, 256>, 3, 256>;
+        type Tree = KdTree<f64, (), Eytzinger, VecOfArrays<f64, (), 3, 256>, 3, 256>;
 
         let points = vec![[0.0f64; 3]];
 
@@ -1104,7 +1102,7 @@ mod tests {
     #[test]
     fn can_add_to_and_remove_from_points_only_tree() {
         // points-only tree can be created by specifying T / Item parameter as ()
-        type Tree = KdTree<f64, (), Eytzinger<3>, VecOfArrays<f64, (), 3, 256>, 3, 256>;
+        type Tree = KdTree<f64, (), Eytzinger, VecOfArrays<f64, (), 3, 256>, 3, 256>;
 
         let points = vec![[0.0f64; 3]];
 
@@ -1124,7 +1122,7 @@ mod tests {
 
     #[test]
     fn new_from_entries_preserves_explicit_items() {
-        type Tree = KdTree<f32, u32, Eytzinger<2>, FlatVec<f32, u32, 2, 4>, 2, 4>;
+        type Tree = KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 2, 4>, 2, 4>;
 
         let entries = vec![
             (42u32, [0.0f32, 0.0f32]),
@@ -1149,7 +1147,7 @@ mod tests {
 
     #[test]
     fn new_from_source_accepts_custom_source_structs() {
-        type Tree = KdTree<f64, u32, Eytzinger<2>, FlatVec<f64, u32, 2, 4>, 2, 4>;
+        type Tree = KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 2, 4>, 2, 4>;
 
         #[derive(Clone, Copy)]
         struct SourcePoint {
@@ -1200,7 +1198,7 @@ mod tests {
 
     #[test]
     fn new_from_source_can_use_indices_for_items() {
-        type Tree = KdTree<f64, u32, Eytzinger<2>, FlatVec<f64, u32, 2, 4>, 2, 4>;
+        type Tree = KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 2, 4>, 2, 4>;
 
         let source = [[0.0f64, 0.0f64], [3.0f64, 3.0f64], [9.0f64, 1.0f64]];
 
@@ -1223,7 +1221,7 @@ mod tests {
 
     #[test]
     fn try_from_kdtree_converts_across_variants() {
-        type SourceTree = KdTree<f32, u16, Eytzinger<2>, VecOfArrays<f32, u16, 2, 4>, 2, 4>;
+        type SourceTree = KdTree<f32, u16, Eytzinger, VecOfArrays<f32, u16, 2, 4>, 2, 4>;
         type DestTree = KdTree<f64, u32, Donnelly<2, 64, 4, 2>, FlatVec<f64, u32, 2, 8>, 2, 8>;
 
         let entries = vec![
@@ -1263,8 +1261,8 @@ mod tests {
 
     #[test]
     fn try_from_kdtree_reports_item_conversion_failure() {
-        type SourceTree = KdTree<u16, u16, Eytzinger<2>, FlatVec<u16, u16, 2, 4>, 2, 4>;
-        type DestTree = KdTree<u16, u8, Eytzinger<2>, FlatVec<u16, u8, 2, 4>, 2, 4>;
+        type SourceTree = KdTree<u16, u16, Eytzinger, FlatVec<u16, u16, 2, 4>, 2, 4>;
+        type DestTree = KdTree<u16, u8, Eytzinger, FlatVec<u16, u8, 2, 4>, 2, 4>;
 
         let source = SourceTree::new_from_entries(&[(300u16, [1u16, 2u16])]).unwrap();
         let err = match DestTree::try_from(&source) {
@@ -1280,8 +1278,8 @@ mod tests {
 
     #[test]
     fn try_from_kdtree_reports_axis_conversion_failure() {
-        type SourceTree = KdTree<u16, u16, Eytzinger<2>, FlatVec<u16, u16, 2, 4>, 2, 4>;
-        type DestTree = KdTree<u8, u16, Eytzinger<2>, FlatVec<u8, u16, 2, 4>, 2, 4>;
+        type SourceTree = KdTree<u16, u16, Eytzinger, FlatVec<u16, u16, 2, 4>, 2, 4>;
+        type DestTree = KdTree<u8, u16, Eytzinger, FlatVec<u8, u16, 2, 4>, 2, 4>;
 
         let source = SourceTree::new_from_entries(&[(7u16, [300u16, 2u16])]).unwrap();
         let err = match DestTree::try_from(&source) {
@@ -1301,8 +1299,8 @@ mod tests {
 
     #[test]
     fn try_from_kdtree_converts_mutable_to_immutable() {
-        type SourceTree = KdTree<u16, u16, Eytzinger<2>, VecOfArrays<u16, u16, 2, 4>, 2, 4>;
-        type DestTree = KdTree<u16, u16, Eytzinger<2>, FlatVec<u16, u16, 2, 4>, 2, 4>;
+        type SourceTree = KdTree<u16, u16, Eytzinger, VecOfArrays<u16, u16, 2, 4>, 2, 4>;
+        type DestTree = KdTree<u16, u16, Eytzinger, FlatVec<u16, u16, 2, 4>, 2, 4>;
 
         let entries = vec![
             (1u16, [1u16, 1u16]),

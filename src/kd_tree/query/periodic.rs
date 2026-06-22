@@ -575,7 +575,7 @@ fn periodic_backtracking_query<Tree, A, T, SS, LS, QC, O, D, F, const K: usize, 
             };
 
             if pivot >= A::max_value() {
-                stem_strat.traverse(false);
+                stem_strat.traverse::<A, K>(false);
                 continue;
             }
 
@@ -585,7 +585,7 @@ fn periodic_backtracking_query<Tree, A, T, SS, LS, QC, O, D, F, const K: usize, 
             let query_val = query[dim];
             let query_wide_val = query_wide[dim];
             let is_right_child = query_val >= pivot;
-            let far_ctx = stem_strat.branch_relative(is_right_child);
+            let far_ctx = stem_strat.branch_relative::<K>(is_right_child);
 
             let (near_lower, near_upper, far_lower, far_upper) = if is_right_child {
                 (
