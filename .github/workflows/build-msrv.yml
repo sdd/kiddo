@@ -59,7 +59,7 @@ jobs:
           options: --features=serde,rkyv_08,test_utils --no-deps
           name: Clippy (MSRV)
 
-      - name: Clippy (MSRV, dependabot fallback)
+      - name: Clippy (MSRV)
         if: github.actor == 'dependabot[bot]'
         run: cargo clippy --features=serde,rkyv_08,test_utils --no-deps
 

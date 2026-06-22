@@ -58,7 +58,7 @@ jobs:
           options: --features fixed,rkyv_08,serde --no-deps
           name: Clippy nightly
 
-      - name: Clippy (Nightly, dependabot fallback)
+      - name: Clippy (Nightly)
         if: github.actor == 'dependabot[bot]'
         run: cargo clippy --features fixed,rkyv_08,serde --no-deps
 
