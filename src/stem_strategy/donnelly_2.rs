@@ -85,7 +85,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         self.level
     }
 
-    fn traverse(&mut self, is_right: bool) {
+    fn traverse<A: Axis<Coord = A>, const K2: usize>(&mut self, is_right: bool) {
         let (idx, lvl) = Self::step_pure(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
         self.stem_idx = idx;
         self.minor_level = lvl;
@@ -100,7 +100,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
 
     /// When running loop-unrolled, traverse_head operates under the assumption that
     /// we stay within a minor triangle and don't hit the bottom level of the tree as a whole
-    fn traverse_head(&mut self, is_right: bool) {
+    fn traverse_head<A: Axis<Coord = A>, const K2: usize>(&mut self, is_right: bool) {
         let (idx, lvl) =
             Self::step_pure_head(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
         self.stem_idx = idx;
@@ -116,7 +116,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
 
     /// When running loop-unrolled, traverse_head operates under the assumption that
     /// we are on the bottom level of a minor triangle
-    fn traverse_tail(&mut self, is_right: bool) {
+    fn traverse_tail<A: Axis<Coord = A>, const K2: usize>(&mut self, is_right: bool) {
         let (idx, lvl) =
             Self::step_pure_tail(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
         self.stem_idx = idx;
@@ -131,7 +131,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
     }
 
     #[cfg(feature = "simulator")]
-    fn simulate_traverse(
+    fn simulate_traverse<A: Axis<Coord = A>, const K2: usize>(
         &mut self,
         is_right: bool,
         event_tx: &std::sync::mpsc::Sender<crate::test_utils::cache_simulator::Event>,
@@ -139,7 +139,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         use crate::test_utils::cache_simulator::Event;
 
         // Execute the real traversal logic
-        self.traverse(is_right);
+        self.traverse::<A, K2>(is_right);
 
         // Emit synthetic "work" delay representing ~5 cycles of integer ops
 
@@ -150,7 +150,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         let _ = event_tx.send(Event::Working(5));
     }
 
-    fn branch(&mut self) -> Self {
+    fn branch<const K2: usize>(&mut self) -> Self {
         let (left, right) = Self::both_children_pure(self.stem_idx, self.minor_level);
 
         // mutate self into left
@@ -173,7 +173,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
         }
     }
 
-    fn branch_relative(&mut self, is_right: bool) -> Self {
+    fn branch_relative<const K2: usize>(&mut self, is_right: bool) -> Self {
         // precompute both children (left,right) at current (stem_idx, minor_level)
         let (left, right) = Self::both_children_pure(self.stem_idx, self.minor_level);
 
@@ -254,7 +254,7 @@ impl<const L: u32, const CL: u32, const VB: u32, const K: usize> StemStrategy
             loop {
                 let val = &stems[so.stem_idx()];
                 let is_right_child = !A::is_max_value(*val);
-                so.traverse(is_right_child);
+                so.traverse::<A, K>(is_right_child);
                 if so.level() as usize == max_stem_level {
                     break;
                 }
@@ -548,9 +548,9 @@ pub fn test_traverse_hook(is_right_child: bool, stems: *mut u8) -> usize {
 
     let mut stem_strat = Donnelly::<3, 64, 8, 3>::new(stems_ptr);
 
-    stem_strat.traverse(is_right_child);
-    stem_strat.traverse(!is_right_child);
-    stem_strat.traverse(is_right_child);
+    stem_strat.traverse::<f64, 3>(is_right_child);
+    stem_strat.traverse::<f64, 3>(!is_right_child);
+    stem_strat.traverse::<f64, 3>(is_right_child);
 
     stem_strat.stem_idx()
 }
@@ -650,7 +650,7 @@ mod tests {
         let mut stem_strat = Donnelly::<3, 64, 8, 3>::new(stems_ptr);
         let mut result = 0;
         input.iter().for_each(|selection| {
-            stem_strat.traverse(*selection);
+            stem_strat.traverse::<f64, 3>(*selection);
             result = stem_strat.stem_idx();
         });
 
@@ -713,10 +713,10 @@ mod tests {
 
         // let last = input.last().unwrap();
         input.iter().for_each(|selection| {
-            stem_strat.branch_relative(*selection);
+            stem_strat.branch_relative::<3>(*selection);
         });
 
-        let results = stem_strat.split();
+        let results = stem_strat.split::<3>();
         let result = (results.0.stem_idx(), results.1.stem_idx());
 
         assert_eq!(result, expected);
@@ -778,11 +778,11 @@ mod tests {
         let mut minor_tri_idx = 0;
         input.iter().for_each(|selection| {
             if minor_tri_idx == 2 {
-                stem_strat.traverse_tail(*selection);
+                stem_strat.traverse_tail::<f64, 3>(*selection);
                 minor_tri_idx = 0;
             } else {
                 minor_tri_idx += 1;
-                stem_strat.traverse_head(*selection);
+                stem_strat.traverse_head::<f64, 3>(*selection);
             }
 
             result = stem_strat.stem_idx();

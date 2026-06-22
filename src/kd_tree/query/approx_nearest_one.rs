@@ -97,11 +97,11 @@ pub mod cargo_asm {
     const BUCKET_SIZE: usize = 64;
 
     type FlatVecKdT =
-        KdTree<f64, usize, Eytzinger<K>, FlatVec<f64, usize, K, BUCKET_SIZE>, K, BUCKET_SIZE>;
+        KdTree<f64, usize, Eytzinger, FlatVec<f64, usize, K, BUCKET_SIZE>, K, BUCKET_SIZE>;
     type VecOfArraysKdT =
-        KdTree<f64, usize, Eytzinger<K>, VecOfArrays<f64, usize, K, BUCKET_SIZE>, K, BUCKET_SIZE>;
+        KdTree<f64, usize, Eytzinger, VecOfArrays<f64, usize, K, BUCKET_SIZE>, K, BUCKET_SIZE>;
     type VecOfArenasKdT =
-        KdTree<f64, usize, Eytzinger<K>, VecOfArenas<f64, usize, K, BUCKET_SIZE>, K, BUCKET_SIZE>;
+        KdTree<f64, usize, Eytzinger, VecOfArenas<f64, usize, K, BUCKET_SIZE>, K, BUCKET_SIZE>;
 
     /// Hook for cargo-asm to render the v6 approx-nearest-one call path.
     #[inline(never)]
@@ -175,7 +175,7 @@ mod tests {
             points.push([x, y, z]);
         }
 
-        let tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+        let tree: KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
         assert!(!tree.is_empty());
@@ -207,7 +207,7 @@ mod tests {
             points.push([x, y, z]);
         }
 
-        let tree: KdTree<f32, (), Eytzinger<3>, FlatVec<f32, (), 3, 32>, 3, 32> =
+        let tree: KdTree<f32, (), Eytzinger, FlatVec<f32, (), 3, 32>, 3, 32> =
             KdTree::new_from_slice_no_items(&points).unwrap();
 
         assert!(!tree.is_empty());
@@ -239,7 +239,7 @@ mod tests {
             points.push([x, y, z]);
         }
 
-        let tree: KdTree<f32, u32, Eytzinger<3>, VecOfArrays<f32, u32, 3, 32>, 3, 32> =
+        let tree: KdTree<f32, u32, Eytzinger, VecOfArrays<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
         assert!(!tree.is_empty());
@@ -270,9 +270,9 @@ mod tests {
         ];
         let query = [0.39f32, 0.51, 0.61];
 
-        let flat_tree: KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+        let flat_tree: KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
-        let arena_tree: KdTree<f32, u32, Eytzinger<3>, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
+        let arena_tree: KdTree<f32, u32, Eytzinger, VecOfArenas<f32, u32, 3, 32>, 3, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
         let flat_result = flat_tree
@@ -302,7 +302,7 @@ mod tests {
             points.push([x, y, z]);
         }
 
-        let mut tree: KdTree<f32, u32, Eytzinger<3>, VecOfArrays<f32, u32, 3, 32>, 3, 32> =
+        let mut tree: KdTree<f32, u32, Eytzinger, VecOfArrays<f32, u32, 3, 32>, 3, 32> =
             KdTree::default();
 
         for (idx, point) in points.iter().enumerate() {
@@ -352,7 +352,7 @@ mod tests {
             points.push([x, y, z]);
         }
 
-        let mut tree: KdTree<f32, u32, Eytzinger<3>, VecOfArrays<f32, u32, 3, 32>, 3, 32> =
+        let mut tree: KdTree<f32, u32, Eytzinger, VecOfArrays<f32, u32, 3, 32>, 3, 32> =
             KdTree::default();
 
         for (idx, point) in points.iter().enumerate() {
@@ -412,7 +412,7 @@ mod tests {
             points.push([x, y, z]);
         }
 
-        let mut tree: KdTree<f32, u32, Eytzinger<3>, VecOfArrays<f32, u32, 3, 32>, 3, 32> =
+        let mut tree: KdTree<f32, u32, Eytzinger, VecOfArrays<f32, u32, 3, 32>, 3, 32> =
             KdTree::default();
 
         for (idx, point) in points.iter().enumerate() {
@@ -499,7 +499,7 @@ mod tests {
             })
             .collect();
 
-        let tree_eytz: KdTree<f32, u32, Eytzinger<4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
+        let tree_eytz: KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 4, 32>, 4, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
         let tree_donnelly: KdTree<
@@ -560,7 +560,7 @@ mod tests {
             })
             .collect();
 
-        let tree_eytz: KdTree<f32, u32, Eytzinger<4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
+        let tree_eytz: KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 4, 32>, 4, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
         let tree_donnelly: KdTree<

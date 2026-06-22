@@ -694,14 +694,14 @@ where
     }
 
     #[inline(always)]
-    fn traverse(&mut self, is_right: bool) {
-        self.core.traverse(is_right)
+    fn traverse<A: Axis<Coord = A>, const K2: usize>(&mut self, is_right: bool) {
+        self.core.traverse::<A, K2>(is_right)
     }
 
     #[inline(always)]
-    fn branch(&mut self) -> Self {
+    fn branch<const K2: usize>(&mut self) -> Self {
         Self {
-            core: self.core.branch(),
+            core: self.core.branch::<K2>(),
             _marker: std::marker::PhantomData,
         }
     }
@@ -711,7 +711,7 @@ where
         self.core.child_indices()
     }
 
-    fn get_leaf_idx<A: Axis, const K2: usize>(
+    fn get_leaf_idx<A: Axis<Coord = A>, const K2: usize>(
         stems: &[A],
         query: &[A; K2],
         max_stem_level: i32,
@@ -745,7 +745,7 @@ where
                 } else {
                     false
                 };
-                strat.traverse(is_right);
+                strat.traverse::<A, K2>(is_right);
             }
         }
 
@@ -823,7 +823,7 @@ where
             };
             if pivot < A::max_value() {
                 let is_right_child = query_val >= pivot;
-                let far_ctx = self.branch_relative(is_right_child);
+                let far_ctx = self.branch_relative::<K2>(is_right_child);
 
                 let pivot_wide: O = D::widen_coord(pivot);
                 let new_off = O::saturating_dist(query_wide_val, pivot_wide);
@@ -842,7 +842,7 @@ where
             } else {
                 // +Inf can represent structural padding in left-aligned trees.
                 // Scalar traversal just descends left through the padding.
-                self.traverse(false);
+                self.traverse::<A, K2>(false);
             }
 
             *dim = self.dim();
@@ -1172,14 +1172,14 @@ where
     }
 
     #[inline(always)]
-    fn traverse(&mut self, is_right: bool) {
-        self.core.traverse(is_right)
+    fn traverse<A: Axis<Coord = A>, const K2: usize>(&mut self, is_right: bool) {
+        self.core.traverse::<A, K2>(is_right)
     }
 
     #[inline(always)]
-    fn branch(&mut self) -> Self {
+    fn branch<const K2: usize>(&mut self) -> Self {
         Self {
-            core: self.core.branch(),
+            core: self.core.branch::<K2>(),
             _marker: std::marker::PhantomData,
         }
     }
@@ -1189,7 +1189,7 @@ where
         self.core.child_indices()
     }
 
-    fn get_leaf_idx<A: Axis, const K2: usize>(
+    fn get_leaf_idx<A: Axis<Coord = A>, const K2: usize>(
         stems: &[A],
         query: &[A; K2],
         max_stem_level: i32,
@@ -1229,7 +1229,7 @@ where
                 } else {
                     false
                 };
-                strat.traverse(is_right);
+                strat.traverse::<A, K2>(is_right);
             }
         }
 
@@ -1295,7 +1295,7 @@ where
             };
             if pivot < A::max_value() {
                 let is_right_child = query_val >= pivot;
-                let far_ctx = self.branch_relative(is_right_child);
+                let far_ctx = self.branch_relative::<K2>(is_right_child);
 
                 let pivot_wide: O = D::widen_coord(pivot);
                 let new_off = O::saturating_dist(query_wide_val, pivot_wide);
@@ -1335,7 +1335,7 @@ where
             } else {
                 // +Inf can represent structural padding in left-aligned trees.
                 // Traversing right should not add geometric distance.
-                let far_ctx = self.branch_relative(false);
+                let far_ctx = self.branch_relative::<K2>(false);
                 if O::cmp(rd, best_dist) != std::cmp::Ordering::Greater {
                     stack.push(SimdQueryStackContext::Single {
                         stem_strat: far_ctx,

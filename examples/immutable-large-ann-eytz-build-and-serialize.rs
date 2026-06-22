@@ -6,7 +6,7 @@ use std::time::Instant;
 use elapsed::ElapsedDuration;
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::VecOfArenas;
-use kiddo::stem_strategy::EytzingerPf;
+use kiddo::Eytzinger;
 use rand::{RngExt, SeedableRng};
 use rkyv_08::{rancor::Error as RkyvError, to_bytes};
 use ubyte::ToByteUnit;
@@ -15,8 +15,7 @@ const TREE_SIZE: usize = 2usize.pow(25);
 const QUERY_POINT_QTY: usize = 20_000_000;
 const BUCKET_SIZE: usize = 2;
 
-type Tree =
-    KdTree<f64, usize, EytzingerPf<4, 8>, VecOfArenas<f64, usize, 4, BUCKET_SIZE>, 4, BUCKET_SIZE>;
+type Tree = KdTree<f64, usize, Eytzinger, VecOfArenas<f64, usize, 4, BUCKET_SIZE>, 4, BUCKET_SIZE>;
 
 fn build_query_points(count: usize) -> Vec<[f64; 4]> {
     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);

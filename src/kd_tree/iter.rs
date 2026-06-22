@@ -454,7 +454,7 @@ where
                 if pivot < A::max_value() {
                     let query_elem = unsafe { *self.query.get_unchecked(dim) };
                     let is_right_child = query_elem >= pivot;
-                    let far_ctx = stem_strat.branch_relative(is_right_child);
+                    let far_ctx = stem_strat.branch_relative::<K>(is_right_child);
 
                     let pivot_wide = D::widen_coord(pivot);
                     let query_elem_wide = unsafe { *self.query_wide.get_unchecked(dim) };
@@ -477,7 +477,7 @@ where
                         });
                     }
                 } else {
-                    stem_strat.traverse(false);
+                    stem_strat.traverse::<A, K>(false);
                 }
             }
         }

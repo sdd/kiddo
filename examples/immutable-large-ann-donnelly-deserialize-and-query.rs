@@ -8,7 +8,7 @@ use std::time::Instant;
 use elapsed::ElapsedDuration;
 use kiddo::kd_tree::ArchivedKdTree;
 use kiddo::leaf_strategy::VecOfArenas;
-use kiddo::stem_strategy::EytzingerPf;
+use kiddo::Eytzinger;
 use kiddo::SquaredEuclidean;
 use memmap::MmapOptions;
 use rkyv_08::access;
@@ -17,14 +17,8 @@ use rkyv_08::vec::ArchivedVec;
 
 const BUCKET_SIZE: usize = 2;
 
-type ArchivedTree = ArchivedKdTree<
-    f64,
-    usize,
-    EytzingerPf<4, 8>,
-    VecOfArenas<f64, usize, 4, BUCKET_SIZE>,
-    4,
-    BUCKET_SIZE,
->;
+type ArchivedTree =
+    ArchivedKdTree<f64, usize, Eytzinger, VecOfArenas<f64, usize, 4, BUCKET_SIZE>, 4, BUCKET_SIZE>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();

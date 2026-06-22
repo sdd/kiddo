@@ -22,7 +22,7 @@ const POINT_SEED: u64 = 0x5eed_0000_0000_0301;
 const QUERY_SEED: u64 = 0x5eed_0000_0000_0302;
 
 type ArenaLeaves = VecOfArenas<f64, u32, K, B>;
-type EytzingerTree = KdTree<f64, u32, Eytzinger<K>, ArenaLeaves, K, B>;
+type EytzingerTree = KdTree<f64, u32, Eytzinger, ArenaLeaves, K, B>;
 type DonnellyPfTree = KdTree<f64, u32, DonnellyPf<3, 64, 8, K>, ArenaLeaves, K, B>;
 
 fn read_usize_env(var: &str, default: usize) -> usize {

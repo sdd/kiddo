@@ -224,7 +224,7 @@ pub mod stem_strategies;
 pub use stem_strategies as stem_strategy;
 #[doc(hidden)]
 pub use stem_strategies::DonnellyMarkerSimd;
-pub use stem_strategies::{Donnelly, DonnellyMarkerPf, Eytzinger, EytzingerPf};
+pub use stem_strategies::{Donnelly, DonnellyMarkerPf, Eytzinger};
 
 /// Leaf storage strategies for the kd-tree
 #[path = "leaf_strategy/mod.rs"]
@@ -235,11 +235,11 @@ pub use leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
 
 /// Convenience type alias for recommended default params for an immutable KdTree
 pub type ImmutableKdTree<AX, const K: usize> =
-    KdTree<AX, u32, Eytzinger<K>, VecOfArenas<AX, u32, K, 32>, K, 32>;
+    KdTree<AX, u32, Eytzinger, VecOfArenas<AX, u32, K, 32>, K, 32>;
 
 /// Convenience type alias for recommended default params for a mutable KdTree
 pub type MutableKdTree<AX, const K: usize> =
-    KdTree<AX, u32, Eytzinger<K>, VecOfArrays<AX, u32, K, 32>, K, 32>;
+    KdTree<AX, u32, Eytzinger, VecOfArrays<AX, u32, K, 32>, K, 32>;
 
 pub mod huge_pages;
 

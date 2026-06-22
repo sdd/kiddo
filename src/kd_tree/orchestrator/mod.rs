@@ -194,7 +194,7 @@ where
 
             let pivot = unsafe { self.stems().get_unchecked(stem_strat.stem_idx()) };
             let is_right_child: bool = *unsafe { query.get_unchecked(stem_strat.dim()) } >= *pivot;
-            stem_strat.traverse(is_right_child);
+            stem_strat.traverse::<A, K>(is_right_child);
         }
 
         self.stem_leaf_resolution()
@@ -471,7 +471,7 @@ where
                 if pivot < A::max_value() {
                     let query_elem = unsafe { *query.get_unchecked(dim) };
                     let is_right_child = query_elem >= pivot;
-                    let far_ctx = stem_strat.branch_relative(is_right_child);
+                    let far_ctx = stem_strat.branch_relative::<K>(is_right_child);
 
                     let pivot_wide = D::widen_coord(pivot);
                     let query_elem_wide = unsafe { *query_wide.get_unchecked(dim) };
@@ -504,7 +504,7 @@ where
                         .push_unchecked_inline(ScalarContinuationRestore::restore_only(old_off));
                     #[cfg(feature = "result_collection_stats")]
                     crate::results::result_collection_stats::record_query_scalar_continuation_frame_push();
-                    stem_strat.traverse(false);
+                    stem_strat.traverse::<A, K>(false);
                 }
 
                 dim = stem_strat.dim();
@@ -1427,7 +1427,7 @@ where
                     if pivot < A::max_value() {
                         let query_elem = unsafe { *query.get_unchecked(dim_val) };
                         let is_right_child = query_elem >= pivot;
-                        let far_ctx = stem_strat.branch_relative(is_right_child);
+                        let far_ctx = stem_strat.branch_relative::<K>(is_right_child);
 
                         let pivot_wide: O = D::widen_coord(pivot);
                         let query_elem_wide = unsafe { *query_wide.get_unchecked(dim_val) };
@@ -1491,7 +1491,7 @@ where
                         // +Inf pivots can still encode structural branches in left-aligned trees.
                         // Scalar traversal treats these as structural padding and just descends
                         // left without enqueuing a synthetic sibling branch.
-                        stem_strat.traverse(false);
+                        stem_strat.traverse::<A, K>(false);
                     }
 
                     *dim = stem_strat.dim();

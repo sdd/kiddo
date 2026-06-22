@@ -3,7 +3,7 @@
 
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::VecOfArenas;
-use kiddo::stem_strategy::eytzinger_pf_far::EytzingerPfFar;
+use kiddo::Eytzinger;
 use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use rkyv_08::api::high::to_bytes_in;
@@ -21,7 +21,7 @@ const POINT_SEED: u64 = 0x5eed_0000_0000_0501;
 const QUERY_SEED: u64 = 0x5eed_0000_0000_0502;
 
 type ArenaLeaves = VecOfArenas<f64, u32, K, B>;
-type EytzingerPfFarTree = KdTree<f64, u32, EytzingerPfFar<K, 8>, ArenaLeaves, K, B>;
+type EytzingerPfFarTree = KdTree<f64, u32, Eytzinger, ArenaLeaves, K, B>;
 
 fn read_usize_env(var: &str, default: usize) -> usize {
     std::env::var(var)

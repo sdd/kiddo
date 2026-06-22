@@ -186,14 +186,14 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
     }
 
     #[inline(always)]
-    fn traverse(&mut self, is_right: bool) {
-        self.core.traverse(is_right)
+    fn traverse<A: Axis<Coord = A>, const K2: usize>(&mut self, is_right: bool) {
+        self.core.traverse::<A, K2>(is_right)
     }
 
     #[inline(always)]
-    fn branch(&mut self) -> Self {
+    fn branch<const K2: usize>(&mut self) -> Self {
         Self {
-            core: self.core.branch(),
+            core: self.core.branch::<K2>(),
             _marker: PhantomData,
         }
     }
@@ -222,7 +222,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
             loop {
                 let val = &stems[so.stem_idx()];
                 let is_right_child = !A::is_max_value(*val);
-                so.traverse(is_right_child);
+                so.traverse::<A, K>(is_right_child);
                 if so.level() as usize == max_stem_level {
                     break;
                 }
@@ -239,7 +239,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
         }
     }
 
-    fn get_leaf_idx<A: Axis, const K2: usize>(
+    fn get_leaf_idx<A: Axis<Coord = A>, const K2: usize>(
         stems: &[A],
         query: &[A; K2],
         max_stem_level: i32,
@@ -266,7 +266,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
                 } else {
                     false
                 };
-                strat.traverse(is_right);
+                strat.traverse::<A, K>(is_right);
             }
         }
 
@@ -310,7 +310,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
 
             if pivot < A::max_value() {
                 let is_right_child = query_val >= pivot;
-                let far_ctx = self.branch_relative(is_right_child);
+                let far_ctx = self.branch_relative::<K>(is_right_child);
                 let pivot_wide: O = D::widen_coord(pivot);
                 let new_off = O::saturating_dist(query_wide_val, pivot_wide);
                 let rd_far = D::rect_dist_after_update(rd, off, *dim, new_off);
@@ -324,7 +324,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
                     ));
                 }
             } else {
-                self.traverse(false);
+                self.traverse::<A, K>(false);
             }
 
             *dim = self.dim();
@@ -415,7 +415,7 @@ mod tests {
         assert_eq!(strat.level(), 0);
         assert_eq!(strat.dim(), 0);
 
-        strat.traverse(true);
+        strat.traverse::<f64, 3>(true);
         assert!(strat.stem_idx() > 0);
         assert_eq!(strat.level(), 1);
     }
@@ -465,7 +465,7 @@ mod tests {
         assert!(!strat.can_take_full_block(7, 2));
         assert!(!strat.can_take_full_block(stems.len(), 1));
 
-        strat.traverse(false);
+        strat.traverse::<f64, 3>(false);
         assert!(!strat.can_take_full_block(stems.len(), 3));
     }
 
@@ -529,7 +529,7 @@ mod tests {
         let ptr = NonNull::dangling();
         let mut manual = Strat::new(ptr);
         loop {
-            manual.traverse(false);
+            manual.traverse::<f64, 3>(false);
             if manual.level() == 2 {
                 break;
             }
@@ -565,8 +565,8 @@ mod tests {
 
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         let mut manual = Strat::new(stems_ptr);
-        manual.traverse(true);
-        manual.traverse(false);
+        manual.traverse::<f64, 3>(true);
+        manual.traverse::<f64, 3>(false);
 
         assert_eq!(leaf_idx, manual.leaf_idx());
     }
@@ -673,7 +673,7 @@ mod tests {
             <DonnellySimdDescentStackContext<f64, Strat> as ScalarStackContext<f64, Strat>>::into_parts_with_restore_dim(popped);
 
         let mut expected_far = Strat::new(stems_ptr);
-        expected_far.traverse(false);
+        expected_far.traverse::<f64, 3>(false);
 
         assert_eq!(state.stem_idx(), expected_far.stem_idx());
         assert_eq!(restore_dim, Some(0));

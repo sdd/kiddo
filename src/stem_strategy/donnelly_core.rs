@@ -1,7 +1,6 @@
 use crate::stem_strategy::prefetch::prefetch_t1;
-use std::ptr::NonNull;
-// use num_traits::WrappingShl;
 use crate::StemStrategy;
+use std::ptr::NonNull;
 
 /// Inner implementation that holds state and core logic.
 /// BS::SIZE is used at runtime via the marker trait.
@@ -69,7 +68,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellyCore
     }
 
     #[inline(always)]
-    fn traverse(&mut self, is_right: bool) {
+    fn traverse<A: crate::Axis<Coord = A>, const K2: usize>(&mut self, is_right: bool) {
         let (idx, lvl) = Self::step_pure(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
         self.stem_idx = idx;
         self.minor_level = lvl;
@@ -88,7 +87,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellyCore
     /// * we stay within a minor triangle;
     /// * we don't hit the bottom level of the tree as a whole
     #[inline(always)]
-    fn traverse_head(&mut self, is_right: bool) {
+    fn traverse_head<A: crate::Axis<Coord = A>, const K2: usize>(&mut self, is_right: bool) {
         let (idx, lvl) =
             Self::step_pure_head(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
         self.stem_idx = idx;
@@ -103,7 +102,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellyCore
     }
 
     #[inline(always)]
-    fn branch(&mut self) -> Self {
+    fn branch<const K2: usize>(&mut self) -> Self {
         let (left, right) = Self::both_children_pure(self.stem_idx, self.minor_level);
 
         // mutate self into left
@@ -420,9 +419,9 @@ pub fn test_traverse_hook(is_right_child: bool, stems: *mut u8) -> usize {
 
     let mut stem_strat = DonnellyCore::<64, 8, 3>::new(stems_ptr);
 
-    stem_strat.traverse(is_right_child);
-    stem_strat.traverse(!is_right_child);
-    stem_strat.traverse(is_right_child);
+    stem_strat.traverse::<f64, 3>(is_right_child);
+    stem_strat.traverse::<f64, 3>(!is_right_child);
+    stem_strat.traverse::<f64, 3>(is_right_child);
 
     stem_strat.stem_idx()
 }
@@ -487,7 +486,7 @@ mod tests {
         let mut stem_strat = DonnellyCore::<64, 8, 3>::new(stems_ptr);
         let mut result = 0;
         input.iter().for_each(|selection| {
-            stem_strat.traverse(*selection);
+            stem_strat.traverse::<f64, 3>(*selection);
             result = stem_strat.stem_idx();
         });
 
@@ -550,10 +549,10 @@ mod tests {
 
         // let last = input.last().unwrap();
         input.iter().for_each(|selection| {
-            stem_strat.branch_relative(*selection);
+            stem_strat.branch_relative::<3>(*selection);
         });
 
-        let results = stem_strat.split();
+        let results = stem_strat.split::<3>();
         let result = (results.0.stem_idx(), results.1.stem_idx());
 
         assert_eq!(result, expected);
@@ -615,11 +614,11 @@ mod tests {
         let mut minor_tri_idx = 0;
         input.iter().for_each(|selection| {
             if minor_tri_idx == 2 {
-                stem_strat.traverse_tail(*selection);
+                stem_strat.traverse_tail::<f64, 3>(*selection);
                 minor_tri_idx = 0;
             } else {
                 minor_tri_idx += 1;
-                stem_strat.traverse_head(*selection);
+                stem_strat.traverse_head::<f64, 3>(*selection);
             }
 
             result = stem_strat.stem_idx();
@@ -686,7 +685,7 @@ mod tests {
         for start_path in start_paths {
             let mut base = DonnellyCore::<64, 4, 2>::new(stems_ptr);
             for &is_right in start_path {
-                base.traverse(is_right);
+                base.traverse::<f32, 2>(is_right);
             }
             assert_eq!(base.level() % 4, 0, "base must be at block boundary");
 
@@ -696,7 +695,7 @@ mod tests {
 
                 let mut repeated = base;
                 for shift in (0..4).rev() {
-                    repeated.traverse(((child_idx >> shift) & 1) != 0);
+                    repeated.traverse::<f32, 2>(((child_idx >> shift) & 1) != 0);
                 }
 
                 assert_eq!(
@@ -737,7 +736,7 @@ mod tests {
 
                     let mut repeated = base;
                     for shift in (0..4).rev() {
-                        repeated.traverse(((child_idx >> shift) & 1) != 0);
+                        repeated.traverse::<f32, 2>(((child_idx >> shift) & 1) != 0);
                     }
 
                     assert_eq!(
@@ -780,19 +779,19 @@ mod tests {
                         // Deterministic extension once the bit-combination cap is reached.
                         step % 2 == 1
                     };
-                    base.traverse(is_right);
+                    base.traverse::<f32, 2>(is_right);
                 }
 
                 for &is_right in &[false, true] {
                     let mut branched = base;
-                    let far = branched.branch_relative(is_right);
+                    let far = branched.branch_relative::<2>(is_right);
                     let near = branched;
 
                     let mut near_ref = base;
-                    near_ref.traverse(is_right);
+                    near_ref.traverse::<f32, 2>(is_right);
 
                     let mut far_ref = base;
-                    far_ref.traverse(!is_right);
+                    far_ref.traverse::<f32, 2>(!is_right);
 
                     assert_eq!(near.stem_idx(), near_ref.stem_idx());
                     assert_eq!(near.level(), near_ref.level());

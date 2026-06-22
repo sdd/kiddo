@@ -5,7 +5,7 @@ use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::VecOfArrays;
 use kiddo::{Eytzinger, SquaredEuclidean};
 
-type TestTree<T> = KdTree<f64, T, Eytzinger<2>, VecOfArrays<f64, T, 2, 32>, 2, 32>;
+type TestTree<T> = KdTree<f64, T, Eytzinger, VecOfArrays<f64, T, 2, 32>, 2, 32>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Default, Eq, Ord, PartialOrd)]
 struct MyFixedString {

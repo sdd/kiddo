@@ -18,9 +18,9 @@ const DEFAULT_QUERY_BATCH_REPEATS: usize = 100;
 const POINT_SEED: u64 = 0x5eed_0000_0000_0201;
 const QUERY_SEED: u64 = 0x5eed_0000_0000_0202;
 
-type FlatTree = KdTree<f64, u32, Eytzinger<K>, FlatVec<f64, u32, K, B>, K, B>;
-type ArenaTree = KdTree<f64, u32, Eytzinger<K>, VecOfArenas<f64, u32, K, B>, K, B>;
-type VecOfArraysTree = KdTree<f64, u32, Eytzinger<K>, VecOfArrays<f64, u32, K, B>, K, B>;
+type FlatTree = KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, K, B>, K, B>;
+type ArenaTree = KdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, K, B>, K, B>;
+type VecOfArraysTree = KdTree<f64, u32, Eytzinger, VecOfArrays<f64, u32, K, B>, K, B>;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum QueryKind {

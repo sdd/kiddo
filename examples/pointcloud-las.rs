@@ -13,7 +13,7 @@ use kiddo::kd_tree::KdTree;
 use kiddo::Eytzinger;
 use las::Reader;
 
-type Tree = KdTree<f32, u32, Eytzinger<3>, FlatVec<f32, u32, 3, 64>, 3, 64>;
+type Tree = KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 3, 64>, 3, 64>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();

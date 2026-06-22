@@ -6,7 +6,7 @@ use std::time::Instant;
 use elapsed::ElapsedDuration;
 use kiddo::kd_tree::ArchivedKdTree;
 use kiddo::leaf_strategy::VecOfArenas;
-use kiddo::stem_strategy::EytzingerPf;
+use kiddo::Eytzinger;
 use kiddo::SquaredEuclidean;
 use memmap::MmapOptions;
 use rkyv_08::rancor::Error as RkyvError;
@@ -14,8 +14,7 @@ use rkyv_08::{access, access_unchecked};
 use tracing::Level;
 use tracing_subscriber::fmt;
 
-type ArchivedTree =
-    ArchivedKdTree<f64, u32, EytzingerPf<3, 8>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
+type ArchivedTree = ArchivedKdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let subscriber = fmt().with_max_level(Level::TRACE).without_time().finish();

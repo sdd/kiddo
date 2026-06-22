@@ -633,7 +633,7 @@ mod tests {
     use crate::stem_strategy::Eytzinger;
     use std::ptr::NonNull;
 
-    type TestStem = Eytzinger<3>;
+    type TestStem = Eytzinger;
 
     fn test_stem() -> TestStem {
         TestStem::new(NonNull::dangling())
@@ -644,7 +644,7 @@ mod tests {
         let root = test_stem();
         let siblings = std::array::from_fn(|idx| {
             let mut stem = root.clone();
-            stem.traverse(idx % 2 == 1);
+            stem.traverse::<f32, 3>(idx % 2 == 1);
             stem
         });
 

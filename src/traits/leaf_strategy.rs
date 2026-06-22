@@ -16,16 +16,23 @@ pub(crate) trait Mutability: sealed::Sealed + 'static {
     fn is_mutable() -> bool;
 
     /// Creates the appropriate OwnedStemLeafResolution for this mutability type
-    fn initial_stem_leaf_resolution<SS: StemStrategy>(
+    fn initial_stem_leaf_resolution<AX, SS, const K: usize>(
         stems_depth: usize,
         leaf_count: usize,
-    ) -> crate::kd_tree::OwnedStemLeafResolution;
+    ) -> crate::kd_tree::OwnedStemLeafResolution
+    where
+        AX: Axis<Coord = AX>,
+        SS: StemStrategy;
 }
 
-fn build_mapped_stem_leaf_resolution<SS: StemStrategy>(
+fn build_mapped_stem_leaf_resolution<AX, SS, const K: usize>(
     stems_depth: usize,
     leaf_count: usize,
-) -> crate::kd_tree::OwnedStemLeafResolution {
+) -> crate::kd_tree::OwnedStemLeafResolution
+where
+    AX: Axis<Coord = AX>,
+    SS: StemStrategy,
+{
     if leaf_count == 0 {
         return crate::kd_tree::OwnedStemLeafResolution::Mapped {
             min_stem_leaf_idx: 0,
@@ -39,7 +46,7 @@ fn build_mapped_stem_leaf_resolution<SS: StemStrategy>(
     let mut stem_strategy = SS::new_no_ptr();
     for bit_idx in (0..stems_depth).rev() {
         let is_right = (leaf_count - 1) & (1 << bit_idx) != 0;
-        stem_strategy.traverse(is_right);
+        stem_strategy.traverse::<AX, K>(is_right);
     }
 
     let mut leaf_idx_map: Vec<Option<NonMaxUsize>> = vec![None; stem_strategy.stem_idx() + 1];
@@ -49,7 +56,7 @@ fn build_mapped_stem_leaf_resolution<SS: StemStrategy>(
         let mut stem_strategy = SS::new_no_ptr();
         for bit_idx in (0..stems_depth).rev() {
             let is_right = leaf_idx & (1 << bit_idx) != 0;
-            stem_strategy.traverse(is_right);
+            stem_strategy.traverse::<AX, K>(is_right);
         }
         if let Some(existing_leaf_idx) = leaf_idx_map[stem_strategy.stem_idx()] {
             panic!(
@@ -81,10 +88,14 @@ impl Mutability for Immutable {
         false
     }
 
-    fn initial_stem_leaf_resolution<SS: StemStrategy>(
+    fn initial_stem_leaf_resolution<AX, SS, const K: usize>(
         stems_depth: usize,
         leaf_count: usize,
-    ) -> crate::kd_tree::OwnedStemLeafResolution {
+    ) -> crate::kd_tree::OwnedStemLeafResolution
+    where
+        AX: Axis<Coord = AX>,
+        SS: StemStrategy,
+    {
         crate::kd_tree::OwnedStemLeafResolution::Arithmetic {
             stems_depth,
             leaf_count,
@@ -104,13 +115,17 @@ impl Mutability for Mutable {
         true
     }
 
-    fn initial_stem_leaf_resolution<SS: StemStrategy>(
+    fn initial_stem_leaf_resolution<AX, SS, const K: usize>(
         stems_depth: usize,
         leaf_count: usize,
-    ) -> crate::kd_tree::OwnedStemLeafResolution {
+    ) -> crate::kd_tree::OwnedStemLeafResolution
+    where
+        AX: Axis<Coord = AX>,
+        SS: StemStrategy,
+    {
         // Start in Mapped state with min_stem_leaf_idx = 0 for simplicity.
         // TODO: Optimize later with Pristine state and dynamic min_stem_leaf_idx
-        build_mapped_stem_leaf_resolution::<SS>(stems_depth, leaf_count)
+        build_mapped_stem_leaf_resolution::<AX, SS, K>(stems_depth, leaf_count)
     }
 }
 

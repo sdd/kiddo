@@ -11,10 +11,6 @@ pub mod donnelly_simd_descent;
 /// Eytzinger Stem Ordering
 #[doc(hidden)]
 pub mod eytzinger;
-#[doc(hidden)]
-pub mod eytzinger_pf;
-#[doc(hidden)]
-pub mod eytzinger_pf_far;
 
 mod block_size;
 mod donnelly_2_pf_blockmarker;
@@ -40,10 +36,11 @@ pub use donnelly_2_pf_blockmarker::{DonnellyMarkerPf, DonnellyMarkerScalar};
 pub use donnelly_3::DonnellySwPre;
 #[doc(inline)]
 pub use donnelly_simd_descent::DonnellySimdDescent;
+
 #[doc(inline)]
 pub use eytzinger::Eytzinger;
 #[doc(inline)]
-pub use eytzinger_pf::EytzingerPf;
+pub use eytzinger::EytzingerNoPf;
 
 /// Marker types used to parameterize block-based stem strategies.
 pub mod markers {

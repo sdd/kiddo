@@ -18,8 +18,7 @@ const DEFAULT_MAX_QTY: usize = 16;
 const DEFAULT_MAX_DIST: f64 = 0.0025;
 
 type ArenaLeaves = VecOfArenas<f64, u32, K, B>;
-type ArchivedEytzingerTree =
-    kiddo::kd_tree::ArchivedKdTree<f64, u32, Eytzinger<K>, ArenaLeaves, K, B>;
+type ArchivedEytzingerTree = kiddo::kd_tree::ArchivedKdTree<f64, u32, Eytzinger, ArenaLeaves, K, B>;
 type ArchivedDonnellyPfTree =
     kiddo::kd_tree::ArchivedKdTree<f64, u32, DonnellyPf<3, 64, 8, K>, ArenaLeaves, K, B>;
 
