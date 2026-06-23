@@ -45,7 +45,7 @@ jobs:
 
       - name: Cache Toolchain
         if: steps.changes.outputs.coverage == 'true'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.rustup
           key: toolchain-x86-64-nightly-${{ env.TODAY_DATE }}
