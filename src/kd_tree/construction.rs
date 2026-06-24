@@ -71,7 +71,7 @@ where
 
             parent_stem_idx = Some(NonMaxUsize::new(stem_idx).unwrap());
             let pivot = unsafe { self.stems.get_unchecked(stem_idx) };
-            is_right_child = unsafe { *query.get_unchecked(stem_strat.dim()) } >= *pivot;
+            is_right_child = unsafe { *query.get_unchecked(stem_strat.dim::<K>()) } >= *pivot;
             stem_strat.traverse::<A, K>(is_right_child);
         }
 
@@ -92,13 +92,13 @@ where
         _is_right_child: bool,
     ) -> Result<(A, usize, usize), ConstructionError> {
         let old_leaf_idx = leaf_idx; // stem_strategy.leaf_idx();
-        let split_dim = stem_strategy.dim();
+        let split_dim = stem_strategy.dim::<K>();
 
         // Split the leaf
         let (pivot_val, new_leaf_idx) = self.leaves.split_leaf(old_leaf_idx, split_dim)?;
 
         // Get the indices of the children of the stem at which the split occurs
-        let (left_child_idx, right_child_idx) = stem_strategy.child_indices();
+        let (left_child_idx, right_child_idx) = stem_strategy.child_indices::<A>();
         let stem_idx = stem_strategy.stem_idx();
 
         // Ensure the stem array is large enough
@@ -711,7 +711,7 @@ where
         FI: FnMut(usize, &X) -> Result<T, ConstructionError>,
     {
         let chunk_length = sort_index.len();
-        let dim = stem_ordering.construction_dim();
+        let dim = stem_ordering.construction_dim::<K>();
 
         debug_assert!(
             chunk_length > 0,
@@ -825,7 +825,7 @@ where
             }
         }
 
-        let right_stem_ordering = stem_ordering.branch::<K>();
+        let right_stem_ordering = stem_ordering.branch::<A, K>();
         let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
 
         Self::populate_recursive_hard(
@@ -899,7 +899,7 @@ where
         }
 
         let chunk_length = sort_index.len();
-        let dim = stem_ordering.construction_dim();
+        let dim = stem_ordering.construction_dim::<K>();
         let stem_index = stem_ordering.stem_idx();
         *actual_max_stem_level = (*actual_max_stem_level).max(stem_ordering.level());
 
@@ -932,7 +932,7 @@ where
             stems[stem_index] = axis_at(&source[sort_index[pivot]], dim);
         }
 
-        let right_stem_ordering = stem_ordering.branch::<K>();
+        let right_stem_ordering = stem_ordering.branch::<A, K>();
         let split_idx = pivot.min(chunk_length);
         let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(split_idx);
 

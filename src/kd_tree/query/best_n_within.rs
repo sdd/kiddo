@@ -16,7 +16,7 @@ use crate::results::result_collection::{
 use crate::results::result_collection::{
     SmallBinaryHeapResultCollection, SMALL_RESULT_COLLECTION_MAX_QTY,
 };
-use crate::stem_strategy::donnelly_2_blockmarker_simd::{
+use crate::stem_strategy::donnelly::simd_full::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits::leaf_strategy::LeafProjection;
@@ -164,7 +164,7 @@ pub mod cargo_asm {
     use crate::dist::SquaredEuclidean;
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::VecOfArenas;
-    use crate::stem_strategy::donnelly_2_pf::DonnellyPf;
+    use crate::stem_strategy::{Block3, DonnellyUnrolled};
     use std::num::NonZeroUsize;
 
     const K: usize = 3;
@@ -173,13 +173,14 @@ pub mod cargo_asm {
     const MAX_QTY: usize = 16;
 
     type ArenaLeaves = VecOfArenas<f64, u32, K, BUCKET_SIZE>;
-    type DonnellyPfKdT = KdTree<f64, u32, DonnellyPf<3, 64, 8, K>, ArenaLeaves, K, BUCKET_SIZE>;
+    type DonnellyUnrolledKdT =
+        KdTree<f64, u32, DonnellyUnrolled<Block3>, ArenaLeaves, K, BUCKET_SIZE>;
 
     /// Hook for cargo-asm to render the best_n_within focus path.
     #[inline(never)]
     #[unsafe(no_mangle)]
     pub fn v6_best_n_within_donnelly_pf_focus_cargo_asm_hook(
-        tree: &DonnellyPfKdT,
+        tree: &DonnellyUnrolledKdT,
         query: [f64; 3],
     ) -> (usize, u64, u64) {
         let results = tree

@@ -2,7 +2,7 @@ use aligned_vec::AVec;
 use std::ptr::NonNull;
 
 use crate::kd_tree::query_stack::{ScalarStackContext, StackTrait};
-use crate::stem_strategy::donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4};
+use crate::stem_strategy::donnelly::simd_full::{BacktrackBlock3, BacktrackBlock4};
 use crate::{Axis, Content};
 
 /// Trait that needs to be implemented by any potential stem ordering
@@ -71,11 +71,11 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
     fn leaf_idx(&self) -> usize;
 
     /// Get the current dimension (query time)
-    fn dim(&self) -> usize;
+    fn dim<const K: usize>(&self) -> usize;
 
     /// Get the current dimension (construction time)
-    fn construction_dim(&self) -> usize {
-        self.dim()
+    fn construction_dim<const K: usize>(&self) -> usize {
+        self.dim::<K>()
     }
 
     /// Get the current level
@@ -101,35 +101,35 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
     /// Advance `self` down to one child, returning the other.
     /// - `self` mutates into the left child
     /// - return value is the right child
-    fn branch<const K: usize>(&mut self) -> Self;
+    fn branch<A: Axis<Coord = A>, const K: usize>(&mut self) -> Self;
 
     /// Advance `self` to the "closer" child, returning the "further" one.
     #[inline(always)]
-    fn branch_relative<const K: usize>(&mut self, is_right: bool) -> Self {
+    fn branch_relative<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) -> Self {
         if is_right {
-            let mut right = self.branch::<K>();
+            let mut right = self.branch::<A, K>();
             std::mem::swap(self, &mut right);
             right
         } else {
-            self.branch::<K>()
+            self.branch::<A, K>()
         }
     }
 
     /// Split `self` into two independent child strategies (left, right).
-    fn split<const K: usize>(mut self) -> (Self, Self)
+    fn split<A: Axis<Coord = A>, const K: usize>(mut self) -> (Self, Self)
     where
         Self: Sized,
     {
-        let right = self.branch::<K>();
+        let right = self.branch::<A, K>();
         (self, right)
     }
 
     /// Split `self` into (closer, further) given a direction.
-    fn split_relative<const K: usize>(self, is_right: bool) -> (Self, Self)
+    fn split_relative<A: Axis<Coord = A>, const K: usize>(self, is_right: bool) -> (Self, Self)
     where
         Self: Sized,
     {
-        let (l, r) = self.split::<K>();
+        let (l, r) = self.split::<A, K>();
         if is_right {
             (r, l)
         } else {
@@ -139,7 +139,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
 
     /// Get the stem indices where the left and right children would be located.
     /// Returns (left_child_stem_idx, right_child_stem_idx).
-    fn child_indices(&self) -> (usize, usize);
+    fn child_indices<A: Axis<Coord = A>>(&self) -> (usize, usize);
 
     /// Calculate the stem node count for a given leaf node count.
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -155,7 +155,10 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
 
     /// Trim unneeded stem nodes.
     #[cfg_attr(coverage_nightly, coverage(off))]
-    fn trim_unneeded_stems<A: Axis<Coord = A>>(_stems: &mut AVec<A>, _max_stem_level: usize) {
+    fn trim_unneeded_stems<A: Axis<Coord = A>, const K: usize>(
+        _stems: &mut AVec<A>,
+        _max_stem_level: usize,
+    ) {
         // Default: no-op
     }
 
@@ -187,7 +190,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
 
         while stem_strat.level() <= max_stem_level {
             let pivot = unsafe { stems.get_unchecked(stem_strat.stem_idx()) };
-            let is_right = unsafe { *query.get_unchecked(stem_strat.dim()) } >= *pivot;
+            let is_right = unsafe { *query.get_unchecked(stem_strat.dim::<K>()) } >= *pivot;
             stem_strat.traverse::<A, K>(is_right);
         }
 
@@ -245,11 +248,11 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
             let is_right_child = query_elem >= pivot;
 
             let old_stem_idx = self.stem_idx();
-            let far_ctx = self.branch_relative::<K>(is_right_child);
+            let far_ctx = self.branch_relative::<A, K>(is_right_child);
 
             tracing::trace!(
                 %pivot,
-                dim = %self.dim(),
+                dim = %self.dim::<K>(),
                 %query_elem,
                 %is_right_child,
                 %old_stem_idx,
@@ -315,7 +318,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
             self.traverse::<A, K>(false);
         }
 
-        *dim = self.dim();
+        *dim = self.dim::<K>();
         true
     }
 
@@ -484,7 +487,7 @@ mod tests {
             self.state.leaf_idx
         }
 
-        fn dim(&self) -> usize {
+        fn dim<const K: usize>(&self) -> usize {
             self.state.dim
         }
 
@@ -499,7 +502,7 @@ mod tests {
             self.state.level += 1;
         }
 
-        fn branch<const K: usize>(&mut self) -> Self {
+        fn branch<A: Axis<Coord = A>, const K: usize>(&mut self) -> Self {
             let mut right = self.clone();
             self.state.stem_idx = self.state.stem_idx * 2 + 1;
             self.state.leaf_idx <<= 1;
@@ -513,7 +516,7 @@ mod tests {
             right
         }
 
-        fn child_indices(&self) -> (usize, usize) {
+        fn child_indices<A: Axis<Coord = A>>(&self) -> (usize, usize) {
             (self.state.stem_idx * 2 + 1, self.state.stem_idx * 2 + 2)
         }
     }
@@ -527,16 +530,16 @@ mod tests {
         head.traverse_head::<f32, 2>(true);
         assert_eq!(head.stem_idx(), 2);
         assert_eq!(head.leaf_idx(), 1);
-        assert_eq!(head.dim(), 1);
+        assert_eq!(head.dim::<2>(), 1);
         assert_eq!(head.level(), 1);
 
-        let left_first = TestStemStrategy::new(stems_ptr).split_relative::<2>(false);
+        let left_first = TestStemStrategy::new(stems_ptr).split_relative::<f32, 2>(false);
         assert_eq!(left_first.0.stem_idx(), 1);
         assert_eq!(left_first.1.stem_idx(), 2);
         assert_eq!(left_first.0.leaf_idx(), 0);
         assert_eq!(left_first.1.leaf_idx(), 1);
 
-        let right_first = TestStemStrategy::new(stems_ptr).split_relative::<2>(true);
+        let right_first = TestStemStrategy::new(stems_ptr).split_relative::<f32, 2>(true);
         assert_eq!(right_first.0.stem_idx(), 2);
         assert_eq!(right_first.1.stem_idx(), 1);
         assert_eq!(right_first.0.leaf_idx(), 1);
@@ -574,7 +577,7 @@ mod tests {
         assert_eq!(strat.stem_idx(), 2);
         assert_eq!(strat.leaf_idx(), 1);
         assert_eq!(strat.level(), 1);
-        assert_eq!(strat.dim(), 1);
+        assert_eq!(strat.dim::<2>(), 1);
         assert_eq!(dim, 1);
         assert_eq!(off, [0.0, 0.0]);
         assert_eq!(lower, [f32::NEG_INFINITY, f32::NEG_INFINITY]);

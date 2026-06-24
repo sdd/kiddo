@@ -13,7 +13,7 @@ use crate::kd_tree::query_stack::{
 };
 use crate::kd_tree::{KdTreeAccessor, StemLeafResolution};
 use crate::stem_strategy::{
-    donnelly_2_blockmarker_simd::{BacktrackBlock3, BacktrackBlock4},
+    donnelly::simd_full::{BacktrackBlock3, BacktrackBlock4},
     SimdPrune, SimdSelectBestChildBlock3,
 };
 use crate::{Axis, Content, LeafStrategy, StemStrategy};
@@ -86,7 +86,7 @@ where
 {
     let mut off = [O::zero(); K];
     for dim in 0..K {
-        off[dim] = crate::stem_strategy::donnelly_2_blockmarker_simd::interval_distance_1d(
+        off[dim] = crate::stem_strategy::donnelly::simd_full::interval_distance_1d(
             query_wide[dim],
             lower[dim],
             upper[dim],
@@ -193,7 +193,8 @@ where
             }
 
             let pivot = unsafe { self.stems().get_unchecked(stem_strat.stem_idx()) };
-            let is_right_child: bool = *unsafe { query.get_unchecked(stem_strat.dim()) } >= *pivot;
+            let is_right_child: bool =
+                *unsafe { query.get_unchecked(stem_strat.dim::<K>()) } >= *pivot;
             stem_strat.traverse::<A, K>(is_right_child);
         }
 
@@ -327,7 +328,7 @@ where
             let (stem_state, restore_dim, old_off, rd) =
                 SS::StackContext::<O>::into_parts_with_restore_dim(stack_ctx);
             stem_strat.rehydrate_deferred_state(stem_state);
-            let mut dim = stem_strat.dim();
+            let mut dim = stem_strat.dim::<K>();
             let restore_dim = restore_dim.unwrap_or(dim);
             tracing::trace!(%dim, %old_off, %rd, ?off, "Popped stack context");
 
@@ -448,7 +449,7 @@ where
         let mut far_stack = ScalarContinuationFarStack::<O, SS::DeferredState>::default();
 
         let mut rd = O::zero();
-        let mut dim = stem_strat.dim();
+        let mut dim = stem_strat.dim::<K>();
 
         'query: loop {
             loop {
@@ -471,7 +472,7 @@ where
                 if pivot < A::max_value() {
                     let query_elem = unsafe { *query.get_unchecked(dim) };
                     let is_right_child = query_elem >= pivot;
-                    let far_ctx = stem_strat.branch_relative::<K>(is_right_child);
+                    let far_ctx = stem_strat.branch_relative::<A, K>(is_right_child);
 
                     let pivot_wide = D::widen_coord(pivot);
                     let query_elem_wide = unsafe { *query_wide.get_unchecked(dim) };
@@ -507,7 +508,7 @@ where
                     stem_strat.traverse::<A, K>(false);
                 }
 
-                dim = stem_strat.dim();
+                dim = stem_strat.dim::<K>();
             }
 
             let leaf_idx = stem_strat.leaf_idx();
@@ -562,7 +563,7 @@ where
                 unsafe { *off.get_unchecked_mut(restore_dim) = far.far_off };
                 stem_strat.rehydrate_deferred_state(far.stem_state);
                 rd = far.rd;
-                dim = stem_strat.dim();
+                dim = stem_strat.dim::<K>();
 
                 #[cfg(feature = "result_collection_stats")]
                 crate::results::result_collection_stats::record_query_scalar_continuation_far_enter(
@@ -642,7 +643,7 @@ where
     }
 
     /// Implementation of backtracking query with SIMD stack.
-    /// Called by DonnellyMarkerSimd's backtracking_query_with_stack override.
+    /// Called by DonnellySimdFull's backtracking_query_with_stack override.
     #[inline(always)]
     fn backtracking_query_with_block3_simd_stack_impl<QC, O, D>(
         &self,
@@ -657,8 +658,7 @@ where
             + BacktrackBlock3
             + BacktrackBlock4,
         D: DistanceMetric<A, Output = O>,
-        SS: StemStrategy
-            + crate::stem_strategy::donnelly_2_blockmarker_simd::DeferredBlockTraversal,
+        SS: StemStrategy + crate::stem_strategy::donnelly::simd_full::DeferredBlockTraversal,
         SS::StackContext<O>: crate::kd_tree::query_stack_simd::Block3ExactStackContext<O, SS, K>
             + crate::kd_tree::query_stack_simd::SimdIntervalStackContext<O, SS>,
     {
@@ -701,7 +701,7 @@ where
                     crate::test_utils::exact_query_stats::record_simd_single_pop();
 
                     let restore_dim = dim_val;
-                    let mut dim = ss.dim();
+                    let mut dim = ss.dim::<K>();
                     tracing::trace!(
                         %restore_dim,
                         resumed_dim = %dim,
@@ -756,7 +756,7 @@ where
                     #[cfg(feature = "test_utils")]
                     crate::test_utils::exact_query_stats::record_block3_pending_pop(pending_mask);
 
-                    let dim_val = base.dim();
+                    let dim_val = base.dim::<K>();
                     lower = restored_lower;
                     upper = restored_upper;
                     off = rebuild_interval_offs(&query_wide, &lower, &upper);
@@ -982,8 +982,8 @@ where
                         crate::results::result_collection_stats::record_query_stack_push();
                     }
 
-                    let mut ss = base.block_child(selected_child_idx);
-                    let mut dim = ss.dim();
+                    let mut ss = base.block_child::<K>(selected_child_idx);
+                    let mut dim = ss.dim::<K>();
 
                     unsafe {
                         *off.get_unchecked_mut(dim_val) = selected_child_off;
@@ -1012,7 +1012,7 @@ where
     }
 
     /// Implementation of backtracking query with SIMD stack.
-    /// Called by DonnellyMarkerSimd's backtracking_query_with_stack override.
+    /// Called by DonnellySimdFull's backtracking_query_with_stack override.
     #[inline(always)]
     fn backtracking_query_with_simd_stack_impl<QC, O, D>(
         &self,
@@ -1029,7 +1029,7 @@ where
         D: DistanceMetric<A, Output = O>,
         SS: StemStrategy<
                 StackContext<O> = crate::kd_tree::query_stack_simd::SimdQueryStackContext<O, SS>,
-            > + crate::stem_strategy::donnelly_2_blockmarker_simd::DeferredBlockTraversal,
+            > + crate::stem_strategy::donnelly::simd_full::DeferredBlockTraversal,
     {
         use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
 
@@ -1046,7 +1046,7 @@ where
         let mut lower = [O::min_value(); K];
         let mut upper = [O::max_value(); K];
 
-        stack.push(SimdQueryStackContext::new_single(stem_strat));
+        stack.push(SimdQueryStackContext::new_single::<K>(stem_strat));
         #[cfg(feature = "result_collection_stats")]
         crate::results::result_collection_stats::record_query_stack_push();
 
@@ -1065,7 +1065,7 @@ where
                 } => {
                     // Single entry - standard scalar processing
                     let restore_dim = dim_val;
-                    let mut dim = ss.dim();
+                    let mut dim = ss.dim::<K>();
                     tracing::trace!(
                         %restore_dim,
                         resumed_dim = %dim,
@@ -1166,8 +1166,8 @@ where
                         crate::results::result_collection_stats::record_query_stack_push();
                     }
 
-                    let mut ss = base.block_child(selection.child_idx);
-                    let mut dim = ss.dim();
+                    let mut ss = base.block_child::<K>(selection.child_idx);
+                    let mut dim = ss.dim::<K>();
 
                     unsafe {
                         *off.get_unchecked_mut(dim_val) = selection.child_off;
@@ -1256,7 +1256,7 @@ where
                             //     );
                             //     continue;
                             // }
-                            let mut dim = ss.dim();
+                            let mut dim = ss.dim::<K>();
 
                             // Restore off array to saved state, then update the split dimension
                             // Use the per-sibling new_off value (e.g., interval distance)
@@ -1342,10 +1342,10 @@ where
 
                     for sibling_idx in 0..8 {
                         if surviving_mask & (1 << sibling_idx) != 0 {
-                            let mut ss = base.block_child(child_base + sibling_idx as u8);
+                            let mut ss = base.block_child::<K>(child_base + sibling_idx as u8);
                             let rd = rd_values[sibling_idx];
                             let new_off = new_off_values[sibling_idx];
-                            let mut dim = ss.dim();
+                            let mut dim = ss.dim::<K>();
 
                             off = saved_off;
                             lower = saved_lower;
@@ -1397,8 +1397,7 @@ where
     where
         O: Axis<Coord = O> + SimdSelectBestChildBlock3 + BacktrackBlock3 + BacktrackBlock4,
         D: DistanceMetric<A, Output = O>,
-        SS: StemStrategy
-            + crate::stem_strategy::donnelly_2_blockmarker_simd::DeferredBlockTraversal,
+        SS: StemStrategy + crate::stem_strategy::donnelly::simd_full::DeferredBlockTraversal,
         SS::StackContext<O>: crate::kd_tree::query_stack_simd::SimdIntervalStackContext<O, SS>,
     {
         let use_scalar_step = !self.stem_leaf_resolution().uses_arithmetic()
@@ -1427,7 +1426,7 @@ where
                     if pivot < A::max_value() {
                         let query_elem = unsafe { *query.get_unchecked(dim_val) };
                         let is_right_child = query_elem >= pivot;
-                        let far_ctx = stem_strat.branch_relative::<K>(is_right_child);
+                        let far_ctx = stem_strat.branch_relative::<A, K>(is_right_child);
 
                         let pivot_wide: O = D::widen_coord(pivot);
                         let query_elem_wide = unsafe { *query_wide.get_unchecked(dim_val) };
@@ -1465,7 +1464,7 @@ where
                         }
 
                         let near_off =
-                            crate::stem_strategy::donnelly_2_blockmarker_simd::interval_distance_1d(
+                            crate::stem_strategy::donnelly::simd_full::interval_distance_1d(
                                 query_elem_wide,
                                 near_lower,
                                 near_upper,
@@ -1494,7 +1493,7 @@ where
                         stem_strat.traverse::<A, K>(false);
                     }
 
-                    *dim = stem_strat.dim();
+                    *dim = stem_strat.dim::<K>();
                     true
                 }
             } else {
@@ -1516,7 +1515,7 @@ where
             tracing::trace!(
                 stem_idx = %stem_strat.stem_idx(),
                 level = %stem_strat.level(),
-                dim = %stem_strat.dim(),
+                dim = %stem_strat.dim::<K>(),
                 "Descended one block"
             );
 
@@ -1554,8 +1553,8 @@ mod tests {
     use crate::kd_tree::query_stack_simd::SimdQueryStackContext;
     use crate::kd_tree::stem_leaf_resolution::OwnedStemLeafResolution;
     use crate::leaf_strategy::DummyLeafStrategy;
-    use crate::stem_strategy::donnelly_2_blockmarker_simd::DeferredBlockTraversal;
-    use crate::stem_strategy::{Block3, Block4, DonnellyMarkerSimd};
+    use crate::stem_strategy::donnelly::simd_full::DeferredBlockTraversal;
+    use crate::stem_strategy::{Block3, Block4, DonnellySimdFull};
     use nonmax::NonMaxUsize;
 
     #[test]
@@ -1583,7 +1582,7 @@ mod tests {
         assert_eq!(off[1], 1.0);
     }
 
-    type TestStemStrategy = DonnellyMarkerSimd<Block4, 64, 4, 3>;
+    type TestStemStrategy = DonnellySimdFull<Block4>;
     type TestLeafStrategy = DummyLeafStrategy;
 
     struct TestQueryContext {
@@ -1638,7 +1637,7 @@ mod tests {
         }
     }
 
-    impl KdTreeAccessor<f64, u32, DonnellyMarkerSimd<Block3, 64, 8, 3>, TestLeafStrategy, 3, 16>
+    impl KdTreeAccessor<f64, u32, DonnellySimdFull<Block3>, TestLeafStrategy, 3, 16>
         for Block3TestTree
     {
         fn stems(&self) -> &[f64] {
@@ -1694,9 +1693,9 @@ mod tests {
     #[test]
     fn test_backtracking_query_with_simd_stack_exercises_block3_pending_arm() {
         let root = build_root_strat();
-        let child0 = root.block_child(0);
-        let child1 = root.block_child(1);
-        let child2 = root.block_child(2);
+        let child0 = root.block_child::<3>(0);
+        let child1 = root.block_child::<3>(1);
+        let child2 = root.block_child::<3>(2);
         let tree = build_test_tree_with_terminal_stems(&[
             (root.stem_idx(), 100),
             (child0.stem_idx(), 200),
@@ -1741,7 +1740,7 @@ mod tests {
     #[test]
     fn test_backtracking_query_with_simd_stack_exercises_block_arm() {
         let root = build_root_strat();
-        let siblings = std::array::from_fn(|idx| root.block_child(idx as u8));
+        let siblings = std::array::from_fn(|idx| root.block_child::<3>(idx as u8));
         let tree = build_test_tree_with_terminal_stems(&[
             (root.stem_idx(), 100),
             (siblings[0].stem_idx(), 300),
@@ -1780,8 +1779,8 @@ mod tests {
     #[test]
     fn test_backtracking_query_with_simd_stack_exercises_deferred_block_arm() {
         let root = build_root_strat();
-        let child0 = root.block_child(0);
-        let child2 = root.block_child(2);
+        let child0 = root.block_child::<3>(0);
+        let child2 = root.block_child::<3>(2);
         let tree = build_test_tree_with_terminal_stems(&[
             (root.stem_idx(), 100),
             (child0.stem_idx(), 400),
@@ -1824,15 +1823,15 @@ mod tests {
         use crate::kd_tree::query_stack_simd::Block3ExactStackContext;
         use crate::stem_strategy::Block3;
 
-        type Block3StemStrategy = DonnellyMarkerSimd<Block3, 64, 8, 3>;
+        type Block3StemStrategy = DonnellySimdFull<Block3>;
         type Block3Tree = Block3TestTree;
 
         let stems = vec![0.2f64, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f64::INFINITY];
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         let base = Block3StemStrategy::new(stems_ptr);
-        let child0 = base.block_child(0);
-        let child1 = base.block_child(1);
-        let child2 = base.block_child(2);
+        let child0 = base.block_child::<3>(0);
+        let child1 = base.block_child::<3>(1);
+        let child2 = base.block_child::<3>(2);
 
         let tree = Block3Tree {
             stems,

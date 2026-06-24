@@ -4,7 +4,7 @@
 use kiddo::dist::SquaredEuclidean;
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::VecOfArenas;
-use kiddo::stem_strategy::{Block3, Donnelly, DonnellyMarkerSimd};
+use kiddo::stem_strategy::{Block3, Donnelly, DonnellySimdFull};
 use kiddo::test_utils::exact_query_stats::{reset, snapshot, ExactQueryStats};
 use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
@@ -20,8 +20,8 @@ const POINT_SEED: u64 = 0x5eed_0000_0000_0201;
 const QUERY_SEED: u64 = 0x5eed_0000_0000_0202;
 
 type ArenaLeaves = VecOfArenas<f64, u32, K, B>;
-type DonnellyTree = KdTree<f64, u32, Donnelly<3, 64, 8, K>, ArenaLeaves, K, B>;
-type DonnellySimdTree = KdTree<f64, u32, DonnellyMarkerSimd<Block3, 64, 8, K>, ArenaLeaves, K, B>;
+type DonnellyTree = KdTree<f64, u32, Donnelly<Block3>, ArenaLeaves, K, B>;
+type DonnellySimdTree = KdTree<f64, u32, DonnellySimdFull<Block3>, ArenaLeaves, K, B>;
 
 #[derive(Clone, Copy)]
 struct RunResult {
@@ -201,5 +201,5 @@ fn main() {
     let donnelly_simd = run_donnelly_simd(&donnelly_simd_tree, &queries, repeats);
 
     print_stats("Donnelly", donnelly, total_queries);
-    print_stats("Donnelly Block SIMD", donnelly_simd, total_queries);
+    print_stats("DonnellySimdFull", donnelly_simd, total_queries);
 }

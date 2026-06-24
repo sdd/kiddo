@@ -3,8 +3,8 @@
 
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::VecOfArenas;
-use kiddo::stem_strategy::donnelly_2_pf::DonnellyPf;
 use kiddo::stem_strategy::Eytzinger;
+use kiddo::stem_strategy::{Block3, DonnellyUnrolled};
 use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use rkyv_08::api::high::to_bytes_in;
@@ -23,7 +23,7 @@ const QUERY_SEED: u64 = 0x5eed_0000_0000_0302;
 
 type ArenaLeaves = VecOfArenas<f64, u32, K, B>;
 type EytzingerTree = KdTree<f64, u32, Eytzinger, ArenaLeaves, K, B>;
-type DonnellyPfTree = KdTree<f64, u32, DonnellyPf<3, 64, 8, K>, ArenaLeaves, K, B>;
+type DonnellyUnrolledTree = KdTree<f64, u32, DonnellyUnrolled<Block3>, ArenaLeaves, K, B>;
 
 fn read_usize_env(var: &str, default: usize) -> usize {
     std::env::var(var)
@@ -98,9 +98,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let start = Instant::now();
-    let donnelly_pf_tree: DonnellyPfTree = KdTree::new_from_slice(&points).unwrap();
+    let donnelly_unrolled_tree: DonnellyUnrolledTree = KdTree::new_from_slice(&points).unwrap();
     eprintln!(
-        "built Donnelly PF tree in {:.0} ns",
+        "built DonnellyUnrolled tree in {:.0} ns",
         start.elapsed().as_nanos() as f64
     );
 
@@ -114,9 +114,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
 
     let start = Instant::now();
-    let bytes = to_bytes_in::<_, RkyvError>(&donnelly_pf_tree, AlignedVec::<128>::new())?;
+    let bytes = to_bytes_in::<_, RkyvError>(&donnelly_unrolled_tree, AlignedVec::<128>::new())?;
     write_archive_bytes(
-        "Donnelly PF tree",
+        "DonnellyUnrolled tree",
         &bytes,
         &archive_path(&prefix, "donnelly-pf-tree"),
         start.elapsed().as_nanos() as f64,

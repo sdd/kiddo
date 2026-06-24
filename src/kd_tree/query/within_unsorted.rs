@@ -9,7 +9,7 @@ use crate::leaf_view_chunked::nearest_n_within::{
     nearest_n_within_with_query_wide, nearest_n_within_with_query_wide_arena,
 };
 use crate::results::result_collection::VisitorResultCollection;
-use crate::stem_strategy::donnelly_2_blockmarker_simd::{
+use crate::stem_strategy::donnelly::simd_full::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits::leaf_strategy::LeafProjection;

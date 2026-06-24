@@ -143,7 +143,7 @@ impl CompareBlock3 for f64 {
         #[cfg(all(feature = "simd", target_arch = "aarch64"))]
         {
             unsafe {
-                crate::stem_strategy::donnelly_2_blockmarker_simd::aarch64::compare_block3_f64_neon(
+                crate::stem_strategy::donnelly::simd_full::aarch64::compare_block3_f64_neon(
                     stems_ptr,
                     block_base_idx,
                     query_val,
@@ -157,7 +157,7 @@ impl CompareBlock3 for f64 {
         )))]
         {
             unsafe {
-                crate::stem_strategy::donnelly_2_blockmarker_simd::autovec::compare_block3_f64_autovec(
+                crate::stem_strategy::donnelly::simd_full::autovec::compare_block3_f64_autovec(
                     stems_ptr,
                     block_base_idx,
                     query_val,
@@ -223,7 +223,7 @@ impl CompareBlock3 for f32 {
         #[cfg(all(feature = "simd", target_arch = "aarch64"))]
         {
             unsafe {
-                crate::stem_strategy::donnelly_2_blockmarker_simd::aarch64::compare_block3_f32_neon(
+                crate::stem_strategy::donnelly::simd_full::aarch64::compare_block3_f32_neon(
                     stems_ptr,
                     block_base_idx,
                     query_val,
@@ -237,7 +237,7 @@ impl CompareBlock3 for f32 {
         )))]
         {
             unsafe {
-                crate::stem_strategy::donnelly_2_blockmarker_simd::autovec::compare_block3_f32_autovec(
+                crate::stem_strategy::donnelly::simd_full::autovec::compare_block3_f32_autovec(
                     stems_ptr,
                     block_base_idx,
                     query_val,
@@ -291,7 +291,7 @@ impl CompareBlock4 for f32 {
         #[cfg(all(feature = "simd", target_arch = "aarch64"))]
         {
             unsafe {
-                crate::stem_strategy::donnelly_2_blockmarker_simd::aarch64::compare_block4_f32_neon(
+                crate::stem_strategy::donnelly::simd_full::aarch64::compare_block4_f32_neon(
                     stems_ptr,
                     block_base_idx,
                     query_val,
@@ -305,7 +305,7 @@ impl CompareBlock4 for f32 {
         )))]
         {
             unsafe {
-                crate::stem_strategy::donnelly_2_blockmarker_simd::autovec::compare_block4_f32_autovec(
+                crate::stem_strategy::donnelly::simd_full::autovec::compare_block4_f32_autovec(
                     stems_ptr,
                     block_base_idx,
                     query_val,

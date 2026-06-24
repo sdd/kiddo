@@ -52,6 +52,7 @@ impl<const PF1: isize, const PF2: isize> StemStrategy for EytzingerFlexPf<PF1, P
         }
     }
 
+    #[inline(always)]
     fn stem_idx(&self) -> usize {
         self.stem_idx as usize
     }
@@ -67,13 +68,19 @@ impl<const PF1: isize, const PF2: isize> StemStrategy for EytzingerFlexPf<PF1, P
         self.level = state.level as i32;
         self.dim = state.dim as usize;
     }
+
+    #[inline(always)]
     fn leaf_idx(&self) -> usize {
         let mask = 1u32.wrapping_shl(self.level as u32);
         (self.stem_idx & !mask) as usize
     }
-    fn dim(&self) -> usize {
+
+    #[inline(always)]
+    fn dim<const K: usize>(&self) -> usize {
         self.dim
     }
+
+    #[inline(always)]
     fn level(&self) -> i32 {
         self.level
     }
@@ -103,7 +110,7 @@ impl<const PF1: isize, const PF2: isize> StemStrategy for EytzingerFlexPf<PF1, P
         let _ = event_tx.send(crate::test_utils::cache_simulator::Event::Working(2));
     }
 
-    fn branch<const K: usize>(&mut self) -> Self {
+    fn branch<A: Axis<Coord = A>, const K: usize>(&mut self) -> Self {
         self.stem_idx = self.stem_idx.wrapping_shl(1);
         let right = self.stem_idx | 1;
 
@@ -118,7 +125,7 @@ impl<const PF1: isize, const PF2: isize> StemStrategy for EytzingerFlexPf<PF1, P
         }
     }
 
-    fn child_indices(&self) -> (usize, usize) {
+    fn child_indices<A: Axis<Coord = A>>(&self) -> (usize, usize) {
         let left = (self.stem_idx << 1) as usize;
         let right = left | 1;
         (left, right)

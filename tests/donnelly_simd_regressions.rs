@@ -7,7 +7,7 @@ use kiddo::kd_tree::KdTree;
 #[cfg(feature = "simd")]
 use kiddo::leaf_strategy::FlatVec;
 #[cfg(feature = "simd")]
-use kiddo::stem_strategy::{Block3, Block4, Donnelly, DonnellyMarkerSimd};
+use kiddo::stem_strategy::{Block3, Block4, Donnelly, DonnellySimdFull};
 #[cfg(feature = "simd")]
 use kiddo::BestQueryResultItem;
 #[cfg(feature = "simd")]
@@ -186,16 +186,10 @@ fn regression_donnelly_simd_block4_f32_nearest_one_matches_scalar_and_linear() {
     let query = build_query_f32_k2();
     let expected = linear_search(&points, &query);
 
-    let tree_scalar: KdTree<f32, usize, Donnelly<4, 64, 4, 2>, FlatVec<f32, usize, 2, 16>, 2, 16> =
+    let tree_scalar: KdTree<f32, usize, Donnelly<Block4>, FlatVec<f32, usize, 2, 16>, 2, 16> =
         KdTree::new_from_slice(&points).unwrap();
-    let tree_simd: KdTree<
-        f32,
-        usize,
-        DonnellyMarkerSimd<Block4, 64, 4, 2>,
-        FlatVec<f32, usize, 2, 16>,
-        2,
-        16,
-    > = KdTree::new_from_slice(&points).unwrap();
+    let tree_simd: KdTree<f32, usize, DonnellySimdFull<Block4>, FlatVec<f32, usize, 2, 16>, 2, 16> =
+        KdTree::new_from_slice(&points).unwrap();
 
     let scalar_result = tree_scalar
         .query(&query)
@@ -217,16 +211,10 @@ fn regression_donnelly_simd_block4_f32_nearest_one_matches_scalar_and_linear() {
 fn regression_donnelly_simd_block4_f32_approx_self_lookup_hits_zero_distance() {
     let points = build_points_f32_k2();
 
-    let tree_scalar: KdTree<f32, usize, Donnelly<4, 64, 4, 2>, FlatVec<f32, usize, 2, 16>, 2, 16> =
+    let tree_scalar: KdTree<f32, usize, Donnelly<Block4>, FlatVec<f32, usize, 2, 16>, 2, 16> =
         KdTree::new_from_slice(&points).unwrap();
-    let tree_simd: KdTree<
-        f32,
-        usize,
-        DonnellyMarkerSimd<Block4, 64, 4, 2>,
-        FlatVec<f32, usize, 2, 16>,
-        2,
-        16,
-    > = KdTree::new_from_slice(&points).unwrap();
+    let tree_simd: KdTree<f32, usize, DonnellySimdFull<Block4>, FlatVec<f32, usize, 2, 16>, 2, 16> =
+        KdTree::new_from_slice(&points).unwrap();
 
     for point in points.iter() {
         let scalar_result = tree_scalar
@@ -254,16 +242,10 @@ fn regression_donnelly_simd_block4_f32_best_n_within_matches_scalar_and_linear()
     let max_qty = NonZeroUsize::new(16).unwrap();
     let expected = linear_best_n_within_f32(&points, &query, max_dist, max_qty.get());
 
-    let tree_scalar: KdTree<f32, usize, Donnelly<4, 64, 4, 2>, FlatVec<f32, usize, 2, 16>, 2, 16> =
+    let tree_scalar: KdTree<f32, usize, Donnelly<Block4>, FlatVec<f32, usize, 2, 16>, 2, 16> =
         KdTree::new_from_slice(&points).unwrap();
-    let tree_simd: KdTree<
-        f32,
-        usize,
-        DonnellyMarkerSimd<Block4, 64, 4, 2>,
-        FlatVec<f32, usize, 2, 16>,
-        2,
-        16,
-    > = KdTree::new_from_slice(&points).unwrap();
+    let tree_simd: KdTree<f32, usize, DonnellySimdFull<Block4>, FlatVec<f32, usize, 2, 16>, 2, 16> =
+        KdTree::new_from_slice(&points).unwrap();
 
     let scalar_result = tree_scalar
         .query(&query)
@@ -303,16 +285,10 @@ fn control_donnelly_simd_block3_f64_nearest_one_matches_scalar_and_linear() {
 
     let expected = linear_search_f64(&points, &query);
 
-    let tree_scalar: KdTree<f64, usize, Donnelly<3, 64, 8, 2>, FlatVec<f64, usize, 2, 16>, 2, 16> =
+    let tree_scalar: KdTree<f64, usize, Donnelly<Block3>, FlatVec<f64, usize, 2, 16>, 2, 16> =
         KdTree::new_from_slice(&points).unwrap();
-    let tree_simd: KdTree<
-        f64,
-        usize,
-        DonnellyMarkerSimd<Block3, 64, 8, 2>,
-        FlatVec<f64, usize, 2, 16>,
-        2,
-        16,
-    > = KdTree::new_from_slice(&points).unwrap();
+    let tree_simd: KdTree<f64, usize, DonnellySimdFull<Block3>, FlatVec<f64, usize, 2, 16>, 2, 16> =
+        KdTree::new_from_slice(&points).unwrap();
 
     let scalar_result = tree_scalar
         .query(&query)
@@ -343,16 +319,10 @@ fn control_donnelly_simd_block3_f64_best_n_within_matches_scalar_and_linear() {
     let max_qty = NonZeroUsize::new(16).unwrap();
     let expected = linear_best_n_within_f64(&points, &query, max_dist, max_qty.get());
 
-    let tree_scalar: KdTree<f64, usize, Donnelly<3, 64, 8, 2>, FlatVec<f64, usize, 2, 16>, 2, 16> =
+    let tree_scalar: KdTree<f64, usize, Donnelly<Block3>, FlatVec<f64, usize, 2, 16>, 2, 16> =
         KdTree::new_from_slice(&points).unwrap();
-    let tree_simd: KdTree<
-        f64,
-        usize,
-        DonnellyMarkerSimd<Block3, 64, 8, 2>,
-        FlatVec<f64, usize, 2, 16>,
-        2,
-        16,
-    > = KdTree::new_from_slice(&points).unwrap();
+    let tree_simd: KdTree<f64, usize, DonnellySimdFull<Block3>, FlatVec<f64, usize, 2, 16>, 2, 16> =
+        KdTree::new_from_slice(&points).unwrap();
 
     let scalar_result = tree_scalar
         .query(&query)
@@ -388,16 +358,10 @@ fn regression_donnelly_simd_block4_f32_small_grid_within_variants_match_linear()
     let expected = linear_within_f32(&points, &query, max_dist);
     let max_qty = NonZeroUsize::new(usize::MAX).unwrap();
 
-    let tree_scalar: KdTree<f32, usize, Donnelly<4, 64, 4, 2>, FlatVec<f32, usize, 2, 16>, 2, 16> =
+    let tree_scalar: KdTree<f32, usize, Donnelly<Block4>, FlatVec<f32, usize, 2, 16>, 2, 16> =
         KdTree::new_from_slice(&points).unwrap();
-    let tree_simd: KdTree<
-        f32,
-        usize,
-        DonnellyMarkerSimd<Block4, 64, 4, 2>,
-        FlatVec<f32, usize, 2, 16>,
-        2,
-        16,
-    > = KdTree::new_from_slice(&points).unwrap();
+    let tree_simd: KdTree<f32, usize, DonnellySimdFull<Block4>, FlatVec<f32, usize, 2, 16>, 2, 16> =
+        KdTree::new_from_slice(&points).unwrap();
 
     let mut scalar_within_unsorted: Vec<(f32, usize)> = tree_scalar
         .query(&query)

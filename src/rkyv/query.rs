@@ -16,7 +16,7 @@ use crate::results::result_collection::{
     BestNeighbourResultCollection, BinaryHeapResultCollection, ResultCollection,
     VisitorResultCollection,
 };
-use crate::stem_strategy::donnelly_2_blockmarker_simd::{
+use crate::stem_strategy::donnelly::simd_full::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits::leaf_strategy::LeafProjection;

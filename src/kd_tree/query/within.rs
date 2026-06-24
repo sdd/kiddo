@@ -3,7 +3,7 @@ use std::num::NonZeroUsize;
 use crate::dist::DistanceMetric;
 use crate::kd_tree::query_stack::StackTrait;
 use crate::leaf_view::TlsLeafScratch;
-use crate::stem_strategy::donnelly_2_blockmarker_simd::{
+use crate::stem_strategy::donnelly::simd_full::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::{Axis, Content, KdTree, LeafStrategy, QueryResultItem, StemStrategy};
