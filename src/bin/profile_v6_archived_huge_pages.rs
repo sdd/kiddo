@@ -8,7 +8,7 @@ mod linux {
         mapping_report_for_slice, prepare_archived_bytes, HugePageMappingReport, HugePageMode,
     };
     use kiddo::leaf_strategy::VecOfArenas;
-    use kiddo::stem_strategy::donnelly_2_pf::DonnellyPf;
+    use kiddo::stem_strategy::{Block3, DonnellyUnrolled};
     use rkyv_08::util::AlignedVec;
     use std::error::Error;
     use std::fs::File;
@@ -23,8 +23,8 @@ mod linux {
     const DEFAULT_START_DELAY_MS: u64 = 0;
 
     type ArenaLeaves = VecOfArenas<f64, u32, K, B>;
-    type ArchivedDonnellyPfTree =
-        kiddo::kd_tree::ArchivedKdTree<f64, u32, DonnellyPf<3, 64, 8, K>, ArenaLeaves, K, B>;
+    type ArchivedDonnellyUnrolledTree =
+        kiddo::kd_tree::ArchivedKdTree<f64, u32, DonnellyUnrolled<Block3>, ArenaLeaves, K, B>;
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum LoadMode {
@@ -250,7 +250,7 @@ mod linux {
     }
 
     fn run_nearest_one(
-        tree: &ArchivedDonnellyPfTree,
+        tree: &ArchivedDonnellyUnrolledTree,
         queries: &rkyv_08::vec::ArchivedVec<[f64; K]>,
         repeats: usize,
     ) -> RunResult {
@@ -277,7 +277,7 @@ mod linux {
     }
 
     fn run_approx_nearest_one(
-        tree: &ArchivedDonnellyPfTree,
+        tree: &ArchivedDonnellyUnrolledTree,
         queries: &rkyv_08::vec::ArchivedVec<[f64; K]>,
         repeats: usize,
     ) -> RunResult {
@@ -347,7 +347,7 @@ mod linux {
             );
         }
 
-        let tree = rkyv_08::access::<ArchivedDonnellyPfTree, rkyv_08::rancor::Error>(
+        let tree = rkyv_08::access::<ArchivedDonnellyUnrolledTree, rkyv_08::rancor::Error>(
             tree_bytes.as_slice(),
         )?;
         let queries = rkyv_08::access::<rkyv_08::vec::ArchivedVec<[f64; K]>, rkyv_08::rancor::Error>(

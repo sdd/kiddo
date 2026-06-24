@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let tree: KdTree<
         f64,
         usize,
-        Donnelly<3, 64, 8, 4>,
+        Donnelly<Block3>,
         VecOfArenas<f64, usize, 4, BUCKET_SIZE>,
         4,
         BUCKET_SIZE,

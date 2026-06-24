@@ -3991,7 +3991,7 @@ mod f16_impl {
 mod tests {
     use super::*;
     use crate::dist::{DistanceMetricCore, SquaredEuclidean};
-    use crate::stem_strategy::donnelly_2_blockmarker_simd::{
+    use crate::stem_strategy::donnelly::simd_full::{
         child_interval_bounds_block3, child_interval_bounds_block4, interval_distance_1d,
     };
 

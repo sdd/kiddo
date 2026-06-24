@@ -4,8 +4,8 @@
 use kiddo::dist::SquaredEuclidean;
 use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::results::result_collection_stats::{reset, snapshot, ResultCollectionStats};
-use kiddo::stem_strategy::donnelly_2_pf::DonnellyPf;
 use kiddo::stem_strategy::Eytzinger;
+use kiddo::stem_strategy::{Block3, DonnellyUnrolled};
 use std::hint::black_box;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
@@ -19,8 +19,8 @@ const DEFAULT_MAX_DIST: f64 = 0.0025;
 
 type ArenaLeaves = VecOfArenas<f64, u32, K, B>;
 type ArchivedEytzingerTree = kiddo::kd_tree::ArchivedKdTree<f64, u32, Eytzinger, ArenaLeaves, K, B>;
-type ArchivedDonnellyPfTree =
-    kiddo::kd_tree::ArchivedKdTree<f64, u32, DonnellyPf<3, 64, 8, K>, ArenaLeaves, K, B>;
+type ArchivedDonnellyUnrolledTree =
+    kiddo::kd_tree::ArchivedKdTree<f64, u32, DonnellyUnrolled<Block3>, ArenaLeaves, K, B>;
 
 #[derive(Clone, Copy)]
 struct RunResult {
@@ -163,7 +163,7 @@ fn load_aligned_archive(
 }
 
 fn run_sorted_nearest_n_within_archived_donnelly(
-    tree: &ArchivedDonnellyPfTree,
+    tree: &ArchivedDonnellyUnrolledTree,
     queries: &rkyv_08::vec::ArchivedVec<[f64; K]>,
     repeats: usize,
     max_dist: f64,
@@ -201,7 +201,7 @@ fn run_sorted_nearest_n_within_archived_donnelly(
 }
 
 fn run_best_n_within_archived_donnelly(
-    tree: &ArchivedDonnellyPfTree,
+    tree: &ArchivedDonnellyUnrolledTree,
     queries: &rkyv_08::vec::ArchivedVec<[f64; K]>,
     repeats: usize,
     max_dist: f64,
@@ -338,8 +338,10 @@ fn run_archived_profile(
     let query_bytes = load_aligned_archive(&queries_path)?;
     let eytzinger_tree =
         rkyv_08::access::<ArchivedEytzingerTree, rkyv_08::rancor::Error>(&eytzinger_bytes[..])?;
-    let donnelly_pf_tree =
-        rkyv_08::access::<ArchivedDonnellyPfTree, rkyv_08::rancor::Error>(&donnelly_bytes[..])?;
+    let donnelly_unrolled_tree = rkyv_08::access::<
+        ArchivedDonnellyUnrolledTree,
+        rkyv_08::rancor::Error,
+    >(&donnelly_bytes[..])?;
     let queries = rkyv_08::access::<rkyv_08::vec::ArchivedVec<[f64; K]>, rkyv_08::rancor::Error>(
         &query_bytes[..],
     )?;
@@ -348,7 +350,7 @@ fn run_archived_profile(
         load_start.elapsed().as_nanos() as f64,
         queries.len(),
         eytzinger_tree.size(),
-        donnelly_pf_tree.size()
+        donnelly_unrolled_tree.size()
     );
 
     let total_queries = queries.len() * repeats;
@@ -369,16 +371,21 @@ fn run_archived_profile(
     );
 
     let donnelly_pf_sorted = run_sorted_nearest_n_within_archived_donnelly(
-        donnelly_pf_tree,
+        donnelly_unrolled_tree,
         queries,
         repeats,
         max_dist,
         max_qty,
     );
-    let donnelly_pf_best =
-        run_best_n_within_archived_donnelly(donnelly_pf_tree, queries, repeats, max_dist, max_qty);
+    let donnelly_pf_best = run_best_n_within_archived_donnelly(
+        donnelly_unrolled_tree,
+        queries,
+        repeats,
+        max_dist,
+        max_qty,
+    );
     print_strategy_results(
-        "Donnelly PF archived",
+        "DonnellyUnrolled archived",
         donnelly_pf_sorted,
         donnelly_pf_best,
         total_queries,

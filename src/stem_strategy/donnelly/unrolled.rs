@@ -1,0 +1,186 @@
+//! Unrolled Donnelly stem strategy.
+
+use std::ptr::NonNull;
+
+use crate::stem_strategy::donnelly::core::DonnellyCore;
+use crate::stem_strategy::{Block3, Block4, Block5, Block6, Block7, BlockHeightMarker};
+use crate::{Axis, StemStrategy};
+
+#[doc(hidden)]
+pub trait DonnellyUnrolledType: BlockHeightMarker {
+    type Strategy;
+}
+
+/// Unrolled Donnelly strategy with per-level dimension scheduling.
+pub type DonnellyUnrolled<BS> = <BS as DonnellyUnrolledType>::Strategy;
+
+/// Unrolled Donnelly strategy with per-level dimension scheduling.
+#[derive(Copy, Clone, Debug)]
+pub struct DonnellyUnrolledInner<const BH: u32> {
+    core: DonnellyCore<BH>,
+}
+
+macro_rules! impl_donnelly_unrolled_strategy {
+    ($marker:ty, $size:tt) => {
+        impl StemStrategy for DonnellyUnrolledInner<$size> {
+            const ROOT_IDX: usize = 0;
+
+            type DeferredState = Self;
+            type StackContext<A> =
+                crate::kd_tree::query_stack::QueryStackContext<A, Self::DeferredState>;
+            type Stack<A> = crate::kd_tree::query_stack::QueryStack<A, Self>;
+
+            #[inline(always)]
+            fn new(stems_ptr: NonNull<u8>) -> Self {
+                Self {
+                    core: DonnellyCore::new(stems_ptr),
+                }
+            }
+
+            #[inline(always)]
+            fn stem_idx(&self) -> usize { self.core.stem_idx() }
+
+            #[inline(always)]
+            fn deferred_state(&self) -> Self::DeferredState { *self }
+
+            #[inline(always)]
+            fn rehydrate_deferred_state(&mut self, state: Self::DeferredState) { *self = state; }
+
+            #[inline(always)]
+            fn leaf_idx(&self) -> usize { self.core.leaf_idx() }
+
+            #[inline(always)]
+            fn dim<const K: usize>(&self) -> usize { self.core.dim::<K>() }
+
+            #[inline(always)]
+            fn level(&self) -> i32 { self.core.level() }
+
+            #[inline(always)]
+            fn traverse<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
+                self.core.traverse::<A, K>(is_right)
+            }
+
+            #[inline(always)]
+            fn traverse_head<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
+                self.core.traverse_head::<A, K>(is_right)
+            }
+
+            #[inline(always)]
+            fn traverse_tail<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
+                self.core
+                    .traverse_tail_with_block_size::<A, K>(is_right, $size)
+            }
+
+            #[inline(always)]
+            fn branch<A: Axis<Coord = A>, const K: usize>(&mut self) -> Self {
+                Self {
+                    core: self.core.branch::<A, K>(),
+                }
+            }
+
+            #[inline(always)]
+            fn child_indices<A: Axis<Coord = A>>(&self) -> (usize, usize) {
+                self.core.child_indices::<A>()
+            }
+
+            fn get_stem_node_count_from_leaf_node_count(_leaf_node_count: usize) -> usize {
+                unimplemented!()
+            }
+            fn stem_node_padding_factor() -> usize {
+                unimplemented!()
+            }
+
+            fn block_size() -> usize { $size }
+
+            fn get_leaf_idx<A: Axis<Coord = A>, const K2: usize>(
+                stems: &[A],
+                query: &[A; K2],
+                max_stem_level: i32,
+            ) -> usize {
+                let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+                let mut strat = Self::new(stems_ptr);
+
+                while strat.level() + ($size as i32) <= max_stem_level + 1 {
+                    impl_donnelly_unrolled_strategy!(@unroll $size, stems, query, strat);
+                }
+
+                while strat.level() <= max_stem_level {
+                    let pivot = unsafe { stems.get_unchecked(strat.stem_idx()) };
+                    let is_right = unsafe { *query.get_unchecked(strat.dim::<K2>()) } >= *pivot;
+                    strat.traverse::<A, K2>(is_right);
+                }
+
+                strat.leaf_idx()
+            }
+        }
+    };
+
+    (@unroll 3, $stems:expr, $query:expr, $strat:expr) => {
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@tail $stems, $query, $strat);
+    };
+    (@unroll 4, $stems:expr, $query:expr, $strat:expr) => {
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@tail $stems, $query, $strat);
+    };
+    (@unroll 5, $stems:expr, $query:expr, $strat:expr) => {
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@tail $stems, $query, $strat);
+    };
+    (@unroll 6, $stems:expr, $query:expr, $strat:expr) => {
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@tail $stems, $query, $strat);
+    };
+    (@unroll 7, $stems:expr, $query:expr, $strat:expr) => {
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@tail $stems, $query, $strat);
+    };
+
+    (@head $stems:expr, $query:expr, $strat:expr) => {{
+        let pivot = unsafe { $stems.get_unchecked($strat.stem_idx()) };
+        let is_right = unsafe { *$query.get_unchecked($strat.dim::<K2>()) } >= *pivot;
+        $strat.traverse_head::<A, K2>(is_right);
+    }};
+    (@tail $stems:expr, $query:expr, $strat:expr) => {{
+        let pivot = unsafe { $stems.get_unchecked($strat.stem_idx()) };
+        let is_right = unsafe { *$query.get_unchecked($strat.dim::<K2>()) } >= *pivot;
+        $strat.traverse_tail::<A, K2>(is_right);
+    }};
+}
+
+impl_donnelly_unrolled_strategy!(Block3, 3);
+impl_donnelly_unrolled_strategy!(Block4, 4);
+impl_donnelly_unrolled_strategy!(Block5, 5);
+impl_donnelly_unrolled_strategy!(Block6, 6);
+impl_donnelly_unrolled_strategy!(Block7, 7);
+
+impl DonnellyUnrolledType for Block3 {
+    type Strategy = DonnellyUnrolledInner<3>;
+}
+impl DonnellyUnrolledType for Block4 {
+    type Strategy = DonnellyUnrolledInner<4>;
+}
+impl DonnellyUnrolledType for Block5 {
+    type Strategy = DonnellyUnrolledInner<5>;
+}
+impl DonnellyUnrolledType for Block6 {
+    type Strategy = DonnellyUnrolledInner<6>;
+}
+impl DonnellyUnrolledType for Block7 {
+    type Strategy = DonnellyUnrolledInner<7>;
+}

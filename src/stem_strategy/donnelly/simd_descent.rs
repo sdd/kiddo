@@ -10,12 +10,20 @@ use std::ptr::NonNull;
 use aligned_vec::AVec;
 
 use crate::kd_tree::query_stack::{QueryStack, ScalarStackContext};
-use crate::stem_strategy::donnelly_2_blockmarker_simd::{
+use crate::stem_strategy::donnelly::core::DonnellyCore;
+use crate::stem_strategy::donnelly::simd_full::{
     child_interval_bounds_block3, compare_block3, interval_distance_1d,
 };
-use crate::stem_strategy::donnelly_core::DonnellyCore;
-use crate::stem_strategy::Block3;
+use crate::stem_strategy::{Block3, BlockHeightMarker};
 use crate::{Axis, StemStrategy};
+
+#[doc(hidden)]
+pub trait DonnellySimdDescentType: BlockHeightMarker {
+    type Strategy;
+}
+
+/// Donnelly block-at-once descent strategy selected by block-height marker.
+pub type DonnellySimdDescent<BS> = <BS as DonnellySimdDescentType>::Strategy;
 
 /// Scalar stack context for block-at-once scalar backtracking.
 ///
@@ -73,17 +81,21 @@ impl<A, S> ScalarStackContext<A, S> for DonnellySimdDescentStackContext<A, S> {
 
 /// Donnelly block-marker descent with scalar pruning/backtracking.
 #[derive(Copy, Clone, Debug)]
-pub struct DonnellySimdDescent<const CL: u32, const VB: u32, const K: usize> {
-    core: DonnellyCore<CL, VB, K>,
+pub struct DonnellySimdDescentBlock3 {
+    core: DonnellyCore<3>,
     _marker: PhantomData<Block3>,
 }
 
-impl<const CL: u32, const VB: u32, const K: usize> DonnellySimdDescent<CL, VB, K> {
+impl DonnellySimdDescentType for Block3 {
+    type Strategy = DonnellySimdDescentBlock3;
+}
+
+impl DonnellySimdDescentBlock3 {
     #[inline(always)]
-    fn can_take_full_block(&self, stems_len: usize, max_stem_level: i32) -> bool {
+    fn can_take_full_block<A: Axis>(&self, stems_len: usize, max_stem_level: i32) -> bool {
         let block_width = 1usize << Self::BLOCK_SIZE;
         let block_base_idx = self.stem_idx();
-        let minor_tri_height = (CL / VB).ilog2();
+        let minor_tri_height = (64 / A::VALUE_WIDTH_BYTES as u32).ilog2();
 
         self.level() + Self::BLOCK_SIZE as i32 - 1 <= max_stem_level
             && block_base_idx + block_width <= stems_len
@@ -92,11 +104,11 @@ impl<const CL: u32, const VB: u32, const K: usize> DonnellySimdDescent<CL, VB, K
     }
 
     #[inline(always)]
-    fn block_child(&self, child_idx: u8) -> Self {
+    fn block_child<const K: usize>(&self, child_idx: u8) -> Self {
         let mut child = *self;
         child
             .core
-            .traverse_block(child_idx, Self::BLOCK_SIZE as u32);
+            .traverse_block::<K>(child_idx, Self::BLOCK_SIZE as u32);
         child
     }
 
@@ -132,7 +144,7 @@ impl<const CL: u32, const VB: u32, const K: usize> DonnellySimdDescent<CL, VB, K
     }
 }
 
-impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimdDescent<CL, VB, K> {
+impl StemStrategy for DonnellySimdDescentBlock3 {
     const ROOT_IDX: usize = 0;
     const BLOCK_SIZE: usize = 3;
 
@@ -142,7 +154,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
 
     #[inline]
     fn new(stems_ptr: NonNull<u8>) -> Self {
-        debug_assert!(CL >= VB);
+        // debug_assert!(CL >= A::VALUE_WIDTH_BYTES);
 
         Self {
             core: DonnellyCore::new(stems_ptr),
@@ -171,12 +183,12 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
     }
 
     #[inline(always)]
-    fn dim(&self) -> usize {
+    fn dim<const K: usize>(&self) -> usize {
         self.core.level() as usize / Self::BLOCK_SIZE % K
     }
 
     #[inline(always)]
-    fn construction_dim(&self) -> usize {
+    fn construction_dim<const K: usize>(&self) -> usize {
         self.core.level() as usize / Self::BLOCK_SIZE % K
     }
 
@@ -191,16 +203,16 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
     }
 
     #[inline(always)]
-    fn branch<const K2: usize>(&mut self) -> Self {
+    fn branch<A: Axis<Coord = A>, const K: usize>(&mut self) -> Self {
         Self {
-            core: self.core.branch::<K2>(),
+            core: self.core.branch::<A, K>(),
             _marker: PhantomData,
         }
     }
 
     #[inline(always)]
-    fn child_indices(&self) -> (usize, usize) {
-        self.core.child_indices()
+    fn child_indices<A: Axis<Coord = A>>(&self) -> (usize, usize) {
+        self.core.child_indices::<A>()
     }
 
     fn get_stem_node_count_from_leaf_node_count(leaf_node_count: usize) -> usize {
@@ -215,7 +227,10 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
         50
     }
 
-    fn trim_unneeded_stems<A: Axis<Coord = A>>(stems: &mut AVec<A>, max_stem_level: usize) {
+    fn trim_unneeded_stems<A: Axis<Coord = A>, const K: usize>(
+        stems: &mut AVec<A>,
+        max_stem_level: usize,
+    ) {
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         if !stems.is_empty() {
             let mut so = Self::new(stems_ptr);
@@ -239,9 +254,9 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
         }
     }
 
-    fn get_leaf_idx<A: Axis<Coord = A>, const K2: usize>(
+    fn get_leaf_idx<A: Axis<Coord = A>, const K: usize>(
         stems: &[A],
-        query: &[A; K2],
+        query: &[A; K],
         max_stem_level: i32,
     ) -> usize
     where
@@ -251,14 +266,14 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
         let mut strat = Self::new(stems_ptr);
 
         while strat.level() <= max_stem_level {
-            let dim = strat.dim();
+            let dim = strat.dim::<K>();
             let query_val = unsafe { *query.get_unchecked(dim) };
 
-            if strat.can_take_full_block(stems.len(), max_stem_level) {
+            if strat.can_take_full_block::<A>(stems.len(), max_stem_level) {
                 let child_idx = compare_block3(stems, query_val, strat.stem_idx());
                 strat
                     .core
-                    .traverse_block(child_idx, Self::BLOCK_SIZE as u32);
+                    .traverse_block::<K>(child_idx, Self::BLOCK_SIZE as u32);
             } else {
                 let stem_idx = strat.stem_idx();
                 let is_right = if stem_idx < stems.len() {
@@ -274,12 +289,12 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
     }
 
     #[inline(always)]
-    fn backtracking_traverse_step<A, O, D, const K2: usize>(
+    fn backtracking_traverse_step<A, O, D, const K: usize>(
         &mut self,
         stems: &[A],
-        query: &[A; K2],
-        query_wide: &[O; K2],
-        off: &mut [O; K2],
+        query: &[A; K],
+        query_wide: &[O; K],
+        off: &mut [O; K],
         dim: &mut usize,
         rd: O,
         max_stem_level: i32,
@@ -289,7 +304,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
     where
         Self: Sized,
         A: Axis<Coord = A>,
-        O: Axis<Coord = O> + crate::stem_strategy::donnelly_2_blockmarker_simd::BacktrackBlock3,
+        O: Axis<Coord = O> + crate::stem_strategy::donnelly::simd_full::BacktrackBlock3,
         D: crate::dist::DistanceMetric<A, Output = O>,
     {
         if self.level() > max_stem_level {
@@ -300,7 +315,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
         let query_val = unsafe { *query.get_unchecked(dim_val) };
         let query_wide_val = unsafe { *query_wide.get_unchecked(dim_val) };
 
-        if !self.can_take_full_block(stems.len(), max_stem_level) {
+        if !self.can_take_full_block::<A>(stems.len(), max_stem_level) {
             let stem_idx = self.stem_idx();
             let pivot = if stem_idx < stems.len() {
                 unsafe { *stems.get_unchecked(stem_idx) }
@@ -310,7 +325,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
 
             if pivot < A::max_value() {
                 let is_right_child = query_val >= pivot;
-                let far_ctx = self.branch_relative::<K>(is_right_child);
+                let far_ctx = self.branch_relative::<A, K>(is_right_child);
                 let pivot_wide: O = D::widen_coord(pivot);
                 let new_off = O::saturating_dist(query_wide_val, pivot_wide);
                 let rd_far = D::rect_dist_after_update(rd, off, *dim, new_off);
@@ -327,7 +342,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
                 self.traverse::<A, K>(false);
             }
 
-            *dim = self.dim();
+            *dim = self.dim::<K>();
             return true;
         }
 
@@ -345,7 +360,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
                 continue;
             }
 
-            let new_off = Self::child_new_off::<A, O, D, K2>(
+            let new_off = Self::child_new_off::<A, O, D, K>(
                 stems,
                 block_base_idx,
                 sibling_idx,
@@ -378,7 +393,7 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
         }
 
         for i in (0..candidate_count).rev() {
-            let sibling = base.block_child(candidate_idx[i]);
+            let sibling = base.block_child::<K>(candidate_idx[i]);
             stack.push(Self::StackContext::<O>::from_parts_with_restore_dim(
                 sibling.deferred_state(),
                 dim_val,
@@ -388,12 +403,12 @@ impl<const CL: u32, const VB: u32, const K: usize> StemStrategy for DonnellySimd
         }
 
         let child_new_off =
-            Self::child_new_off::<A, O, D, K2>(stems, block_base_idx, child_idx, query_wide_val);
+            Self::child_new_off::<A, O, D, K>(stems, block_base_idx, child_idx, query_wide_val);
         unsafe { *off.get_unchecked_mut(dim_val) = child_new_off };
 
         self.core
-            .traverse_block(child_idx as u8, Self::BLOCK_SIZE as u32);
-        *dim = self.dim();
+            .traverse_block::<K>(child_idx as u8, Self::BLOCK_SIZE as u32);
+        *dim = self.dim::<K>();
         true
     }
 }
@@ -409,11 +424,11 @@ mod tests {
     fn test_donnelly_simd_descent_basics() {
         let stems = vec![10.0f64; 100];
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
-        let mut strat = DonnellySimdDescent::<64, 8, 3>::new(stems_ptr);
+        let mut strat = DonnellySimdDescent::<Block3>::new(stems_ptr);
 
         assert_eq!(strat.stem_idx(), 0);
         assert_eq!(strat.level(), 0);
-        assert_eq!(strat.dim(), 0);
+        assert_eq!(strat.dim::<3>(), 0);
 
         strat.traverse::<f64, 3>(true);
         assert!(strat.stem_idx() > 0);
@@ -426,7 +441,7 @@ mod tests {
 
     #[test]
     fn test_stack_context_round_trips_restore_dim() {
-        type Strat = DonnellySimdDescent<64, 8, 3>;
+        type Strat = DonnellySimdDescent<Block3>;
 
         let stems = [f64::INFINITY; 8];
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
@@ -455,42 +470,42 @@ mod tests {
 
     #[test]
     fn test_can_take_full_block_only_at_minor_triangle_boundary() {
-        type Strat = DonnellySimdDescent<64, 8, 3>;
+        type Strat = DonnellySimdDescent<Block3>;
 
         let stems = build_test_block3_pivots_f64();
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         let mut strat = Strat::new(stems_ptr);
 
-        assert!(strat.can_take_full_block(stems.len(), 2));
-        assert!(!strat.can_take_full_block(7, 2));
-        assert!(!strat.can_take_full_block(stems.len(), 1));
+        assert!(strat.can_take_full_block::<f64>(stems.len(), 2));
+        assert!(!strat.can_take_full_block::<f64>(7, 2));
+        assert!(!strat.can_take_full_block::<f64>(stems.len(), 1));
 
         strat.traverse::<f64, 3>(false);
-        assert!(!strat.can_take_full_block(stems.len(), 3));
+        assert!(!strat.can_take_full_block::<f64>(stems.len(), 3));
     }
 
     #[test]
     fn test_block_child_matches_manual_traverse_block() {
-        type Strat = DonnellySimdDescent<64, 8, 3>;
+        type Strat = DonnellySimdDescent<Block3>;
 
         let stems = build_test_block3_pivots_f64();
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         let strat = Strat::new(stems_ptr);
 
-        let child = strat.block_child(5);
+        let child = strat.block_child::<3>(5);
 
         let mut manual = strat;
-        manual.core.traverse_block(5, Strat::BLOCK_SIZE as u32);
+        manual.core.traverse_block::<3>(5, Strat::BLOCK_SIZE as u32);
 
         assert_eq!(child.stem_idx(), manual.stem_idx());
         assert_eq!(child.level(), manual.level());
         assert_eq!(child.leaf_idx(), manual.leaf_idx());
-        assert_eq!(child.dim(), manual.dim());
+        assert_eq!(child.dim::<3>(), manual.dim::<3>());
     }
 
     #[test]
     fn test_child_new_off_uses_child_interval_bounds() {
-        type Strat = DonnellySimdDescent<64, 8, 3>;
+        type Strat = DonnellySimdDescent<Block3>;
 
         let stems = build_test_block3_pivots_f64();
         let query = 0.45;
@@ -509,7 +524,7 @@ mod tests {
 
     #[test]
     fn test_leaf_metadata_helpers_match_current_layout() {
-        type Strat = DonnellySimdDescent<64, 8, 3>;
+        type Strat = DonnellySimdDescent<Block3>;
 
         assert_eq!(Strat::get_stem_node_count_from_leaf_node_count(0), 0);
         assert_eq!(Strat::get_stem_node_count_from_leaf_node_count(1), 0);
@@ -521,10 +536,10 @@ mod tests {
 
     #[test]
     fn test_trim_unneeded_stems_truncates_to_last_reachable_left_path_node() {
-        type Strat = DonnellySimdDescent<64, 8, 3>;
+        type Strat = DonnellySimdDescent<Block3>;
 
         let mut stems = avec![f64::INFINITY; 100];
-        Strat::trim_unneeded_stems(&mut stems, 2);
+        Strat::trim_unneeded_stems::<f64, 3>(&mut stems, 2);
 
         let ptr = NonNull::dangling();
         let mut manual = Strat::new(ptr);
@@ -541,7 +556,7 @@ mod tests {
 
     #[test]
     fn test_get_leaf_idx_matches_manual_full_block_traversal() {
-        type Strat = DonnellySimdDescent<64, 8, 3>;
+        type Strat = DonnellySimdDescent<Block3>;
 
         let stems = build_test_block3_pivots_f64();
         let query = [0.45, 0.0, 0.0];
@@ -550,14 +565,14 @@ mod tests {
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         let mut manual = Strat::new(stems_ptr);
         let child_idx = compare_block3(&stems, query[0], 0);
-        manual.core.traverse_block(child_idx, 3);
+        manual.core.traverse_block::<3>(child_idx, 3);
 
         assert_eq!(leaf_idx, manual.leaf_idx());
     }
 
     #[test]
     fn test_get_leaf_idx_matches_manual_scalar_fallback() {
-        type Strat = DonnellySimdDescent<64, 8, 3>;
+        type Strat = DonnellySimdDescent<Block3>;
 
         let stems = build_test_block3_pivots_f64();
         let query = [0.45, 0.0, 0.0];
@@ -573,7 +588,7 @@ mod tests {
 
     #[test]
     fn test_backtracking_step_full_block_updates_state_and_pushes_sorted_siblings() {
-        type Strat = DonnellySimdDescent<64, 8, 3>;
+        type Strat = DonnellySimdDescent<Block3>;
 
         let stems = build_test_block3_pivots_f64();
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
@@ -618,7 +633,7 @@ mod tests {
 
         assert!(stepped);
         assert_eq!(off[0], 0.0);
-        assert_eq!(dim, strat.dim());
+        assert_eq!(dim, strat.dim::<3>());
 
         let mut popped = Vec::new();
         while let Some(ctx) = stack.pop() {
@@ -631,7 +646,7 @@ mod tests {
         for ((stem_idx, restore_dim, old_off, rd), (sibling_idx, expected_off, expected_rd)) in
             popped.into_iter().zip(expected.into_iter())
         {
-            let expected_state = Strat::new(stems_ptr).block_child(sibling_idx);
+            let expected_state = Strat::new(stems_ptr).block_child::<3>(sibling_idx);
             assert_eq!(stem_idx, expected_state.stem_idx());
             assert_eq!(restore_dim, Some(0));
             assert_eq!(old_off, expected_off);
@@ -641,7 +656,7 @@ mod tests {
 
     #[test]
     fn test_backtracking_step_scalar_fallback_pushes_far_context() {
-        type Strat = DonnellySimdDescent<64, 8, 3>;
+        type Strat = DonnellySimdDescent<Block3>;
 
         let stems = build_test_block3_pivots_f64();
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
@@ -666,7 +681,7 @@ mod tests {
 
         assert!(stepped);
         assert_eq!(strat.level(), 1);
-        assert_eq!(strat.dim(), 0);
+        assert_eq!(strat.dim::<3>(), 0);
 
         let popped = stack.pop().expect("expected deferred far context");
         let (state, restore_dim, old_off, rd) =
@@ -684,17 +699,17 @@ mod tests {
 
     #[test]
     fn test_backtracking_step_returns_false_past_max_level() {
-        type Strat = DonnellySimdDescent<64, 8, 3>;
+        type Strat = DonnellySimdDescent<Block3>;
 
         let stems = build_test_block3_pivots_f64();
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
         let mut strat = Strat::new(stems_ptr);
-        strat.core.traverse_block(4, 3);
+        strat.core.traverse_block::<3>(4, 3);
 
         let query = [0.45, 0.0, 0.0];
         let query_wide = query;
         let mut off = [0.0; 3];
-        let mut dim = strat.dim();
+        let mut dim = strat.dim::<3>();
         let mut stack = <Strat as StemStrategy>::Stack::<f64>::default();
 
         let stepped = strat.backtracking_traverse_step::<f64, f64, SquaredEuclidean<f64>, 3>(

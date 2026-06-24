@@ -4,7 +4,7 @@ use crate::kd_tree::query_stack::StackTrait;
 use crate::kd_tree::KdTreeQueryOps;
 use crate::leaf_view::TlsLeafScratch;
 use crate::leaf_view_chunked::nearest_one::nearest_one_with_query_wide;
-use crate::stem_strategy::donnelly_2_blockmarker_simd::{
+use crate::stem_strategy::donnelly::simd_full::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits::leaf_strategy::LeafProjection;
@@ -250,7 +250,7 @@ pub mod cargo_asm {
     use crate::kd_tree::query_stack::QueryStack;
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::{FlatVec, VecOfArenas};
-    use crate::stem_strategy::{Block3, Donnelly, DonnellyMarkerSimd};
+    use crate::stem_strategy::{Block3, Block4, Donnelly, DonnellySimdFull, DonnellyUnrolled};
     use crate::Eytzinger;
 
     const K: usize = 3;
@@ -259,9 +259,9 @@ pub mod cargo_asm {
     type KdT = KdTree<f64, usize, Eytzinger, FlatVec<f64, usize, K, BUCKET_SIZE>, K, BUCKET_SIZE>;
     type ArenaLeaves = VecOfArenas<f64, usize, K, BUCKET_SIZE>;
     type EytzingerPfFarArenaKdT = KdTree<f64, usize, Eytzinger, ArenaLeaves, K, BUCKET_SIZE>;
-    type DonnellyKdT = KdTree<f64, usize, Donnelly<3, 64, 8, K>, ArenaLeaves, K, BUCKET_SIZE>;
+    type DonnellyKdT = KdTree<f64, usize, Donnelly<Block3>, ArenaLeaves, K, BUCKET_SIZE>;
     type DonnellySimdKdT =
-        KdTree<f64, usize, DonnellyMarkerSimd<Block3, 64, 8, K>, ArenaLeaves, K, BUCKET_SIZE>;
+        KdTree<f64, usize, DonnellySimdFull<Block3>, ArenaLeaves, K, BUCKET_SIZE>;
 
     /// Hook for cargo-asm to render the v6 nearest-one call path.
     #[inline(never)]
@@ -302,7 +302,7 @@ pub mod cargo_asm {
     pub fn v6_nearest_one_donnelly_vec_of_arenas_cargo_asm_hook(
         tree: &DonnellyKdT,
         query: [f64; 3],
-        stack: &mut QueryStack<f64, Donnelly<3, 64, 8, 3>>,
+        stack: &mut QueryStack<f64, Donnelly<Block3>>,
     ) -> (f64, usize) {
         tree.nearest_one_with_stack::<SquaredEuclidean<f64>>(&query, stack)
     }
@@ -313,7 +313,7 @@ pub mod cargo_asm {
     pub fn v6_nearest_one_donnelly_blocksimd_vec_of_arenas_cargo_asm_hook(
         tree: &DonnellySimdKdT,
         query: [f64; 3],
-        stack: &mut <DonnellyMarkerSimd<Block3, 64, 8, 3> as crate::StemStrategy>::Stack<f64>,
+        stack: &mut <DonnellySimdFull<Block3> as crate::StemStrategy>::Stack<f64>,
     ) -> (f64, usize) {
         tree.nearest_one_with_stack::<SquaredEuclidean<f64>>(&query, stack)
     }
@@ -357,7 +357,7 @@ mod tests {
     use crate::kd_tree::query_stack::QueryStack;
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
-    use crate::stem_strategy::Donnelly;
+    use crate::stem_strategy::{Block4, Donnelly};
     use crate::Axis;
     use crate::{Eytzinger, QueryResultItem};
 
@@ -624,7 +624,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let tree: KdTree<f32, u32, Donnelly<4, 64, 4, 4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
+        let tree: KdTree<f32, u32, Donnelly<Block4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
             KdTree::new_from_slice(&content_to_add).unwrap();
 
         assert_eq!(tree.size(), TREE_SIZE);
@@ -724,7 +724,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let mut tree: KdTree<f32, u32, Donnelly<4, 64, 4, 4>, VecOfArrays<f32, u32, 4, 32>, 4, 32> =
+        let mut tree: KdTree<f32, u32, Donnelly<Block4>, VecOfArrays<f32, u32, 4, 32>, 4, 32> =
             KdTree::default();
 
         for (idx, point) in content_to_add.iter().enumerate() {
@@ -758,7 +758,7 @@ mod tests {
         let content_to_add: Vec<[f32; 4]> =
             (0..TREE_SIZE).map(|_| rng.random::<[f32; 4]>()).collect();
 
-        let tree: KdTree<f32, u32, Donnelly<4, 64, 4, 4>, VecOfArrays<f32, u32, 4, 32>, 4, 32> =
+        let tree: KdTree<f32, u32, Donnelly<Block4>, VecOfArrays<f32, u32, 4, 32>, 4, 32> =
             KdTree::new_from_slice(&content_to_add).unwrap();
 
         assert_eq!(tree.size(), TREE_SIZE);
@@ -928,9 +928,9 @@ mod tests {
     #[cfg(feature = "simd")]
     #[cfg(target_arch = "x86_64")]
     fn v6_query_nearest_one_donnelly_marker_simd_f64() {
-        use crate::stem_strategy::{Block3, DonnellyMarkerPf, DonnellyMarkerSimd};
+        use crate::stem_strategy::{Block3, DonnellySimdFull, DonnellyUnrolled};
 
-        // Test DonnellyMarkerSimd with f64 data using exact nearest_one query
+        // Test DonnellySimdFull with f64 data using exact nearest_one query
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
 
         // Use 8192 points which with bucket size 32 gives 256 leaves
@@ -946,19 +946,13 @@ mod tests {
             })
             .collect();
 
-        let tree: KdTree<
-            f64,
-            u32,
-            DonnellyMarkerSimd<Block3, 64, 8, 3>,
-            FlatVec<f64, u32, 3, 32>,
-            3,
-            32,
-        > = KdTree::new_from_slice(&points).unwrap();
+        let tree: KdTree<f64, u32, DonnellySimdFull<Block3>, FlatVec<f64, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points).unwrap();
 
         let tree_non_simd: KdTree<
             f64,
             u32,
-            DonnellyMarkerPf<Block3, 64, 8, 3>,
+            DonnellyUnrolled<Block3>,
             FlatVec<f64, u32, 3, 32>,
             3,
             32,
@@ -1015,9 +1009,9 @@ mod tests {
     #[cfg(feature = "simd")]
     #[cfg(target_arch = "x86_64")]
     fn v6_query_nearest_one_donnelly_marker_simd_block4_f32() {
-        use crate::stem_strategy::{Block4, DonnellyMarkerSimd};
+        use crate::stem_strategy::{Block4, DonnellySimdFull};
 
-        // Test DonnellyMarkerSimd with f32 data using exact nearest_one query
+        // Test DonnellySimdFull with f32 data using exact nearest_one query
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
 
         // Use smaller dataset for faster test (16384 points = 512 leaves = 2^9, depth = 9)
@@ -1033,14 +1027,8 @@ mod tests {
             })
             .collect();
 
-        let tree: KdTree<
-            f32,
-            u32,
-            DonnellyMarkerSimd<Block4, 64, 4, 4>,
-            FlatVec<f32, u32, 4, 32>,
-            4,
-            32,
-        > = KdTree::new_from_slice(&points).unwrap();
+        let tree: KdTree<f32, u32, DonnellySimdFull<Block4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
+            KdTree::new_from_slice(&points).unwrap();
 
         assert!(!tree.is_empty());
         assert_eq!(tree.size(), 16_384);

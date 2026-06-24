@@ -14,7 +14,7 @@ use crate::results::result_collection::{BinaryHeapResultCollection, ResultCollec
 use crate::results::result_collection::{
     SmallSortedVecResultCollection, SMALL_RESULT_COLLECTION_MAX_QTY,
 };
-use crate::stem_strategy::donnelly_2_blockmarker_simd::{
+use crate::stem_strategy::donnelly::simd_full::{
     interval_distance_1d, BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
 };
 use crate::traits::leaf_strategy::LeafProjection;
@@ -566,7 +566,7 @@ fn periodic_backtracking_query<Tree, A, T, SS, LS, QC, O, D, F, const K: usize, 
                 break;
             }
 
-            let dim = stem_strat.dim();
+            let dim = stem_strat.dim::<K>();
             let stem_idx = stem_strat.stem_idx();
             let pivot = if stem_idx < tree.stems().len() {
                 unsafe { *tree.stems().get_unchecked(stem_idx) }
@@ -585,7 +585,7 @@ fn periodic_backtracking_query<Tree, A, T, SS, LS, QC, O, D, F, const K: usize, 
             let query_val = query[dim];
             let query_wide_val = query_wide[dim];
             let is_right_child = query_val >= pivot;
-            let far_ctx = stem_strat.branch_relative::<K>(is_right_child);
+            let far_ctx = stem_strat.branch_relative::<A, K>(is_right_child);
 
             let (near_lower, near_upper, far_lower, far_upper) = if is_right_child {
                 (

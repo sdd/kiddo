@@ -156,7 +156,7 @@ mod tests {
 
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
-    use crate::stem_strategy::{Donnelly, DonnellyMarkerPf};
+    use crate::stem_strategy::{Block4, Donnelly, DonnellyUnrolled};
 
     use crate::dist::SquaredEuclidean;
     use crate::Eytzinger;
@@ -452,15 +452,9 @@ mod tests {
             points.push([x, y, z, w]);
         }
 
-        // Use DonnellyMarkerPf with Block4 (4 levels per block, matching 16 f32s per 64-byte cache line)
-        let tree: KdTree<
-            f32,
-            u32,
-            DonnellyMarkerPf<Block4, 64, 4, 4>,
-            FlatVec<f32, u32, 4, 32>,
-            4,
-            32,
-        > = KdTree::new_from_slice(&points).unwrap();
+        // Use DonnellyUnrolled with Block4 (4 levels per block, matching 16 f32s per 64-byte cache line)
+        let tree: KdTree<f32, u32, DonnellyUnrolled<Block4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
+            KdTree::new_from_slice(&points).unwrap();
 
         assert!(!tree.is_empty());
         assert_eq!(tree.size(), 131_072);
@@ -484,7 +478,7 @@ mod tests {
     fn v6_approx_nearest_one_donnelly_marker_matches_eytzinger() {
         use crate::stem_strategy::Block4;
 
-        // Verify that DonnellyMarkerPf produces the same results as Eytzinger
+        // Verify that DonnellyUnrolled produces the same results as Eytzinger
         // for the same input data
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
@@ -505,7 +499,7 @@ mod tests {
         let tree_donnelly: KdTree<
             f32,
             u32,
-            DonnellyMarkerPf<Block4, 64, 4, 4>,
+            DonnellyUnrolled<Block4>,
             FlatVec<f32, u32, 4, 32>,
             4,
             32,
@@ -539,7 +533,7 @@ mod tests {
             // and the approximate query just returns the best match in the target leaf
             assert_eq!(
                 result_eytz, result_donnelly,
-                "DonnellyMarkerPf should produce same results as Eytzinger for query #{} ({:?})",
+                "DonnellyUnrolled should produce same results as Eytzinger for query #{} ({:?})",
                 idx, query_point
             );
         }
@@ -563,14 +557,8 @@ mod tests {
         let tree_eytz: KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 4, 32>, 4, 32> =
             KdTree::new_from_slice(&points).unwrap();
 
-        let tree_donnelly: KdTree<
-            f32,
-            u32,
-            Donnelly<4, 64, 4, 4>,
-            FlatVec<f32, u32, 4, 32>,
-            4,
-            32,
-        > = KdTree::new_from_slice(&points).unwrap();
+        let tree_donnelly: KdTree<f32, u32, Donnelly<Block4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
+            KdTree::new_from_slice(&points).unwrap();
 
         // Test multiple query points
         let query_points: Vec<[f32; 4]> = (0..100)
@@ -608,7 +596,7 @@ mod tests {
     fn v6_approx_nearest_one_donnelly_marker_matches_donnelly() {
         use crate::stem_strategy::Block4;
 
-        // Verify that DonnellyMarkerPf produces the same results as Donnelly
+        // Verify that DonnellyUnrolled produces the same results as Donnelly
         // for the same input data
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
@@ -623,19 +611,13 @@ mod tests {
             })
             .collect();
 
-        let tree_donnelly: KdTree<
-            f32,
-            u32,
-            Donnelly<4, 64, 4, 4>,
-            FlatVec<f32, u32, 4, 32>,
-            4,
-            32,
-        > = KdTree::new_from_slice(&points).unwrap();
+        let tree_donnelly: KdTree<f32, u32, Donnelly<Block4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
+            KdTree::new_from_slice(&points).unwrap();
 
         let tree_donnelly_marker: KdTree<
             f32,
             u32,
-            DonnellyMarkerPf<Block4, 64, 4, 4>,
+            DonnellyUnrolled<Block4>,
             FlatVec<f32, u32, 4, 32>,
             4,
             32,
@@ -669,7 +651,7 @@ mod tests {
             // and the approximate query just returns the best match in the target leaf
             assert_eq!(
                 result_eytz, result_donnelly,
-                "DonnellyMarkerPf should produce same results as Donnelly for query #{} ({:?})",
+                "DonnellyUnrolled should produce same results as Donnelly for query #{} ({:?})",
                 idx, query_point
             );
         }
@@ -680,7 +662,7 @@ mod tests {
     #[cfg(target_arch = "x86_64")]
     fn v6_approx_nearest_one_donnelly_marker_simd_f64() {
         use crate::stem_strategy::Block3;
-        use crate::stem_strategy::DonnellyMarkerSimd;
+        use crate::stem_strategy::DonnellySimdFull;
 
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
@@ -694,14 +676,8 @@ mod tests {
             })
             .collect();
 
-        let tree: KdTree<
-            f64,
-            u32,
-            DonnellyMarkerSimd<Block3, 64, 8, 3>,
-            FlatVec<f64, u32, 3, 32>,
-            3,
-            32,
-        > = KdTree::new_from_slice(&points).unwrap();
+        let tree: KdTree<f64, u32, DonnellySimdFull<Block3>, FlatVec<f64, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(&points).unwrap();
 
         assert!(!tree.is_empty());
         assert_eq!(tree.size(), 2_097_152);
@@ -746,9 +722,9 @@ mod tests {
     #[cfg(target_arch = "x86_64")]
     fn v6_approx_nearest_one_donnelly_marker_simd_f32() {
         use crate::stem_strategy::Block4;
-        use crate::stem_strategy::DonnellyMarkerSimd;
+        use crate::stem_strategy::DonnellySimdFull;
 
-        // Test DonnellyMarkerSimd with f32 data
+        // Test DonnellySimdFull with f32 data
         let mut rng = StdRng::seed_from_u64(RNG_SEED);
 
         let points: Vec<[f32; 4]> = (0..2_097_152)
@@ -764,14 +740,8 @@ mod tests {
 
         // 2_097_152 points with bucket size 32 = 65_536 leaves = 2^16, depth = 16
         // Block4 divides evenly into 16
-        let tree: KdTree<
-            f32,
-            u32,
-            DonnellyMarkerSimd<Block4, 64, 4, 4>,
-            FlatVec<f32, u32, 4, 32>,
-            4,
-            32,
-        > = KdTree::new_from_slice(&points).unwrap();
+        let tree: KdTree<f32, u32, DonnellySimdFull<Block4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
+            KdTree::new_from_slice(&points).unwrap();
 
         assert!(!tree.is_empty());
         assert_eq!(tree.size(), 2_097_152);

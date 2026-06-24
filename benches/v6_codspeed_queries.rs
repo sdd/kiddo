@@ -4,14 +4,13 @@ use codspeed_criterion_compat::{black_box, criterion_group, criterion_main, Crit
 use kiddo::dist::SquaredEuclidean;
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
-use kiddo::stem_strategy::donnelly_2_pf::DonnellyPf;
 #[cfg(all(
     feature = "simd",
     target_arch = "x86_64",
     any(target_feature = "avx2", target_feature = "avx512f")
 ))]
-use kiddo::stem_strategy::{Block3, DonnellyMarkerSimd};
-use kiddo::stem_strategy::{Donnelly, DonnellySimdDescent, Eytzinger};
+use kiddo::stem_strategy::DonnellySimdFull;
+use kiddo::stem_strategy::{Block3, Donnelly, DonnellySimdDescent, DonnellyUnrolled, Eytzinger};
 use kiddo::{LeafStrategy, StemStrategy};
 use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
@@ -39,17 +38,16 @@ type VecOfArraysTreeF64 = KdTree<f64, u32, Eytzinger, VecOfArrays<f64, u32, K, B
 
 type EytzingerTreeF64 = KdTree<f64, u32, Eytzinger, BaselineLeavesF64, K, B>;
 type EytzingerPfFarTreeF64 = KdTree<f64, u32, Eytzinger, BaselineLeavesF64, K, B>;
-type DonnellyTreeF64 = KdTree<f64, u32, Donnelly<3, 64, 8, K>, BaselineLeavesF64, K, B>;
-type DonnellyPfTreeF64 = KdTree<f64, u32, DonnellyPf<3, 64, 8, K>, BaselineLeavesF64, K, B>;
+type DonnellyTreeF64 = KdTree<f64, u32, Donnelly<Block3>, BaselineLeavesF64, K, B>;
+type DonnellyUnrolledTreeF64 = KdTree<f64, u32, DonnellyUnrolled<Block3>, BaselineLeavesF64, K, B>;
 type DonnellySimdDescentTreeF64 =
-    KdTree<f64, u32, DonnellySimdDescent<64, 8, K>, BaselineLeavesF64, K, B>;
+    KdTree<f64, u32, DonnellySimdDescent<Block3>, BaselineLeavesF64, K, B>;
 #[cfg(all(
     feature = "simd",
     target_arch = "x86_64",
     any(target_feature = "avx2", target_feature = "avx512f")
 ))]
-type DonnellyMarkerSimdTreeF64 =
-    KdTree<f64, u32, DonnellyMarkerSimd<Block3, 64, 8, K>, BaselineLeavesF64, K, B>;
+type DonnellySimdFullTreeF64 = KdTree<f64, u32, DonnellySimdFull<Block3>, BaselineLeavesF64, K, B>;
 
 fn read_usize_env(var: &str, default: usize) -> usize {
     std::env::var(var)
@@ -294,7 +292,8 @@ fn v6_codspeed_queries(c: &mut Criterion) {
     let eytzinger_pf_far_tree_f64: EytzingerPfFarTreeF64 =
         KdTree::new_from_slice(&points_f64).unwrap();
     let donnelly_tree_f64: DonnellyTreeF64 = KdTree::new_from_slice(&points_f64).unwrap();
-    let donnelly_pf_tree_f64: DonnellyPfTreeF64 = KdTree::new_from_slice(&points_f64).unwrap();
+    let donnelly_unrolled_tree_f64: DonnellyUnrolledTreeF64 =
+        KdTree::new_from_slice(&points_f64).unwrap();
     let donnelly_simd_descent_tree_f64: DonnellySimdDescentTreeF64 =
         KdTree::new_from_slice(&points_f64).unwrap();
     #[cfg(all(
@@ -302,7 +301,7 @@ fn v6_codspeed_queries(c: &mut Criterion) {
         target_arch = "x86_64",
         any(target_feature = "avx2", target_feature = "avx512f")
     ))]
-    let donnelly_marker_simd_tree_f64: DonnellyMarkerSimdTreeF64 =
+    let donnelly_marker_simd_tree_f64: DonnellySimdFullTreeF64 =
         KdTree::new_from_slice(&points_f64).unwrap();
 
     c.bench_function(
@@ -370,18 +369,25 @@ fn v6_codspeed_queries(c: &mut Criterion) {
         &bench_name(
             "nearest_one",
             "VecOfArenas",
-            "Donnelly PF",
+            "DonnellyUnrolled",
             "f64",
             log2_points,
         ),
-        |b| b.iter(|| black_box(run_nearest_one_f64(&donnelly_pf_tree_f64, &queries_f64))),
+        |b| {
+            b.iter(|| {
+                black_box(run_nearest_one_f64(
+                    &donnelly_unrolled_tree_f64,
+                    &queries_f64,
+                ))
+            })
+        },
     );
 
     c.bench_function(
         &bench_name(
             "nearest_one",
             "VecOfArenas",
-            "Donnelly SIMD Descent",
+            "DonnellySimdDescent",
             "f64",
             log2_points,
         ),
@@ -404,7 +410,7 @@ fn v6_codspeed_queries(c: &mut Criterion) {
         &bench_name(
             "nearest_one",
             "VecOfArenas",
-            "Donnelly Block SIMD",
+            "DonnellySimdFull",
             "f64",
             log2_points,
         ),

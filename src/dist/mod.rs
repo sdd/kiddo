@@ -1215,12 +1215,19 @@ pub trait DistanceMetric<A: Copy>:
             + std::ops::Add<Output = Self::Output>
             + std::ops::Sub<Output = Self::Output>,
     {
-        crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::autovec_backtrack_block3::<
+        crate::stem_strategy::donnelly::simd_full::backtrack_traits::autovec_backtrack_block3::<
             Self::Output,
             A,
             Self,
             K,
-        >(query_wide, stems_ptr, block_base_idx, old_off, rd, best_dist)
+        >(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
     }
 
     /// Block3 bounds-aware backtrack mask generation.
@@ -1240,7 +1247,7 @@ pub trait DistanceMetric<A: Copy>:
         Self: Sized,
         Self::Output: Axis<Coord = Self::Output>,
     {
-        crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::autovec_backtrack_block3_with_bounds::<
+        crate::stem_strategy::donnelly::simd_full::backtrack_traits::autovec_backtrack_block3_with_bounds::<
             A,
             Self::Output,
             Self,
@@ -1278,7 +1285,7 @@ pub trait DistanceMetric<A: Copy>:
         Self: Sized,
         Self::Output: Axis<Coord = Self::Output>,
     {
-        crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::autovec_fill_block3_values_and_bounds::<
+        crate::stem_strategy::donnelly::simd_full::backtrack_traits::autovec_fill_block3_values_and_bounds::<
             A,
             Self::Output,
             Self,
@@ -1316,12 +1323,19 @@ pub trait DistanceMetric<A: Copy>:
             + std::ops::Add<Output = Self::Output>
             + std::ops::Sub<Output = Self::Output>,
     {
-        crate::stem_strategy::donnelly_2_blockmarker_simd::backtrack_traits::autovec_backtrack_block4::<
+        crate::stem_strategy::donnelly::simd_full::backtrack_traits::autovec_backtrack_block4::<
             Self::Output,
             A,
             Self,
             K,
-        >(query_wide, stems_ptr, block_base_idx, old_off, rd, best_dist)
+        >(
+            query_wide,
+            stems_ptr,
+            block_base_idx,
+            old_off,
+            rd,
+            best_dist,
+        )
     }
 }
 

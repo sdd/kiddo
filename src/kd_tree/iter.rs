@@ -443,7 +443,7 @@ where
                     break;
                 }
 
-                let dim = stem_strat.dim();
+                let dim = stem_strat.dim::<K>();
                 let stem_idx = stem_strat.stem_idx();
                 let pivot = if stem_idx < self.tree.stems().len() {
                     unsafe { *self.tree.stems().get_unchecked(stem_idx) }
@@ -454,7 +454,7 @@ where
                 if pivot < A::max_value() {
                     let query_elem = unsafe { *self.query.get_unchecked(dim) };
                     let is_right_child = query_elem >= pivot;
-                    let far_ctx = stem_strat.branch_relative::<K>(is_right_child);
+                    let far_ctx = stem_strat.branch_relative::<A, K>(is_right_child);
 
                     let pivot_wide = D::widen_coord(pivot);
                     let query_elem_wide = unsafe { *self.query_wide.get_unchecked(dim) };

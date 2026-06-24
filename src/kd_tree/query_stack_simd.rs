@@ -334,9 +334,9 @@ impl<
 }
 
 impl<A: Axis<Coord = A>, SS: StemStrategy> SimdQueryStackContext<A, SS> {
-    pub fn new_single(stem_strat: SS) -> Self {
+    pub fn new_single<const K: usize>(stem_strat: SS) -> Self {
         Self::Single {
-            dim: stem_strat.dim(),
+            dim: stem_strat.dim::<K>(),
             lower_bound: A::min_value(),
             upper_bound: A::max_value(),
             stem_strat,
@@ -469,7 +469,7 @@ where
 impl<A: Axis<Coord = A>, SS: StemStrategy, const K: usize> Block3SimdQueryStackContext<A, SS, K> {
     pub fn new_single(stem_strat: SS) -> Self {
         Self::Single {
-            dim: stem_strat.dim(),
+            dim: stem_strat.dim::<K>(),
             lower_bound: A::min_value(),
             upper_bound: A::max_value(),
             stem_strat,

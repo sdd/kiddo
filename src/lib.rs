@@ -13,6 +13,8 @@
 #![allow(clippy::pointers_in_nomem_asm_block)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::needless_range_loop)]
+#![allow(incomplete_features)]
+#![feature(generic_const_exprs)]
 
 //! # Kiddo
 //!
@@ -222,9 +224,10 @@ pub use crate::dist::{Chebyshev, DotProduct, Manhattan, Minkowski, SquaredEuclid
 pub mod stem_strategies;
 #[doc(hidden)]
 pub use stem_strategies as stem_strategy;
-#[doc(hidden)]
-pub use stem_strategies::DonnellyMarkerSimd;
-pub use stem_strategies::{Donnelly, DonnellyMarkerPf, Eytzinger};
+pub use stem_strategies::{
+    Donnelly, DonnellyNoPf, DonnellySimdDescent, DonnellySimdFull, DonnellyUnrolled,
+    DonnellyUnrolledBlockDim, Eytzinger,
+};
 
 /// Leaf storage strategies for the kd-tree
 #[path = "leaf_strategy/mod.rs"]
