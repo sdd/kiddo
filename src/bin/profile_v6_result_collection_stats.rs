@@ -4,8 +4,8 @@
 use kiddo::dist::SquaredEuclidean;
 use kiddo::leaf_strategy::VecOfArenas;
 use kiddo::results::result_collection_stats::{reset, snapshot, ResultCollectionStats};
+use kiddo::stem_strategy::DonnellyUnrolled;
 use kiddo::stem_strategy::Eytzinger;
-use kiddo::stem_strategy::{Block3, DonnellyUnrolled};
 use std::hint::black_box;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
@@ -20,7 +20,7 @@ const DEFAULT_MAX_DIST: f64 = 0.0025;
 type ArenaLeaves = VecOfArenas<f64, u32, K, B>;
 type ArchivedEytzingerTree = kiddo::kd_tree::ArchivedKdTree<f64, u32, Eytzinger, ArenaLeaves, K, B>;
 type ArchivedDonnellyUnrolledTree =
-    kiddo::kd_tree::ArchivedKdTree<f64, u32, DonnellyUnrolled<Block3>, ArenaLeaves, K, B>;
+    kiddo::kd_tree::ArchivedKdTree<f64, u32, DonnellyUnrolled<3>, ArenaLeaves, K, B>;
 
 #[derive(Clone, Copy)]
 struct RunResult {

@@ -7,7 +7,7 @@ use fixed::{FixedI32, FixedU16};
 
 use num_traits::Float;
 
-/// Trait for coordinate/axis types used in the [`KdTree`](crate::KdTree) (the `A` type parameter)
+/// Trait for coordinate/axis types used in the [`KdTree`](crate::kd_tree::KdTree) (the `A` type parameter)
 ///
 /// This trait must be implemented on a type for it to be usable as the coordinates
 /// for points stored in a `KdTree`.

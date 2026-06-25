@@ -4,17 +4,16 @@ on:
   push:
     branches:
       - "master"
-    paths:
-      - "src/**"
-      - "Cargo.toml"
-      - ".cargo/**"
   pull_request:
     branches:
       - "master"
     paths:
       - "src/**"
+      - "benches/**"
       - "Cargo.toml"
+      - "Cargo.lock"
       - ".cargo/**"
+      - ".github/workflows/codspeed.yml"
   # `workflow_dispatch` allows CodSpeed to trigger backtest
   # performance analysis in order to generate initial data.
   workflow_dispatch:
@@ -23,7 +22,8 @@ permissions:
   contents: read
 
 env:
-  KIDDO_BENCH_LOG2_POINTS: ${{ github.event_name == 'pull_request' && '16' || '26' }}
+  # Keep benchmark identities identical on PR and master runs so CodSpeed can compare them.
+  KIDDO_BENCH_LOG2_POINTS: "16"
 
 jobs:
   walltime_benchmarks:

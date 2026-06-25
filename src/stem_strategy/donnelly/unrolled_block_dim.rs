@@ -3,27 +3,19 @@
 use std::ptr::NonNull;
 
 use crate::stem_strategy::donnelly::core::DonnellyCore;
-use crate::stem_strategy::{Block3, Block4, Block5, Block6, Block7, BlockHeightMarker};
 use crate::{Axis, StemStrategy};
-
-#[doc(hidden)]
-pub trait DonnellyUnrolledBlockDimType: BlockHeightMarker {
-    type Strategy;
-}
-
-/// Unrolled Donnelly strategy with block-sized dimension scheduling.
-pub type DonnellyUnrolledBlockDim<BS> = <BS as DonnellyUnrolledBlockDimType>::Strategy;
 
 /// Unrolled Donnelly strategy using block-sized dimension scheduling.
 #[derive(Copy, Clone, Debug)]
-pub struct DonnellyUnrolledBlockDimInner<const BH: u32> {
+pub struct DonnellyUnrolledBlockDim<const BH: usize> {
     core: DonnellyCore<BH>,
 }
 
 macro_rules! impl_donnelly_unrolled_block_dim_strategy {
-    ($marker:ty, $size:tt) => {
-        impl StemStrategy for DonnellyUnrolledBlockDimInner<$size> {
+    ($size:tt) => {
+        impl StemStrategy for DonnellyUnrolledBlockDim<$size> {
             const ROOT_IDX: usize = 0;
+            const BLOCK_SIZE: usize = $size;
 
             type DeferredState = Self;
             type StackContext<A> =
@@ -84,7 +76,8 @@ macro_rules! impl_donnelly_unrolled_block_dim_strategy {
 
             #[inline(always)]
             fn traverse_tail<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
-                self.core.traverse_tail_with_block_size::<A, K>(is_right, $size)
+                self.core
+                    .traverse_tail_with_block_size::<A, K>(is_right, $size as u32)
             }
 
             #[inline(always)]
@@ -105,10 +98,6 @@ macro_rules! impl_donnelly_unrolled_block_dim_strategy {
 
             fn stem_node_padding_factor() -> usize {
                 unimplemented!()
-            }
-
-            fn block_size() -> usize {
-                $size
             }
 
             fn get_leaf_idx<A: Axis<Coord = A>, const K2: usize>(
@@ -182,34 +171,18 @@ macro_rules! impl_donnelly_unrolled_block_dim_strategy {
     }};
 }
 
-impl_donnelly_unrolled_block_dim_strategy!(Block3, 3);
-impl_donnelly_unrolled_block_dim_strategy!(Block4, 4);
-impl_donnelly_unrolled_block_dim_strategy!(Block5, 5);
-impl_donnelly_unrolled_block_dim_strategy!(Block6, 6);
-impl_donnelly_unrolled_block_dim_strategy!(Block7, 7);
-
-impl DonnellyUnrolledBlockDimType for Block3 {
-    type Strategy = DonnellyUnrolledBlockDimInner<3>;
-}
-impl DonnellyUnrolledBlockDimType for Block4 {
-    type Strategy = DonnellyUnrolledBlockDimInner<4>;
-}
-impl DonnellyUnrolledBlockDimType for Block5 {
-    type Strategy = DonnellyUnrolledBlockDimInner<5>;
-}
-impl DonnellyUnrolledBlockDimType for Block6 {
-    type Strategy = DonnellyUnrolledBlockDimInner<6>;
-}
-impl DonnellyUnrolledBlockDimType for Block7 {
-    type Strategy = DonnellyUnrolledBlockDimInner<7>;
-}
+impl_donnelly_unrolled_block_dim_strategy!(3);
+impl_donnelly_unrolled_block_dim_strategy!(4);
+impl_donnelly_unrolled_block_dim_strategy!(5);
+impl_donnelly_unrolled_block_dim_strategy!(6);
+impl_donnelly_unrolled_block_dim_strategy!(7);
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::panic::{catch_unwind, AssertUnwindSafe};
 
-    type Block3Scalar = DonnellyUnrolledBlockDim<Block3>;
+    type Block3Scalar = DonnellyUnrolledBlockDim<3>;
 
     #[test]
     fn donnelly_marker_scalar_block3_basics_and_state_round_trip() {

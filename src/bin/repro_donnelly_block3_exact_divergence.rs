@@ -4,7 +4,7 @@
 use kiddo::dist::{DistanceMetricScalar, SquaredEuclidean};
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::VecOfArenas;
-use kiddo::stem_strategy::{Block3, Donnelly, DonnellySimdFull, DonnellyUnrolledBlockDim};
+use kiddo::stem_strategy::{Donnelly, DonnellySimdFull, DonnellyUnrolledBlockDim};
 use kiddo::test_utils::exact_query_stats::{reset, snapshot, ExactQueryStats};
 use kiddo::test_utils::exact_query_trace;
 use rand::{RngExt, SeedableRng};
@@ -18,10 +18,9 @@ const POINT_SEED: u64 = 0x5eed_0000_0000_0201;
 const QUERY_SEED: u64 = 0x5eed_0000_0000_0202;
 
 type ArenaLeaves = VecOfArenas<f64, u32, K, B>;
-type DonnellyTree = KdTree<f64, u32, Donnelly<Block3>, ArenaLeaves, K, B>;
-type DonnellyBlockScalarTree =
-    KdTree<f64, u32, DonnellyUnrolledBlockDim<Block3>, ArenaLeaves, K, B>;
-type DonnellySimdTree = KdTree<f64, u32, DonnellySimdFull<Block3>, ArenaLeaves, K, B>;
+type DonnellyTree = KdTree<f64, u32, Donnelly<3>, ArenaLeaves, K, B>;
+type DonnellyBlockScalarTree = KdTree<f64, u32, DonnellyUnrolledBlockDim<3>, ArenaLeaves, K, B>;
+type DonnellySimdTree = KdTree<f64, u32, DonnellySimdFull<3>, ArenaLeaves, K, B>;
 
 fn read_usize_env(var: &str, default: usize) -> usize {
     std::env::var(var)

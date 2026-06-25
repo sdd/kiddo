@@ -164,7 +164,7 @@ pub mod cargo_asm {
     use crate::dist::SquaredEuclidean;
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::VecOfArenas;
-    use crate::stem_strategy::{Block3, DonnellyUnrolled};
+    use crate::stem_strategy::DonnellyUnrolled;
     use std::num::NonZeroUsize;
 
     const K: usize = 3;
@@ -173,8 +173,7 @@ pub mod cargo_asm {
     const MAX_QTY: usize = 16;
 
     type ArenaLeaves = VecOfArenas<f64, u32, K, BUCKET_SIZE>;
-    type DonnellyUnrolledKdT =
-        KdTree<f64, u32, DonnellyUnrolled<Block3>, ArenaLeaves, K, BUCKET_SIZE>;
+    type DonnellyUnrolledKdT = KdTree<f64, u32, DonnellyUnrolled<3>, ArenaLeaves, K, BUCKET_SIZE>;
 
     /// Hook for cargo-asm to render the best_n_within focus path.
     #[inline(never)]

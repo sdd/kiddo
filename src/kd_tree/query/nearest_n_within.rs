@@ -206,8 +206,8 @@ pub mod cargo_asm {
     use crate::dist::SquaredEuclidean;
     use crate::kd_tree::KdTree;
     use crate::leaf_strategy::VecOfArenas;
+    use crate::stem_strategy::DonnellyUnrolled;
     use crate::stem_strategy::Eytzinger;
-    use crate::stem_strategy::{Block3, DonnellyUnrolled};
     use std::num::NonZeroUsize;
 
     const K: usize = 3;
@@ -217,8 +217,7 @@ pub mod cargo_asm {
 
     type ArenaLeaves = VecOfArenas<f64, u32, K, BUCKET_SIZE>;
     type EytzingerPfFarKdT = KdTree<f64, u32, Eytzinger, ArenaLeaves, K, BUCKET_SIZE>;
-    type DonnellyUnrolledKdT =
-        KdTree<f64, u32, DonnellyUnrolled<Block3>, ArenaLeaves, K, BUCKET_SIZE>;
+    type DonnellyUnrolledKdT = KdTree<f64, u32, DonnellyUnrolled<3>, ArenaLeaves, K, BUCKET_SIZE>;
 
     /// Hook for cargo-asm to render the sorted nearest_n_within focus path.
     #[inline(never)]
@@ -320,7 +319,7 @@ mod tests {
     #[cfg(feature = "result_collection_stats")]
     use crate::results::result_collection_stats::{reset, snapshot};
     #[cfg(all(feature = "result_collection_stats", feature = "simd"))]
-    use crate::stem_strategy::{Block3, DonnellySimdFull};
+    use crate::stem_strategy::DonnellySimdFull;
     use crate::Axis;
     use crate::Eytzinger;
 
@@ -812,7 +811,7 @@ mod tests {
         let max_qty = NonZeroUsize::new(4).unwrap();
         let max_dist = 0.0004;
 
-        let tree: KdTree<f64, u32, DonnellySimdFull<Block3>, VecOfArenas<f64, u32, K, B>, K, B> =
+        let tree: KdTree<f64, u32, DonnellySimdFull<3>, VecOfArenas<f64, u32, K, B>, K, B> =
             KdTree::new_from_slice(&points).unwrap();
 
         reset();

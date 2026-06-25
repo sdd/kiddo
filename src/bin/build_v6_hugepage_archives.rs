@@ -3,7 +3,7 @@
 
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::VecOfArenas;
-use kiddo::stem_strategy::{Block3, DonnellyUnrolled};
+use kiddo::stem_strategy::DonnellyUnrolled;
 use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use rkyv_08::api::high::to_bytes_in;
@@ -21,7 +21,7 @@ const POINT_SEED: u64 = 0x5eed_0000_0000_0401;
 const QUERY_SEED: u64 = 0x5eed_0000_0000_0402;
 
 type ArenaLeaves = VecOfArenas<f64, u32, K, B>;
-type DonnellyUnrolledTree = KdTree<f64, u32, DonnellyUnrolled<Block3>, ArenaLeaves, K, B>;
+type DonnellyUnrolledTree = KdTree<f64, u32, DonnellyUnrolled<3>, ArenaLeaves, K, B>;
 
 fn read_usize_env(var: &str, default: usize) -> usize {
     std::env::var(var)

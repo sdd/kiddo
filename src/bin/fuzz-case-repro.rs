@@ -17,7 +17,7 @@ use kiddo::StemStrategy;
 use kiddo::{Manhattan as V6Manhattan, QueryResultItem, SquaredEuclidean as V6SquaredEuclidean};
 
 #[cfg(feature = "simd")]
-use kiddo::stem_strategy::{Block3, Block4, DonnellySimdFull};
+use kiddo::stem_strategy::DonnellySimdFull;
 
 use kiddo::Axis;
 use rand::rngs::StdRng;
@@ -329,10 +329,10 @@ impl V6StrategySelectorF32 for V6EytzingerStrategyF32 {
 
 impl V6StrategySelectorF32 for V6DonnellyStrategyF32 {
     fn run_mutable<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
-        run_v6_mutable_case_f32::<K, B, Donnelly<Block4>>(params)
+        run_v6_mutable_case_f32::<K, B, Donnelly<4>>(params)
     }
     fn run_immutable<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
-        run_v6_immutable_case_f32::<K, B, Donnelly<Block4>>(params)
+        run_v6_immutable_case_f32::<K, B, Donnelly<4>>(params)
     }
 }
 
@@ -341,7 +341,7 @@ impl V6StrategySelectorF32 for V6DonnellySimdStrategyF32 {
         let _ = params;
         #[cfg(feature = "simd")]
         {
-            run_v6_mutable_case_f32::<K, B, DonnellySimdFull<Block4>>(params)
+            run_v6_mutable_case_f32::<K, B, DonnellySimdFull<4>>(params)
         }
         #[cfg(not(feature = "simd"))]
         {
@@ -353,7 +353,7 @@ impl V6StrategySelectorF32 for V6DonnellySimdStrategyF32 {
         let _ = params;
         #[cfg(feature = "simd")]
         {
-            run_v6_immutable_case_f32::<K, B, DonnellySimdFull<Block4>>(params)
+            run_v6_immutable_case_f32::<K, B, DonnellySimdFull<4>>(params)
         }
         #[cfg(not(feature = "simd"))]
         {
@@ -367,7 +367,7 @@ impl V6StrategySelectorF32 for V6DonnellySimdBlock4StrategyF32 {
         let _ = params;
         #[cfg(feature = "simd")]
         {
-            run_v6_mutable_case_f32::<K, B, DonnellySimdFull<Block4>>(params)
+            run_v6_mutable_case_f32::<K, B, DonnellySimdFull<4>>(params)
         }
         #[cfg(not(feature = "simd"))]
         {
@@ -379,7 +379,7 @@ impl V6StrategySelectorF32 for V6DonnellySimdBlock4StrategyF32 {
         let _ = params;
         #[cfg(feature = "simd")]
         {
-            run_v6_immutable_case_f32::<K, B, DonnellySimdFull<Block4>>(params)
+            run_v6_immutable_case_f32::<K, B, DonnellySimdFull<4>>(params)
         }
         #[cfg(not(feature = "simd"))]
         {
@@ -399,10 +399,10 @@ impl V6StrategySelectorF64 for V6EytzingerStrategyF64 {
 
 impl V6StrategySelectorF64 for V6DonnellyStrategyF64 {
     fn run_mutable<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
-        run_v6_mutable_case_f64::<K, B, Donnelly<Block3>>(params)
+        run_v6_mutable_case_f64::<K, B, Donnelly<3>>(params)
     }
     fn run_immutable<const K: usize, const B: usize>(params: &ReproParams) -> Result<(), String> {
-        run_v6_immutable_case_f64::<K, B, Donnelly<Block3>>(params)
+        run_v6_immutable_case_f64::<K, B, Donnelly<3>>(params)
     }
 }
 
@@ -411,7 +411,7 @@ impl V6StrategySelectorF64 for V6DonnellySimdStrategyF64 {
         let _ = params;
         #[cfg(feature = "simd")]
         {
-            run_v6_mutable_case_f64::<K, B, DonnellySimdFull<Block3>>(params)
+            run_v6_mutable_case_f64::<K, B, DonnellySimdFull<3>>(params)
         }
         #[cfg(not(feature = "simd"))]
         {
@@ -423,7 +423,7 @@ impl V6StrategySelectorF64 for V6DonnellySimdStrategyF64 {
         let _ = params;
         #[cfg(feature = "simd")]
         {
-            run_v6_immutable_case_f64::<K, B, DonnellySimdFull<Block3>>(params)
+            run_v6_immutable_case_f64::<K, B, DonnellySimdFull<3>>(params)
         }
         #[cfg(not(feature = "simd"))]
         {
@@ -437,7 +437,7 @@ impl V6StrategySelectorF64 for V6DonnellySimdBlock3StrategyF64 {
         let _ = params;
         #[cfg(feature = "simd")]
         {
-            run_v6_mutable_case_f64::<K, B, DonnellySimdFull<Block3>>(params)
+            run_v6_mutable_case_f64::<K, B, DonnellySimdFull<3>>(params)
         }
         #[cfg(not(feature = "simd"))]
         {
@@ -449,7 +449,7 @@ impl V6StrategySelectorF64 for V6DonnellySimdBlock3StrategyF64 {
         let _ = params;
         #[cfg(feature = "simd")]
         {
-            run_v6_immutable_case_f64::<K, B, DonnellySimdFull<Block3>>(params)
+            run_v6_immutable_case_f64::<K, B, DonnellySimdFull<3>>(params)
         }
         #[cfg(not(feature = "simd"))]
         {
