@@ -671,9 +671,9 @@ mod tests {
     #[cfg(feature = "rkyv_08")]
     use crate::leaf_strategy::VecOfArenas;
     use crate::leaf_strategy::{FlatVec, VecOfArrays};
-    use crate::stem_strategy::{Block2, Block3, Block4, Donnelly};
+    use crate::stem_strategy::Donnelly;
     #[cfg(all(feature = "rkyv_08", feature = "simd", target_arch = "x86_64"))]
-    use crate::stem_strategy::{Block2, Block3, Block4, Donnelly, DonnellySimdFull};
+    use crate::stem_strategy::DonnellySimdFull;
     use crate::Eytzinger;
     use crate::SquaredEuclidean;
     #[cfg(feature = "rkyv_08")]
@@ -730,7 +730,7 @@ mod tests {
             })
             .collect();
 
-        let tree: KdTree<f32, u32, Donnelly<Block4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
+        let tree: KdTree<f32, u32, Donnelly<4>, FlatVec<f32, u32, 4, 32>, 4, 32> =
             KdTree::new_from_slice(&content_to_add).unwrap();
 
         assert_eq!(tree.size(), TREE_SIZE);
@@ -773,7 +773,7 @@ mod tests {
     #[cfg(feature = "rkyv_08")]
     #[test]
     fn rkyv_archived_donnelly_stems_stay_cacheline_aligned() {
-        type Tree = KdTree<f64, u32, Donnelly<Block3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
+        type Tree = KdTree<f64, u32, Donnelly<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
 
         let points: Vec<[f64; 3]> = (0..4096)
             .map(|i| {
@@ -791,7 +791,7 @@ mod tests {
         .unwrap();
 
         let archived = rkyv_08::access::<
-            ArchivedKdTree<f64, u32, Donnelly<Block3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>,
+            ArchivedKdTree<f64, u32, Donnelly<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>,
             rkyv_08::rancor::Error,
         >(bytes.as_slice())
         .unwrap();
@@ -806,9 +806,9 @@ mod tests {
     #[cfg(feature = "rkyv_08")]
     #[test]
     fn rkyv_roundtrip_preserves_alignment_and_query_results() {
-        type Tree = KdTree<f64, u32, Donnelly<Block3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
+        type Tree = KdTree<f64, u32, Donnelly<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
         type ArchivedTree =
-            ArchivedKdTree<f64, u32, Donnelly<Block3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
+            ArchivedKdTree<f64, u32, Donnelly<3>, VecOfArenas<f64, u32, 3, 32>, 3, 32>;
 
         let points: Vec<[f64; 3]> = (0..2048)
             .map(|i| {
@@ -857,9 +857,9 @@ mod tests {
     #[cfg(all(feature = "rkyv_08", feature = "simd", target_arch = "x86_64"))]
     #[test]
     fn rkyv_archived_donnelly_block4_vec_of_arenas_within_matches_owned() {
-        type Tree = KdTree<f32, u32, DonnellySimdFull<Block4>, VecOfArenas<f32, u32, 4, 32>, 4, 32>;
+        type Tree = KdTree<f32, u32, DonnellySimdFull<4>, VecOfArenas<f32, u32, 4, 32>, 4, 32>;
         type ArchivedTree =
-            ArchivedKdTree<f32, u32, DonnellySimdFull<Block4>, VecOfArenas<f32, u32, 4, 32>, 4, 32>;
+            ArchivedKdTree<f32, u32, DonnellySimdFull<4>, VecOfArenas<f32, u32, 4, 32>, 4, 32>;
 
         let points: Vec<[f32; 4]> = (0..4096)
             .map(|i| {
@@ -1209,7 +1209,7 @@ mod tests {
     #[test]
     fn try_from_kdtree_converts_across_variants() {
         type SourceTree = KdTree<f32, u16, Eytzinger, VecOfArrays<f32, u16, 2, 4>, 2, 4>;
-        type DestTree = KdTree<f64, u32, Donnelly<Block2>, FlatVec<f64, u32, 2, 8>, 2, 8>;
+        type DestTree = KdTree<f64, u32, Donnelly<2>, FlatVec<f64, u32, 2, 8>, 2, 8>;
 
         let entries = vec![
             (10u16, [1.0f32, 2.0f32]),

@@ -8,7 +8,7 @@ mod linux {
         mapping_report_for_slice, prepare_archived_bytes, HugePageMappingReport, HugePageMode,
     };
     use kiddo::leaf_strategy::VecOfArenas;
-    use kiddo::stem_strategy::{Block3, DonnellyUnrolled};
+    use kiddo::stem_strategy::DonnellyUnrolled;
     use rkyv_08::util::AlignedVec;
     use std::error::Error;
     use std::fs::File;
@@ -24,7 +24,7 @@ mod linux {
 
     type ArenaLeaves = VecOfArenas<f64, u32, K, B>;
     type ArchivedDonnellyUnrolledTree =
-        kiddo::kd_tree::ArchivedKdTree<f64, u32, DonnellyUnrolled<Block3>, ArenaLeaves, K, B>;
+        kiddo::kd_tree::ArchivedKdTree<f64, u32, DonnellyUnrolled<3>, ArenaLeaves, K, B>;
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum LoadMode {

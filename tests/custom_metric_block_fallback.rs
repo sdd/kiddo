@@ -5,7 +5,7 @@ use kiddo::dist::{
     DistanceMetricScalar,
 };
 use kiddo::leaf_strategies::VecOfArenas;
-use kiddo::stem_strategies::{markers::Block3, DonnellySimdFull, Eytzinger};
+use kiddo::stem_strategies::{DonnellySimdFull, Eytzinger};
 use kiddo::KdTree;
 
 struct AbsDistance;
@@ -48,7 +48,7 @@ impl DistanceMetricNeon<f64> for AbsDistance {
 }
 
 type GeneralTree = KdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
-type BlockTree = KdTree<f64, u32, DonnellySimdFull<Block3>, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
+type BlockTree = KdTree<f64, u32, DonnellySimdFull<3>, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
 
 fn assert_distance_metric<M: DistanceMetric<f64>>() {}
 

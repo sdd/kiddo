@@ -7,7 +7,7 @@ use std::ptr::NonNull;
 /// Inner implementation that holds state and core logic.
 /// - BH: Block height, in rows
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct DonnellyCore<const BH: u32> {
+pub(crate) struct DonnellyCore<const BH: usize> {
     stem_idx: u32,
     dim: usize,
     level: i32,
@@ -29,10 +29,10 @@ pub struct DonnellyCoreDeferred {
 // Send & Sync. But, we can safely manually declare DonnellyCore as Send and Sync here
 // because we are only using it with prefetch instructions, which do not deref the pointer
 // and are guaranteed to succeed even with an invalid pointer
-unsafe impl<const BH: u32> Send for DonnellyCore<BH> {}
-unsafe impl<const BH: u32> Sync for DonnellyCore<BH> {}
+unsafe impl<const BH: usize> Send for DonnellyCore<BH> {}
+unsafe impl<const BH: usize> Sync for DonnellyCore<BH> {}
 
-impl<const BH: u32> StemStrategy for DonnellyCore<BH> {
+impl<const BH: usize> StemStrategy for DonnellyCore<BH> {
     const ROOT_IDX: usize = 0;
 
     type DeferredState = DonnellyCoreDeferred;
@@ -90,8 +90,7 @@ impl<const BH: u32> StemStrategy for DonnellyCore<BH> {
 
     #[inline(always)]
     fn traverse<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
-        let (idx, lvl) =
-            Self::step_pure::<A>(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
+        let (idx, lvl) = Self::step_pure(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
         self.stem_idx = idx;
         self.minor_level = lvl;
 
@@ -111,7 +110,7 @@ impl<const BH: u32> StemStrategy for DonnellyCore<BH> {
     #[inline(always)]
     fn traverse_head<A: crate::Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
         let (idx, lvl) =
-            Self::step_pure_head::<A, K>(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
+            Self::step_pure_head(self.stem_idx, self.minor_level, is_right, self.stems_ptr);
         self.stem_idx = idx;
         self.minor_level = lvl;
 
@@ -125,12 +124,12 @@ impl<const BH: u32> StemStrategy for DonnellyCore<BH> {
 
     #[inline(always)]
     fn branch<A: Axis, const K: usize>(&mut self) -> Self {
-        let (left, right) = Self::both_children_pure::<A>(self.stem_idx, self.minor_level);
+        let (left, right) = Self::both_children_pure(self.stem_idx, self.minor_level);
 
         // mutate self into left
         self.stem_idx = left;
-        self.minor_level =
-            (self.minor_level + 1) & !(0u32.wrapping_sub((self.minor_level + 1u32 == BH) as u32));
+        self.minor_level = (self.minor_level + 1)
+            & !(0u32.wrapping_sub((self.minor_level + 1u32 == BH as u32) as u32));
 
         self.level = self.level.wrapping_add(1);
 
@@ -149,12 +148,12 @@ impl<const BH: u32> StemStrategy for DonnellyCore<BH> {
 
     #[inline(always)]
     fn child_indices<A: Axis>(&self) -> (usize, usize) {
-        let res = DonnellyCore::<BH>::both_children_pure::<A>(self.stem_idx, self.minor_level);
+        let res = DonnellyCore::<BH>::both_children_pure(self.stem_idx, self.minor_level);
         (res.0 as usize, res.1 as usize)
     }
 }
 
-impl<const BH: u32> DonnellyCore<BH> {
+impl<const BH: usize> DonnellyCore<BH> {
     #[inline(always)]
     pub(crate) fn minor_level(&self) -> u32 {
         self.minor_level
@@ -194,7 +193,7 @@ impl<const BH: u32> DonnellyCore<BH> {
         self.stem_idx = major_base
             .wrapping_add(major_offset)
             .wrapping_add(child_idx as u32)
-            .wrapping_shl(BH);
+            .wrapping_shl(BH as u32);
 
         self.minor_level = 0;
         self.level = self.level.wrapping_add(block_size as i32);
@@ -235,7 +234,7 @@ impl<const BH: u32> DonnellyCore<BH> {
 
     #[inline(always)]
     const fn items_per_line() -> u32 {
-        2u32.pow(BH)
+        1u32 << BH
         // CL / (A::VALUE_WIDTH_BYTES as u32)
     }
     // #[inline(always)]
@@ -252,7 +251,7 @@ impl<const BH: u32> DonnellyCore<BH> {
     }
 
     #[inline(always)]
-    fn step_pure<A: Axis>(
+    fn step_pure(
         curr_idx: u32,
         mut minor_level: u32,
         is_right_child: bool,
@@ -269,14 +268,15 @@ impl<const BH: u32> DonnellyCore<BH> {
         let base_no_right = (curr_idx & Self::line_mask_inv()).wrapping_add(1);
         let next_prefetch_base = base_no_right
             .wrapping_add(min_col_idx.wrapping_shl(1))
-            .wrapping_shl(BH);
+            .wrapping_shl(BH as u32);
 
         let base_with_side: u32 = base_no_right.wrapping_add(is_right_child);
         let same_base = base_with_side.wrapping_add(min_idx.wrapping_shl(1));
 
-        let next_result_base = next_prefetch_base.wrapping_add(is_right_child.wrapping_shl(BH));
+        let next_result_base =
+            next_prefetch_base.wrapping_add(is_right_child.wrapping_shl(BH as u32));
 
-        let inc_major_level = (minor_level.wrapping_add(1) == BH) as u32;
+        let inc_major_level = (minor_level.wrapping_add(1) == BH as u32) as u32;
         let inc_major_level_mask = 0u32.wrapping_sub(inc_major_level);
 
         let result =
@@ -289,7 +289,7 @@ impl<const BH: u32> DonnellyCore<BH> {
     }
 
     #[inline(always)]
-    fn step_pure_head<A: Axis, const K: usize>(
+    fn step_pure_head(
         curr_idx: u32,
         mut minor_level: u32,
         is_right_child: bool,
@@ -330,9 +330,9 @@ impl<const BH: u32> DonnellyCore<BH> {
         let base_no_right = (curr_idx & Self::line_mask_inv()).wrapping_add(1);
         let next_prefetch_base = base_no_right
             .wrapping_add(min_row_idx.wrapping_shl(1))
-            .wrapping_shl(BH);
+            .wrapping_shl(BH as u32);
 
-        let result = next_prefetch_base.wrapping_add(is_right_child.wrapping_shl(BH));
+        let result = next_prefetch_base.wrapping_add(is_right_child.wrapping_shl(BH as u32));
 
         // Prefetch result? Not much point, it's likely gonna be requested within 1 cycle
         // unsafe {
@@ -344,7 +344,7 @@ impl<const BH: u32> DonnellyCore<BH> {
 
         // Prefetch deeper-level 8 base ptrs to L2
         let next_base_no_right = (result & Self::line_mask_inv()).wrapping_add(7);
-        let next_next_prefetch_base = next_base_no_right.wrapping_shl(BH);
+        let next_next_prefetch_base = next_base_no_right.wrapping_shl(BH as u32);
 
         Self::prefetch_next_base::<A>(
             stems_ptr,
@@ -362,11 +362,11 @@ impl<const BH: u32> DonnellyCore<BH> {
 
     #[allow(unused)]
     #[inline(always)]
-    fn step_pure_block<A: Axis>(curr_idx: u32, child_idx: u8) -> u32 {
+    fn step_pure_block(curr_idx: u32, child_idx: u8) -> u32 {
         curr_idx
             .wrapping_add(1)
-            .wrapping_shl(BH)
-            .wrapping_add((child_idx as u32).wrapping_shl(BH))
+            .wrapping_shl(BH as u32)
+            .wrapping_add((child_idx as u32).wrapping_shl(BH as u32))
     }
 
     #[inline(always)]
@@ -397,7 +397,7 @@ impl<const BH: u32> DonnellyCore<BH> {
     /// Two-children step in one pass (left=false, right=true).
     /// Advances minor_level once; does NOT change curr_idx (so caller can choose a child later).
     #[inline(always)]
-    pub(crate) fn both_children_pure<A: Axis>(curr_idx: u32, minor_level: u32) -> (u32, u32) {
+    pub(crate) fn both_children_pure(curr_idx: u32, minor_level: u32) -> (u32, u32) {
         // precompute pieces identical to step_pure
         let line_mask = Self::line_mask();
         let line_mask_inv = Self::line_mask_inv();
@@ -405,7 +405,7 @@ impl<const BH: u32> DonnellyCore<BH> {
         let min_idx = curr_idx & line_mask;
         let min_row_idx = min_idx.wrapping_sub(minor_level).wrapping_sub(1);
 
-        let inc_major = (minor_level.wrapping_add(1) == BH) as u32;
+        let inc_major = (minor_level.wrapping_add(1) == BH as u32) as u32;
         let inc_mask = 0u32.wrapping_sub(inc_major);
 
         let base_no_right = (curr_idx & line_mask_inv).wrapping_add(1);
@@ -416,8 +416,8 @@ impl<const BH: u32> DonnellyCore<BH> {
 
         // next-block left/right (note: add right after shift by L)
         let next_pre = base_no_right.wrapping_add(min_row_idx.wrapping_shl(1));
-        let next_left = next_pre.wrapping_shl(BH);
-        let next_right = next_left.wrapping_add(1u32.wrapping_shl(BH));
+        let next_left = next_pre.wrapping_shl(BH as u32);
+        let next_right = next_left.wrapping_add(1u32.wrapping_shl(BH as u32));
 
         // masked select between same/next for both children
         let left = (same_left & !inc_mask) | (next_left & inc_mask);
@@ -435,13 +435,13 @@ pub fn calc_child_idx_hook(
     is_right_child: bool,
     stems_ptr: NonNull<u8>,
 ) -> (u32, u32) {
-    DonnellyCore::<3>::step_pure::<f64>(curr_idx, minor_index, is_right_child, stems_ptr)
+    DonnellyCore::<3>::step_pure(curr_idx, minor_index, is_right_child, stems_ptr)
 }
 
 /// Exposed pure function for use with cargo-asm
 #[inline(never)]
 pub fn both_children_pure_hook(curr_idx: u32, minor_index: u32) -> (u32, u32) {
-    DonnellyCore::<3>::both_children_pure::<f64>(curr_idx, minor_index)
+    DonnellyCore::<3>::both_children_pure(curr_idx, minor_index)
 }
 
 /// Exposed pure function for use with cargo-asm

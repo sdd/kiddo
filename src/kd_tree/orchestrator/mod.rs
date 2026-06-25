@@ -1554,7 +1554,7 @@ mod tests {
     use crate::kd_tree::stem_leaf_resolution::OwnedStemLeafResolution;
     use crate::leaf_strategy::DummyLeafStrategy;
     use crate::stem_strategy::donnelly::simd_full::DeferredBlockTraversal;
-    use crate::stem_strategy::{Block3, Block4, DonnellySimdFull};
+    use crate::stem_strategy::DonnellySimdFull;
     use nonmax::NonMaxUsize;
 
     #[test]
@@ -1582,7 +1582,7 @@ mod tests {
         assert_eq!(off[1], 1.0);
     }
 
-    type TestStemStrategy = DonnellySimdFull<Block4>;
+    type TestStemStrategy = DonnellySimdFull<4>;
     type TestLeafStrategy = DummyLeafStrategy;
 
     struct TestQueryContext {
@@ -1637,9 +1637,7 @@ mod tests {
         }
     }
 
-    impl KdTreeAccessor<f64, u32, DonnellySimdFull<Block3>, TestLeafStrategy, 3, 16>
-        for Block3TestTree
-    {
+    impl KdTreeAccessor<f64, u32, DonnellySimdFull<3>, TestLeafStrategy, 3, 16> for Block3TestTree {
         fn stems(&self) -> &[f64] {
             &self.stems
         }
@@ -1821,9 +1819,7 @@ mod tests {
     #[test]
     fn test_backtracking_query_with_block3_simd_stack_emits_pending_selection_trace() {
         use crate::kd_tree::query_stack_simd::Block3ExactStackContext;
-        use crate::stem_strategy::Block3;
-
-        type Block3StemStrategy = DonnellySimdFull<Block3>;
+        type Block3StemStrategy = DonnellySimdFull<3>;
         type Block3Tree = Block3TestTree;
 
         let stems = vec![0.2f64, 0.4, 0.6, 0.1, 0.3, 0.5, 0.7, f64::INFINITY];

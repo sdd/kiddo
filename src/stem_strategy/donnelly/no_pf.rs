@@ -5,168 +5,128 @@ use std::ptr::NonNull;
 use aligned_vec::AVec;
 
 use crate::stem_strategy::donnelly::core::{DonnellyCore, DonnellyCoreDeferred};
-use crate::stem_strategy::{Block2, Block3, Block4, Block5, Block6, Block7, BlockHeightMarker};
 use crate::{Axis, StemStrategy};
-
-#[doc(hidden)]
-pub trait DonnellyNoPfType: BlockHeightMarker {
-    type Strategy;
-}
-
-/// Scalar Donnelly stem strategy without software prefetch.
-pub type DonnellyNoPf<BS> = <BS as DonnellyNoPfType>::Strategy;
 
 /// Scalar Donnelly stem strategy without software prefetch.
 #[derive(Copy, Clone, Debug)]
-pub struct DonnellyNoPfInner<const BH: u32> {
+pub struct DonnellyNoPf<const BH: usize> {
     core: DonnellyCore<BH>,
 }
 
-macro_rules! impl_donnelly_no_pf {
-    ($marker:ty, $size:literal) => {
-        impl StemStrategy for DonnellyNoPfInner<$size> {
-            const ROOT_IDX: usize = 0;
-            const BLOCK_SIZE: usize = $size;
+impl<const BH: usize> StemStrategy for DonnellyNoPf<BH> {
+    const ROOT_IDX: usize = 0;
+    const BLOCK_SIZE: usize = BH;
 
-            type DeferredState = DonnellyCoreDeferred;
-            type StackContext<A> =
-                crate::kd_tree::query_stack::QueryStackContext<A, Self::DeferredState>;
-            type Stack<A> = crate::kd_tree::query_stack::QueryStack<A, Self>;
+    type DeferredState = DonnellyCoreDeferred;
+    type StackContext<A> = crate::kd_tree::query_stack::QueryStackContext<A, Self::DeferredState>;
+    type Stack<A> = crate::kd_tree::query_stack::QueryStack<A, Self>;
 
-            #[inline(always)]
-            fn new(stems_ptr: NonNull<u8>) -> Self {
-                Self {
-                    core: DonnellyCore::new(stems_ptr),
-                }
-            }
+    #[inline(always)]
+    fn new(stems_ptr: NonNull<u8>) -> Self {
+        Self {
+            core: DonnellyCore::new(stems_ptr),
+        }
+    }
 
-            #[inline(always)]
-            fn stem_idx(&self) -> usize {
-                self.core.stem_idx()
-            }
+    #[inline(always)]
+    fn stem_idx(&self) -> usize {
+        self.core.stem_idx()
+    }
 
-            #[inline(always)]
-            fn deferred_state(&self) -> Self::DeferredState {
-                self.core.deferred_state()
-            }
+    #[inline(always)]
+    fn deferred_state(&self) -> Self::DeferredState {
+        self.core.deferred_state()
+    }
 
-            #[inline(always)]
-            fn rehydrate_deferred_state(&mut self, state: Self::DeferredState) {
-                self.core.rehydrate_deferred_state(state);
-            }
+    #[inline(always)]
+    fn rehydrate_deferred_state(&mut self, state: Self::DeferredState) {
+        self.core.rehydrate_deferred_state(state);
+    }
 
-            #[inline(always)]
-            fn leaf_idx(&self) -> usize {
-                self.core.leaf_idx()
-            }
+    #[inline(always)]
+    fn leaf_idx(&self) -> usize {
+        self.core.leaf_idx()
+    }
 
-            #[inline(always)]
-            fn dim<const K: usize>(&self) -> usize {
-                self.core.dim::<K>()
-            }
+    #[inline(always)]
+    fn dim<const K: usize>(&self) -> usize {
+        self.core.dim::<K>()
+    }
 
-            #[inline(always)]
-            fn level(&self) -> i32 {
-                self.core.level()
-            }
+    #[inline(always)]
+    fn level(&self) -> i32 {
+        self.core.level()
+    }
 
-            #[inline(always)]
-            fn traverse<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
-                self.core.traverse::<A, K>(is_right);
-            }
+    #[inline(always)]
+    fn traverse<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
+        self.core.traverse::<A, K>(is_right);
+    }
 
-            #[inline(always)]
-            fn traverse_head<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
-                self.core.traverse_head::<A, K>(is_right);
-            }
+    #[inline(always)]
+    fn traverse_head<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
+        self.core.traverse_head::<A, K>(is_right);
+    }
 
-            #[inline(always)]
-            fn traverse_tail<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
-                self.core
-                    .traverse_tail_with_block_size::<A, K>(is_right, $size as u32);
-            }
+    #[inline(always)]
+    fn traverse_tail<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
+        self.core
+            .traverse_tail_with_block_size::<A, K>(is_right, BH as u32);
+    }
 
-            #[inline(always)]
-            fn branch<A: Axis<Coord = A>, const K: usize>(&mut self) -> Self {
-                Self {
-                    core: self.core.branch::<A, K>(),
-                }
-            }
+    #[inline(always)]
+    fn branch<A: Axis<Coord = A>, const K: usize>(&mut self) -> Self {
+        Self {
+            core: self.core.branch::<A, K>(),
+        }
+    }
 
-            #[inline(always)]
-            fn child_indices<A: Axis<Coord = A>>(&self) -> (usize, usize) {
-                self.core.child_indices::<A>()
-            }
+    #[inline(always)]
+    fn child_indices<A: Axis<Coord = A>>(&self) -> (usize, usize) {
+        self.core.child_indices::<A>()
+    }
 
-            fn get_stem_node_count_from_leaf_node_count(leaf_node_count: usize) -> usize {
-                if leaf_node_count < 2 {
-                    0
-                } else {
-                    leaf_node_count.next_power_of_two() - 1
-                }
-            }
+    fn get_stem_node_count_from_leaf_node_count(leaf_node_count: usize) -> usize {
+        if leaf_node_count < 2 {
+            0
+        } else {
+            leaf_node_count.next_power_of_two() - 1
+        }
+    }
 
-            fn stem_node_padding_factor() -> usize {
-                50
-            }
+    fn stem_node_padding_factor() -> usize {
+        50
+    }
 
-            fn trim_unneeded_stems<A: Axis<Coord = A>, const K: usize>(
-                stems: &mut AVec<A>,
-                max_stem_level: usize,
-            ) {
-                let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
-                if stems.is_empty() {
-                    return;
-                }
+    fn trim_unneeded_stems<A: Axis<Coord = A>, const K: usize>(
+        stems: &mut AVec<A>,
+        max_stem_level: usize,
+    ) {
+        let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
+        if stems.is_empty() {
+            return;
+        }
 
-                let mut so = Self::new(stems_ptr);
-                loop {
-                    let val = stems[so.stem_idx()];
-                    let is_right_child = !A::is_max_value(val);
-                    so.traverse::<A, K>(is_right_child);
-                    if so.level() as usize == max_stem_level {
-                        break;
-                    }
-                }
-
-                #[cfg(debug_assertions)]
-                {
-                    for i in (so.stem_idx() + 1)..stems.len() {
-                        debug_assert!(A::is_max_value(stems[i]), "stems[{i}] = {}", stems[i]);
-                    }
-                }
-
-                stems.truncate(so.stem_idx() + 1);
+        let mut so = Self::new(stems_ptr);
+        loop {
+            let val = stems[so.stem_idx()];
+            let is_right_child = !A::is_max_value(val);
+            so.traverse::<A, K>(is_right_child);
+            if so.level() as usize == max_stem_level {
+                break;
             }
         }
-    };
-}
 
-impl DonnellyNoPfType for Block2 {
-    type Strategy = DonnellyNoPfInner<2>;
-}
-impl DonnellyNoPfType for Block3 {
-    type Strategy = DonnellyNoPfInner<3>;
-}
-impl DonnellyNoPfType for Block4 {
-    type Strategy = DonnellyNoPfInner<4>;
-}
-impl DonnellyNoPfType for Block5 {
-    type Strategy = DonnellyNoPfInner<5>;
-}
-impl DonnellyNoPfType for Block6 {
-    type Strategy = DonnellyNoPfInner<6>;
-}
-impl DonnellyNoPfType for Block7 {
-    type Strategy = DonnellyNoPfInner<7>;
-}
+        #[cfg(debug_assertions)]
+        {
+            for i in (so.stem_idx() + 1)..stems.len() {
+                debug_assert!(A::is_max_value(stems[i]), "stems[{i}] = {}", stems[i]);
+            }
+        }
 
-impl_donnelly_no_pf!(Block2, 2);
-impl_donnelly_no_pf!(Block3, 3);
-impl_donnelly_no_pf!(Block4, 4);
-impl_donnelly_no_pf!(Block5, 5);
-impl_donnelly_no_pf!(Block6, 6);
-impl_donnelly_no_pf!(Block7, 7);
+        stems.truncate(so.stem_idx() + 1);
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -177,7 +137,7 @@ mod tests {
         let stems = [0.0f64; 256];
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
 
-        let mut strat = DonnellyNoPf::<Block3>::new(stems_ptr);
+        let mut strat = DonnellyNoPf::<3>::new(stems_ptr);
         let saved = strat.deferred_state();
 
         strat.traverse::<f64, 3>(true);
@@ -196,7 +156,7 @@ mod tests {
         let stems = [0.0f64; 256];
         let stems_ptr = NonNull::new(stems.as_ptr() as *mut u8).unwrap();
 
-        let mut wrapper = DonnellyNoPf::<Block3>::new(stems_ptr);
+        let mut wrapper = DonnellyNoPf::<3>::new(stems_ptr);
         let mut core = DonnellyCore::<3>::new(stems_ptr);
 
         wrapper.traverse_head::<f64, 3>(true);

@@ -3,11 +3,9 @@
 //! This module provides SIMD-optimized block-at-once traversal strategies for kd-trees.
 //! Architecture-specific implementations are in submodules.
 
-use std::marker::PhantomData;
 use std::ptr::NonNull;
 
 use crate::stem_strategy::donnelly::core::DonnellyCore;
-use crate::stem_strategy::{Block3, Block4, BlockHeightMarker};
 use crate::{Axis, Content, LeafStrategy, StemStrategy};
 
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
@@ -426,34 +424,10 @@ where
     mask
 }
 
-#[doc(hidden)]
-pub trait DonnellySimdFullType: BlockHeightMarker {
-    type Strategy;
-}
-
-/// SIMD Donnelly block traversal strategy selected by block-height marker.
-pub type DonnellySimdFull<BS> = <BS as DonnellySimdFullType>::Strategy;
-
-/// Donnelly SIMD block-at-once traversal for Block3 layouts.
+/// Donnelly SIMD block-at-once traversal strategy parameterized by block height.
 #[derive(Copy, Clone, Debug)]
-pub struct DonnellySimdFullBlock3 {
-    core: DonnellyCore<3>,
-    _marker: PhantomData<Block3>,
-}
-
-/// Donnelly SIMD block-at-once traversal for Block4 layouts.
-#[derive(Copy, Clone, Debug)]
-pub struct DonnellySimdFullBlock4 {
-    core: DonnellyCore<4>,
-    _marker: PhantomData<Block4>,
-}
-
-impl DonnellySimdFullType for Block3 {
-    type Strategy = DonnellySimdFullBlock3;
-}
-
-impl DonnellySimdFullType for Block4 {
-    type Strategy = DonnellySimdFullBlock4;
+pub struct DonnellySimdFull<const BH: usize> {
+    core: DonnellyCore<BH>,
 }
 
 /// Perform all comparisons in a 3-level block, dispatching to the appropriate SIMD implementation
@@ -486,7 +460,7 @@ pub mod cargo_asm {
         selected_block3_child_state_and_rd,
     };
     use crate::dist::SquaredEuclidean;
-    use crate::stem_strategy::{Block3, DonnellySimdFull, SimdSelectBestChildBlock3};
+    use crate::stem_strategy::{DonnellySimdFull, SimdSelectBestChildBlock3};
     use crate::StemStrategy;
 
     /// Hook for cargo-asm to render the exact Block3 backtrack fill kernel directly.
@@ -524,7 +498,7 @@ pub mod cargo_asm {
     #[inline(never)]
     #[unsafe(no_mangle)]
     pub fn donnelly_block3_exact_step_f64_cargo_asm_hook(
-        stem_strat: &mut DonnellySimdFullBlock3,
+        stem_strat: &mut DonnellySimdFull<3>,
         stems: &[f64],
         query: &[f64; 3],
         query_wide: &[f64; 3],
@@ -535,7 +509,7 @@ pub mod cargo_asm {
         rd: f64,
         max_stem_level: i32,
         best_dist: f64,
-        stack: &mut <DonnellySimdFullBlock3 as StemStrategy>::Stack<f64>,
+        stack: &mut <DonnellySimdFull<3> as StemStrategy>::Stack<f64>,
     ) -> bool {
         stem_strat.backtracking_traverse_step_with_bounds::<f64, f64, SquaredEuclidean<f64>, 3>(
             stems,
@@ -638,17 +612,15 @@ pub mod cargo_asm {
 // ====================================================================================
 
 // Block3 implementation (3-level blocks, 64-byte cache lines)
-impl StemStrategy for DonnellySimdFullBlock3 {
+impl StemStrategy for DonnellySimdFull<3> {
     const ROOT_IDX: usize = 0;
     const BLOCK_SIZE: usize = 3;
 
     type DeferredState = Self;
-    type StackContext<A> =
-        crate::kd_tree::query_stack_simd::Block3SimdQueryStackContext<A, Self, 3>;
+    type StackContext<A> = crate::kd_tree::query_stack_simd::Block3SimdQueryStackContext<A, Self>;
     type Stack<A> = crate::kd_tree::query_stack_simd::Block3ExactQueryStack<
         A,
         Self,
-        3,
         { crate::kd_tree::query_stack_simd::BLOCK3_EXACT_INLINE_SIMD_QUERY_STACK_CAPACITY },
     >;
 
@@ -656,7 +628,6 @@ impl StemStrategy for DonnellySimdFullBlock3 {
     fn new(stems_ptr: std::ptr::NonNull<u8>) -> Self {
         Self {
             core: crate::stem_strategy::donnelly::core::DonnellyCore::new(stems_ptr),
-            _marker: std::marker::PhantomData,
         }
     }
 
@@ -704,7 +675,6 @@ impl StemStrategy for DonnellySimdFullBlock3 {
     fn branch<A: Axis<Coord = A>, const K2: usize>(&mut self) -> Self {
         Self {
             core: self.core.branch::<A, K2>(),
-            _marker: std::marker::PhantomData,
         }
     }
 
@@ -1011,7 +981,7 @@ impl StemStrategy for DonnellySimdFullBlock3 {
     }
 }
 
-impl DeferredBlockTraversal for DonnellySimdFullBlock3 {
+impl DeferredBlockTraversal for DonnellySimdFull<3> {
     #[inline(always)]
     fn block_child<const K: usize>(&self, child_idx: u8) -> Self {
         let mut child = *self;
@@ -1115,7 +1085,7 @@ impl DeferredBlockTraversal for DonnellySimdFullBlock3 {
 }
 
 // Block4 implementation (4-level blocks, 64-byte cache lines)
-impl crate::StemStrategy for DonnellySimdFullBlock4 {
+impl crate::StemStrategy for DonnellySimdFull<4> {
     const ROOT_IDX: usize = 0;
     const BLOCK_SIZE: usize = 4;
 
@@ -1127,7 +1097,6 @@ impl crate::StemStrategy for DonnellySimdFullBlock4 {
     fn new(stems_ptr: std::ptr::NonNull<u8>) -> Self {
         Self {
             core: crate::stem_strategy::donnelly::core::DonnellyCore::new(stems_ptr),
-            _marker: std::marker::PhantomData,
         }
     }
 
@@ -1175,7 +1144,6 @@ impl crate::StemStrategy for DonnellySimdFullBlock4 {
     fn branch<A: Axis<Coord = A>, const K2: usize>(&mut self) -> Self {
         Self {
             core: self.core.branch::<A, K2>(),
-            _marker: std::marker::PhantomData,
         }
     }
 
@@ -1462,7 +1430,7 @@ impl crate::StemStrategy for DonnellySimdFullBlock4 {
     }
 }
 
-impl DeferredBlockTraversal for DonnellySimdFullBlock4 {
+impl DeferredBlockTraversal for DonnellySimdFull<4> {
     #[inline(always)]
     fn block_child<const K: usize>(&self, child_idx: u8) -> Self {
         let mut child = *self;
@@ -1738,7 +1706,7 @@ mod tests {
 
     #[test]
     fn test_block3_deferred_block_helpers_match_free_functions() {
-        type Strat = DonnellySimdFull<Block3>;
+        type Strat = DonnellySimdFull<3>;
 
         let pivots = build_test_block3_pivots_f64();
         let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
@@ -1816,7 +1784,7 @@ mod tests {
 
     #[test]
     fn test_block4_deferred_block_helpers_default_to_panic() {
-        type Strat = DonnellySimdFull<Block4>;
+        type Strat = DonnellySimdFull<4>;
 
         let pivots = build_test_block4_pivots_f32();
         let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
@@ -1872,7 +1840,7 @@ mod tests {
 
     #[test]
     fn test_block4_block_child_matches_manual_traversal() {
-        type Strat = DonnellySimdFull<Block4>;
+        type Strat = DonnellySimdFull<4>;
 
         let pivots = build_test_block4_pivots_f32();
         let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
@@ -1935,7 +1903,7 @@ mod tests {
 
     #[test]
     fn test_block3_get_leaf_idx_matches_manual_traversal() {
-        type Strat = DonnellySimdFull<Block3>;
+        type Strat = DonnellySimdFull<3>;
 
         let pivots = build_test_block3_pivots_f64();
         let query = [0.45, 0.0, 0.0];
@@ -1951,7 +1919,7 @@ mod tests {
 
     #[test]
     fn test_block4_get_leaf_idx_matches_manual_traversal() {
-        type Strat = DonnellySimdFull<Block4>;
+        type Strat = DonnellySimdFull<4>;
 
         let pivots = build_test_block4_pivots_f32();
         let query = [0.55, 0.0, 0.0];
@@ -1967,7 +1935,7 @@ mod tests {
 
     #[test]
     fn test_block3_backtracking_step_full_block_updates_state_and_pushes_pending() {
-        type Strat = DonnellySimdFull<Block3>;
+        type Strat = DonnellySimdFull<3>;
 
         let pivots = build_test_block3_pivots_f64();
         let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
@@ -2036,7 +2004,7 @@ mod tests {
 
     #[test]
     fn test_block3_backtracking_step_scalar_fallback_pushes_single() {
-        type Strat = DonnellySimdFull<Block3>;
+        type Strat = DonnellySimdFull<3>;
 
         let pivots = build_test_block3_pivots_f64();
         let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
@@ -2081,7 +2049,7 @@ mod tests {
 
     #[test]
     fn test_block4_backtracking_step_full_block_pushes_deferred_blocks() {
-        type Strat = DonnellySimdFull<Block4>;
+        type Strat = DonnellySimdFull<4>;
 
         let pivots = build_test_block4_pivots_f32();
         let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
@@ -2157,7 +2125,7 @@ mod tests {
 
     #[test]
     fn test_block4_backtracking_step_scalar_fallback_pushes_single() {
-        type Strat = DonnellySimdFull<Block4>;
+        type Strat = DonnellySimdFull<4>;
 
         let pivots = build_test_block4_pivots_f32();
         let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();
@@ -2199,7 +2167,7 @@ mod tests {
     #[cfg(feature = "test_utils")]
     #[test]
     fn test_block3_backtracking_step_emits_exact_query_trace_event() {
-        type Strat = DonnellySimdFull<Block3>;
+        type Strat = DonnellySimdFull<3>;
 
         let pivots = build_test_block3_pivots_f64();
         let stems_ptr = NonNull::new(pivots.as_ptr() as *mut u8).unwrap();

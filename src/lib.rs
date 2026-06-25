@@ -13,8 +13,6 @@
 #![allow(clippy::pointers_in_nomem_asm_block)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::needless_range_loop)]
-#![allow(incomplete_features)]
-#![feature(generic_const_exprs)]
 
 //! # Kiddo
 //!
@@ -26,7 +24,7 @@
 //! benchmarking site to compare Kiddo against other k-d tree implementations
 //! across a range of workloads.
 //!
-//! Kiddo v6 provides a single generic [`KdTree`] that supports floating-point
+//! Kiddo v6 provides a single generic [`KdTree`](crate::kd_tree::KdTree) that supports floating-point
 //! (`f64`, `f32`, `f16`), selected fixed-point (via the `fixed` crate), and
 //! unsigned-integer (`u8`, `u16`, `u32`) types as coordinates, along with both mutable
 //! and immutable usage patterns.
@@ -93,7 +91,7 @@
 //! rebuilds.
 //!
 //! [`ImmutableKdTree`] and [`MutableKdTree`] are convenience aliases for
-//! [`KdTree`] with sensible defaults for these common read-heavy and mutable
+//! [`KdTree`](crate::kd_tree::KdTree) with sensible defaults for these common read-heavy and mutable
 //! workloads.
 //!
 //! Kiddo is not intended as a library for high-dimensional vector search or
@@ -213,28 +211,61 @@
 mod custom_serde;
 
 pub mod kd_tree;
-pub use kd_tree::KdTree;
+#[doc(hidden)]
+pub type KdTree<A, T, SS, LS, const K: usize, const B: usize> = kd_tree::KdTree<A, T, SS, LS, K, B>;
 
 /// Distance metrics
 pub mod dist;
-pub use crate::dist::{Chebyshev, DotProduct, Manhattan, Minkowski, SquaredEuclidean};
+#[doc(hidden)]
+pub type Chebyshev<R> = crate::dist::Chebyshev<R>;
+#[doc(hidden)]
+pub type DotProduct<R> = crate::dist::DotProduct<R>;
+#[doc(hidden)]
+pub type Manhattan<R> = crate::dist::Manhattan<R>;
+#[doc(hidden)]
+pub type Minkowski<const P: u32, R> = crate::dist::Minkowski<P, R>;
+#[doc(hidden)]
+pub type SquaredEuclidean<R> = crate::dist::SquaredEuclidean<R>;
 
 /// Stem ordering strategies for the kd-tree
 #[path = "stem_strategy/mod.rs"]
 pub mod stem_strategies;
 #[doc(hidden)]
 pub use stem_strategies as stem_strategy;
-pub use stem_strategies::{
-    Donnelly, DonnellyNoPf, DonnellySimdDescent, DonnellySimdFull, DonnellyUnrolled,
-    DonnellyUnrolledBlockDim, Eytzinger,
-};
+#[doc(hidden)]
+pub type Donnelly<const BH: usize> = stem_strategies::donnelly::Donnelly<BH>;
+#[doc(hidden)]
+pub type DonnellyNoPf<const BH: usize> = stem_strategies::donnelly::DonnellyNoPf<BH>;
+#[doc(hidden)]
+pub type DonnellySimdDescent<const BH: usize> = stem_strategies::donnelly::DonnellySimdDescent<BH>;
+#[doc(hidden)]
+pub type DonnellySimdFull<const BH: usize> = stem_strategies::donnelly::DonnellySimdFull<BH>;
+#[doc(hidden)]
+pub type DonnellyUnrolled<const BH: usize> = stem_strategies::donnelly::DonnellyUnrolled<BH>;
+#[doc(hidden)]
+pub type DonnellyUnrolledBlockDim<const BH: usize> =
+    stem_strategies::donnelly::DonnellyUnrolledBlockDim<BH>;
+#[doc(hidden)]
+pub type Eytzinger = stem_strategies::eytzinger::Eytzinger;
+#[doc(hidden)]
+pub type EytzingerFlexPf<const PF1: isize = 0, const PF2: isize = 1> =
+    stem_strategies::eytzinger::EytzingerFlexPf<PF1, PF2>;
+#[doc(hidden)]
+pub type EytzingerNoPf = stem_strategies::eytzinger::EytzingerNoPf;
 
 /// Leaf storage strategies for the kd-tree
 #[path = "leaf_strategy/mod.rs"]
 pub mod leaf_strategies;
 #[doc(hidden)]
 pub use leaf_strategies as leaf_strategy;
-pub use leaf_strategies::{FlatVec, VecOfArenas, VecOfArrays};
+#[doc(hidden)]
+pub type FlatVec<A, T, const K: usize, const B: usize> = leaf_strategies::FlatVec<A, T, K, B>;
+#[doc(hidden)]
+pub type VecOfArenas<A, T, const K: usize, const B: usize> =
+    leaf_strategies::VecOfArenas<A, T, K, B>;
+#[doc(hidden)]
+pub type VecOfArrays<A, T, const K: usize, const B: usize> =
+    leaf_strategies::VecOfArrays<A, T, K, B>;
 
 /// Convenience type alias for recommended default params for an immutable KdTree
 pub type ImmutableKdTree<AX, const K: usize> =

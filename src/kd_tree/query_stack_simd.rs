@@ -7,6 +7,7 @@ const DEFAULT_INLINE_SIMD_QUERY_STACK_CAPACITY: usize = 50;
 // Block3 exact traversal pushes at most one pending context per 3-level block.
 // Supporting trees up to 30 stem levels therefore requires ceil(30 / 3) = 10 entries.
 pub(crate) const BLOCK3_EXACT_INLINE_SIMD_QUERY_STACK_CAPACITY: usize = 10;
+pub(crate) const BLOCK3_EXACT_INLINE_DIM_CAPACITY: usize = 16;
 
 #[derive(Debug)]
 pub struct SimdQueryStack<
@@ -22,11 +23,10 @@ pub struct SimdQueryStack<
 #[derive(Debug)]
 pub struct Block3ExactQueryStack<
     A,
-    SS: StemStrategy<StackContext<A> = Block3SimdQueryStackContext<A, SS, K>>,
-    const K: usize,
+    SS: StemStrategy<StackContext<A> = Block3SimdQueryStackContext<A, SS>>,
     const INLINE_CAPACITY: usize = BLOCK3_EXACT_INLINE_SIMD_QUERY_STACK_CAPACITY,
 > {
-    stack: [MaybeUninit<Block3SimdQueryStackContext<A, SS, K>>; INLINE_CAPACITY],
+    stack: [MaybeUninit<Block3SimdQueryStackContext<A, SS>>; INLINE_CAPACITY],
     len: usize,
 }
 
@@ -88,10 +88,9 @@ impl<A, SS: StemStrategy, const INLINE_CAPACITY: usize> Default
 
 impl<
         A,
-        SS: StemStrategy<StackContext<A> = Block3SimdQueryStackContext<A, SS, K>>,
-        const K: usize,
+        SS: StemStrategy<StackContext<A> = Block3SimdQueryStackContext<A, SS>>,
         const INLINE_CAPACITY: usize,
-    > Default for Block3ExactQueryStack<A, SS, K, INLINE_CAPACITY>
+    > Default for Block3ExactQueryStack<A, SS, INLINE_CAPACITY>
 {
     fn default() -> Self {
         Self::new()
@@ -148,7 +147,7 @@ pub enum SimdQueryStackContext<A, SS> {
 }
 
 #[derive(Debug)]
-pub enum Block3SimdQueryStackContext<A, SS, const K: usize> {
+pub enum Block3SimdQueryStackContext<A, SS> {
     Single {
         stem_strat: SS,
         dim: usize,
@@ -161,19 +160,39 @@ pub enum Block3SimdQueryStackContext<A, SS, const K: usize> {
         base: SS,
         pending_mask: u8,
         rd: A,
-        lower: [A; K],
-        upper: [A; K],
+        dim_count: usize,
+        lower: [A; BLOCK3_EXACT_INLINE_DIM_CAPACITY],
+        upper: [A; BLOCK3_EXACT_INLINE_DIM_CAPACITY],
     },
 }
 
 #[inline(always)]
-fn copy_state_array<A, const SRC: usize, const DST: usize>(src: &[A; SRC]) -> [A; DST]
+fn copy_state_array_to_inline<A, const SRC: usize>(
+    src: &[A; SRC],
+) -> [A; BLOCK3_EXACT_INLINE_DIM_CAPACITY]
+where
+    A: Axis<Coord = A>,
+{
+    assert!(
+        SRC <= BLOCK3_EXACT_INLINE_DIM_CAPACITY,
+        "Block3 exact stack context dimension overflow: dims={SRC}, max={BLOCK3_EXACT_INLINE_DIM_CAPACITY}"
+    );
+    let mut dst = [A::zero(); BLOCK3_EXACT_INLINE_DIM_CAPACITY];
+    dst[..SRC].copy_from_slice(src);
+    dst
+}
+
+#[inline(always)]
+fn copy_inline_state_array<A, const DST: usize>(
+    src: &[A; BLOCK3_EXACT_INLINE_DIM_CAPACITY],
+    dim_count: usize,
+) -> [A; DST]
 where
     A: Axis<Coord = A>,
 {
     assert_eq!(
-        SRC, DST,
-        "Block3 exact stack context dimension mismatch: src={SRC}, dst={DST}"
+        dim_count, DST,
+        "Block3 exact stack context dimension mismatch: src={dim_count}, dst={DST}"
     );
     let mut dst = [A::zero(); DST];
     dst.copy_from_slice(&src[..DST]);
@@ -226,10 +245,9 @@ impl<A, SS: StemStrategy, const INLINE_CAPACITY: usize> StackTrait<A, SS>
 
 impl<
         A,
-        SS: StemStrategy<StackContext<A> = Block3SimdQueryStackContext<A, SS, K>>,
-        const K: usize,
+        SS: StemStrategy<StackContext<A> = Block3SimdQueryStackContext<A, SS>>,
         const INLINE_CAPACITY: usize,
-    > StackTrait<A, SS> for Block3ExactQueryStack<A, SS, K, INLINE_CAPACITY>
+    > StackTrait<A, SS> for Block3ExactQueryStack<A, SS, INLINE_CAPACITY>
 {
     #[inline]
     fn push(&mut self, item: SS::StackContext<A>) {
@@ -289,10 +307,9 @@ impl<A, SS: StemStrategy, const INLINE_CAPACITY: usize> SimdQueryStack<A, SS, IN
 
 impl<
         A,
-        SS: StemStrategy<StackContext<A> = Block3SimdQueryStackContext<A, SS, K>>,
-        const K: usize,
+        SS: StemStrategy<StackContext<A> = Block3SimdQueryStackContext<A, SS>>,
         const INLINE_CAPACITY: usize,
-    > Block3ExactQueryStack<A, SS, K, INLINE_CAPACITY>
+    > Block3ExactQueryStack<A, SS, INLINE_CAPACITY>
 {
     #[inline]
     pub fn new() -> Self {
@@ -323,10 +340,9 @@ impl<A, SS: StemStrategy, const INLINE_CAPACITY: usize> Drop
 
 impl<
         A,
-        SS: StemStrategy<StackContext<A> = Block3SimdQueryStackContext<A, SS, K>>,
-        const K: usize,
+        SS: StemStrategy<StackContext<A> = Block3SimdQueryStackContext<A, SS>>,
         const INLINE_CAPACITY: usize,
-    > Drop for Block3ExactQueryStack<A, SS, K, INLINE_CAPACITY>
+    > Drop for Block3ExactQueryStack<A, SS, INLINE_CAPACITY>
 {
     fn drop(&mut self) {
         self.clear();
@@ -466,8 +482,8 @@ where
     }
 }
 
-impl<A: Axis<Coord = A>, SS: StemStrategy, const K: usize> Block3SimdQueryStackContext<A, SS, K> {
-    pub fn new_single(stem_strat: SS) -> Self {
+impl<A: Axis<Coord = A>, SS: StemStrategy> Block3SimdQueryStackContext<A, SS> {
+    pub fn new_single<const K: usize>(stem_strat: SS) -> Self {
         Self::Single {
             dim: stem_strat.dim::<K>(),
             lower_bound: A::min_value(),
@@ -482,13 +498,15 @@ impl<A: Axis<Coord = A>, SS: StemStrategy, const K: usize> Block3SimdQueryStackC
         base: SS,
         pending_mask: u8,
         rd: A,
-        lower: &[A; K],
-        upper: &[A; K],
+        dim_count: usize,
+        lower: &[A; BLOCK3_EXACT_INLINE_DIM_CAPACITY],
+        upper: &[A; BLOCK3_EXACT_INLINE_DIM_CAPACITY],
     ) -> Self {
         Self::Block3Pending {
             base,
             pending_mask,
             rd,
+            dim_count,
             lower: *lower,
             upper: *upper,
         }
@@ -509,8 +527,7 @@ impl<A: Axis<Coord = A>, SS: StemStrategy, const K: usize> Block3SimdQueryStackC
     }
 }
 
-impl<A, SS, const KCTX: usize, const K: usize> Block3ExactStackContext<A, SS, K>
-    for Block3SimdQueryStackContext<A, SS, KCTX>
+impl<A, SS, const K: usize> Block3ExactStackContext<A, SS, K> for Block3SimdQueryStackContext<A, SS>
 where
     A: Axis<Coord = A>,
     SS: StemStrategy,
@@ -520,7 +537,7 @@ where
     where
         A: Axis<Coord = A>,
     {
-        Block3SimdQueryStackContext::new_single(stem_strat)
+        Block3SimdQueryStackContext::new_single::<K>(stem_strat)
     }
 
     #[inline(always)]
@@ -538,8 +555,9 @@ where
             base,
             pending_mask,
             rd,
-            &copy_state_array(lower),
-            &copy_state_array(upper),
+            K2,
+            &copy_state_array_to_inline(lower),
+            &copy_state_array_to_inline(upper),
         )
     }
 
@@ -565,21 +583,21 @@ where
                 base,
                 pending_mask,
                 rd,
+                dim_count,
                 lower,
                 upper,
             } => Block3ExactStackContextState::Block3Pending {
                 base,
                 pending_mask,
                 rd,
-                lower: copy_state_array(&lower),
-                upper: copy_state_array(&upper),
+                lower: copy_inline_state_array(&lower, dim_count),
+                upper: copy_inline_state_array(&upper, dim_count),
             },
         }
     }
 }
 
-impl<A, SS, const K: usize> SimdIntervalStackContext<A, SS>
-    for Block3SimdQueryStackContext<A, SS, K>
+impl<A, SS> SimdIntervalStackContext<A, SS> for Block3SimdQueryStackContext<A, SS>
 where
     SS: StemStrategy,
 {
@@ -615,7 +633,7 @@ impl<A, SS, S> ScalarStackContext<A, S> for SimdQueryStackContext<A, SS> {
     }
 }
 
-impl<A, SS, S, const K: usize> ScalarStackContext<A, S> for Block3SimdQueryStackContext<A, SS, K> {
+impl<A, SS, S> ScalarStackContext<A, S> for Block3SimdQueryStackContext<A, SS> {
     #[inline(always)]
     fn from_parts(_stem_state: S, _old_off: A, _rd: A) -> Self {
         unreachable!("SIMD stack contexts do not support scalar stack packing")
@@ -763,7 +781,7 @@ mod tests {
     #[test]
     fn block3_simd_query_stack_context_into_parts_extracts_single_fields() {
         let stem = test_stem();
-        let ctx = Block3SimdQueryStackContext::<f32, TestStem, 3>::Single {
+        let ctx = Block3SimdQueryStackContext::<f32, TestStem>::Single {
             stem_strat: stem.clone(),
             dim: 2,
             lower_bound: -3.0,
@@ -782,7 +800,7 @@ mod tests {
     #[test]
     fn block3_simd_query_stack_context_new_single_with_bounds_sets_single_variant() {
         let stem = test_stem();
-        let ctx = <Block3SimdQueryStackContext<f32, TestStem, 3> as SimdIntervalStackContext<
+        let ctx = <Block3SimdQueryStackContext<f32, TestStem> as SimdIntervalStackContext<
             f32,
             TestStem,
         >>::new_single_with_bounds(stem.clone(), 2, -4.0, 9.0, 1.0, 3.0);

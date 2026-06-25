@@ -1,15 +1,5 @@
 # Kiddo Changelog
 
-## Unreleased
-
-I've kept back these changes for now as, whilst extremely welcome, the change to the return type of `size()` would be breaking.
-I'm hoping to have v6 available soon, which will include both these changes as well as addressing quite a few other long-running feature requests.
-
-### ✨ Features
-
-- Improve the flexibility of T type, KdTree.size. Add generate nearest_one_point (@pjkundert)
-- Fix broken test of custom struct as T. Add test for () as T (@pjkundert)
-
 ## [5.2.2] - 2025-12-08
 
 ### 🐛 Bug Fixes

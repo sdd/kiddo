@@ -11,7 +11,7 @@ use std::sync::{Mutex, OnceLock};
 
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
-use kiddo::stem_strategy::{Block3, Block4, Donnelly, Eytzinger};
+use kiddo::stem_strategy::{Donnelly, Eytzinger};
 use kiddo::traits::leaf_strategy::ConstructibleLeafStrategy;
 use kiddo::{dist::DistanceMetricScalar, Manhattan, SquaredEuclidean};
 use kiddo::{Axis, LeafStrategy, QueryResultItem, StemStrategy};
@@ -2734,16 +2734,16 @@ fn run_immutable_case_f64_arenas<const K: usize, const B: usize, SO>(
 }
 
 #[allow(type_alias_bounds)]
-type DonnellyF32<const K: usize> = Donnelly<Block4>;
+type DonnellyF32<const K: usize> = Donnelly<4>;
 #[allow(type_alias_bounds)]
-type DonnellyF64<const K: usize> = Donnelly<Block3>;
+type DonnellyF64<const K: usize> = Donnelly<3>;
 
 #[cfg(feature = "simd")]
 #[allow(type_alias_bounds)]
-type DonnellySimdBlock4F32<const K: usize> = DonnellySimdFull<Block4>;
+type DonnellySimdBlock4F32<const K: usize> = DonnellySimdFull<4>;
 #[cfg(feature = "simd")]
 #[allow(type_alias_bounds)]
-type DonnellySimdBlock3F64<const K: usize> = DonnellySimdFull<Block3>;
+type DonnellySimdBlock3F64<const K: usize> = DonnellySimdFull<3>;
 
 #[cfg(feature = "simd")]
 macro_rules! run_simd_matrix_f32 {

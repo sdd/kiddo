@@ -24,9 +24,6 @@ jobs:
   lint-msrv:
     name: Lint (MSRV)
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      checks: write
 
     steps:
       - uses: actions/checkout@v7
@@ -51,16 +48,7 @@ jobs:
           components: clippy
           toolchain: ${{ env.MSRV_RUST_VERSION }}
 
-      - name: Clippy (MSRV)
-        uses: LoliGothick/clippy-check@9019e9494e188cc9fddfea43467e7fdf6602ad14
-        if: github.actor != 'dependabot[bot]'
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          options: --features=serde,rkyv_08,test_utils --no-deps
-          name: Clippy (MSRV)
-
-      - name: Clippy (MSRV)
-        if: github.actor == 'dependabot[bot]'
+      - name: Run Clippy
         run: cargo clippy --features=serde,rkyv_08,test_utils --no-deps
 
       - name: Install cargo-hack

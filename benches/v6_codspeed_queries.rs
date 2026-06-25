@@ -10,7 +10,7 @@ use kiddo::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
     any(target_feature = "avx2", target_feature = "avx512f")
 ))]
 use kiddo::stem_strategy::DonnellySimdFull;
-use kiddo::stem_strategy::{Block3, Donnelly, DonnellySimdDescent, DonnellyUnrolled, Eytzinger};
+use kiddo::stem_strategy::{Donnelly, DonnellySimdDescent, DonnellyUnrolled, Eytzinger};
 use kiddo::{LeafStrategy, StemStrategy};
 use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
@@ -38,16 +38,15 @@ type VecOfArraysTreeF64 = KdTree<f64, u32, Eytzinger, VecOfArrays<f64, u32, K, B
 
 type EytzingerTreeF64 = KdTree<f64, u32, Eytzinger, BaselineLeavesF64, K, B>;
 type EytzingerPfFarTreeF64 = KdTree<f64, u32, Eytzinger, BaselineLeavesF64, K, B>;
-type DonnellyTreeF64 = KdTree<f64, u32, Donnelly<Block3>, BaselineLeavesF64, K, B>;
-type DonnellyUnrolledTreeF64 = KdTree<f64, u32, DonnellyUnrolled<Block3>, BaselineLeavesF64, K, B>;
-type DonnellySimdDescentTreeF64 =
-    KdTree<f64, u32, DonnellySimdDescent<Block3>, BaselineLeavesF64, K, B>;
+type DonnellyTreeF64 = KdTree<f64, u32, Donnelly<3>, BaselineLeavesF64, K, B>;
+type DonnellyUnrolledTreeF64 = KdTree<f64, u32, DonnellyUnrolled<3>, BaselineLeavesF64, K, B>;
+type DonnellySimdDescentTreeF64 = KdTree<f64, u32, DonnellySimdDescent<3>, BaselineLeavesF64, K, B>;
 #[cfg(all(
     feature = "simd",
     target_arch = "x86_64",
     any(target_feature = "avx2", target_feature = "avx512f")
 ))]
-type DonnellySimdFullTreeF64 = KdTree<f64, u32, DonnellySimdFull<Block3>, BaselineLeavesF64, K, B>;
+type DonnellySimdFullTreeF64 = KdTree<f64, u32, DonnellySimdFull<3>, BaselineLeavesF64, K, B>;
 
 fn read_usize_env(var: &str, default: usize) -> usize {
     std::env::var(var)

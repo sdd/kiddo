@@ -3,27 +3,19 @@
 use std::ptr::NonNull;
 
 use crate::stem_strategy::donnelly::core::DonnellyCore;
-use crate::stem_strategy::{Block3, Block4, Block5, Block6, Block7, BlockHeightMarker};
 use crate::{Axis, StemStrategy};
-
-#[doc(hidden)]
-pub trait DonnellyUnrolledType: BlockHeightMarker {
-    type Strategy;
-}
-
-/// Unrolled Donnelly strategy with per-level dimension scheduling.
-pub type DonnellyUnrolled<BS> = <BS as DonnellyUnrolledType>::Strategy;
 
 /// Unrolled Donnelly strategy with per-level dimension scheduling.
 #[derive(Copy, Clone, Debug)]
-pub struct DonnellyUnrolledInner<const BH: u32> {
+pub struct DonnellyUnrolled<const BH: usize> {
     core: DonnellyCore<BH>,
 }
 
 macro_rules! impl_donnelly_unrolled_strategy {
-    ($marker:ty, $size:tt) => {
-        impl StemStrategy for DonnellyUnrolledInner<$size> {
+    ($size:tt) => {
+        impl StemStrategy for DonnellyUnrolled<$size> {
             const ROOT_IDX: usize = 0;
+            const BLOCK_SIZE: usize = $size;
 
             type DeferredState = Self;
             type StackContext<A> =
@@ -68,7 +60,7 @@ macro_rules! impl_donnelly_unrolled_strategy {
             #[inline(always)]
             fn traverse_tail<A: Axis<Coord = A>, const K: usize>(&mut self, is_right: bool) {
                 self.core
-                    .traverse_tail_with_block_size::<A, K>(is_right, $size)
+                    .traverse_tail_with_block_size::<A, K>(is_right, $size as u32)
             }
 
             #[inline(always)]
@@ -89,8 +81,6 @@ macro_rules! impl_donnelly_unrolled_strategy {
             fn stem_node_padding_factor() -> usize {
                 unimplemented!()
             }
-
-            fn block_size() -> usize { $size }
 
             fn get_leaf_idx<A: Axis<Coord = A>, const K2: usize>(
                 stems: &[A],
@@ -163,24 +153,8 @@ macro_rules! impl_donnelly_unrolled_strategy {
     }};
 }
 
-impl_donnelly_unrolled_strategy!(Block3, 3);
-impl_donnelly_unrolled_strategy!(Block4, 4);
-impl_donnelly_unrolled_strategy!(Block5, 5);
-impl_donnelly_unrolled_strategy!(Block6, 6);
-impl_donnelly_unrolled_strategy!(Block7, 7);
-
-impl DonnellyUnrolledType for Block3 {
-    type Strategy = DonnellyUnrolledInner<3>;
-}
-impl DonnellyUnrolledType for Block4 {
-    type Strategy = DonnellyUnrolledInner<4>;
-}
-impl DonnellyUnrolledType for Block5 {
-    type Strategy = DonnellyUnrolledInner<5>;
-}
-impl DonnellyUnrolledType for Block6 {
-    type Strategy = DonnellyUnrolledInner<6>;
-}
-impl DonnellyUnrolledType for Block7 {
-    type Strategy = DonnellyUnrolledInner<7>;
-}
+impl_donnelly_unrolled_strategy!(3);
+impl_donnelly_unrolled_strategy!(4);
+impl_donnelly_unrolled_strategy!(5);
+impl_donnelly_unrolled_strategy!(6);
+impl_donnelly_unrolled_strategy!(7);

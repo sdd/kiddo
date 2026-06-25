@@ -1,4 +1,4 @@
-//! Traits used by [`KdTree`](crate::KdTree).
+//! Traits used by [`KdTree`](crate::kd_tree::KdTree).
 
 /// Trait for coordinate/axis types
 #[doc(hidden)]

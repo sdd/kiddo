@@ -1,9 +1,9 @@
 //! Donnelly-family stem strategies.
 //!
 //! The Donnelly family shares the same broad layout idea: stems are arranged in
-//! fixed-height minor triangles (block-height markers live in
-//! [`crate::stem_strategy::markers`]) so traversal stays cache-friendly while
-//! still supporting the normal `StemStrategy` query surface.
+//! fixed-height minor triangles parameterized by a `const BH: usize` block
+//! height, so traversal stays cache-friendly while still supporting the normal
+//! `StemStrategy` query surface.
 //!
 //! The variants differ by how much traversal work is specialized:
 //!
@@ -24,8 +24,8 @@
 //! - [`DonnellySimdFull`] takes the same block-at-once descent idea and also
 //!   uses SIMD-aware backtracking and pruning.
 //!
-//! Internally, these variants share [`core`] for scalar Donnelly indexing/state
-//! and [`simd_full`] for the reusable SIMD comparison and backtrack machinery.
+//! Internally, these variants share `core` for scalar Donnelly indexing/state
+//! and `simd_full` for the reusable SIMD comparison and backtrack machinery.
 
 mod no_pf;
 mod scalar;

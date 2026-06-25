@@ -738,7 +738,7 @@ where
     type Output = D::Output;
 }
 
-/// A fluent query builder created by [`KdTree::query`](crate::KdTree::query).
+/// A fluent query builder created by [`KdTree::query`](crate::kd_tree::KdTree::query).
 ///
 /// Chain one of the query selectors such as [`nearest_one`](Self::nearest_one),
 /// [`nearest_n`](Self::nearest_n), [`within`](Self::within), or
