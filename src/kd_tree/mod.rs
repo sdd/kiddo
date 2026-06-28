@@ -1,4 +1,20 @@
-//! Flexible kd-trees that can be used with float or fixed point, mutable or immutable, and selectable stem ordering strategies
+//! The core `KdTree` struct lives here, around which the whole crate is based.
+//!
+//! Alongside it are some ancillary structs:
+//! * `ArchivedKdTree` is the type that a `KdTree` serialized with `rkyv` deserializes into when
+//!   using `rkyv`'s full zero-copy deserialization mode. It implements `KdTreeAccessor` so that
+//!   all queries that can be performed on a `KdTree` can also be performed on an `ArchivedKdTree`.
+//! * `KdTreeIter` is the type returned by `KdTree::iter()`.
+//! * `KdTreeResolver` is created by the `rkyv::Archive` derive macro. You can almost certainly
+//!   ignore it.
+//! * [`QueryBuilder`] is returned by `KdTree::query()` - **this is where you'll find documentation
+//!   on how to build queries and all the query methods and their semantics.**
+//! * `WithinUnsortedIter` is the lazy iterator returned by
+//!   `QueryBuilder::within().unsorted().iter()` if you have not also called
+//!   `QueryBuilder.with_points()`. This is a more memory-efficient iterator, avoiding materializing
+//!   the full result set up-front, maintaining the traversal state, and lazily emitting results as
+//!   soon as they are found.
+//!
 mod construction;
 mod iter;
 pub(crate) mod orchestrator;
@@ -187,11 +203,12 @@ fn resolve_mapped_terminal_stem_idx(
 ///
 /// # Type Parameters
 /// * `A`: [`Axis`] - coordinate type (e.g., `f32`, `f64`, or fixed-point types)
-/// * `T`: [`Content`] - item type stored at each point
-/// * `SS`: [`StemStrategy`]
-/// * `LS`: [`LeafStrategy`]
+/// * `T`: [`Content`] - item type stored at each point. `u32` is the default choice and most common.
+/// * `SS`: [`StemStrategy`] - determines what ordering scheme is used for stem nodes and what
+///   approaches are used for prefetch, traversal, backtracking, and leaf node resolution.
+/// * `LS`: [`LeafStrategy`] - determines how leaf nodes are stored.
 /// * `K`: [`usize`] - Dimensionality (number of dimensions)
-/// * `B`: [`usize`] - Bucket size (maximum items per leaf node)
+/// * `B`: [`usize`] - Bucket size (maximum items per leaf node - 32 is the recommended default)
 #[cfg_attr(
     feature = "rkyv_08",
     derive(rkyv_08::Archive, rkyv_08::Serialize, rkyv_08::Deserialize)

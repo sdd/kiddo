@@ -1,3 +1,88 @@
+//! Fluent query builder APIs used by [`KdTree::query`](crate::kd_tree::KdTree::query)
+//! and the archived-tree `query` entry point when that feature is enabled.
+//!
+//! A query is assembled in stages: choose a query type, apply optional query
+//! modifiers, choose which fields should appear in each result, and then finish
+//! with a terminal method.
+//!
+//! # Query Type
+//!
+//! The first choice is the search family and distance metric:
+//!
+//! - `nearest_one::<D>()` finds the single nearest neighbour.
+//! - `nearest_n::<D>(n)` finds the `n` nearest neighbours.
+//! - `nearest_n::<D>(n).within(radius)` finds up to `n` neighbours, but only
+//!   among entries inside `radius`.
+//! - `within::<D>(radius)` returns every entry inside `radius`.
+//! - `best_n_within::<D>(radius, n)` returns up to `n` entries inside `radius`,
+//!   ranked by item ordering rather than by distance.
+//!
+//! The metric `D` is selected when the query type is chosen, so each fluent
+//! chain starts by deciding both "what kind of query is this?" and "which
+//! distance metric defines closeness?".
+//!
+//! # Query Options
+//!
+//! ## `approx`
+//!
+//! `approx()` is available only after `nearest_one::<D>()`. It switches the
+//! exact nearest-neighbour search to a descent-only approximate search.
+//!
+//! ## `exclusive_boundaries`
+//!
+//! Radius-bounded queries use inclusive `<= radius` semantics by default.
+//! `exclusive_boundaries()` changes those queries to strict `< radius`
+//! semantics. This applies to `within::<D>(radius)`,
+//! `nearest_n::<D>(n).within(radius)`, and `best_n_within::<D>(radius, n)`.
+//!
+//! ## `periodic_boundary_conditions`
+//!
+//! `periodic_boundary_condition(box_size)` must be chosen before the query
+//! type. It changes the space from Cartesian coordinates to periodic wrapping,
+//! using `box_size` as the period along each axis. Every entry in `box_size`
+//! must be strictly positive.
+//!
+//! Periodic queries support `nearest_one`, `nearest_n`, `nearest_n(...).within`,
+//! and `within`. `best_n_within` is Cartesian-only.
+//!
+//! # Result Content
+//!
+//! Result projection is independent from the query type. By default, builder
+//! results include the stored item and the computed distance, but not the point
+//! coordinates.
+//!
+//! - `with_points()` includes point coordinates.
+//! - `without_points()` removes point coordinates.
+//! - `with_items()` includes stored items.
+//! - `without_items()` removes stored items.
+//! - `with_distances()` includes distances.
+//! - `without_distances()` removes distances.
+//!
+//! These toggles rewrite the eventual result item type by replacing omitted
+//! fields with `()`. For example, removing items produces
+//! `QueryResultItem<_, (), _>`.
+//!
+//! `with_points()` is available only for Cartesian queries. Periodic queries do
+//! not expose a point projection toggle.
+//!
+//! # Result Type
+//!
+//! `execute()` eagerly runs the query and returns the query-specific container:
+//!
+//! - `nearest_one` and `nearest_one().approx()` return one `QueryResultItem`.
+//! - `nearest_n`, `nearest_n(...).within(...)`, and `within(...)` return
+//!   `Vec<QueryResultItem<...>>`.
+//! - `best_n_within(...)` returns
+//!   `BinaryHeap<BestQueryResultItem<...>>`.
+//!
+//! `iter()` and `visit()` are streaming terminal forms for Cartesian
+//! `within(...)` queries after `unsorted()` has been selected:
+//!
+//! - `iter()` returns a lazy iterator instead of materializing a `Vec`.
+//! - `visit()` calls a visitor closure for each matching result.
+//!
+//! `unsorted()` is also available for the other multi-result query families
+//! when traversal order is acceptable.
 #![allow(private_bounds)]
 
 use std::cmp::Ordering;
@@ -740,10 +825,104 @@ where
 
 /// A fluent query builder created by [`KdTree::query`](crate::kd_tree::KdTree::query).
 ///
-/// Chain one of the query selectors such as [`nearest_one`](Self::nearest_one),
-/// [`nearest_n`](Self::nearest_n), [`within`](Self::within), or
-/// [`best_n_within`](Self::best_n_within), optionally refine the query, and
-/// then call a terminal method such as [`execute`](Self::execute).
+/// A query is assembled in stages: choose a query type, apply optional query
+/// modifiers, choose which fields should appear in each result, and then
+/// finish with a terminal method.
+///
+/// # Query Type
+///
+/// The first choice is the search family and distance metric:
+///
+/// - [`nearest_one`](Self::nearest_one)`::<D>()` finds the single nearest
+///   neighbour.
+/// - [`nearest_n`](Self::nearest_n)`::<D>(n)` finds the `n` nearest
+///   neighbours.
+/// - [`nearest_n`](Self::nearest_n)`::<D>(n).`[`within`](Self::within)`(radius)`
+///   finds up to `n` neighbours, but only among entries inside `radius`.
+/// - [`within`](Self::within)`::<D>(radius)` returns every entry inside
+///   `radius`.
+/// - [`best_n_within`](Self::best_n_within)`::<D>(radius, n)` returns up to
+///   `n` entries inside `radius`, ranked by item ordering rather than by
+///   distance.
+///
+/// The metric `D` is selected when the query type is chosen, so each fluent
+/// chain starts by deciding both what kind of query it is and which distance
+/// metric defines closeness.
+///
+/// # Query Options
+///
+/// ## `approx`
+///
+/// [`approx`](Self::approx) is available only after
+/// [`nearest_one`](Self::nearest_one)`::<D>()`. It switches the exact
+/// nearest-neighbour search to a descent-only approximate search.
+///
+/// ## `exclusive_boundaries`
+///
+/// Radius-bounded queries use inclusive `<= radius` semantics by default.
+/// [`exclusive_boundaries`](Self::exclusive_boundaries) changes those queries
+/// to strict `< radius` semantics. This applies to
+/// [`within`](Self::within)`::<D>(radius)`,
+/// [`nearest_n`](Self::nearest_n)`::<D>(n).`[`within`](Self::within)`(radius)`,
+/// and [`best_n_within`](Self::best_n_within)`::<D>(radius, n)`.
+///
+/// ## `periodic_boundary_conditions`
+///
+/// [`periodic_boundary_condition`](Self::periodic_boundary_condition)`(box_size)`
+/// must be chosen before the query type. It changes the space from Cartesian
+/// coordinates to periodic wrapping, using `box_size` as the period along each
+/// axis. Every entry in `box_size` must be strictly positive.
+///
+/// Periodic queries support [`nearest_one`](Self::nearest_one),
+/// [`nearest_n`](Self::nearest_n),
+/// [`nearest_n`](Self::nearest_n)`(...).`[`within`](Self::within)`(...)`, and
+/// [`within`](Self::within). [`best_n_within`](Self::best_n_within) is
+/// Cartesian-only.
+///
+/// # Result Content
+///
+/// Result projection is independent from the query type. By default, builder
+/// results include the stored item and the computed distance, but not the
+/// point coordinates.
+///
+/// - [`with_points`](Self::with_points) includes point coordinates.
+/// - [`without_points`](Self::without_points) removes point coordinates.
+/// - [`with_items`](Self::with_items) includes stored items.
+/// - [`without_items`](Self::without_items) removes stored items.
+/// - [`with_distances`](Self::with_distances) includes distances.
+/// - [`without_distances`](Self::without_distances) removes distances.
+///
+/// These toggles rewrite the eventual result item type by replacing omitted
+/// fields with `()`. For example, removing items produces
+/// [`QueryResultItem<_, (), _>`](crate::QueryResultItem).
+///
+/// [`with_points`](Self::with_points) is available only for Cartesian queries.
+/// Periodic queries do not expose a point projection toggle.
+///
+/// # Result Type
+///
+/// [`execute`](Self::execute) eagerly runs the query and returns the
+/// query-specific container:
+///
+/// - [`nearest_one`](Self::nearest_one) and
+///   [`nearest_one`](Self::nearest_one)`(...).`[`approx`](Self::approx)`()`
+///   return one [`QueryResultItem`](crate::QueryResultItem).
+/// - [`nearest_n`](Self::nearest_n),
+///   [`nearest_n`](Self::nearest_n)`(...).`[`within`](Self::within)`(...)`, and
+///   [`within`](Self::within)`(...)` return `Vec<QueryResultItem<...>>`.
+/// - [`best_n_within`](Self::best_n_within)`(...)` returns
+///   `BinaryHeap<BestQueryResultItem<...>>`.
+///
+/// [`iter`](Self::iter) and [`visit`](Self::visit) are streaming terminal
+/// forms for Cartesian [`within`](Self::within)`(...)` queries after
+/// [`unsorted`](Self::unsorted) has been selected:
+///
+/// - [`iter`](Self::iter) returns a lazy iterator instead of materializing a
+///   `Vec`.
+/// - [`visit`](Self::visit) calls a visitor closure for each matching result.
+///
+/// [`unsorted`](Self::unsorted) is also available for the other multi-result
+/// query families when traversal order is acceptable.
 ///
 /// The concrete generic parameters on this type encode the current builder
 /// state and are considered an implementation detail of the fluent API.
@@ -1436,6 +1615,9 @@ where
     LS: LeafStrategy<A, T, SS, K, B>,
 {
     /// Starts a fluent query against this tree.
+    ///
+    /// See [`QueryBuilder`] for the full query-building guide, including query
+    /// families, option toggles, result projection, and terminal methods.
     #[inline]
     pub fn query<'a>(
         &'a self,
@@ -1462,6 +1644,9 @@ where
     rkyv_08::Archived<LS>: LeafStrategy<A, T, SS, K, B>,
 {
     /// Starts a fluent query against this archived tree.
+    ///
+    /// See [`QueryBuilder`] for the full query-building guide, including query
+    /// families, option toggles, result projection, and terminal methods.
     #[inline]
     pub fn query<'a>(
         &'a self,

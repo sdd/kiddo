@@ -2,7 +2,7 @@ use crate::leaf_view::LeafView;
 use crate::traits::leaf_strategy::{
     BucketLimitType, ConstructibleLeafStrategy, Immutable, LeafProjection,
 };
-use crate::{Axis, Content, LeafStrategy, StemStrategy};
+use crate::{Axis, Content, KdTree, LeafStrategy, StemStrategy};
 
 /// A leaf storage strategy using flat vectors for coordinates.
 ///
@@ -47,6 +47,11 @@ pub struct FlatVec<A, T, const K: usize, const B: usize> {
     leaf_extents: Vec<(u32, u32)>,
     size: usize,
 }
+
+/// Convenience type alias for a [`KdTree`] with a [`FlatVec`] leaf strategy, to avoid having to
+/// specify the KdTree's generic parameters twice.
+pub type FlatVecKdTree<A, T, SS, const K: usize, const B: usize> =
+    KdTree<A, T, SS, FlatVec<A, u32, K, 32>, K, 32>;
 
 impl<AX, T, SS, const K: usize, const B: usize> LeafStrategy<AX, T, SS, K, B>
     for FlatVec<AX, T, K, B>
