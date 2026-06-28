@@ -24,11 +24,8 @@ pub mod leaf_strategy;
 #[doc(inline)]
 pub use leaf_strategy::{ConstructibleLeafStrategy, LeafStrategy, MutableLeafStrategy};
 
-///Trait implemented by stem strategie (determines tree stem ordering and traversal)
+///Trait implemented by stem strategy (determines tree stem ordering and traversal)
 #[doc(hidden)]
 pub mod stem_strategy;
 #[doc(inline)]
 pub use stem_strategy::StemStrategy;
-
-/// Advanced traits for extending or specializing stem strategies.
-pub mod stem_strategies;

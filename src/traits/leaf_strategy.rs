@@ -149,14 +149,18 @@ pub enum LeafProjection {
 }
 
 /// Query/access strategy for how leaf storage is laid out.
-/// - AX: Axis marker implementing AxisUnified (selects float or fixed semantics).
-/// - T: item/content type stored alongside points.
-/// - SS: stem layout strategy used to map split values into KdTree::stems (external).
-/// - K: dimensionality.
-/// - B: nominal bucket size (strategies may use or ignore it).
-pub trait LeafStrategy<AX, T, SS, const K: usize, const B: usize>
+///
+/// To see which stem strategies are available, see the [`leaf_strategy`](`crate::leaf_strategy`) module.
+///
+/// The generic parameters are the same as those of [`KdTree`](`crate::kd_tree::KdTree`) and must match the tree with which
+/// they're being specified for. It is a bit verbose and clunky to have to repeat these parameters
+/// that are specified on the `KdTree` itself as well as on a given leaf strategy. Unfortunately,
+/// this has been the least worst option after having investigated implementations that would
+/// eliminate this duplication. Each provided leaf strategy also exposes a type alias that avoids
+/// this if you find that preferable.
+pub trait LeafStrategy<A, T, SS, const K: usize, const B: usize>
 where
-    AX: Axis<Coord = AX>,
+    A: Axis<Coord = A>,
     T: Content,
     SS: StemStrategy,
 {
@@ -185,22 +189,22 @@ where
     fn leaf_len(&self, leaf_idx: usize) -> usize;
 
     /// Returns a view into the specified leaf's data.
-    fn leaf_view(&self, leaf_idx: usize) -> LeafView<'_, AX, T, K, B>;
+    fn leaf_view(&self, leaf_idx: usize) -> LeafView<'_, A, T, K, B>;
 
     /// Returns arena-backed access for the specified leaf.
     ///
     /// Callers should only use this when [`Self::LEAF_PROJECTION`] is
     /// [`LeafProjection::LeafArena`].
     #[inline(always)]
-    fn leaf_arena(&self, _leaf_idx: usize) -> LeafArena<'_, AX, T, K> {
+    fn leaf_arena(&self, _leaf_idx: usize) -> LeafArena<'_, A, T, K> {
         unimplemented!("leaf_arena is unsupported for this leaf strategy")
     }
 
     /// Returns the point/item pair at `pos_in_leaf`.
     #[inline(always)]
-    fn leaf_point_item(&self, leaf_idx: usize, pos_in_leaf: usize) -> ([AX; K], T)
+    fn leaf_point_item(&self, leaf_idx: usize, pos_in_leaf: usize) -> ([A; K], T)
     where
-        AX: Copy,
+        A: Copy,
         T: Copy,
     {
         match Self::LEAF_PROJECTION {
@@ -223,7 +227,7 @@ where
     fn replace_item_in_leaf(
         &mut self,
         _leaf_idx: usize,
-        _point: &[AX; K],
+        _point: &[A; K],
         _old_item: T,
         _new_item: T,
     ) -> bool

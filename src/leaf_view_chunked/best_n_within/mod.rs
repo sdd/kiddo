@@ -41,7 +41,7 @@ pub(crate) fn best_n_within_with_query_wide_arena<
 {
     #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
     if unsafe {
-        try_best_n_within_arena_avx512::<AX, T, D, R, K>(
+        try_best_n_within_arena_avx512::<AX, T, D, R, EXCLUSIVE, K>(
             arena,
             query_wide,
             dist,
