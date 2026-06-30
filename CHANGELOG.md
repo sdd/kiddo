@@ -1,228 +1,136 @@
 # Kiddo Changelog
 
-## [6.0.0-alpha.1] - 2026-06-29
+## [6.0.0-alpha.1] - 2026-06-30
+
+Almost a year in the making and counting, Kiddo v6 is effectively a full rewrite, addressing some
+long-standing issues.
+
+- V6 represents a fundamental shift to a unified single `KdTree` struct, replacing the previous
+  mutable/immutable and float/fixed splits. The need for separate mutable / immutable trees has
+  been removed by introducing the `LeafStrategy` trait, which the `KdTree` has as a generic parameter.
+  LeafStrategies can be mutable or immutable.
+- `KdTree` is also now generic over the new `StemStrategy` trait too. The combination of these two
+  orthogonal traits allow experimentation and selection of alternative stem layouts and traversal
+  mechanisms, alongside configurable leaf strategies, for performance experimentation.
+- The query API has been refactored from a handful of separate methods that were not particularly
+  cohesive into a single unified fluent builder API. The builder approach is much more orthogonal,
+  and protects against breaking changes when new options are introduced in the future. It permits
+  constraints to be encoded in the type system for impossible option combinations, prevents the need
+  for as many methods that differ only by some combination of features; allowing for configurable
+  result type projection, query types, and query configurations with defaults that match the v5-era
+  separate methods.
+- Some of the other new features added include configurable boundary-inclusivity, periodic boundary
+  conditions, the `within_unsorted_visit` result mode to avoid materialization of results, `TryFrom`
+  for converting between different `KdTree` types, `new_from_source`, and `replace_item`.
+- Distance metric coverage has also been expanded and tidied up, including the addition of Chebyshev
+  Minkowski, and Dot Product metrics and support for queries whose result type is wider than the
+  stored coordinate type, which is especially important for fixed-point trees.
+- With regard to the Stem Strategy trait system, alongside the Eytzinger ordering from v5 and prior
+  is still available but now supports configurable prefetch behaviour. I've introduced the new
+  Donnelly stem ordering via a family of stem strategies, featuring configurable pre-fetch and block size,
+  unrolled traversal, SIMD descent, and full SIMD pruning and backtracking variants. The SIMD variant
+  contains custom AVX2, AVX512, and NEON kernels.
+
+## [5.3.2] - 2026-06-02
+
+### Ci
+
+- Backport workflow and repo config updates
+- Backport build and coverage workflow updates
+
+### 🐛 Bug Fixes
+
+- Add msrv, use algernative to f64::fract
+
+### 💄 Styling
+
+- Formatting and clean up unneeded md file
+
+## Unreleased
+
+I've kept back these changes for now as, whilst extremely welcome, the change to the return type of `size()` would be breaking.
+I'm hoping to have v6 available soon, which will include both these changes as well as addressing quite a few other long-running feature requests.
+
+### ✨ Features
+
+- Improve the flexibility of T type, KdTree.size. Add generate nearest_one_point (https://github.com/sdd/kiddo/pull/214, @pjkundert)
+- Fix broken test of custom struct as T. Add test for `()` as T (https://github.com/sdd/kiddo/pull/243 @pjkundert)
+
+## [5.3.1] - 2026-04-15
+
+### 🐛 Bug Fixes
+
+- Add a compile-time assertion to prevent bucket size of less than 2 for `KdTree` to avoid UB when trying to split a bucket of size 1.
+  Fixes https://github.com/sdd/kiddo/issues/295. (Note that even though bucket sizes of 2 are possible, I would generally not recommend
+  using a value of B below 32 anyway, for best performance.)
+
+## [5.3.0] - 2026-03-19
+
+I'm extremely grateful to @cbueth for his fantastic set of contributions to this release. The new distance metrics are a great addition to the library,
+come with extensive tests, and he was even able to contribute a big fix and some welcome refactors along the way. Thanks very much, Carlson!
+
+### ✨ Features
+
+- Add Chebyshev (L_∞ norm) distance metric (https://github.com/sdd/kiddo/pull/290, @cbueth)
+- Add Generalised Minkowski (L_p norm) distance metric (https://github.com/sdd/kiddo/pull/291, @cbueth)
+- Add `*_exclusive` methods for querying with an exclusive (`<`) rather than inclusive (`<=`) boundary check (https://github.com/sdd/kiddo/pull/294, @cbueth)
+
+### 🐛 Bug Fixes
+
+- Ensure that all existing query methods have boundary checks that are inclusive (`<=`), in line with typical k-d tree expectations (@cbueth)
+  If you were relying on these checks being exclusive, switch over to using the new `*_exclusive` variants of the query methods.
+
+### Docs
+
+- Correct a mistake in the docs for `fixed::distance::Manhattan` (https://github.com/sdd/kiddo/pull/283, @Luca-spopo)
+
+### Deps
+
+- update cmov dep from 0.4 to 0.5 (@sdd)
+
+## [5.2.4] - 2026-01-01 (Happy New Year! 🎉)
+
+### Deps
+
+- update cmov dep from 0.3 to 0.4 after 0.3 got yanked (see https://github.com/RustCrypto/utils/issues/1304). Thanks @yuby and @jqnatividad
+
+## [5.2.3] - 2025-12-08
+
+### 🐛 Bug Fixes
+
+- Correct slice access in remainder processing and remove unsafe (@MarkusZoppelt)
+- Use `try_from()` with error for `leaf_items.len()` (@MarkusZoppelt)
+
+### ♻️ Refactor
+
+- within_unsorted_iter no longer uses a generator (@KvA2KLvAST)
+- Remove needless SubAssign trait bound from Content trait
+
+### Deps
+
+- Remove doc-comment dependency and use doc attribute that was added in Rust 1.54 instead (@jqnatividad)
+- Use `doc` attribute instead of `doc_comment!` (@jqnatividad)
+- Update actions/checkout action to v6
+- Update codspeedhq/action action to v4
+- Update ad-m/github-push-action action to v1
+- Update rust crate rstest to 0.26
+- Update rust crate codspeed-criterion-compat to v4
 
 ### Ci
 
 - Update CI workflow triggers to include PR and workflow_dispatch
 - Permit coverage to run for PRs as well
 - Fix release-plz and add commitlint
-- Add codeql and dep review steps. fix codspeed. Pin some floating actions
-- Ensure dependabot PR CI runs don't write checks
-- Don't run comitlint for dependabot PRs
-- Run machete, update hooks, coverage skip at step level
-- Rename depandabot-specific jobs to match non-dependabot ones
-
-### Deps
-
-- Remove doc-comment dependency and use doc attribute that was added in Rust 1.54 instead
-- Bump cmov to 0.4 as all other versions were yanked
-
-### ♻️ Refactor
-
-- Remove within_unsorted_iter_owned in favour of modifying within_unsorted_iter
-- Update all immutable query methods to use generic stem strategy
-- Better file structure for SIMD code. some lint / formatting fixes
-- Switch from size_of dispatch in QO pruning to `SimdPrune` trait
-- Rename Basics trait to Content
-- Move PBC code into own file
-- Query builder now a single generic struct
-- Query builder uses traits to avoid dupes in docs
-- Yet another builder refactor - use macros for less repetition
-- Move some traits around and rename some traits, improve docs
-- Distance trait reorg
-- Stem strategy trait now has generic methods
-
-### ⚡️ Performance
-
-- Refactor donnelly block simd code
-- Improve PBC performance
-- Nearest_n / within queries are now single-pass
-
-### ✨ Features
-
-- Improve the flexibility of T type, KdTree.size. Add generate nearest_one_point
-- Restructure project layout to rationalize things a bit more
-- Fixed tree can now return results in a wider type than the stored points, Fixes:#32
-- Remove rkyv 0.7 support
-- Make stem ordering scheme generic
-- Add benches for donnelly strategy
-- Updated donnelly strategies. approx nearest one bench comparing with eytzinger
-- Added benches and tests
-- Add examples and benches
-- Add get_leaf_node to immutable for testing, plus benches
-- Add cache simulator
-- Extend simulator to include basic timing simulation
-- Extend simulator. add testing for unroll
-- Add donnelly_unrolled experiment
-- Beat eytzinger on unrolled donnelly 4 on zen3
-- Part-way through development of basic structure of new traits for new tree
-- New structure updated axis trait. metrics added for L2 and DP, with widening variants
-- Widen float->float and fixed->float. Rough impls for more queries
-- V6 construction
-- Construction and tests for both initial leaf strategies working
-- V6 querying
-- V6 querying working for ann/n1. bug fixing for nearest-n / best-n
-- V6 bug fix for enarest/best n in progress, minor cleanup of lints
-- V6 fix orchestrator logic bug
-- V6 flat vec queries working
-- V6 vec of arrays tests in place for unmutated construct from slice
-- Support arithmetic or mapped stem-to-leaf-idx mapping
-- Leaf splitting partially implemented
-- Continuing to iterate on leaf splitting
-- Refactor Mutability trait (unify query and trav methods)
-- Improved splitting
-- Continuing to iterate on leaf splitting
-- Leaf split and query working for mut / immut, donnelly / eytz, flat_vec / vec_of_arrays
-- Stem levels can be padded to a full block. Construction now calcs exact stem count
-- Add DonnellyMarker stem strat. Uses marker type for block height
-- Simd block-at-once comparison. move core Donnelly traversal logic to DonnellyCore
-- Simd backtracking qyery
-- Split fix
-- Some more trace logging
-- Debug logging / tests / minor cleanup
-- Neon and fallback impls for simd block. simd refactor. fix build and lints
-- Refactor SIMD compare to traits to avoid size_of based dispatch
-- Block4 proper interval calculation and distance handling
-- Generalize interval calculation to support metric-agnostic approach
-- Implementations for blockmarker SIMD
-- Construction and query issues fixed, all tests inc fuzz pass for v6
-- Simd backtrack AVX512 initial implementation
-- Include some workarounds for now that address simd block-at-once fails
-- Simd kernel naming changes and improvements
-- Thread-local query stack, nearest-one improvements, return to chunked leaf slice
-- New simd dist traits and improved simd leaf processing
-- Avx512 tidyup
-- Add VecOfArenas leaf strategy. Get all the AVX512 code working for approx_n1 and n1
-- Refactor to avoid ugly typeId routing in nearest_one
-- Donnelly block simd refactor to improve performance on prune
-- Remove v5 trees
-- V6 multi0-result queries implemented, plus cleanup
-- V6 examples and benches cleanup, fixes from fuzzing
-- Thp and improved result collections experiment
-- Rkyv and iterators
-- Introduce within_unsorted_visit, improve within_unsorted_iter
-- Add huge pages suppt
-- Large-scale restructure to move modules around
-- Large-scale restructure to move modules around pt 2
-- Large scale restructure part 3
-- Relabel from RC to alpha
-- Remove legacy traits and re-organize things even more
-- Add scalar split stack (off / far) and result collection stats. Add some asm hooks
-- Add scalar split stack (off / far) and result collection stats
-- Add tests for DonnellySimdDescent and comment out unused function
-- Update construction and mutation API surface to return `Result`
-- Protect against bucket size of 1 with VecOfArrays at compile time
-- Re-add Chebyshev and Minkowski distance metrics
-- Refactor query API to fluent builder style
-- Port over boundary inclusivity
-- Flexible results projection via builder
-- Implement TryFrom convertion from one KdTree type to another
-- Add new_from_source constructor
-- Initial periodic boundary conditions support for v6
-- Add replace_item method
-- Restore serde support
-- Refactor donelly stem strats to explicit block height
-- Restructure donnelly strats
-
-### 🐛 Bug Fixes
-
-- Remove needless SubAssign trait bound from Content trait
-- Broken during rebase of earlier trait change commit
-- Update to use transform function
-- Correct slice access in remainder processing and remove unsafe, Signed-off-by:Markus Zoppelt <markus.zoppelt@helsing.ai>
-- Use try_from() with error for leaf_items.len()
-- Larger stem buffer to avoid overflow. add examples for ann for cachegrind
-- Gate arm stuff behind cfg
-- Leaf extent calc during construction
-- Simd block3 avx2 bugs fixed. v6_query_nearest_one_donnelly_marker_simd_f64 partial fix
-- Construct stems with len multiple of 8. Display trait for KdTree shows stems in 8 columns
-- Tracked down simd backtrack bug. This was a MASSIVE PITA to find
-- Rd calc issue in new tree
-- Rd calc issue in old trees
-- Ensure within tests use <= rather than <. Add fuzz test repro bin
-- Nearest_one pruning uses gte rather than gt
-- Correct handling of non-u64 sentinel values
-- Fix up breakage from rebase on to master
-- Gate prefetch behind nightly detection to avoid breakage on stable builds
-- Use INF / NEG_INF instead of MIN / MAX for float sentinels
-- Manually inline some SIMD fns
-- Constrution bug could break invariants assumeed by arithmetic mapping
-- Don't use deprecated max_value form
-- Keep fixed dep below 1.31.0 to preseve MSRV
 
 ### 💄 Styling
 
 - Remove unnecessary parentheses
 - Fix formatting
-- Formatting
-- Formatting, codspeed run on feature branches
-
-### 📝 Documentation
-
-- Update changelog
-- Update documentation for v6
-- Update README
-- Update README
-- Improve huge pages documentation
-- Improve leaf strategy docs
-- Extend and clean up docs
+- Fix some lint issues
 
 ### 🧪 Testing
 
-- Fix broken test of custom struct as T. Add test for () as T
-- Add regression test for remainder slice access bug, Signed-off-by:Markus Zoppelt <markus.zoppelt@helsing.ai>
-- Add test for get_both_child_idx to donnelly2
-- Restore state of some tests. Clean up some lints
-- Add more tests of donnelly block simd prior to refactor
-- Add tests for SIMD interval code. reformat
-- Improve coverage, mostly dist metric traits
-- Increase coverage on THP, traits and leaf_view
-- Improve coverage for simd stem strat
-- Improve coverage further for simd stem strat
-- Inc test coverage for orchestrator
-- Add coverage for LeafView
-- Coverage for eytzinger_pf_far and query_stack_simd
-- Coverage for vec_of_arrays
-- Coverage for d3 and backtrack traits
-- General coverage improvements
-- Confirm issue #258 is resolved in v6
-
-### 🧹 Chore
-
-- Fix some lint issues
-- Use `doc` attribute instead of `doc_comment!`
-- Update actions/checkout action to v6
-- Update codspeedhq/action action to v4
-- Update ad-m/github-push-action action to v1
-- Update rust crate rstest to 0.26
-- Update rust crate codspeed-criterion-compat to v4
-- Update actions/cache action to v5
-- Clean up broken benches and examples
-- Change imports (clippy). Reduce size of test tree & test_log. add non-simd tree
-- Switch from monk to prek
-- Update cmov dep, fix some simd cond cfg that was arm only, fix some missing imports
-- Fix kiddo-v5 dep in Cargo.toml
-- Fix clippy lints
-- Fix GH CI building binary with invalid instructions
-- Update prek cfg, format and lint taml/toml/md files
-- Bump moonrepo/setup-rust from 0 to 1, Signed-off-by:dependabot[bot] <support@github.com>
-- Update dependency node to v24
-- Bump ad-m/github-push-action from 1.0.0 to 1.3.0, Signed-off-by:dependabot[bot] <support@github.com>
-- Bump actions/setup-node from 5 to 6, Signed-off-by:dependabot[bot] <support@github.com>
-- Bump codecov/codecov-action from 5 to 6, Signed-off-by:dependabot[bot] <support@github.com>
-- Update actions/dependency-review-action action to v5
-- Specify v6 msrv and policy and include an msrv CI build
-- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
-- Update codecov/codecov-action action to v7
-- Update dorny/paths-filter action to v4
-- Bump rand deps
-- Bump criterion dep
-- Update rust crate itertools to 0.15
-- Update rust crate codspeed-criterion-compat to v5
-- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
-- Bump actions/checkout from 6 to 7, Signed-off-by:dependabot[bot] <support@github.com>
-- Update actions/cache action to v6
+- Add regression test for remainder slice access bug (@MarkusZoppelt)
 
 ## [5.2.2] - 2025-12-08
 
