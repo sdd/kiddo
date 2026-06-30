@@ -2123,6 +2123,7 @@ impl BacktrackBlock4 for f32 {
 #[cfg(all(
     feature = "simd",
     target_arch = "x86_64",
+    target_feature = "avx2",
     not(target_feature = "avx512f")
 ))]
 #[inline(always)]
@@ -2191,6 +2192,7 @@ unsafe fn simd_backtrack_block3_f64_avx2_squared_euclidean<
 #[cfg(all(
     feature = "simd",
     target_arch = "x86_64",
+    target_feature = "avx2",
     not(target_feature = "avx512f")
 ))]
 #[inline(always)]
@@ -2252,6 +2254,7 @@ unsafe fn simd_backtrack_block3_f32_avx2_squared_euclidean<
 #[cfg(all(
     feature = "simd",
     target_arch = "x86_64",
+    target_feature = "avx2",
     not(target_feature = "avx512f")
 ))]
 #[inline(always)]
@@ -2321,6 +2324,7 @@ unsafe fn simd_backtrack_block4_f64_avx2_squared_euclidean<
 #[cfg(all(
     feature = "simd",
     target_arch = "x86_64",
+    target_feature = "avx2",
     not(target_feature = "avx512f")
 ))]
 #[inline(always)]
@@ -2391,6 +2395,7 @@ unsafe fn simd_backtrack_block4_f32_avx2_squared_euclidean<
 #[cfg(all(
     feature = "simd",
     target_arch = "x86_64",
+    target_feature = "avx2",
     not(target_feature = "avx512f")
 ))]
 #[inline(always)]
@@ -2457,6 +2462,7 @@ unsafe fn simd_backtrack_block3_f64_avx2_manhattan<
 #[cfg(all(
     feature = "simd",
     target_arch = "x86_64",
+    target_feature = "avx2",
     not(target_feature = "avx512f")
 ))]
 #[inline(always)]
@@ -2514,6 +2520,7 @@ unsafe fn simd_backtrack_block3_f32_avx2_manhattan<
 #[cfg(all(
     feature = "simd",
     target_arch = "x86_64",
+    target_feature = "avx2",
     not(target_feature = "avx512f")
 ))]
 #[inline(always)]
@@ -2577,6 +2584,7 @@ unsafe fn simd_backtrack_block4_f64_avx2_manhattan<
 #[cfg(all(
     feature = "simd",
     target_arch = "x86_64",
+    target_feature = "avx2",
     not(target_feature = "avx512f")
 ))]
 #[inline(always)]

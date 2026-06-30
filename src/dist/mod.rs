@@ -77,7 +77,11 @@ pub use minkowski::Minkowski;
 #[doc(inline)]
 pub use squared_euclidean::SquaredEuclidean;
 
-#[cfg(feature = "simd")]
+#[cfg(any(
+    all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
+    all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"),
+    all(feature = "simd", target_arch = "aarch64", target_feature = "neon")
+))]
 macro_rules! with_nearest_result_emitter {
     ($results:expr, $distance_ty:ty, $item_ty:ty, $emit:ident, $body:block) => {{
         let mut $emit = |candidate_dist: $distance_ty, item: $item_ty| {
@@ -97,7 +101,11 @@ macro_rules! with_nearest_result_emitter {
     }};
 }
 
-#[cfg(feature = "simd")]
+#[cfg(any(
+    all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
+    all(feature = "simd", target_arch = "x86_64", target_feature = "avx2"),
+    all(feature = "simd", target_arch = "aarch64", target_feature = "neon")
+))]
 macro_rules! with_best_result_emitter {
     ($results:expr, $threshold_item:expr, $distance_ty:ty, $item_ty:ty, $emit:ident, $body:block) => {{
         let threshold_item = $threshold_item;
