@@ -40,7 +40,7 @@ long-standing issues.
 
 ### 🐛 Bug Fixes
 
-- Add msrv, use algernative to f64::fract
+- Add msrv, use alernative to f64::fract
 
 ### 💄 Styling
 
