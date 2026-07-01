@@ -1,5 +1,23 @@
 # Kiddo Changelog
 
+## [5.3.3] - 2026-07-01
+
+### Ci
+
+- Don't run comitlint for dependabot PRs
+
+### 🧹 Chore
+
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump rand deps
+- Bump criterion deps
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump codecov/codecov-action from 5 to 7, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump actions/checkout from 6 to 7, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump actions/cache from 5 to 6, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+
 ## [5.3.2] - 2026-06-02
 
 ### Ci
