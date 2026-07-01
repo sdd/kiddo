@@ -691,9 +691,9 @@ mod tests {
     use crate::stem_strategy::Donnelly;
     #[cfg(all(feature = "rkyv_08", feature = "simd", target_arch = "x86_64"))]
     use crate::stem_strategy::DonnellySimdFull;
+    use crate::stem_strategy::DonnellyUnrolled;
     use crate::Eytzinger;
     use crate::SquaredEuclidean;
-    #[cfg(feature = "rkyv_08")]
     use std::num::NonZeroUsize;
 
     fn sort_entries_u32<A: Copy, const K: usize>(
@@ -785,6 +785,37 @@ mod tests {
             leaf_idx,
             tree.leaf_count()
         );
+    }
+
+    fn check_unrolled_bh<const BH: usize>(points: &[[f32; 3]], query: &[f32; 3])
+    where
+        DonnellyUnrolled<BH>: StemStrategy,
+    {
+        let tree: KdTree<f32, u32, DonnellyUnrolled<BH>, FlatVec<f32, u32, 3, 32>, 3, 32> =
+            KdTree::new_from_slice(points).unwrap();
+        assert_eq!(tree.size(), points.len());
+        let result = tree
+            .query(query)
+            .nearest_n::<SquaredEuclidean<f32>>(NonZeroUsize::new(1).unwrap())
+            .execute();
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn test_donnelly_unrolled_all_bh() {
+        let points: Vec<[f32; 3]> = (0..64)
+            .map(|i| {
+                let x = i as f32 / 64.0;
+                [x, x * 2.0, x * 3.0]
+            })
+            .collect();
+        let query = [0.5f32, 1.0, 1.5];
+        check_unrolled_bh::<3>(&points, &query);
+        check_unrolled_bh::<4>(&points, &query);
+        check_unrolled_bh::<5>(&points, &query);
+        check_unrolled_bh::<6>(&points, &query);
+        check_unrolled_bh::<7>(&points, &query);
+        check_unrolled_bh::<8>(&points, &query);
     }
 
     #[cfg(feature = "rkyv_08")]

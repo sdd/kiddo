@@ -140,6 +140,16 @@ macro_rules! impl_donnelly_unrolled_strategy {
         impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
         impl_donnelly_unrolled_strategy!(@tail $stems, $query, $strat);
     };
+    (@unroll 8, $stems:expr, $query:expr, $strat:expr) => {
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@head $stems, $query, $strat);
+        impl_donnelly_unrolled_strategy!(@tail $stems, $query, $strat);
+    };
 
     (@head $stems:expr, $query:expr, $strat:expr) => {{
         let pivot = unsafe { $stems.get_unchecked($strat.stem_idx()) };
@@ -158,3 +168,4 @@ impl_donnelly_unrolled_strategy!(4);
 impl_donnelly_unrolled_strategy!(5);
 impl_donnelly_unrolled_strategy!(6);
 impl_donnelly_unrolled_strategy!(7);
+impl_donnelly_unrolled_strategy!(8);
