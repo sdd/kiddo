@@ -21,61 +21,6 @@ ignored = ["log"]
 [package.metadata.docs.rs]
 all-features = true
 
-[[bin]]
-name = "fuzz-case-repro"
-path = "src/bin/fuzz-case-repro.rs"
-required-features = ["fuzz"]
-
-[[bin]]
-name = "profile_v6_nearest_one_eytzinger"
-path = "src/bin/profile_v6_nearest_one_eytzinger.rs"
-required-features = ["test_utils"]
-
-[[bin]]
-name = "profile_v6_leaf_strategies"
-path = "src/bin/profile_v6_leaf_strategies.rs"
-required-features = ["test_utils"]
-
-[[bin]]
-name = "profile_v6_stem_exact_stats"
-path = "src/bin/profile_v6_stem_exact_stats.rs"
-required-features = ["simd", "test_utils"]
-
-[[bin]]
-name = "repro_donnelly_block3_exact_divergence"
-path = "src/bin/repro_donnelly_block3_exact_divergence.rs"
-required-features = ["simd", "test_utils"]
-
-[[bin]]
-name = "profile_v6_result_collection_stats"
-path = "src/bin/profile_v6_result_collection_stats.rs"
-required-features = ["rkyv_08", "simd", "test_utils", "result_collection_stats"]
-
-[[bin]]
-name = "build_v6_profile_archives"
-path = "src/bin/build_v6_profile_archives.rs"
-required-features = ["rkyv_08", "simd", "test_utils"]
-
-[[bin]]
-name = "build_v6_hugepage_archives"
-path = "src/bin/build_v6_hugepage_archives.rs"
-required-features = ["rkyv_08", "test_utils"]
-
-[[bin]]
-name = "build_v6_query_focus_archives"
-path = "src/bin/build_v6_query_focus_archives.rs"
-required-features = ["rkyv_08", "test_utils"]
-
-[[bin]]
-name = "profile_v6_archived_huge_pages"
-path = "src/bin/profile_v6_archived_huge_pages.rs"
-required-features = ["rkyv_08", "huge_pages"]
-
-[[bin]]
-name = "profile_v6_archived_query_focus"
-path = "src/bin/profile_v6_archived_query_focus.rs"
-required-features = ["rkyv_08", "huge_pages"]
-
 [features]
 cargo_asm = ["dep:rand", "dep:rand_chacha"]
 csv = ["dep:csv"]
@@ -286,6 +231,67 @@ required-features = ["test_utils"]
 name = "v6_periodic_queries"
 harness = false
 required-features = ["test_utils"]
+
+[[bench]]
+name = "profile_v6_nearest_one_eytzinger"
+path = "benches/profile_v6_nearest_one_eytzinger.rs"
+harness = false
+required-features = ["test_utils"]
+
+[[bench]]
+name = "profile_v6_leaf_strategies"
+path = "benches/profile_v6_leaf_strategies.rs"
+harness = false
+required-features = ["test_utils"]
+
+[[bench]]
+name = "profile_v6_stem_exact_stats"
+path = "benches/profile_v6_stem_exact_stats.rs"
+harness = false
+required-features = ["simd", "test_utils"]
+
+[[bench]]
+name = "profile_v6_result_collection_stats"
+path = "benches/profile_v6_result_collection_stats.rs"
+harness = false
+required-features = ["rkyv_08", "simd", "test_utils", "result_collection_stats"]
+
+[[bench]]
+name = "profile_v6_archived_huge_pages"
+path = "benches/profile_v6_archived_huge_pages.rs"
+harness = false
+required-features = ["rkyv_08", "huge_pages"]
+
+[[bench]]
+name = "profile_v6_archived_query_focus"
+path = "benches/profile_v6_archived_query_focus.rs"
+harness = false
+required-features = ["rkyv_08", "huge_pages"]
+
+[[example]]
+name = "fuzz-case-repro"
+path = "examples/fuzz-case-repro.rs"
+required-features = ["fuzz"]
+
+[[example]]
+name = "repro_donnelly_block3_exact_divergence"
+path = "examples/repro_donnelly_block3_exact_divergence.rs"
+required-features = ["simd", "test_utils"]
+
+[[example]]
+name = "build_v6_profile_archives"
+path = "examples/build_v6_profile_archives.rs"
+required-features = ["rkyv_08", "simd", "test_utils"]
+
+[[example]]
+name = "build_v6_hugepage_archives"
+path = "examples/build_v6_hugepage_archives.rs"
+required-features = ["rkyv_08", "test_utils"]
+
+[[example]]
+name = "build_v6_query_focus_archives"
+path = "examples/build_v6_query_focus_archives.rs"
+required-features = ["rkyv_08", "test_utils"]
 
 #[[example]]
 #name = "avx2-check"

@@ -63,7 +63,7 @@ struct ReproRunContext<'a, A, const K: usize> {
 fn main() {
     let arg = env::args().nth(1).unwrap_or_else(|| {
         eprintln!(
-            "Usage: cargo run --features fuzz --bin fuzz-case-repro -- <repro-id>\n\
+            "Usage: cargo run --features fuzz --example fuzz-case-repro -- <repro-id>\n\
              Add `simd` to --features for SIMD repro ids, or use `just fuzz-case-repro ...`.\n\
              Example: failure-kind_immutable-ty_f32-strategy_donnelly-b_32-k_4-size_12345-content_seed_1-query_seed_2\n\
              Example (v6): failure-kind_v6_mutable-leaf_vec_of_arrays-ty_f32-strategy_eytzinger-b_32-k_4-size_12345-content_seed_1-query_seed_2"

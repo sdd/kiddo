@@ -40,7 +40,7 @@ fuzz-kd-tree-v6-simd-fast:
     RUST_TEST_THREADS=1 KIDDO_FUZZ_V6_RUN_NON_SIMD=0 KIDDO_FUZZ_V6_RUN_SIMD=1 KIDDO_FUZZ_V6_SIMD_FAST=1 cargo test --profile fast-tests --features "fuzz simd" --test kd_tree_fuzz_v6 -- --ignored --nocapture
 
 fuzz-case-repro REPRO:
-    cargo run --features "fuzz simd" --bin fuzz-case-repro -- {{REPRO}}
+    cargo run --features "fuzz simd" --example fuzz-case-repro -- {{REPRO}}
 
 bench-d-v2:
     cargo bench --bench donnelly_v2
@@ -173,7 +173,7 @@ profile-v6-stem-exact-stats FEATURES='simd,test_utils,logging_off' POINTS='41943
     KIDDO_PROFILE_QUERIES={{QUERIES}} \
     KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo run --release --bin profile_v6_stem_exact_stats --features {{FEATURES}}
+    cargo bench --bench profile_v6_stem_exact_stats --features {{FEATURES}}
 
 build-v6-profile-archives FEATURES='rkyv_08,simd,test_utils,logging_off' POINTS='16777216' QUERIES='100' PREFIX='./target/kiddo-profile-v6-result-collection':
     RUSTC_WRAPPER= \
@@ -181,7 +181,7 @@ build-v6-profile-archives FEATURES='rkyv_08,simd,test_utils,logging_off' POINTS=
     KIDDO_PROFILE_QUERIES={{QUERIES}} \
     KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo run --release --bin build_v6_profile_archives --features {{FEATURES}}
+    cargo run --release --example build_v6_profile_archives --features {{FEATURES}}
 
 profile-v6-result-collection-stats FEATURES='rkyv_08,simd,test_utils,result_collection_stats,logging_off' REPEATS='1' MAX_QTY='16' MAX_DIST='0.0025' PREFIX='./target/kiddo-profile-v6-result-collection':
     RUSTC_WRAPPER= \
@@ -190,7 +190,7 @@ profile-v6-result-collection-stats FEATURES='rkyv_08,simd,test_utils,result_coll
     KIDDO_PROFILE_MAX_QTY={{MAX_QTY}} \
     KIDDO_PROFILE_MAX_DIST={{MAX_DIST}} \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo run --release --bin profile_v6_result_collection_stats --features {{FEATURES}}
+    cargo bench --bench profile_v6_result_collection_stats --features {{FEATURES}}
 
 build-v6-hugepage-archives FEATURES='rkyv_08,test_utils,logging_off' POINTS='33554432' QUERIES='100000' PREFIX='./target/kiddo-hugepage-v6':
     RUSTC_WRAPPER= \
@@ -198,7 +198,7 @@ build-v6-hugepage-archives FEATURES='rkyv_08,test_utils,logging_off' POINTS='335
     KIDDO_PROFILE_QUERIES={{QUERIES}} \
     KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo run --release --bin build_v6_hugepage_archives --features {{FEATURES}}
+    cargo run --release --example build_v6_hugepage_archives --features {{FEATURES}}
 
 build-v6-query-focus-archives FEATURES='rkyv_08,test_utils,logging_off' POINTS='33554432' QUERIES='100000' PREFIX='./target/kiddo-query-focus-v6':
     RUSTC_WRAPPER= \
@@ -206,17 +206,17 @@ build-v6-query-focus-archives FEATURES='rkyv_08,test_utils,logging_off' POINTS='
     KIDDO_PROFILE_QUERIES={{QUERIES}} \
     KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo run --release --bin build_v6_query_focus_archives --features {{FEATURES}}
+    cargo run --release --example build_v6_query_focus_archives --features {{FEATURES}}
 
 build-profile-v6-archived-hugepages FEATURES='rkyv_08,huge_pages,simd,logging_off':
     RUSTC_WRAPPER= \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo build --release --bin profile_v6_archived_huge_pages --features {{FEATURES}}
+    cargo build --release --bench profile_v6_archived_huge_pages --features {{FEATURES}}
 
 build-profile-v6-archived-query-focus FEATURES='rkyv_08,huge_pages,simd,logging_off':
     RUSTC_WRAPPER= \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo build --release --bin profile_v6_archived_query_focus --features {{FEATURES}}
+    cargo build --release --bench profile_v6_archived_query_focus --features {{FEATURES}}
 
 profile-v6-archived-hugepages FEATURES='rkyv_08,huge_pages,simd,logging_off' MODE='collapse' LOAD='mmap' QUERY='nearest-one' REPEATS='100' PREFIX='./target/kiddo-hugepage-v6' START_DELAY_MS='0':
     RUSTC_WRAPPER= \
@@ -227,7 +227,7 @@ profile-v6-archived-hugepages FEATURES='rkyv_08,huge_pages,simd,logging_off' MOD
     KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
     KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo run --release --bin profile_v6_archived_huge_pages --features {{FEATURES}}
+    cargo bench --bench profile_v6_archived_huge_pages --features {{FEATURES}}
 
 profile-v6-archived-query-focus FEATURES='rkyv_08,huge_pages,simd,logging_off' LOAD='mmap' HUGE='off' QUERY='nearest-one' REPEATS='100' MAX_DIST='0.01' MAX_QTY='1000' PREFIX='./target/kiddo-query-focus-v6' START_DELAY_MS='0':
     RUSTC_WRAPPER= \
@@ -240,12 +240,13 @@ profile-v6-archived-query-focus FEATURES='rkyv_08,huge_pages,simd,logging_off' L
     KIDDO_PROFILE_MAX_QTY={{MAX_QTY}} \
     KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo run --release --bin profile_v6_archived_query_focus --features {{FEATURES}}
+    cargo bench --bench profile_v6_archived_query_focus --features {{FEATURES}}
 
 perf-v6-archived-query-focus-core FEATURES='rkyv_08,huge_pages,simd,logging_off' LOAD='mmap' HUGE='off' QUERY='nearest-one' REPEATS='100' MAX_DIST='0.01' MAX_QTY='1000' PREFIX='./target/kiddo-query-focus-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
     RUSTC_WRAPPER= \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo build --release --bin profile_v6_archived_query_focus --features {{FEATURES}}
+    cargo build --release --bench profile_v6_archived_query_focus --features {{FEATURES}}
+    BENCH_BIN=$(find target/release/deps -maxdepth 1 -type f -perm -111 -name 'profile_v6_archived_query_focus-*' | head -n 1) && \
     KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
     KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
     KIDDO_PROFILE_HUGE_PAGES={{HUGE}} \
@@ -256,12 +257,13 @@ perf-v6-archived-query-focus-core FEATURES='rkyv_08,huge_pages,simd,logging_off'
     KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
     perf stat -D {{PERF_DELAY_MS}} \
         -e cycles,instructions,branches,branch-misses \
-        ./target/release/profile_v6_archived_query_focus
+        "$BENCH_BIN"
 
 perf-v6-archived-query-focus-cache FEATURES='rkyv_08,huge_pages,simd,logging_off' LOAD='mmap' HUGE='off' QUERY='nearest-one' REPEATS='100' MAX_DIST='0.01' MAX_QTY='1000' PREFIX='./target/kiddo-query-focus-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
     RUSTC_WRAPPER= \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo build --release --bin profile_v6_archived_query_focus --features {{FEATURES}}
+    cargo build --release --bench profile_v6_archived_query_focus --features {{FEATURES}}
+    BENCH_BIN=$(find target/release/deps -maxdepth 1 -type f -perm -111 -name 'profile_v6_archived_query_focus-*' | head -n 1) && \
     KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
     KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
     KIDDO_PROFILE_HUGE_PAGES={{HUGE}} \
@@ -272,12 +274,13 @@ perf-v6-archived-query-focus-cache FEATURES='rkyv_08,huge_pages,simd,logging_off
     KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
     perf stat -D {{PERF_DELAY_MS}} \
         -e cache-references,cache-misses,L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses \
-        ./target/release/profile_v6_archived_query_focus
+        "$BENCH_BIN"
 
 perf-v6-archived-query-focus-tlb FEATURES='rkyv_08,huge_pages,simd,logging_off' LOAD='mmap' HUGE='off' QUERY='nearest-one' REPEATS='100' MAX_DIST='0.01' MAX_QTY='1000' PREFIX='./target/kiddo-query-focus-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
     RUSTC_WRAPPER= \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo build --release --bin profile_v6_archived_query_focus --features {{FEATURES}}
+    cargo build --release --bench profile_v6_archived_query_focus --features {{FEATURES}}
+    BENCH_BIN=$(find target/release/deps -maxdepth 1 -type f -perm -111 -name 'profile_v6_archived_query_focus-*' | head -n 1) && \
     KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
     KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
     KIDDO_PROFILE_HUGE_PAGES={{HUGE}} \
@@ -288,12 +291,13 @@ perf-v6-archived-query-focus-tlb FEATURES='rkyv_08,huge_pages,simd,logging_off' 
     KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
     perf stat -D {{PERF_DELAY_MS}} \
         -e dTLB-loads,dTLB-load-misses,page-faults,minor-faults,major-faults \
-        ./target/release/profile_v6_archived_query_focus
+        "$BENCH_BIN"
 
 profile-v6-archived-query-focus-samply FEATURES='rkyv_08,huge_pages,simd,logging_off' LOAD='mmap' HUGE='off' QUERY='nearest-one' REPEATS='100' MAX_DIST='0.01' MAX_QTY='1000' PREFIX='./target/kiddo-query-focus-v6':
     RUSTC_WRAPPER= \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo build --release --bin profile_v6_archived_query_focus --features {{FEATURES}}
+    cargo build --release --bench profile_v6_archived_query_focus --features {{FEATURES}}
+    BENCH_BIN=$(find target/release/deps -maxdepth 1 -type f -perm -111 -name 'profile_v6_archived_query_focus-*' | head -n 1) && \
     KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
     KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
     KIDDO_PROFILE_HUGE_PAGES={{HUGE}} \
@@ -301,12 +305,13 @@ profile-v6-archived-query-focus-samply FEATURES='rkyv_08,huge_pages,simd,logging
     KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
     KIDDO_PROFILE_MAX_DIST={{MAX_DIST}} \
     KIDDO_PROFILE_MAX_QTY={{MAX_QTY}} \
-    samply record ./target/release/profile_v6_archived_query_focus
+    samply record "$BENCH_BIN"
 
 perf-v6-archived-hugepages FEATURES='rkyv_08,huge_pages,simd,logging_off' MODE='collapse' LOAD='mmap' QUERY='nearest-one' REPEATS='100' PREFIX='./target/kiddo-hugepage-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
     RUSTC_WRAPPER= \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo build --release --bin profile_v6_archived_huge_pages --features {{FEATURES}}
+    cargo build --release --bench profile_v6_archived_huge_pages --features {{FEATURES}}
+    BENCH_BIN=$(find target/release/deps -maxdepth 1 -type f -perm -111 -name 'profile_v6_archived_huge_pages-*' | head -n 1) && \
     KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
     KIDDO_PROFILE_HUGE_PAGES={{MODE}} \
     KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
@@ -315,7 +320,7 @@ perf-v6-archived-hugepages FEATURES='rkyv_08,huge_pages,simd,logging_off' MODE='
     KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
     perf stat -D {{PERF_DELAY_MS}} \
         -e cycles,instructions,branches,branch-misses,cache-references,cache-misses,L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses,dTLB-loads,dTLB-load-misses,page-faults,minor-faults,major-faults \
-        ./target/release/profile_v6_archived_huge_pages
+        "$BENCH_BIN"
 
 perf-v6-archived-hugepages-pair FEATURES='rkyv_08,huge_pages,simd,logging_off' LOAD='mmap' QUERY='nearest-one' REPEATS='100' PREFIX='./target/kiddo-hugepage-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
     just perf-v6-archived-hugepages-tlb "{{FEATURES}}" nohuge "{{LOAD}}" "{{QUERY}}" "{{REPEATS}}" "{{PREFIX}}" "{{START_DELAY_MS}}" "{{PERF_DELAY_MS}}"
@@ -324,7 +329,8 @@ perf-v6-archived-hugepages-pair FEATURES='rkyv_08,huge_pages,simd,logging_off' L
 perf-v6-archived-hugepages-core FEATURES='rkyv_08,huge_pages,simd,logging_off' MODE='collapse' LOAD='mmap' QUERY='nearest-one' REPEATS='100' PREFIX='./target/kiddo-hugepage-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
     RUSTC_WRAPPER= \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo build --release --bin profile_v6_archived_huge_pages --features {{FEATURES}}
+    cargo build --release --bench profile_v6_archived_huge_pages --features {{FEATURES}}
+    BENCH_BIN=$(find target/release/deps -maxdepth 1 -type f -perm -111 -name 'profile_v6_archived_huge_pages-*' | head -n 1) && \
     KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
     KIDDO_PROFILE_HUGE_PAGES={{MODE}} \
     KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
@@ -333,12 +339,13 @@ perf-v6-archived-hugepages-core FEATURES='rkyv_08,huge_pages,simd,logging_off' M
     KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
     perf stat -D {{PERF_DELAY_MS}} \
         -e cycles,instructions,branches,branch-misses \
-        ./target/release/profile_v6_archived_huge_pages
+        "$BENCH_BIN"
 
 perf-v6-archived-hugepages-cache FEATURES='rkyv_08,huge_pages,simd,logging_off' MODE='collapse' LOAD='mmap' QUERY='nearest-one' REPEATS='100' PREFIX='./target/kiddo-hugepage-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
     RUSTC_WRAPPER= \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo build --release --bin profile_v6_archived_huge_pages --features {{FEATURES}}
+    cargo build --release --bench profile_v6_archived_huge_pages --features {{FEATURES}}
+    BENCH_BIN=$(find target/release/deps -maxdepth 1 -type f -perm -111 -name 'profile_v6_archived_huge_pages-*' | head -n 1) && \
     KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
     KIDDO_PROFILE_HUGE_PAGES={{MODE}} \
     KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
@@ -347,12 +354,13 @@ perf-v6-archived-hugepages-cache FEATURES='rkyv_08,huge_pages,simd,logging_off' 
     KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
     perf stat -D {{PERF_DELAY_MS}} \
         -e cache-references,cache-misses,L1-dcache-loads,L1-dcache-load-misses \
-        ./target/release/profile_v6_archived_huge_pages
+        "$BENCH_BIN"
 
 perf-v6-archived-hugepages-tlb FEATURES='rkyv_08,huge_pages,simd,logging_off' MODE='collapse' LOAD='mmap' QUERY='nearest-one' REPEATS='100' PREFIX='./target/kiddo-hugepage-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
     RUSTC_WRAPPER= \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo build --release --bin profile_v6_archived_huge_pages --features {{FEATURES}}
+    cargo build --release --bench profile_v6_archived_huge_pages --features {{FEATURES}}
+    BENCH_BIN=$(find target/release/deps -maxdepth 1 -type f -perm -111 -name 'profile_v6_archived_huge_pages-*' | head -n 1) && \
     KIDDO_PROFILE_ARCHIVE_PREFIX={{PREFIX}} \
     KIDDO_PROFILE_HUGE_PAGES={{MODE}} \
     KIDDO_PROFILE_LOAD_MODE={{LOAD}} \
@@ -361,7 +369,7 @@ perf-v6-archived-hugepages-tlb FEATURES='rkyv_08,huge_pages,simd,logging_off' MO
     KIDDO_PROFILE_START_DELAY_MS={{START_DELAY_MS}} \
     perf stat -D {{PERF_DELAY_MS}} \
         -e dTLB-loads,dTLB-load-misses,page-faults,minor-faults,major-faults \
-        ./target/release/profile_v6_archived_huge_pages
+        "$BENCH_BIN"
 
 perf-v6-archived-hugepages-tlb-pair FEATURES='rkyv_08,huge_pages,simd,logging_off' LOAD='mmap' QUERY='nearest-one' REPEATS='100' PREFIX='./target/kiddo-hugepage-v6' START_DELAY_MS='0' PERF_DELAY_MS='0':
     just perf-v6-archived-hugepages-tlb "{{FEATURES}}" nohuge "{{LOAD}}" "{{QUERY}}" "{{REPEATS}}" "{{PREFIX}}" "{{START_DELAY_MS}}" "{{PERF_DELAY_MS}}"
@@ -372,7 +380,7 @@ repro-donnelly-block3-exact-divergence FEATURES='simd,test_utils,logging_off' PO
     KIDDO_REPRO_POINTS={{POINTS}} \
     KIDDO_REPRO_QUERIES={{QUERIES}} \
     RUSTFLAGS='-C target-cpu=native' \
-    cargo run --release --bin repro_donnelly_block3_exact_divergence --features {{FEATURES}}
+    cargo run --release --example repro_donnelly_block3_exact_divergence --features {{FEATURES}}
 
 asm-k6-nearest-one-eytz-v3-core-avx512:
     cargo asm --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "v6_nearest_one_eytzinger_arithmetic_core_cargo_asm_hook" > v6_nearest_one_eytzinger_v3_core_avx512.asm
@@ -411,16 +419,18 @@ objdump-profile-v5-symbol SYMBOL:
     cargo objdump --release --bin profile_v5_nearest_one_eytzinger --features profile_v5 -- --disassemble-symbols="{{SYMBOL}}" --demangle > profile_v5_symbol.objdump
 
 build-profile-v6-nearest-one-eytz:
-    cargo build --release --features test_utils --bin profile_v6_nearest_one_eytzinger
+    cargo build --release --features test_utils --bench profile_v6_nearest_one_eytzinger
 
 profile-v6-nearest-one-eytz-samply: build-profile-v6-nearest-one-eytz
-    KIDDO_PROFILE_QUERY_BATCH_REPEATS=2000 samply record ./target/release/profile_v6_nearest_one_eytzinger
+    BENCH_BIN=$(find target/release/deps -maxdepth 1 -type f -perm -111 -name 'profile_v6_nearest_one_eytzinger-*' | head -n 1) && \
+    KIDDO_PROFILE_QUERY_BATCH_REPEATS=2000 samply record "$BENCH_BIN"
 
 build-profile-v6-leaf-strategies FEATURES='simd,test_utils':
-    cargo build --release --features {{FEATURES}} --bin profile_v6_leaf_strategies
+    cargo build --release --features {{FEATURES}} --bench profile_v6_leaf_strategies
 
 perf-v6-leaf-strategies QUERY='nearest' STRATEGY='arena' POINTS='4194304' QUERIES='1000' REPEATS='2000' FEATURES='simd,test_utils':
-    cargo build --release --features {{FEATURES}} --bin profile_v6_leaf_strategies
+    cargo build --release --features {{FEATURES}} --bench profile_v6_leaf_strategies
+    BENCH_BIN=$(find target/release/deps -maxdepth 1 -type f -perm -111 -name 'profile_v6_leaf_strategies-*' | head -n 1) && \
     KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
     KIDDO_PROFILE_STRATEGY={{STRATEGY}} \
     KIDDO_PROFILE_POINTS={{POINTS}} \
@@ -428,10 +438,11 @@ perf-v6-leaf-strategies QUERY='nearest' STRATEGY='arena' POINTS='4194304' QUERIE
     KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
     perf stat -d -d -d \
         -e cycles,instructions,branches,branch-misses,cache-references,cache-misses,L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses,dTLB-loads,dTLB-load-misses \
-        ./target/release/profile_v6_leaf_strategies
+        "$BENCH_BIN"
 
 perf-v6-leaf-strategies-branch QUERY='nearest' STRATEGY='arena' POINTS='4194304' QUERIES='1000' REPEATS='2000' FEATURES='simd,test_utils':
-    cargo build --release --features {{FEATURES}} --bin profile_v6_leaf_strategies
+    cargo build --release --features {{FEATURES}} --bench profile_v6_leaf_strategies
+    BENCH_BIN=$(find target/release/deps -maxdepth 1 -type f -perm -111 -name 'profile_v6_leaf_strategies-*' | head -n 1) && \
     KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
     KIDDO_PROFILE_STRATEGY={{STRATEGY}} \
     KIDDO_PROFILE_POINTS={{POINTS}} \
@@ -439,10 +450,11 @@ perf-v6-leaf-strategies-branch QUERY='nearest' STRATEGY='arena' POINTS='4194304'
     KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
     perf stat \
         -e cycles,instructions,branches,branch-misses \
-        ./target/release/profile_v6_leaf_strategies
+        "$BENCH_BIN"
 
 perf-v6-leaf-strategies-cache QUERY='nearest' STRATEGY='arena' POINTS='4194304' QUERIES='1000' REPEATS='2000' FEATURES='simd,test_utils':
-    cargo build --release --features {{FEATURES}} --bin profile_v6_leaf_strategies
+    cargo build --release --features {{FEATURES}} --bench profile_v6_leaf_strategies
+    BENCH_BIN=$(find target/release/deps -maxdepth 1 -type f -perm -111 -name 'profile_v6_leaf_strategies-*' | head -n 1) && \
     KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
     KIDDO_PROFILE_STRATEGY={{STRATEGY}} \
     KIDDO_PROFILE_POINTS={{POINTS}} \
@@ -450,10 +462,11 @@ perf-v6-leaf-strategies-cache QUERY='nearest' STRATEGY='arena' POINTS='4194304' 
     KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
     perf stat \
         -e cache-misses,L1-dcache-load-misses,l2_cache_req_stat.ls_rd_blk_c,ls_dmnd_fills_from_sys.local_l2,ls_dmnd_fills_from_sys.local_ccx,ls_dmnd_fills_from_sys.dram_io_near \
-        ./target/release/profile_v6_leaf_strategies
+        "$BENCH_BIN"
 
 perf-v6-leaf-strategies-other QUERY='nearest' STRATEGY='arena' POINTS='4194304' QUERIES='1000' REPEATS='2000' FEATURES='simd,test_utils':
-    cargo build --release --features {{FEATURES}} --bin profile_v6_leaf_strategies
+    cargo build --release --features {{FEATURES}} --bench profile_v6_leaf_strategies
+    BENCH_BIN=$(find target/release/deps -maxdepth 1 -type f -perm -111 -name 'profile_v6_leaf_strategies-*' | head -n 1) && \
     KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
     KIDDO_PROFILE_STRATEGY={{STRATEGY}} \
     KIDDO_PROFILE_POINTS={{POINTS}} \
@@ -461,10 +474,11 @@ perf-v6-leaf-strategies-other QUERY='nearest' STRATEGY='arena' POINTS='4194304' 
     KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
     perf stat \
         -e dTLB-loads,dTLB-load-misses,itlb-loads,itlb-load-misses,ls_l1_d_tlb_miss.tlb_reload_4k_l2_hit,ls_l1_d_tlb_miss.tlb_reload_4k_l2_miss \
-        ./target/release/profile_v6_leaf_strategies
+        "$BENCH_BIN"
 
 perf-v6-leaf-strategies-prefetch QUERY='nearest' STRATEGY='arena' POINTS='4194304' QUERIES='1000' REPEATS='2000' FEATURES='simd,test_utils':
-    cargo build --release --features {{FEATURES}} --bin profile_v6_leaf_strategies
+    cargo build --release --features {{FEATURES}} --bench profile_v6_leaf_strategies
+    BENCH_BIN=$(find target/release/deps -maxdepth 1 -type f -perm -111 -name 'profile_v6_leaf_strategies-*' | head -n 1) && \
     KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
     KIDDO_PROFILE_STRATEGY={{STRATEGY}} \
     KIDDO_PROFILE_POINTS={{POINTS}} \
@@ -472,10 +486,11 @@ perf-v6-leaf-strategies-prefetch QUERY='nearest' STRATEGY='arena' POINTS='419430
     KIDDO_PROFILE_QUERY_BATCH_REPEATS={{REPEATS}} \
     perf stat \
         -e ls_pref_instr_disp.prefetch_nta,ls_inef_sw_pref.mab_mch_cnt,ls_sw_pf_dc_fills.local_ccx,l2_pf_hit_l2.l2_hwpf,l2_pf_miss_l2_hit_l3.l2_hwpf,l2_pf_miss_l2_l3.l2_hwpf \
-        ./target/release/profile_v6_leaf_strategies
+        "$BENCH_BIN"
 
 uprof-v6-leaf-strategies QUERY='nearest' STRATEGY='arena' POINTS='4194304' QUERIES='1000' REPEATS='2000' FEATURES='simd,test_utils' OUT='./uprof-output-v6-leaf-strategies':
-    cargo build --release --features {{FEATURES}} --bin profile_v6_leaf_strategies
+    cargo build --release --features {{FEATURES}} --bench profile_v6_leaf_strategies
+    BENCH_BIN=$(find target/release/deps -maxdepth 1 -type f -perm -111 -name 'profile_v6_leaf_strategies-*' | head -n 1) && \
     KIDDO_PROFILE_QUERY_KIND={{QUERY}} \
     KIDDO_PROFILE_STRATEGY={{STRATEGY}} \
     KIDDO_PROFILE_POINTS={{POINTS}} \
@@ -487,7 +502,7 @@ uprof-v6-leaf-strategies QUERY='nearest' STRATEGY='arena' POINTS='4194304' QUERI
         --format csv \
         -w /home/scotty/projects/kiddo \
         -o {{OUT}} \
-        ./target/release/profile_v6_leaf_strategies
+        "$BENCH_BIN"
 
 build-profile-v5-nearest-one-eytz:
     cargo build --release --features profile_v5 --bin profile_v5_nearest_one_eytzinger
