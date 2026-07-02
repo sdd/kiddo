@@ -408,9 +408,14 @@ where
             (stems, -1, stem_leaf_resolution)
         };
 
+        let leaves = if LS::Mutability::is_mutable() {
+            LS::new_with_empty_leaf()
+        } else {
+            LS::new_with_capacity(0)
+        };
         let tree = Self {
             stems,
-            leaves: LS::new_with_empty_leaf(),
+            leaves,
             stem_leaf_resolution,
             size: 0,
             max_stem_level,
@@ -693,6 +698,7 @@ mod tests {
     use crate::stem_strategy::DonnellySimdFull;
     use crate::Eytzinger;
     use crate::SquaredEuclidean;
+    use crate::{ImmutableKdTree, MutableKdTree};
     #[cfg(feature = "rkyv_08")]
     use std::num::NonZeroUsize;
 
@@ -726,6 +732,20 @@ mod tests {
             points.into_iter().enumerate().collect();
 
         assert_eq!(kd_tree.size, 0);
+    }
+
+    #[test]
+    fn test_new_from_slice_empty() {
+        let tree: ImmutableKdTree<f64, 2> = ImmutableKdTree::new_from_slice(&[]).unwrap();
+        assert_eq!(tree.size(), 0);
+        assert!(tree.is_empty());
+    }
+
+    #[test]
+    fn test_default_mutable_tree_empty() {
+        let tree: MutableKdTree<f64, 2> = MutableKdTree::default();
+        assert_eq!(tree.size(), 0);
+        assert!(tree.is_empty());
     }
 
     #[test]
