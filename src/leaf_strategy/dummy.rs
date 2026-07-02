@@ -56,3 +56,18 @@ where
         // NOOP
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::DummyLeafStrategy;
+    use crate::{kd_tree, Eytzinger};
+
+    #[test]
+    fn default_constructs_dummy_leaf_strategy_kd_tree() {
+        let tree: kd_tree::KdTree<f32, u32, Eytzinger, DummyLeafStrategy, 3, 16> =
+            kd_tree::KdTree::default();
+
+        assert!(tree.is_empty());
+        assert_eq!(tree.size(), 0);
+    }
+}

@@ -591,6 +591,15 @@ mod test {
     use crate::{kd_tree, Eytzinger};
 
     #[test]
+    fn default_constructs_vec_of_arrays_kd_tree() {
+        let tree: kd_tree::KdTree<f32, u32, Eytzinger, VecOfArrays<f32, u32, 3, 32>, 3, 32> =
+            kd_tree::KdTree::default();
+
+        assert!(tree.is_empty());
+        assert_eq!(tree.size(), 0);
+    }
+
+    #[test]
     fn create_single_leaf_vec_of_arrays_float_kd_tree() {
         let points: Vec<[f32; 3]> = vec![[1.0f32, 2.0f32, 3.0f32]];
         let tree: kd_tree::KdTree<f32, u32, Eytzinger, VecOfArrays<f32, u32, 3, 32>, 3, 32> =
