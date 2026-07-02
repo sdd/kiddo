@@ -1,6 +1,10 @@
 [package]
 name = "kiddo"
+<<<<<<< Updated upstream
 version = "5.3.2"
+=======
+version = "6.0.0-alpha.2"
+>>>>>>> Stashed changes
 edition = "2021"
 authors = ["Scott Donnelly <scott@donnel.ly>"]
 description = "A high-performance, flexible, ergonomic k-d tree library. Ideal for geo- and astro- nearest-neighbour and k-nearest-neighbor queries"

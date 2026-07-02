@@ -1,5 +1,54 @@
 # Kiddo Changelog
 
+<<<<<<< Updated upstream
+=======
+## [6.0.0-alpha.2] - 2026-07-02
+
+### 🐛 Bug Fixes
+
+- Add dafault impl of LeafStrategy::new_with_empty_leaf
+
+### 🧪 Testing
+
+- Add regression test to ensure KdTree::default works
+
+### 🧹 Chore
+
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+- Migrate config renovate.json
+
+## [6.0.0-alpha.1] - 2026-06-30
+
+Almost a year in the making and counting, Kiddo v6 is effectively a full rewrite, addressing some
+long-standing issues.
+
+- V6 represents a fundamental shift to a unified single `KdTree` struct, replacing the previous
+  mutable/immutable and float/fixed splits. The need for separate mutable / immutable trees has
+  been removed by introducing the `LeafStrategy` trait, which the `KdTree` has as a generic parameter.
+  LeafStrategies can be mutable or immutable.
+- `KdTree` is also now generic over the new `StemStrategy` trait too. The combination of these two
+  orthogonal traits allow experimentation and selection of alternative stem layouts and traversal
+  mechanisms, alongside configurable leaf strategies, for performance experimentation.
+- The query API has been refactored from a handful of separate methods that were not particularly
+  cohesive into a single unified fluent builder API. The builder approach is much more orthogonal,
+  and protects against breaking changes when new options are introduced in the future. It permits
+  constraints to be encoded in the type system for impossible option combinations, prevents the need
+  for as many methods that differ only by some combination of features; allowing for configurable
+  result type projection, query types, and query configurations with defaults that match the v5-era
+  separate methods.
+- Some of the other new features added include configurable boundary-inclusivity, periodic boundary
+  conditions, the `within_unsorted_visit` result mode to avoid materialization of results, `TryFrom`
+  for converting between different `KdTree` types, `new_from_source`, and `replace_item`.
+- Distance metric coverage has also been expanded and tidied up, including the addition of Chebyshev
+  Minkowski, and Dot Product metrics and support for queries whose result type is wider than the
+  stored coordinate type, which is especially important for fixed-point trees.
+- With regard to the Stem Strategy trait system, alongside the Eytzinger ordering from v5 and prior
+  is still available but now supports configurable prefetch behaviour. I've introduced the new
+  Donnelly stem ordering via a family of stem strategies, featuring configurable pre-fetch and block size,
+  unrolled traversal, SIMD descent, and full SIMD pruning and backtracking variants. The SIMD variant
+  contains custom AVX2, AVX512, and NEON kernels.
+
+>>>>>>> Stashed changes
 ## [5.3.2] - 2026-06-02
 
 ### Ci
