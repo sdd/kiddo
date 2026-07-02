@@ -52,10 +52,6 @@ where
         Self::default()
     }
 
-    fn new_with_empty_leaf() -> Self {
-        Self::default()
-    }
-
     fn append_leaf(&mut self, _leaf_points: &[&[AX]; K], _leaf_items: &[T]) {
         // NOOP
     }

@@ -289,10 +289,6 @@ where
         }
     }
 
-    fn new_with_empty_leaf() -> Self {
-        unimplemented!("VecOfArenas is immutable-focused and should be constructed from slices")
-    }
-
     fn append_leaf(&mut self, leaf_points: &[&[AX]; K], leaf_items: &[T]) {
         let leaf_len = leaf_items.len();
 
