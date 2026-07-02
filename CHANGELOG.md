@@ -1,5 +1,21 @@
 # Kiddo Changelog
 
+## [6.0.0-alpha.2] - 2026-07-02
+
+### 🐛 Bug Fixes
+
+- Add dafault impl of LeafStrategy::new_with_empty_leaf
+
+### 🧪 Testing
+
+- Add regression test to ensure KdTree::default works
+
+### 🧹 Chore
+
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+- Migrate config renovate.json
+- Move binaries to be examples or benches to avoid confusion in the crates.io page
+
 ## [6.0.0-alpha.1] - 2026-06-30
 
 Almost a year in the making and counting, Kiddo v6 is effectively a full rewrite, addressing some
