@@ -252,7 +252,12 @@ where
     fn new_with_capacity(capacity: usize) -> Self;
 
     /// Create a new LeafStrategy with a single, empty leaf.
-    fn new_with_empty_leaf() -> Self;
+    fn new_with_empty_leaf() -> Self
+    where
+        Self: Sized,
+    {
+        Self::new_with_capacity(0)
+    }
 
     /// Appends a new leaf to the storage.
     fn append_leaf(&mut self, leaf_points: &[&[AX]; K], leaf_items: &[T]);

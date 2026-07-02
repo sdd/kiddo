@@ -186,10 +186,6 @@ where
         }
     }
 
-    fn new_with_empty_leaf() -> Self {
-        unimplemented!()
-    }
-
     fn append_leaf(&mut self, leaf_points: &[&[AX]; K], leaf_items: &[T]) {
         let chunk_length = leaf_items.len();
 
