@@ -334,10 +334,20 @@ impl<A, T, const K: usize, const B: usize> VecOfArenas<A, T, K, B> {
 #[cfg(test)]
 mod tests {
     use super::VecOfArenas;
+    use crate::kd_tree;
     use crate::leaf_strategy::vec_of_arenas::extend_bytes_from_slice;
     use crate::leaf_view::LeafArena;
     use crate::traits::leaf_strategy::ConstructibleLeafStrategy;
     use crate::{Eytzinger, LeafStrategy};
+
+    #[test]
+    fn default_constructs_vec_of_arenas_kd_tree() {
+        let tree: kd_tree::KdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 3, 32>, 3, 32> =
+            kd_tree::KdTree::default();
+
+        assert!(tree.is_empty());
+        assert_eq!(tree.size(), 0);
+    }
 
     #[test]
     fn vec_of_arenas_appends_leafs_with_expected_extents() {
