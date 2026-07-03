@@ -51,7 +51,7 @@ jobs:
           components: rustfmt,clippy
 
       - name: Clippy (stable)
-        uses: LoliGothick/clippy-check@f2227b2ac076d5d4f91df9667d2fee2e2b698476
+        uses: LoliGothick/clippy-check@ad7a7d94820528f03680550b984f5b43dd8af294
         if: github.actor != 'dependabot[bot]'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
