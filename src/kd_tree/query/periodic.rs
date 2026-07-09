@@ -8,7 +8,7 @@ use crate::kd_tree::query_context::QueryContext;
 use crate::kd_tree::{KdTreeAccessor, KdTreeQueryOps, StemLeafResolution};
 use crate::leaf_view::LeafView;
 #[cfg(not(feature = "small_n_result_collectors"))]
-use crate::results::result_collection::SortedVecResultCollection;
+use crate::results::result_collection::ThresholdVecResultCollection;
 use crate::results::result_collection::{BinaryHeapResultCollection, ResultCollection};
 #[cfg(feature = "small_n_result_collectors")]
 use crate::results::result_collection::{
@@ -818,7 +818,7 @@ where
                 SS,
                 LS,
                 D,
-                SortedVecResultCollection<QueryResultItem<(), T, D::Output>>,
+                ThresholdVecResultCollection<QueryResultItem<(), T, D::Output>>,
                 EXCLUSIVE,
                 K,
                 B,
