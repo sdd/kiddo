@@ -137,13 +137,14 @@ where
 /// cost (sorting k elements in O(k log k)) is negligible.
 #[cfg(not(feature = "small_n_result_collectors"))]
 #[derive(Debug)]
-pub(crate) struct ThresholdVecResultCollection<E> {
+pub(crate) struct ThresholdVecResultCollection<E, O> {
     max_qty: usize,
     inner: Vec<E>,
+    threshold: Option<O>,
 }
 
 #[cfg(not(feature = "small_n_result_collectors"))]
-impl<O: PartialOrd, T> ThresholdVecResultCollection<QueryResultItem<(), T, O>> {
+impl<O: PartialOrd + Copy, T> ThresholdVecResultCollection<QueryResultItem<(), T, O>, O> {
     #[inline]
     fn farthest_idx(&self) -> usize {
         let mut farthest = 0;
@@ -158,12 +159,13 @@ impl<O: PartialOrd, T> ThresholdVecResultCollection<QueryResultItem<(), T, O>> {
 
 #[cfg(not(feature = "small_n_result_collectors"))]
 impl<O: Axis<Coord = O>, T> ResultCollection<O, QueryResultItem<(), T, O>>
-    for ThresholdVecResultCollection<QueryResultItem<(), T, O>>
+    for ThresholdVecResultCollection<QueryResultItem<(), T, O>, O>
 {
     fn with_max_qty(max_qty: usize) -> Self {
         Self {
             max_qty,
             inner: Vec::with_capacity(max_qty),
+            threshold: None,
         }
     }
 
@@ -176,21 +178,26 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, QueryResultItem<(), T, O>>
     }
 
     fn add(&mut self, entry: QueryResultItem<(), T, O>) {
-        if self.inner.len() < self.max_qty {
-            self.inner.push(entry);
-        } else {
-            let farthest = self.farthest_idx();
-            if entry.distance < self.inner[farthest].distance {
-                self.inner[farthest] = entry;
+        match self.threshold {
+            None => {
+                if self.inner.len() < self.max_qty {
+                    self.inner.push(entry);
+                    if self.inner.len() == self.max_qty {
+                        self.threshold = Some(self.inner[self.farthest_idx()].distance);
+                    }
+                }
             }
+            Some(farthest_dist) if entry.distance < farthest_dist => {
+                let farthest = self.farthest_idx();
+                self.inner[farthest] = entry;
+                self.threshold = Some(self.inner[self.farthest_idx()].distance);
+            }
+            _ => {}
         }
     }
 
     fn threshold_distance(&self) -> Option<O> {
-        if self.inner.len() < self.max_qty {
-            return None;
-        }
-        Some(self.inner[self.farthest_idx()].distance)
+        self.threshold
     }
 
     fn into_vec(self) -> Vec<QueryResultItem<(), T, O>> {
@@ -1167,11 +1174,14 @@ pub mod cargo_asm {
         checksum_nearest(&vec)
     }
 
+    #[cfg(not(feature = "small_n_result_collectors"))]
     #[inline(never)]
     #[unsafe(no_mangle)]
     pub fn v6_threshold_vec_result_collection_add_cargo_asm_hook() -> (usize, u64, u64) {
         let mut results =
-            ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(MAX_QTY);
+            ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>, f64>::with_max_qty(
+                MAX_QTY,
+            );
         for entry in SORTED_NEAREST_INPUTS {
             results.add(entry);
         }
@@ -1338,7 +1348,7 @@ mod tests {
     fn threshold_vec_sorted_output() {
         let k = 3;
         let mut results =
-            ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(k);
+            ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>, f64>::with_max_qty(k);
         for entry in INPUTS {
             results.add(entry);
         }
@@ -1352,7 +1362,7 @@ mod tests {
     #[test]
     fn threshold_vec_threshold_distance() {
         let mut results =
-            ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(3);
+            ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>, f64>::with_max_qty(3);
         assert!(results.threshold_distance().is_none());
         results.add(INPUTS[0]);
         assert!(results.threshold_distance().is_none());
@@ -1365,7 +1375,7 @@ mod tests {
     #[test]
     fn threshold_vec_evicts_farthest() {
         let mut results =
-            ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(3);
+            ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>, f64>::with_max_qty(3);
         for entry in INPUTS.iter().take(3) {
             results.add(*entry); // 0.4, 0.1, 0.8: farthest is 0.8
         }
