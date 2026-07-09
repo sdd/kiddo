@@ -122,6 +122,44 @@ where
         .into_inner()
     }
 
+    pub(crate) fn best_n_within_impl_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        max_qty: NonZero<usize>,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> BinaryHeap<BestQueryResultItem<(), T, D::Output>>
+    where
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        let max_qty = max_qty.into();
+
+        #[cfg(feature = "small_n_result_collectors")]
+        if max_qty <= SMALL_RESULT_COLLECTION_MAX_QTY {
+            return self
+                .best_n_within_inner_with_scratch::<D, SmallBinaryHeapResultCollection<
+                    BestQueryResultItem<(), T, D::Output>,
+                >, EXCLUSIVE>(query, max_dist, max_qty, stack)
+                .into_inner();
+        }
+
+        self.best_n_within_inner_with_scratch::<
+            D,
+            BinaryHeapResultCollection<BestQueryResultItem<(), T, D::Output>>,
+            EXCLUSIVE,
+        >(
+            query, max_dist, max_qty, stack,
+        )
+        .into_inner()
+    }
+
     fn best_n_within_inner<D, R, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
@@ -153,6 +191,46 @@ where
                 &mut req_ctx.results,
             );
         });
+
+        req_ctx.results
+    }
+
+    fn best_n_within_inner_with_scratch<D, R, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        max_qty: usize,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> R
+    where
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        R: BestNeighbourResultCollection<D::Output, T>,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        let mut req_ctx = BestNWithinReqCtx::<A, D::Output, R, EXCLUSIVE, K> {
+            query,
+            max_dist,
+            results: R::with_max_qty(max_qty),
+        };
+
+        self.backtracking_query_with_scratch::<_, _, D>(
+            &mut req_ctx,
+            stack,
+            |leaf_idx, query_wide, req_ctx| {
+                self.process_leaf_best_n_within::<D, _, EXCLUSIVE>(
+                    leaf_idx,
+                    query_wide,
+                    max_dist,
+                    &mut req_ctx.results,
+                );
+            },
+        );
 
         req_ctx.results
     }

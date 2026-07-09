@@ -143,7 +143,7 @@ where
     }
 
     #[inline(always)]
-    fn nearest_one_arithmetic_with_stack<D>(
+    fn nearest_one_arithmetic_with_scratch<D>(
         &self,
         query: &[A; K],
         stack: &mut SS::Stack<D::Output>,
@@ -164,7 +164,7 @@ where
             best_item: T::default(),
         };
 
-        self.arithmetic_query_with_stack::<_, _, D>(
+        self.arithmetic_query_with_scratch::<_, _, D>(
             &mut req_ctx,
             stack,
             |leaf_idx, query_wide, query_ctx| {
@@ -182,7 +182,7 @@ where
 
     #[cfg_attr(not(feature = "cargo_asm"), allow(dead_code))]
     #[inline(always)]
-    pub(crate) fn nearest_one_with_stack<D>(
+    pub(crate) fn nearest_one_with_scratch<D>(
         &self,
         query: &[A; K],
         stack: &mut SS::Stack<D::Output>,
@@ -198,14 +198,14 @@ where
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
         if self.stem_leaf_resolution.uses_arithmetic() {
-            return self.nearest_one_arithmetic_with_stack::<D>(query, stack);
+            return self.nearest_one_arithmetic_with_scratch::<D>(query, stack);
         }
 
-        self.nearest_one_mapped_with_stack::<D>(query, stack)
+        self.nearest_one_mapped_with_scratch::<D>(query, stack)
     }
 
     #[inline(always)]
-    fn nearest_one_mapped_with_stack<D>(
+    fn nearest_one_mapped_with_scratch<D>(
         &self,
         query: &[A; K],
         stack: &mut SS::Stack<D::Output>,
@@ -226,7 +226,7 @@ where
             best_item: T::default(),
         };
 
-        self.backtracking_query_with_stack::<_, _, D>(
+        self.backtracking_query_with_scratch::<_, _, D>(
             &mut req_ctx,
             stack,
             |leaf_idx, query_wide, query_ctx| {
@@ -270,7 +270,7 @@ pub mod cargo_asm {
         query: [f64; 3],
         stack: &mut QueryStack<f64, Eytzinger>,
     ) -> (f64, usize) {
-        tree.nearest_one_with_stack::<SquaredEuclidean<f64>>(&query, stack)
+        tree.nearest_one_with_scratch::<SquaredEuclidean<f64>>(&query, stack)
     }
 
     /// Hook for cargo-asm to render the arithmetic Eytzinger core directly.
@@ -281,7 +281,7 @@ pub mod cargo_asm {
         query: [f64; 3],
         stack: &mut QueryStack<f64, Eytzinger>,
     ) -> (f64, usize) {
-        tree.nearest_one_arithmetic_with_stack::<SquaredEuclidean<f64>>(&query, stack)
+        tree.nearest_one_arithmetic_with_scratch::<SquaredEuclidean<f64>>(&query, stack)
     }
 
     /// Hook for cargo-asm to render the exact nearest-one path for scalar Eytzinger PF-far arena leaves.
@@ -292,7 +292,7 @@ pub mod cargo_asm {
         query: [f64; 3],
         stack: &mut QueryStack<f64, Eytzinger>,
     ) -> (f64, usize) {
-        tree.nearest_one_with_stack::<SquaredEuclidean<f64>>(&query, stack)
+        tree.nearest_one_with_scratch::<SquaredEuclidean<f64>>(&query, stack)
     }
 
     /// Hook for cargo-asm to render the exact nearest-one path for scalar Donnelly.
@@ -303,7 +303,7 @@ pub mod cargo_asm {
         query: [f64; 3],
         stack: &mut QueryStack<f64, Donnelly<3>>,
     ) -> (f64, usize) {
-        tree.nearest_one_with_stack::<SquaredEuclidean<f64>>(&query, stack)
+        tree.nearest_one_with_scratch::<SquaredEuclidean<f64>>(&query, stack)
     }
 
     /// Hook for cargo-asm to render the exact nearest-one path for Block3 Donnelly SIMD.
@@ -314,7 +314,7 @@ pub mod cargo_asm {
         query: [f64; 3],
         stack: &mut <DonnellySimdFull<3> as crate::StemStrategy>::Stack<f64>,
     ) -> (f64, usize) {
-        tree.nearest_one_with_stack::<SquaredEuclidean<f64>>(&query, stack)
+        tree.nearest_one_with_scratch::<SquaredEuclidean<f64>>(&query, stack)
     }
 }
 
@@ -452,7 +452,7 @@ mod tests {
     }
 
     #[test]
-    fn nearest_one_arithmetic_with_stack_matches_expected_result() {
+    fn nearest_one_arithmetic_with_scratch_matches_expected_result() {
         let points = vec![
             [0.0f64, 0.0, 0.0],
             [1.0, 1.0, 1.0],
@@ -464,7 +464,7 @@ mod tests {
             KdTree::new_from_slice(&points).unwrap();
         let mut stack = QueryStack::<f64, Eytzinger>::default();
 
-        let result = tree.nearest_one_arithmetic_with_stack::<SquaredEuclidean<f64>>(
+        let result = tree.nearest_one_arithmetic_with_scratch::<SquaredEuclidean<f64>>(
             &[0.45, 0.55, 0.65],
             &mut stack,
         );
@@ -475,7 +475,7 @@ mod tests {
     }
 
     #[test]
-    fn nearest_one_with_stack_uses_arithmetic_route_when_available() {
+    fn nearest_one_with_scratch_uses_arithmetic_route_when_available() {
         let points = vec![
             [0.0f64, 0.0, 0.0],
             [1.0, 1.0, 1.0],
@@ -488,7 +488,7 @@ mod tests {
         let mut stack = QueryStack::<f64, Eytzinger>::default();
 
         let result =
-            tree.nearest_one_with_stack::<SquaredEuclidean<f64>>(&[0.45, 0.55, 0.65], &mut stack);
+            tree.nearest_one_with_scratch::<SquaredEuclidean<f64>>(&[0.45, 0.55, 0.65], &mut stack);
 
         assert_float_relative_eq!(result.0, 0.0075, REL_EPS_F64);
         assert_eq!(result.1, 2);
@@ -496,7 +496,7 @@ mod tests {
     }
 
     #[test]
-    fn nearest_one_mapped_with_stack_matches_expected_result() {
+    fn nearest_one_mapped_with_scratch_matches_expected_result() {
         let points = [
             [0.0f32, 0.0],
             [1.0, 1.0],
@@ -513,7 +513,7 @@ mod tests {
 
         let mut stack = QueryStack::<f32, Eytzinger>::default();
         let result =
-            tree.nearest_one_mapped_with_stack::<SquaredEuclidean<f32>>(&[0.5, 0.5], &mut stack);
+            tree.nearest_one_mapped_with_scratch::<SquaredEuclidean<f32>>(&[0.5, 0.5], &mut stack);
 
         assert_float_relative_eq!(result.0, 0.0125, REL_EPS_F32);
         assert_eq!(result.1, 2);
@@ -521,7 +521,7 @@ mod tests {
     }
 
     #[test]
-    fn nearest_one_with_stack_uses_mapped_route_when_arithmetic_is_unavailable() {
+    fn nearest_one_with_scratch_uses_mapped_route_when_arithmetic_is_unavailable() {
         let points = [
             [0.0f32, 0.0],
             [1.0, 1.0],
@@ -537,7 +537,8 @@ mod tests {
         }
 
         let mut stack = QueryStack::<f32, Eytzinger>::default();
-        let result = tree.nearest_one_with_stack::<SquaredEuclidean<f32>>(&[0.5, 0.5], &mut stack);
+        let result =
+            tree.nearest_one_with_scratch::<SquaredEuclidean<f32>>(&[0.5, 0.5], &mut stack);
 
         assert_float_relative_eq!(result.0, 0.0125, REL_EPS_F32);
         assert_eq!(result.1, 2);

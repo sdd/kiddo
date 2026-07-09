@@ -109,6 +109,45 @@ where
 
         (req_ctx.best_dist, req_ctx.best_item)
     }
+
+    /// Finds the nearest point to the query point using caller-provided stack scratch.
+    #[inline(always)]
+    pub(crate) fn nearest_one_with_scratch<D>(
+        &self,
+        query: &[A; K],
+        stack: &mut SS::Stack<D::Output>,
+    ) -> (D::Output, T)
+    where
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        let mut req_ctx = ArchivedNearestOneReqCtx {
+            query,
+            best_dist: D::Output::max_value(),
+            best_item: T::default(),
+        };
+
+        self.backtracking_query_with_scratch::<_, _, D>(
+            &mut req_ctx,
+            stack,
+            |leaf_idx, query_wide, query_ctx| {
+                self.process_leaf_nearest_one::<D>(
+                    leaf_idx,
+                    query_wide,
+                    &mut query_ctx.best_dist,
+                    &mut query_ctx.best_item,
+                );
+            },
+        );
+
+        (req_ctx.best_dist, req_ctx.best_item)
+    }
 }
 
 impl<A, T, SS, LS, const K: usize, const B: usize> ArchivedKdTree<A, T, SS, LS, K, B>
@@ -267,6 +306,53 @@ where
         self.nearest_n_within::<D>(query, D::Output::max_value(), max_qty, sorted)
     }
 
+    pub(crate) fn nearest_n_with_scratch<D>(
+        &self,
+        query: &[A; K],
+        max_qty: NonZeroUsize,
+        sorted: bool,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.nearest_n_within_with_scratch::<D>(
+            query,
+            D::Output::max_value(),
+            max_qty,
+            sorted,
+            stack,
+        )
+    }
+
+    pub(crate) fn nearest_n_within_with_scratch<D>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        max_qty: NonZeroUsize,
+        sorted: bool,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.nearest_n_within_impl_with_scratch::<D, false>(query, max_dist, max_qty, sorted, stack)
+    }
+
     pub(crate) fn within_impl<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
@@ -283,6 +369,31 @@ where
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
         self.nearest_n_within_impl::<D, EXCLUSIVE>(query, max_dist, NonZeroUsize::MAX, true)
+    }
+
+    pub(crate) fn within_impl_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.nearest_n_within_impl_with_scratch::<D, EXCLUSIVE>(
+            query,
+            max_dist,
+            NonZeroUsize::MAX,
+            true,
+            stack,
+        )
     }
 
     pub(crate) fn within_unsorted_visit_impl<D, F, const EXCLUSIVE: bool>(
@@ -338,6 +449,151 @@ where
             results.push(result)
         });
         results
+    }
+
+    pub(crate) fn within_unsorted_impl_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        let mut results = Vec::new();
+        self.within_unsorted_visit_impl_with_scratch::<D, _, EXCLUSIVE>(
+            query,
+            max_dist,
+            |result| results.push(result),
+            stack,
+        );
+        results
+    }
+
+    pub(crate) fn nearest_n_within_impl_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        max_qty: NonZeroUsize,
+        sorted: bool,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        let max_qty = max_qty.get();
+        if max_qty == usize::MAX {
+            self.nearest_n_within_inner_with_scratch::<
+                D,
+                Vec<QueryResultItem<(), T, D::Output>>,
+                EXCLUSIVE,
+            >(query, max_dist, max_qty, sorted, stack)
+        } else {
+            self.nearest_n_within_inner_with_scratch::<
+                D,
+                BinaryHeapResultCollection<QueryResultItem<(), T, D::Output>>,
+                EXCLUSIVE,
+            >(query, max_dist, max_qty, sorted, stack)
+        }
+    }
+
+    fn nearest_n_within_inner_with_scratch<D, R, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        max_qty: usize,
+        sorted: bool,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        R: ResultCollection<D::Output, QueryResultItem<(), T, D::Output>>,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        let mut req_ctx = ArchivedNearestNWithinReqCtx::<A, T, D::Output, R, EXCLUSIVE, K> {
+            query,
+            max_dist,
+            results: R::with_max_qty(max_qty),
+            _phantom: std::marker::PhantomData,
+        };
+
+        self.backtracking_query_with_scratch::<_, _, D>(
+            &mut req_ctx,
+            stack,
+            |leaf_idx, query_wide, req_ctx| {
+                let leaf_max_dist = req_ctx.max_dist();
+                self.process_leaf_nearest_n_within::<D, R, EXCLUSIVE>(
+                    leaf_idx,
+                    query_wide,
+                    leaf_max_dist,
+                    &mut req_ctx.results,
+                );
+            },
+        );
+
+        if sorted {
+            req_ctx.results.into_sorted_vec()
+        } else {
+            req_ctx.results.into_vec()
+        }
+    }
+
+    pub(crate) fn within_unsorted_visit_impl_with_scratch<D, F, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        mut visitor: F,
+        stack: &mut SS::Stack<D::Output>,
+    ) where
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+        F: FnMut(QueryResultItem<(), T, D::Output>),
+    {
+        let mut req_ctx = ArchivedWithinUnsortedVisitReqCtx::<A, D::Output, EXCLUSIVE, K> {
+            query,
+            max_dist,
+            _phantom: std::marker::PhantomData,
+        };
+
+        self.backtracking_query_with_scratch::<_, _, D>(
+            &mut req_ctx,
+            stack,
+            |leaf_idx, query_wide, req_ctx| {
+                let mut results = VisitorResultCollection::new(&mut visitor);
+                self.process_leaf_nearest_n_within::<D, _, EXCLUSIVE>(
+                    leaf_idx,
+                    query_wide,
+                    req_ctx.max_dist(),
+                    &mut results,
+                );
+            },
+        );
     }
 
     /// Returns a streaming iterator over all points within a given distance, unsorted.
@@ -444,6 +700,48 @@ where
                 &mut req_ctx.results,
             );
         });
+
+        req_ctx.results.into_inner()
+    }
+
+    pub(crate) fn best_n_within_impl_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        max_qty: NonZeroUsize,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> BinaryHeap<BestQueryResultItem<(), T, D::Output>>
+    where
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        let mut req_ctx = ArchivedBestNWithinReqCtx::<A, D::Output, _, EXCLUSIVE, K> {
+            query,
+            max_dist,
+            results:
+                BinaryHeapResultCollection::<BestQueryResultItem<(), T, D::Output>>::with_max_qty(
+                    max_qty.get(),
+                ),
+        };
+
+        self.backtracking_query_with_scratch::<_, _, D>(
+            &mut req_ctx,
+            stack,
+            |leaf_idx, query_wide, req_ctx| {
+                self.process_leaf_best_n_within::<D, _, EXCLUSIVE>(
+                    leaf_idx,
+                    query_wide,
+                    max_dist,
+                    &mut req_ctx.results,
+                );
+            },
+        );
 
         req_ctx.results.into_inner()
     }

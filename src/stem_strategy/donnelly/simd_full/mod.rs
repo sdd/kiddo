@@ -953,7 +953,7 @@ impl StemStrategy for DonnellySimdFull<3> {
         true
     }
 
-    fn backtracking_query_with_stack<Tree, A, T, O, D, QC, LS, const K2: usize, const B: usize>(
+    fn backtracking_query_with_scratch<Tree, A, T, O, D, QC, LS, const K2: usize, const B: usize>(
         tree: &Tree,
         query_ctx: &mut QC,
         stack: &mut Self::Stack<O>,
@@ -1406,7 +1406,7 @@ impl crate::StemStrategy for DonnellySimdFull<4> {
         true
     }
 
-    fn backtracking_query_with_stack<Tree, A, T, O, D, QC, LS, const K2: usize, const B: usize>(
+    fn backtracking_query_with_scratch<Tree, A, T, O, D, QC, LS, const K2: usize, const B: usize>(
         tree: &Tree,
         query_ctx: &mut QC,
         stack: &mut Self::Stack<O>,

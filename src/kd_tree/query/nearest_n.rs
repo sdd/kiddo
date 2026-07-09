@@ -36,6 +36,32 @@ where
     {
         self.nearest_n_within::<D>(query, D::Output::max_value(), max_qty, sorted)
     }
+
+    pub(crate) fn nearest_n_with_scratch<D>(
+        &self,
+        query: &[A; K],
+        max_qty: NonZero<usize>,
+        sorted: bool,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.nearest_n_within_with_scratch::<D>(
+            query,
+            D::Output::max_value(),
+            max_qty,
+            sorted,
+            stack,
+        )
+    }
 }
 
 #[cfg(test)]
