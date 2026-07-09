@@ -125,6 +125,85 @@ where
     }
 }
 
+/// Vec-based result collection for small-k nearest_n queries.
+///
+/// Inserts candidates via plain `Vec::push` (O(1)) and tracks the current
+/// k-th best distance via a full scan (O(k)) only when the collection is
+/// full. At extraction time `into_sorted_vec` does a
+/// `select_nth_unstable` + sort on at most k elements (k <= 20).
+///
+/// Compared to `SortedVecResultCollection` (binary-search + memmove insert
+/// at O(k)), this is strictly cheaper for small k. The extra extraction
+/// cost (sorting k elements in O(k log k)) is negligible.
+#[cfg(not(feature = "small_n_result_collectors"))]
+#[derive(Debug)]
+pub(crate) struct ThresholdVecResultCollection<E> {
+    max_qty: usize,
+    inner: Vec<E>,
+}
+
+#[cfg(not(feature = "small_n_result_collectors"))]
+impl<O: PartialOrd, T> ThresholdVecResultCollection<QueryResultItem<(), T, O>> {
+    #[inline]
+    fn farthest_idx(&self) -> usize {
+        let mut farthest = 0;
+        for i in 1..self.inner.len() {
+            if self.inner[i].distance > self.inner[farthest].distance {
+                farthest = i;
+            }
+        }
+        farthest
+    }
+}
+
+#[cfg(not(feature = "small_n_result_collectors"))]
+impl<O: Axis<Coord = O>, T> ResultCollection<O, QueryResultItem<(), T, O>>
+    for ThresholdVecResultCollection<QueryResultItem<(), T, O>>
+{
+    fn with_max_qty(max_qty: usize) -> Self {
+        Self {
+            max_qty,
+            inner: Vec::with_capacity(max_qty),
+        }
+    }
+
+    fn max_qty(&self) -> usize {
+        self.max_qty
+    }
+
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    fn add(&mut self, entry: QueryResultItem<(), T, O>) {
+        if self.inner.len() < self.max_qty {
+            self.inner.push(entry);
+        } else {
+            let farthest = self.farthest_idx();
+            if entry.distance < self.inner[farthest].distance {
+                self.inner[farthest] = entry;
+            }
+        }
+    }
+
+    fn threshold_distance(&self) -> Option<O> {
+        if self.inner.len() < self.max_qty {
+            return None;
+        }
+        Some(self.inner[self.farthest_idx()].distance)
+    }
+
+    fn into_vec(self) -> Vec<QueryResultItem<(), T, O>> {
+        self.inner
+    }
+
+    fn into_sorted_vec(mut self) -> Vec<QueryResultItem<(), T, O>> {
+        self.inner
+            .sort_unstable_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
+        self.inner
+    }
+}
+
 #[doc(hidden)]
 pub trait BestNeighbourResultCollection<O: Axis<Coord = O>, T: Content + PartialOrd>:
     ResultCollection<O, BestQueryResultItem<(), T, O>>
@@ -140,6 +219,7 @@ pub(crate) struct BinaryHeapResultCollection<E> {
 
 #[derive(Debug)]
 #[cfg_attr(feature = "small_n_result_collectors", allow(dead_code))]
+#[allow(dead_code)]
 pub(crate) struct SortedVecResultCollection<E: Ord> {
     max_qty: usize,
     inner: SortedVec<E>,
@@ -1089,6 +1169,18 @@ pub mod cargo_asm {
 
     #[inline(never)]
     #[unsafe(no_mangle)]
+    pub fn v6_threshold_vec_result_collection_add_cargo_asm_hook() -> (usize, u64, u64) {
+        let mut results =
+            ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(MAX_QTY);
+        for entry in SORTED_NEAREST_INPUTS {
+            results.add(entry);
+        }
+        let vec = results.into_sorted_vec();
+        checksum_nearest(&vec)
+    }
+
+    #[inline(never)]
+    #[unsafe(no_mangle)]
     pub fn v6_binary_heap_result_collection_add_cargo_asm_hook() -> (usize, u64, u64) {
         let mut results =
             BinaryHeapResultCollection::<BestQueryResultItem<(), u32, f64>>::with_max_qty(MAX_QTY);
@@ -1206,5 +1298,82 @@ impl<O: Axis<Coord = O>, E: Ord> ResultCollection<O, E> for Vec<E> {
     fn into_sorted_vec(mut self) -> Vec<E> {
         self.sort();
         self
+    }
+}
+
+#[cfg(test)]
+#[cfg(all(not(feature = "small_n_result_collectors"), test))]
+mod tests {
+    use super::*;
+
+    const INPUTS: [QueryResultItem<(), u32, f64>; 5] = [
+        QueryResultItem {
+            point: (),
+            distance: 0.4,
+            item: 1,
+        },
+        QueryResultItem {
+            point: (),
+            distance: 0.1,
+            item: 2,
+        },
+        QueryResultItem {
+            point: (),
+            distance: 0.8,
+            item: 3,
+        },
+        QueryResultItem {
+            point: (),
+            distance: 0.3,
+            item: 4,
+        },
+        QueryResultItem {
+            point: (),
+            distance: 0.6,
+            item: 5,
+        },
+    ];
+
+    #[test]
+    fn threshold_vec_sorted_output() {
+        let k = 3;
+        let mut results =
+            ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(k);
+        for entry in INPUTS {
+            results.add(entry);
+        }
+        let sorted = results.into_sorted_vec();
+        assert_eq!(sorted.len(), k);
+        for i in 1..sorted.len() {
+            assert!(sorted[i - 1].distance <= sorted[i].distance);
+        }
+    }
+
+    #[test]
+    fn threshold_vec_threshold_distance() {
+        let mut results =
+            ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(3);
+        assert!(results.threshold_distance().is_none());
+        results.add(INPUTS[0]);
+        assert!(results.threshold_distance().is_none());
+        results.add(INPUTS[1]);
+        assert!(results.threshold_distance().is_none());
+        results.add(INPUTS[2]); // now full
+        assert!(results.threshold_distance().is_some());
+    }
+
+    #[test]
+    fn threshold_vec_evicts_farthest() {
+        let mut results =
+            ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(3);
+        for entry in INPUTS.iter().take(3) {
+            results.add(*entry); // 0.4, 0.1, 0.8: farthest is 0.8
+        }
+        // Add closer than farthest (0.3 < 0.8): should replace it
+        results.add(INPUTS[3]); // 0.3
+        let sorted = results.into_sorted_vec();
+        assert_eq!(sorted.len(), 3);
+        assert!(sorted.iter().any(|item| item.distance == 0.3));
+        assert!(!sorted.iter().any(|item| item.distance == 0.8));
     }
 }
