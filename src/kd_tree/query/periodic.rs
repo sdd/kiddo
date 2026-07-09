@@ -818,7 +818,7 @@ where
                 SS,
                 LS,
                 D,
-                ThresholdVecResultCollection<QueryResultItem<(), T, D::Output>>,
+                ThresholdVecResultCollection<QueryResultItem<(), T, D::Output>, D::Output>,
                 EXCLUSIVE,
                 K,
                 B,

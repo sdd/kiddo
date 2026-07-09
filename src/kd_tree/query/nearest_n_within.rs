@@ -159,7 +159,7 @@ where
             if max_qty <= MAX_VEC_RESULT_SIZE {
                 return self.nearest_n_within_inner::<
                     D,
-                    ThresholdVecResultCollection<QueryResultItem<(), T, D::Output>>,
+                    ThresholdVecResultCollection<QueryResultItem<(), T, D::Output>, D::Output>,
                     EXCLUSIVE,
                 >(query, max_dist, max_qty, sorted);
             }
