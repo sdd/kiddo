@@ -233,6 +233,11 @@ harness = false
 required-features = ["test_utils"]
 
 [[bench]]
+name = "v6_scratch_strategies"
+harness = false
+required-features = ["test_utils"]
+
+[[bench]]
 name = "profile_v6_nearest_one_eytzinger"
 path = "benches/profile_v6_nearest_one_eytzinger.rs"
 harness = false

@@ -29,6 +29,42 @@ pub trait StackTrait<A, SS: StemStrategy> {
     fn clear(&mut self);
 }
 
+/// Reusable traversal scratch storage for query builder scratch APIs.
+///
+/// The concrete stack representation is selected by the stem strategy and is
+/// intentionally hidden so it can keep changing during the v6 alpha cycle.
+#[derive(Debug)]
+pub struct QueryScratch<SS: StemStrategy, O> {
+    stack: SS::Stack<O>,
+}
+
+impl<SS: StemStrategy, O> Default for QueryScratch<SS, O> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<SS: StemStrategy, O> QueryScratch<SS, O> {
+    /// Creates empty query traversal scratch storage.
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            stack: SS::Stack::<O>::default(),
+        }
+    }
+
+    #[inline]
+    pub(crate) fn clear(&mut self) {
+        self.stack.clear();
+    }
+
+    #[inline]
+    pub(crate) fn stack_mut(&mut self) -> &mut SS::Stack<O> {
+        &mut self.stack
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) struct ScalarContinuationFar<A, S> {

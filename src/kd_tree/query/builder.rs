@@ -1,88 +1,3 @@
-//! Fluent query builder APIs used by [`KdTree::query`](crate::kd_tree::KdTree::query)
-//! and the archived-tree `query` entry point when that feature is enabled.
-//!
-//! A query is assembled in stages: choose a query type, apply optional query
-//! modifiers, choose which fields should appear in each result, and then finish
-//! with a terminal method.
-//!
-//! # Query Type
-//!
-//! The first choice is the search family and distance metric:
-//!
-//! - `nearest_one::<D>()` finds the single nearest neighbour.
-//! - `nearest_n::<D>(n)` finds the `n` nearest neighbours.
-//! - `nearest_n::<D>(n).within(radius)` finds up to `n` neighbours, but only
-//!   among entries inside `radius`.
-//! - `within::<D>(radius)` returns every entry inside `radius`.
-//! - `best_n_within::<D>(radius, n)` returns up to `n` entries inside `radius`,
-//!   ranked by item ordering rather than by distance.
-//!
-//! The metric `D` is selected when the query type is chosen, so each fluent
-//! chain starts by deciding both "what kind of query is this?" and "which
-//! distance metric defines closeness?".
-//!
-//! # Query Options
-//!
-//! ## `approx`
-//!
-//! `approx()` is available only after `nearest_one::<D>()`. It switches the
-//! exact nearest-neighbour search to a descent-only approximate search.
-//!
-//! ## `exclusive_boundaries`
-//!
-//! Radius-bounded queries use inclusive `<= radius` semantics by default.
-//! `exclusive_boundaries()` changes those queries to strict `< radius`
-//! semantics. This applies to `within::<D>(radius)`,
-//! `nearest_n::<D>(n).within(radius)`, and `best_n_within::<D>(radius, n)`.
-//!
-//! ## `periodic_boundary_conditions`
-//!
-//! `periodic_boundary_condition(box_size)` must be chosen before the query
-//! type. It changes the space from Cartesian coordinates to periodic wrapping,
-//! using `box_size` as the period along each axis. Every entry in `box_size`
-//! must be strictly positive.
-//!
-//! Periodic queries support `nearest_one`, `nearest_n`, `nearest_n(...).within`,
-//! and `within`. `best_n_within` is Cartesian-only.
-//!
-//! # Result Content
-//!
-//! Result projection is independent from the query type. By default, builder
-//! results include the stored item and the computed distance, but not the point
-//! coordinates.
-//!
-//! - `with_points()` includes point coordinates.
-//! - `without_points()` removes point coordinates.
-//! - `with_items()` includes stored items.
-//! - `without_items()` removes stored items.
-//! - `with_distances()` includes distances.
-//! - `without_distances()` removes distances.
-//!
-//! These toggles rewrite the eventual result item type by replacing omitted
-//! fields with `()`. For example, removing items produces
-//! `QueryResultItem<_, (), _>`.
-//!
-//! `with_points()` is available only for Cartesian queries. Periodic queries do
-//! not expose a point projection toggle.
-//!
-//! # Result Type
-//!
-//! `execute()` eagerly runs the query and returns the query-specific container:
-//!
-//! - `nearest_one` and `nearest_one().approx()` return one `QueryResultItem`.
-//! - `nearest_n`, `nearest_n(...).within(...)`, and `within(...)` return
-//!   `Vec<QueryResultItem<...>>`.
-//! - `best_n_within(...)` returns
-//!   `BinaryHeap<BestQueryResultItem<...>>`.
-//!
-//! `iter()` and `visit()` are streaming terminal forms for Cartesian
-//! `within(...)` queries after `unsorted()` has been selected:
-//!
-//! - `iter()` returns a lazy iterator instead of materializing a `Vec`.
-//! - `visit()` calls a visitor closure for each matching result.
-//!
-//! `unsorted()` is also available for the other multi-result query families
-//! when traversal order is acceptable.
 #![allow(private_bounds)]
 
 use std::cmp::Ordering;
@@ -94,7 +9,9 @@ use crate::dist::{DistanceMetric, DistanceMetricCore};
 use crate::kd_tree::query_stack::StackTrait;
 #[cfg(feature = "rkyv_08")]
 use crate::kd_tree::ArchivedKdTree;
-use crate::kd_tree::{KdTree, KdTreeAccessor, KdTreeIter, KdTreeQueryOps, WithinUnsortedIter};
+use crate::kd_tree::{
+    KdTree, KdTreeAccessor, KdTreeIter, KdTreeQueryOps, QueryScratch, WithinUnsortedIter,
+};
 use crate::leaf_view::TlsLeafScratch;
 use crate::stem_strategy::donnelly::simd_full::{
     BacktrackBlock3, BacktrackBlock4, SimdSelectBestChildBlock3,
@@ -456,6 +373,138 @@ where
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static;
 }
 
+pub(crate) trait QueryBuilderScratchTreeOps<A, T, SS, LS, const K: usize, const B: usize>:
+    QueryBuilderTreeOps<A, T, SS, LS, K, B>
+where
+    A: Axis<Coord = A> + 'static,
+    T: Content,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+{
+    fn qb_nearest_one_with_scratch<D>(
+        &self,
+        query: &[A; K],
+        stack: &mut SS::Stack<D::Output>,
+    ) -> (D::Output, T)
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>;
+
+    fn qb_nearest_n_with_scratch<D>(
+        &self,
+        query: &[A; K],
+        max_qty: NonZeroUsize,
+        sorted: bool,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>;
+
+    fn qb_nearest_n_within_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        max_qty: NonZeroUsize,
+        sorted: bool,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>;
+
+    fn qb_within_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>;
+
+    fn qb_within_unsorted_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>;
+
+    fn qb_within_unsorted_visit_with_scratch<D, F, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        visitor: F,
+        stack: &mut SS::Stack<D::Output>,
+    ) where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+        F: FnMut(QueryResultItem<(), T, D::Output>);
+
+    fn qb_best_n_within_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        max_qty: NonZero<usize>,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> BinaryHeap<BestQueryResultItem<(), T, D::Output>>
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>;
+}
+
 impl<A, T, SS, LS, const K: usize, const B: usize> QueryBuilderTreeOps<A, T, SS, LS, K, B>
     for KdTree<A, T, SS, LS, K, B>
 where
@@ -612,6 +661,170 @@ where
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
         self.best_n_within_impl::<D, EXCLUSIVE>(query, radius, max_qty)
+    }
+}
+
+impl<A, T, SS, LS, const K: usize, const B: usize> QueryBuilderScratchTreeOps<A, T, SS, LS, K, B>
+    for KdTree<A, T, SS, LS, K, B>
+where
+    A: Axis<Coord = A> + 'static,
+    T: Content,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+{
+    #[inline]
+    fn qb_nearest_one_with_scratch<D>(
+        &self,
+        query: &[A; K],
+        stack: &mut SS::Stack<D::Output>,
+    ) -> (D::Output, T)
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.nearest_one_with_scratch::<D>(query, stack)
+    }
+
+    #[inline]
+    fn qb_nearest_n_with_scratch<D>(
+        &self,
+        query: &[A; K],
+        max_qty: NonZeroUsize,
+        sorted: bool,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.nearest_n_with_scratch::<D>(query, max_qty, sorted, stack)
+    }
+
+    #[inline]
+    fn qb_nearest_n_within_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        max_qty: NonZeroUsize,
+        sorted: bool,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.nearest_n_within_impl_with_scratch::<D, EXCLUSIVE>(
+            query, radius, max_qty, sorted, stack,
+        )
+    }
+
+    #[inline]
+    fn qb_within_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.within_impl_with_scratch::<D, EXCLUSIVE>(query, radius, stack)
+    }
+
+    #[inline]
+    fn qb_within_unsorted_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.within_unsorted_impl_with_scratch::<D, EXCLUSIVE>(query, radius, stack)
+    }
+
+    #[inline]
+    fn qb_within_unsorted_visit_with_scratch<D, F, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        visitor: F,
+        stack: &mut SS::Stack<D::Output>,
+    ) where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+        F: FnMut(QueryResultItem<(), T, D::Output>),
+    {
+        self.within_unsorted_visit_impl_with_scratch::<D, F, EXCLUSIVE>(
+            query, radius, visitor, stack,
+        )
+    }
+
+    #[inline]
+    fn qb_best_n_within_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        max_qty: NonZero<usize>,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> BinaryHeap<BestQueryResultItem<(), T, D::Output>>
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.best_n_within_impl_with_scratch::<D, EXCLUSIVE>(query, radius, max_qty, stack)
     }
 }
 
@@ -777,6 +990,173 @@ where
     }
 }
 
+#[cfg(feature = "rkyv_08")]
+impl<A, T, SS, LS, const K: usize, const B: usize>
+    QueryBuilderScratchTreeOps<A, T, SS, rkyv_08::Archived<LS>, K, B>
+    for ArchivedKdTree<A, T, SS, LS, K, B>
+where
+    A: rkyv_08::Archive + Axis<Coord = A> + 'static,
+    T: Content + PartialOrd + PartialEq,
+    SS: StemStrategy,
+    LS: rkyv_08::Archive,
+    rkyv_08::Archived<LS>: LeafStrategy<A, T, SS, K, B>,
+{
+    #[inline]
+    fn qb_nearest_one_with_scratch<D>(
+        &self,
+        query: &[A; K],
+        stack: &mut SS::Stack<D::Output>,
+    ) -> (D::Output, T)
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.nearest_one_with_scratch::<D>(query, stack)
+    }
+
+    #[inline]
+    fn qb_nearest_n_with_scratch<D>(
+        &self,
+        query: &[A; K],
+        max_qty: NonZeroUsize,
+        sorted: bool,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.nearest_n_with_scratch::<D>(query, max_qty, sorted, stack)
+    }
+
+    #[inline]
+    fn qb_nearest_n_within_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        max_qty: NonZeroUsize,
+        sorted: bool,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.nearest_n_within_impl_with_scratch::<D, EXCLUSIVE>(
+            query, radius, max_qty, sorted, stack,
+        )
+    }
+
+    #[inline]
+    fn qb_within_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.within_impl_with_scratch::<D, EXCLUSIVE>(query, radius, stack)
+    }
+
+    #[inline]
+    fn qb_within_unsorted_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.within_unsorted_impl_with_scratch::<D, EXCLUSIVE>(query, radius, stack)
+    }
+
+    #[inline]
+    fn qb_within_unsorted_visit_with_scratch<D, F, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        visitor: F,
+        stack: &mut SS::Stack<D::Output>,
+    ) where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+        F: FnMut(QueryResultItem<(), T, D::Output>),
+    {
+        self.within_unsorted_visit_impl_with_scratch::<D, F, EXCLUSIVE>(
+            query, radius, visitor, stack,
+        )
+    }
+
+    #[inline]
+    fn qb_best_n_within_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        radius: D::Output,
+        max_qty: NonZero<usize>,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> BinaryHeap<BestQueryResultItem<(), T, D::Output>>
+    where
+        T: PartialOrd,
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.best_n_within_impl_with_scratch::<D, EXCLUSIVE>(query, radius, max_qty, stack)
+    }
+}
+
 #[doc(hidden)]
 pub struct NoMetric;
 
@@ -807,6 +1187,13 @@ impl ResultFamily for NearestNState {}
 impl ResultFamily for NearestNWithinState {}
 impl ResultFamily for WithinState {}
 impl ResultFamily for BestNWithinState {}
+
+trait ConfigurableScratchQueryFamily {}
+impl ConfigurableScratchQueryFamily for NearestOneState {}
+impl ConfigurableScratchQueryFamily for NearestNState {}
+impl ConfigurableScratchQueryFamily for NearestNWithinState {}
+impl ConfigurableScratchQueryFamily for WithinState {}
+impl ConfigurableScratchQueryFamily for BestNWithinState {}
 
 trait BuilderMetric<A, const K: usize> {
     type Output: Copy;
@@ -855,7 +1242,9 @@ where
 ///
 /// [`approx`](Self::approx) is available only after
 /// [`nearest_one`](Self::nearest_one)`::<D>()`. It switches the exact
-/// nearest-neighbour search to a descent-only approximate search.
+/// nearest-neighbour search to a descent-only approximate nearest-neighbour (ANN)
+/// search. This is much faster, but the result may not be the truly nearest
+/// neighbour.
 ///
 /// ## `exclusive_boundaries`
 ///
@@ -878,6 +1267,35 @@ where
 /// [`nearest_n`](Self::nearest_n)`(...).`[`within`](Self::within)`(...)`, and
 /// [`within`](Self::within). [`best_n_within`](Self::best_n_within) is
 /// Cartesian-only.
+///
+/// # Scratch Strategy
+///
+/// Queries that involve backtracking need to store temporary state. The scratch
+/// strategy determines how this state is managed. Cartesian (ie not PBC),
+/// non-approximate queries that do not include point coordinates can
+/// choose how their traversal stack scratch is provided. All three options
+/// avoid a heap allocation on the query path (unless your tree is _extremely_
+/// deep - typically deeper than you could ever find in a balanced tree and only
+/// something that you might find in a _very_ unbalanced tree).
+///
+/// - By default, queries will use thread-local-storage scratch.
+///   This avoids allocating per query, but requires a TLS lookup, which may not
+///   be quite as fast as alternatives.
+/// - `with_stack_scratch()` stores scratch in the terminal call's stack frame,
+///   avoiding the TLS lookup. This avoids TLS lookup but increases the size of the
+///   query's stack frame.
+/// - `with_scratch(&mut scratch)` uses caller-owned reusable scratch created by
+///   `KdTree::create_scratch()` or the archived-tree method of the same name.
+///   This is particularly suited to batches of compatible queries but can can
+///   make sense anywhere you'll have the opportunity to re-use the same scratch
+///   for more than one query.
+///
+/// These scratch configuration methods are experimental during the 6.0.0 alpha;
+/// not every option is guaranteed to remain in the final 6.0.0 API.
+///
+/// Scratch strategy selection is not available for `with_points()` or `iter()`.
+/// Those paths currently maintain traversal state in a more complex state
+/// machine rather than the stack-scratch query orchestrator.
 ///
 /// # Result Content
 ///
@@ -1064,6 +1482,213 @@ pub trait ExecuteQueryBuilder {
     fn execute(self) -> Self::Output;
 }
 
+#[doc(hidden)]
+pub trait ExecuteQueryBuilderWithScratch<SS, O>
+where
+    SS: StemStrategy,
+{
+    #[doc(hidden)]
+    type Output;
+
+    #[doc(hidden)]
+    fn execute_with_scratch(self, scratch: &mut QueryScratch<SS, O>) -> Self::Output;
+}
+
+/// Query builder adapter that uses per-call stack scratch instead of TLS.
+pub struct StackScratchQueryBuilder<B, SS, O>
+where
+    SS: StemStrategy,
+{
+    builder: B,
+    _phantom: PhantomData<(SS, O)>,
+}
+
+/// Query builder adapter that uses caller-owned reusable query scratch.
+pub struct ScratchQueryBuilder<'s, B, SS, O>
+where
+    SS: StemStrategy,
+{
+    builder: B,
+    scratch: &'s mut QueryScratch<SS, O>,
+}
+
+impl<B, SS, O> StackScratchQueryBuilder<B, SS, O>
+where
+    SS: StemStrategy,
+    B: ExecuteQueryBuilderWithScratch<SS, O>,
+{
+    /// Executes the configured query with scratch stored in this call's stack frame.
+    #[inline]
+    pub fn execute(self) -> <B as ExecuteQueryBuilderWithScratch<SS, O>>::Output {
+        let mut scratch = QueryScratch::<SS, O>::new();
+        self.builder.execute_with_scratch(&mut scratch)
+    }
+}
+
+impl<B, SS, O> ScratchQueryBuilder<'_, B, SS, O>
+where
+    SS: StemStrategy,
+    B: ExecuteQueryBuilderWithScratch<SS, O>,
+{
+    /// Executes the configured query with caller-owned reusable scratch storage.
+    #[inline]
+    pub fn execute(self) -> <B as ExecuteQueryBuilderWithScratch<SS, O>>::Output {
+        self.builder.execute_with_scratch(self.scratch)
+    }
+}
+
+impl<'a, Tree, A, T, SS, LS, D, I, Dp, const EXCLUSIVE: bool, const K: usize, const B: usize>
+    StackScratchQueryBuilder<
+        QueryBuilder<
+            'a,
+            Tree,
+            A,
+            T,
+            SS,
+            LS,
+            SelectedMetric<D>,
+            WithinState,
+            CartesianSpace,
+            Projection<Exclude, I, Dp>,
+            false,
+            EXCLUSIVE,
+            K,
+            B,
+        >,
+        SS,
+        D::Output,
+    >
+where
+    A: Axis<Coord = A> + 'static,
+    T: Content + PartialOrd,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B> + 'a,
+    Tree: QueryBuilderScratchTreeOps<A, T, SS, LS, K, B> + 'a,
+    D: DistanceMetric<A> + 'a,
+    D::Output: crate::stem_strategy::SimdPrune
+        + SimdSelectBestChildBlock3
+        + BacktrackBlock3
+        + BacktrackBlock4
+        + TlsLeafScratch
+        + 'static,
+    SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    I: ProjectionField<T> + 'a,
+    Dp: ProjectionField<D::Output> + 'a,
+{
+    /// Visits matching entries using per-call stack scratch instead of TLS.
+    #[inline]
+    pub fn visit<F>(self, mut visitor: F)
+    where
+        F: FnMut(QueryResultItem<(), I::Output, Dp::Output>),
+    {
+        let mut scratch = QueryScratch::<SS, D::Output>::new();
+        let builder = self.builder;
+        with_cleared_scratch(&mut scratch, |stack| {
+            builder
+                .tree
+                .qb_within_unsorted_visit_with_scratch::<D, _, EXCLUSIVE>(
+                    builder.query,
+                    builder.radius,
+                    move |result| {
+                        visitor(project_nearest_without_point::<
+                            A,
+                            T,
+                            D::Output,
+                            Exclude,
+                            I,
+                            Dp,
+                            K,
+                        >(result))
+                    },
+                    stack,
+                );
+        });
+    }
+}
+
+impl<
+        's,
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        I,
+        Dp,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    >
+    ScratchQueryBuilder<
+        's,
+        QueryBuilder<
+            'a,
+            Tree,
+            A,
+            T,
+            SS,
+            LS,
+            SelectedMetric<D>,
+            WithinState,
+            CartesianSpace,
+            Projection<Exclude, I, Dp>,
+            false,
+            EXCLUSIVE,
+            K,
+            B,
+        >,
+        SS,
+        D::Output,
+    >
+where
+    A: Axis<Coord = A> + 'static,
+    T: Content + PartialOrd,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B> + 'a,
+    Tree: QueryBuilderScratchTreeOps<A, T, SS, LS, K, B> + 'a,
+    D: DistanceMetric<A> + 'a,
+    D::Output: crate::stem_strategy::SimdPrune
+        + SimdSelectBestChildBlock3
+        + BacktrackBlock3
+        + BacktrackBlock4
+        + TlsLeafScratch
+        + 'static,
+    SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    I: ProjectionField<T> + 'a,
+    Dp: ProjectionField<D::Output> + 'a,
+{
+    /// Visits matching entries using caller-owned reusable scratch storage.
+    #[inline]
+    pub fn visit<F>(self, mut visitor: F)
+    where
+        F: FnMut(QueryResultItem<(), I::Output, Dp::Output>),
+    {
+        let builder = self.builder;
+        with_cleared_scratch(self.scratch, |stack| {
+            builder
+                .tree
+                .qb_within_unsorted_visit_with_scratch::<D, _, EXCLUSIVE>(
+                    builder.query,
+                    builder.radius,
+                    move |result| {
+                        visitor(project_nearest_without_point::<
+                            A,
+                            T,
+                            D::Output,
+                            Exclude,
+                            I,
+                            Dp,
+                            K,
+                        >(result))
+                    },
+                    stack,
+                );
+        });
+    }
+}
+
 impl<
         'a,
         Tree,
@@ -1088,6 +1713,94 @@ where
     #[inline]
     pub fn execute(self) -> <Self as ExecuteQueryBuilder>::Output {
         <Self as ExecuteQueryBuilder>::execute(self)
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Family,
+        I,
+        Dp,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    >
+    QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        Family,
+        CartesianSpace,
+        Projection<Exclude, I, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    A: Axis<Coord = A> + 'static,
+    T: Content + PartialOrd,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+    Tree: QueryBuilderScratchTreeOps<A, T, SS, LS, K, B>,
+    D: DistanceMetric<A>,
+    D::Output: crate::stem_strategy::SimdPrune
+        + SimdSelectBestChildBlock3
+        + BacktrackBlock3
+        + BacktrackBlock4
+        + TlsLeafScratch
+        + 'static,
+    SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    I: ProjectionField<T>,
+    Dp: ProjectionField<D::Output>,
+    Family: ConfigurableScratchQueryFamily,
+{
+    /// Uses per-call stack scratch instead of the default thread-local scratch.
+    ///
+    /// This avoids the TLS lookup while keeping scratch lifetime scoped to the
+    /// terminal query call. The inline stack does not allocate unless traversal
+    /// depth exceeds its inline capacity.
+    ///
+    /// This alpha API is experimental; see the
+    /// [`QueryBuilder` scratch strategy section](QueryBuilder#scratch-strategy)
+    /// for the available strategies and current limitations.
+    #[inline]
+    pub fn with_stack_scratch(self) -> StackScratchQueryBuilder<Self, SS, D::Output> {
+        StackScratchQueryBuilder {
+            builder: self,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Uses caller-owned reusable scratch instead of the default thread-local scratch.
+    ///
+    /// Scratch must have been created for the same stem strategy and distance
+    /// output type, for example with [`KdTree::create_scratch`] or the
+    /// archived-tree method of the same name.
+    ///
+    /// This alpha API is experimental; see the
+    /// [`QueryBuilder` scratch strategy section](QueryBuilder#scratch-strategy)
+    /// for the available strategies and current limitations.
+    #[inline]
+    pub fn with_scratch<'s>(
+        self,
+        scratch: &'s mut QueryScratch<SS, D::Output>,
+    ) -> ScratchQueryBuilder<'s, Self, SS, D::Output> {
+        ScratchQueryBuilder {
+            builder: self,
+            scratch,
+        }
     }
 }
 
@@ -1296,6 +2009,15 @@ where
     /// Includes stored point coordinates in the eventual query results.
     ///
     /// This is available only for non-periodic queries.
+    ///
+    /// Scratch strategy selectors such as
+    /// [`with_stack_scratch`](Self::with_stack_scratch) and
+    /// [`with_scratch`](Self::with_scratch) are not currently available after
+    /// `with_points()`. Point-projected queries use a separate traversal and
+    /// collection path that maintains more complex state than the stack-scratch
+    /// query orchestrator. See the
+    /// [`QueryBuilder` scratch strategy section](QueryBuilder#scratch-strategy)
+    /// for more detail.
     #[inline]
     pub fn with_points(self) -> <Self as WithPointsQueryBuilder>::Output
     where
@@ -1458,6 +2180,18 @@ pub(crate) fn boundary_accepts<O: Axis<Coord = O>>(
         BoundaryMode::Inclusive => O::cmp(distance, radius) != Ordering::Greater,
         BoundaryMode::Exclusive => O::cmp(distance, radius) == Ordering::Less,
     }
+}
+
+#[inline(always)]
+fn with_cleared_scratch<SS, O, R>(
+    scratch: &mut QueryScratch<SS, O>,
+    f: impl FnOnce(&mut SS::Stack<O>) -> R,
+) -> R
+where
+    SS: StemStrategy,
+{
+    scratch.clear();
+    f(scratch.stack_mut())
 }
 
 #[inline(always)]
@@ -1632,6 +2366,56 @@ where
             _phantom: PhantomData,
         }
     }
+
+    /// Creates reusable scratch storage for scratch-aware query builder paths.
+    ///
+    /// Pass the returned value to [`QueryBuilder::with_scratch`] to avoid the
+    /// default thread-local stack lookup and reuse any spill allocation across
+    /// repeated compatible queries.
+    ///
+    /// Scratch strategy selection is experimental during the 6.0.0 alpha; see
+    /// the [`QueryBuilder` scratch strategy section](QueryBuilder#scratch-strategy).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use kiddo::dist::SquaredEuclidean;
+    /// use kiddo::leaf_strategy::FlatVec;
+    /// use kiddo::{Eytzinger, KdTree};
+    /// use std::num::NonZeroUsize;
+    ///
+    /// type Tree = KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 2, 4>, 2, 4>;
+    ///
+    /// let entries = [
+    ///     (10_u32, [0.0, 0.0]),
+    ///     (11_u32, [1.0, 1.0]),
+    ///     (12_u32, [0.2, 0.1]),
+    /// ];
+    /// let tree = Tree::new_from_entries(&entries).unwrap();
+    /// let mut scratch = tree.create_scratch::<SquaredEuclidean<f64>>();
+    /// let max_qty = NonZeroUsize::new(2).unwrap();
+    /// let queries = [[0.1, 0.1], [0.9, 0.9], [0.25, 0.15]];
+    /// let mut nearest_items = Vec::new();
+    ///
+    /// for query in queries {
+    ///     let results = tree
+    ///         .query(&query)
+    ///         .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+    ///         .with_scratch(&mut scratch)
+    ///         .execute();
+    ///
+    ///     nearest_items.push(results[0].item);
+    /// }
+    ///
+    /// assert_eq!(nearest_items, vec![12, 11, 12]);
+    /// ```
+    #[inline]
+    pub fn create_scratch<D>(&self) -> QueryScratch<SS, D::Output>
+    where
+        D: DistanceMetric<A>,
+    {
+        QueryScratch::new()
+    }
 }
 
 #[cfg(feature = "rkyv_08")]
@@ -1660,6 +2444,22 @@ where
             radius: (),
             _phantom: PhantomData,
         }
+    }
+
+    /// Creates reusable scratch storage for scratch-aware query builder paths.
+    ///
+    /// Pass the returned value to [`QueryBuilder::with_scratch`] to avoid the
+    /// default thread-local stack lookup and reuse any spill allocation across
+    /// repeated compatible queries.
+    ///
+    /// Scratch strategy selection is experimental during the 6.0.0 alpha; see
+    /// the [`QueryBuilder` scratch strategy section](QueryBuilder#scratch-strategy).
+    #[inline]
+    pub fn create_scratch<D>(&self) -> QueryScratch<SS, D::Output>
+    where
+        D: DistanceMetric<A>,
+    {
+        QueryScratch::new()
     }
 }
 
@@ -2887,6 +3687,342 @@ where
 impl<
         'a,
         Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        I,
+        Dp,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > ExecuteQueryBuilderWithScratch<SS, D::Output>
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        NearestOneState,
+        CartesianSpace,
+        Projection<Exclude, I, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    A: Axis<Coord = A> + 'static,
+    T: Content + PartialOrd,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+    Tree: QueryBuilderScratchTreeOps<A, T, SS, LS, K, B>,
+    D: DistanceMetric<A>,
+    D::Output: crate::stem_strategy::SimdPrune
+        + SimdSelectBestChildBlock3
+        + BacktrackBlock3
+        + BacktrackBlock4
+        + TlsLeafScratch
+        + 'static,
+    SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    I: ProjectionField<T>,
+    Dp: ProjectionField<D::Output>,
+{
+    type Output = QueryResultItem<(), I::Output, Dp::Output>;
+
+    #[inline]
+    fn execute_with_scratch(self, scratch: &mut QueryScratch<SS, D::Output>) -> Self::Output {
+        let (distance, item) = with_cleared_scratch(scratch, |stack| {
+            self.tree
+                .qb_nearest_one_with_scratch::<D>(self.query, stack)
+        });
+        project_nearest_without_point_from_parts::<A, T, D::Output, Exclude, I, Dp, K>(
+            item, distance,
+        )
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        I,
+        Dp,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > ExecuteQueryBuilderWithScratch<SS, D::Output>
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        NearestNState,
+        CartesianSpace,
+        Projection<Exclude, I, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    A: Axis<Coord = A> + 'static,
+    T: Content + PartialOrd,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+    Tree: QueryBuilderScratchTreeOps<A, T, SS, LS, K, B>,
+    D: DistanceMetric<A>,
+    D::Output: crate::stem_strategy::SimdPrune
+        + SimdSelectBestChildBlock3
+        + BacktrackBlock3
+        + BacktrackBlock4
+        + TlsLeafScratch
+        + 'static,
+    SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    I: ProjectionField<T>,
+    Dp: ProjectionField<D::Output>,
+{
+    type Output = Vec<QueryResultItem<(), I::Output, Dp::Output>>;
+
+    #[inline]
+    fn execute_with_scratch(self, scratch: &mut QueryScratch<SS, D::Output>) -> Self::Output {
+        with_cleared_scratch(scratch, |stack| {
+            self.tree
+                .qb_nearest_n_with_scratch::<D>(
+                    self.query,
+                    self.max_qty.expect("max_qty missing"),
+                    SORTED,
+                    stack,
+                )
+                .into_iter()
+                .map(project_nearest_without_point::<A, T, D::Output, Exclude, I, Dp, K>)
+                .collect()
+        })
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        I,
+        Dp,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > ExecuteQueryBuilderWithScratch<SS, D::Output>
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        NearestNWithinState,
+        CartesianSpace,
+        Projection<Exclude, I, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    A: Axis<Coord = A> + 'static,
+    T: Content + PartialOrd,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+    Tree: QueryBuilderScratchTreeOps<A, T, SS, LS, K, B>,
+    D: DistanceMetric<A>,
+    D::Output: crate::stem_strategy::SimdPrune
+        + SimdSelectBestChildBlock3
+        + BacktrackBlock3
+        + BacktrackBlock4
+        + TlsLeafScratch
+        + 'static,
+    SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    I: ProjectionField<T>,
+    Dp: ProjectionField<D::Output>,
+{
+    type Output = Vec<QueryResultItem<(), I::Output, Dp::Output>>;
+
+    #[inline]
+    fn execute_with_scratch(self, scratch: &mut QueryScratch<SS, D::Output>) -> Self::Output {
+        with_cleared_scratch(scratch, |stack| {
+            self.tree
+                .qb_nearest_n_within_with_scratch::<D, EXCLUSIVE>(
+                    self.query,
+                    self.radius,
+                    self.max_qty.expect("max_qty missing"),
+                    SORTED,
+                    stack,
+                )
+                .into_iter()
+                .map(project_nearest_without_point::<A, T, D::Output, Exclude, I, Dp, K>)
+                .collect()
+        })
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        I,
+        Dp,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > ExecuteQueryBuilderWithScratch<SS, D::Output>
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        WithinState,
+        CartesianSpace,
+        Projection<Exclude, I, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    A: Axis<Coord = A> + 'static,
+    T: Content + PartialOrd,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+    Tree: QueryBuilderScratchTreeOps<A, T, SS, LS, K, B>,
+    D: DistanceMetric<A>,
+    D::Output: crate::stem_strategy::SimdPrune
+        + SimdSelectBestChildBlock3
+        + BacktrackBlock3
+        + BacktrackBlock4
+        + TlsLeafScratch
+        + 'static,
+    SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    I: ProjectionField<T>,
+    Dp: ProjectionField<D::Output>,
+{
+    type Output = Vec<QueryResultItem<(), I::Output, Dp::Output>>;
+
+    #[inline]
+    fn execute_with_scratch(self, scratch: &mut QueryScratch<SS, D::Output>) -> Self::Output {
+        with_cleared_scratch(scratch, |stack| {
+            let results = if SORTED {
+                self.tree
+                    .qb_within_with_scratch::<D, EXCLUSIVE>(self.query, self.radius, stack)
+            } else {
+                self.tree.qb_within_unsorted_with_scratch::<D, EXCLUSIVE>(
+                    self.query,
+                    self.radius,
+                    stack,
+                )
+            };
+            results
+                .into_iter()
+                .map(project_nearest_without_point::<A, T, D::Output, Exclude, I, Dp, K>)
+                .collect()
+        })
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        I,
+        Dp,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > ExecuteQueryBuilderWithScratch<SS, D::Output>
+    for QueryBuilder<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        SelectedMetric<D>,
+        BestNWithinState,
+        CartesianSpace,
+        Projection<Exclude, I, Dp>,
+        SORTED,
+        EXCLUSIVE,
+        K,
+        B,
+    >
+where
+    A: Axis<Coord = A> + 'static,
+    T: Content + PartialOrd,
+    SS: StemStrategy,
+    LS: LeafStrategy<A, T, SS, K, B>,
+    Tree: QueryBuilderScratchTreeOps<A, T, SS, LS, K, B>,
+    D: DistanceMetric<A>,
+    D::Output: crate::stem_strategy::SimdPrune
+        + SimdSelectBestChildBlock3
+        + BacktrackBlock3
+        + BacktrackBlock4
+        + TlsLeafScratch
+        + 'static,
+    SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    I: ProjectionField<T>,
+    Dp: ProjectionField<D::Output>,
+    BestQueryResultItem<(), I::Output, Dp::Output>: Ord,
+{
+    type Output = BinaryHeap<BestQueryResultItem<(), I::Output, Dp::Output>>;
+
+    #[inline]
+    fn execute_with_scratch(self, scratch: &mut QueryScratch<SS, D::Output>) -> Self::Output {
+        with_cleared_scratch(scratch, |stack| {
+            self.tree
+                .qb_best_n_within_with_scratch::<D, EXCLUSIVE>(
+                    self.query,
+                    self.radius,
+                    self.max_qty.expect("max_qty missing"),
+                    stack,
+                )
+                .into_iter()
+                .map(project_best_without_point::<A, T, D::Output, Exclude, I, Dp, K>)
+                .collect()
+        })
+    }
+}
+
+impl<
+        'a,
+        Tree,
         A: Copy,
         T,
         SS,
@@ -4087,6 +5223,12 @@ where
     }
 
     /// Returns an iterator over matching entries without first materializing a result vector.
+    ///
+    /// Scratch strategy selectors are not applicable to this iterator path. The
+    /// iterator owns a traversal state machine rather than borrowing one of the
+    /// query builder scratch strategies. See the
+    /// [`QueryBuilder` scratch strategy section](QueryBuilder#scratch-strategy)
+    /// for more detail.
     #[allow(clippy::type_complexity)]
     #[inline]
     pub fn iter(
@@ -4360,9 +5502,9 @@ mod tests {
     #[cfg(feature = "rkyv_08")]
     use crate::kd_tree::ArchivedKdTree;
     use crate::kd_tree::KdTree;
-    use crate::leaf_strategy::FlatVec;
     #[cfg(feature = "rkyv_08")]
     use crate::leaf_strategy::VecOfArenas;
+    use crate::leaf_strategy::{FlatVec, VecOfArrays};
     use crate::stem_strategy::Eytzinger;
     use std::num::NonZeroUsize;
 
@@ -4467,6 +5609,282 @@ mod tests {
         results.sort_unstable();
 
         assert_eq!(results, vec![7, 7]);
+    }
+
+    #[test]
+    fn scratch_query_execution_matches_tls_for_cartesian_queries() {
+        let entries = [
+            (10u32, [0.0, 0.0]),
+            (11u32, [0.2, 0.1]),
+            (12u32, [0.4, 0.4]),
+            (13u32, [0.8, 0.2]),
+            (14u32, [0.9, 0.9]),
+            (15u32, [0.3, 0.7]),
+        ];
+        let tree = WrapTree::new_from_entries(&entries).unwrap();
+        let query = [0.25, 0.2];
+        let max_qty = NonZeroUsize::new(3).unwrap();
+        let radius = 0.25;
+        let mut scratch = tree.create_scratch::<SquaredEuclidean<f64>>();
+
+        assert_eq!(
+            tree.query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .execute(),
+            tree.query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .with_stack_scratch()
+                .execute()
+        );
+        assert_eq!(
+            tree.query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .execute(),
+            tree.query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .with_scratch(&mut scratch)
+                .execute()
+        );
+
+        assert_eq!(
+            tree.query(&query)
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .execute(),
+            tree.query(&query)
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .with_stack_scratch()
+                .execute()
+        );
+        assert_eq!(
+            tree.query(&query)
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .unsorted()
+                .execute(),
+            tree.query(&query)
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .unsorted()
+                .with_scratch(&mut scratch)
+                .execute()
+        );
+
+        assert_eq!(
+            tree.query(&query)
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .within(radius)
+                .execute(),
+            tree.query(&query)
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .within(radius)
+                .with_stack_scratch()
+                .execute()
+        );
+        assert_eq!(
+            tree.query(&query)
+                .within::<SquaredEuclidean<f64>>(radius)
+                .unsorted()
+                .execute(),
+            tree.query(&query)
+                .within::<SquaredEuclidean<f64>>(radius)
+                .unsorted()
+                .with_scratch(&mut scratch)
+                .execute()
+        );
+
+        let tls_best = tree
+            .query(&query)
+            .best_n_within::<SquaredEuclidean<f64>>(radius, max_qty)
+            .execute()
+            .into_sorted_vec();
+        let stack_best = tree
+            .query(&query)
+            .best_n_within::<SquaredEuclidean<f64>>(radius, max_qty)
+            .with_stack_scratch()
+            .execute()
+            .into_sorted_vec();
+        assert_eq!(tls_best, stack_best);
+
+        let mut tls_visit = Vec::new();
+        tree.query(&query)
+            .within::<SquaredEuclidean<f64>>(radius)
+            .unsorted()
+            .visit(|result| tls_visit.push(result));
+        let mut stack_visit = Vec::new();
+        tree.query(&query)
+            .within::<SquaredEuclidean<f64>>(radius)
+            .unsorted()
+            .with_stack_scratch()
+            .visit(|result| stack_visit.push(result));
+        let mut scratch_visit = Vec::new();
+        tree.query(&query)
+            .within::<SquaredEuclidean<f64>>(radius)
+            .unsorted()
+            .with_scratch(&mut scratch)
+            .visit(|result| scratch_visit.push(result));
+        assert_eq!(tls_visit, stack_visit);
+        assert_eq!(tls_visit, scratch_visit);
+    }
+
+    #[test]
+    fn scratch_can_be_reused_across_mutable_mapped_tree_queries() {
+        type MutableTree = KdTree<f32, u32, Eytzinger, VecOfArrays<f32, u32, 2, 4>, 2, 4>;
+
+        let mut tree = MutableTree::default();
+        for idx in 0..32 {
+            let point = [
+                ((idx * 7) % 23) as f32 / 23.0,
+                ((idx * 11 + 3) % 29) as f32 / 29.0,
+            ];
+            tree.add(&point, idx as u32).unwrap();
+        }
+
+        let mut scratch = tree.create_scratch::<SquaredEuclidean<f32>>();
+        for query in [[0.1, 0.2], [0.45, 0.55], [0.8, 0.25]] {
+            let max_qty = NonZeroUsize::new(5).unwrap();
+            let tls = tree
+                .query(&query)
+                .nearest_n::<SquaredEuclidean<f32>>(max_qty)
+                .within(0.4)
+                .execute();
+            let reused = tree
+                .query(&query)
+                .nearest_n::<SquaredEuclidean<f32>>(max_qty)
+                .within(0.4)
+                .with_scratch(&mut scratch)
+                .execute();
+            assert_eq!(tls, reused);
+        }
+    }
+
+    #[test]
+    fn scratch_queries_handle_empty_trees() {
+        let entries: [(u32, [f64; 2]); 0] = [];
+        let tree = WrapTree::new_from_entries(&entries).unwrap();
+        let query = [0.25, 0.2];
+        let mut scratch = tree.create_scratch::<SquaredEuclidean<f64>>();
+
+        assert_eq!(
+            tree.query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .execute(),
+            tree.query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .with_scratch(&mut scratch)
+                .execute()
+        );
+        assert_eq!(
+            tree.query(&query)
+                .within::<SquaredEuclidean<f64>>(0.25)
+                .with_stack_scratch()
+                .execute(),
+            Vec::new()
+        );
+    }
+
+    #[cfg(feature = "rkyv_08")]
+    #[test]
+    fn archived_scratch_query_execution_matches_tls_for_cartesian_queries() {
+        type Tree = KdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
+        type ArchivedTree =
+            ArchivedKdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
+
+        let entries = vec![
+            (10u32, [0.0, 0.0]),
+            (11u32, [0.2, 0.1]),
+            (12u32, [0.4, 0.4]),
+            (13u32, [0.8, 0.2]),
+            (14u32, [0.9, 0.9]),
+            (15u32, [0.3, 0.7]),
+        ];
+        let tree = Tree::new_from_entries(&entries).unwrap();
+        let query = [0.25, 0.2];
+        let max_qty = NonZeroUsize::new(3).unwrap();
+        let radius = 0.25;
+
+        let bytes = rkyv_08::api::high::to_bytes_in::<_, rkyv_08::rancor::Error>(
+            &tree,
+            rkyv_08::util::AlignedVec::<128>::new(),
+        )
+        .unwrap();
+        let archived =
+            rkyv_08::access::<ArchivedTree, rkyv_08::rancor::Error>(bytes.as_slice()).unwrap();
+        let mut scratch = archived.create_scratch::<SquaredEuclidean<f64>>();
+
+        assert_eq!(
+            archived
+                .query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .execute(),
+            archived
+                .query(&query)
+                .nearest_one::<SquaredEuclidean<f64>>()
+                .with_stack_scratch()
+                .execute()
+        );
+        assert_eq!(
+            archived
+                .query(&query)
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .execute(),
+            archived
+                .query(&query)
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .with_scratch(&mut scratch)
+                .execute()
+        );
+        assert_eq!(
+            archived
+                .query(&query)
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .within(radius)
+                .execute(),
+            archived
+                .query(&query)
+                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
+                .within(radius)
+                .with_stack_scratch()
+                .execute()
+        );
+        assert_eq!(
+            archived
+                .query(&query)
+                .within::<SquaredEuclidean<f64>>(radius)
+                .unsorted()
+                .execute(),
+            archived
+                .query(&query)
+                .within::<SquaredEuclidean<f64>>(radius)
+                .unsorted()
+                .with_scratch(&mut scratch)
+                .execute()
+        );
+
+        let tls_best = archived
+            .query(&query)
+            .best_n_within::<SquaredEuclidean<f64>>(radius, max_qty)
+            .execute()
+            .into_sorted_vec();
+        let stack_best = archived
+            .query(&query)
+            .best_n_within::<SquaredEuclidean<f64>>(radius, max_qty)
+            .with_stack_scratch()
+            .execute()
+            .into_sorted_vec();
+        assert_eq!(tls_best, stack_best);
+
+        let mut tls_visit = Vec::new();
+        archived
+            .query(&query)
+            .within::<SquaredEuclidean<f64>>(radius)
+            .unsorted()
+            .visit(|result| tls_visit.push(result));
+        let mut scratch_visit = Vec::new();
+        archived
+            .query(&query)
+            .within::<SquaredEuclidean<f64>>(radius)
+            .unsorted()
+            .with_scratch(&mut scratch)
+            .visit(|result| scratch_visit.push(result));
+        assert_eq!(tls_visit, scratch_visit);
     }
 
     #[cfg(feature = "rkyv_08")]

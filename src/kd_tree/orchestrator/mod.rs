@@ -251,13 +251,13 @@ where
 
         with_tls_query_stack::<SS::Stack<O>, _>(|stack| {
             stack.clear();
-            self.backtracking_query_with_stack::<QC, O, D>(query_ctx, stack, process_leaf);
+            self.backtracking_query_with_scratch::<QC, O, D>(query_ctx, stack, process_leaf);
         });
     }
 
     /// Backtracking query with explicit stack
     #[inline(always)]
-    fn backtracking_query_with_stack<QC, O, D>(
+    fn backtracking_query_with_scratch<QC, O, D>(
         &self,
         query_ctx: &mut QC,
         stack: &mut SS::Stack<O>,
@@ -273,11 +273,11 @@ where
         SS::Stack<O>: StackTrait<O, SS>,
     {
         if self.stem_leaf_resolution().uses_arithmetic() && SS::BLOCK_SIZE == 1 {
-            self.arithmetic_query_with_stack::<QC, O, D>(query_ctx, stack, process_leaf);
+            self.arithmetic_query_with_scratch::<QC, O, D>(query_ctx, stack, process_leaf);
             return;
         }
 
-        SS::backtracking_query_with_stack::<Self, A, T, O, D, QC, LS, K, B>(
+        SS::backtracking_query_with_scratch::<Self, A, T, O, D, QC, LS, K, B>(
             self,
             query_ctx,
             stack,
@@ -286,10 +286,10 @@ where
     }
 
     /// Implementation of backtracking query with scalar stack.
-    /// Called by default StemStrategy::backtracking_query_with_stack implementation.
+    /// Called by default StemStrategy::backtracking_query_with_scratch implementation.
     /// SIMD strategies override the trait method with custom implementations.
     #[inline(always)]
-    fn backtracking_query_with_stack_impl<QC, O, D>(
+    fn backtracking_query_with_scratch_impl<QC, O, D>(
         &self,
         query_ctx: &mut QC,
         stack: &mut SS::Stack<O>,
@@ -384,13 +384,13 @@ where
         SS::Stack<O>: StackTrait<O, SS> + Default + 'static,
     {
         with_tls_query_stack::<SS::Stack<O>, _>(|stack| {
-            self.arithmetic_query_with_stack::<QC, O, D>(query_ctx, stack, process_leaf);
+            self.arithmetic_query_with_scratch::<QC, O, D>(query_ctx, stack, process_leaf);
         });
     }
 
     /// Arithmetic-resolution backtracking query with explicit stack.
     #[inline(always)]
-    fn arithmetic_query_with_stack<QC, O, D>(
+    fn arithmetic_query_with_scratch<QC, O, D>(
         &self,
         query_ctx: &mut QC,
         stack: &mut SS::Stack<O>,
@@ -402,7 +402,7 @@ where
         SS::Stack<O>: StackTrait<O, SS>,
         SS::StackContext<O>: ScalarStackContext<O, SS::DeferredState>,
     {
-        SS::arithmetic_query_with_stack::<Self, A, T, O, D, QC, LS, K, B>(
+        SS::arithmetic_query_with_scratch::<Self, A, T, O, D, QC, LS, K, B>(
             self,
             query_ctx,
             stack,
@@ -411,9 +411,9 @@ where
     }
 
     /// Implementation of arithmetic-resolution query with scalar stack.
-    /// Called by default StemStrategy::arithmetic_query_with_stack implementation.
+    /// Called by default StemStrategy::arithmetic_query_with_scratch implementation.
     #[inline(always)]
-    fn arithmetic_query_with_stack_impl<QC, O, D>(
+    fn arithmetic_query_with_scratch_impl<QC, O, D>(
         &self,
         query_ctx: &mut QC,
         stack: &mut SS::Stack<O>,
@@ -643,7 +643,7 @@ where
     }
 
     /// Implementation of backtracking query with SIMD stack.
-    /// Called by DonnellySimdFull's backtracking_query_with_stack override.
+    /// Called by DonnellySimdFull's backtracking_query_with_scratch override.
     #[inline(always)]
     fn backtracking_query_with_block3_simd_stack_impl<QC, O, D>(
         &self,
@@ -1012,7 +1012,7 @@ where
     }
 
     /// Implementation of backtracking query with SIMD stack.
-    /// Called by DonnellySimdFull's backtracking_query_with_stack override.
+    /// Called by DonnellySimdFull's backtracking_query_with_scratch override.
     #[inline(always)]
     fn backtracking_query_with_simd_stack_impl<QC, O, D>(
         &self,

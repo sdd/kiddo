@@ -370,13 +370,13 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
 
     /// Execute backtracking query with explicit stack.
     ///
-    /// Default implementation delegates to KdTree's backtracking_query_with_stack_impl.
+    /// Default implementation delegates to KdTree's backtracking_query_with_scratch_impl.
     /// Block-based SIMD strategies can override to use SIMD stack with block pruning.
     ///
     /// This method exists to allow strategies to customize backtracking behavior at compile time.
     #[allow(clippy::too_many_arguments)]
     #[inline(always)]
-    fn backtracking_query_with_stack<Tree, A, T, O, D, QC, LS, const K2: usize, const B: usize>(
+    fn backtracking_query_with_scratch<Tree, A, T, O, D, QC, LS, const K2: usize, const B: usize>(
         tree: &Tree,
         query_ctx: &mut QC,
         stack: &mut Self::Stack<O>,
@@ -397,7 +397,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
         LS: crate::LeafStrategy<A, T, Self, K2, B>,
         Self::Stack<O>: StackTrait<O, Self>,
     {
-        tree.backtracking_query_with_stack_impl::<QC, O, D>(query_ctx, stack, process_leaf);
+        tree.backtracking_query_with_scratch_impl::<QC, O, D>(query_ctx, stack, process_leaf);
     }
 
     /// Execute arithmetic-resolution backtracking query with explicit stack.
@@ -406,7 +406,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
     /// Strategies may override this to provide a more specialized arithmetic walk.
     #[allow(clippy::too_many_arguments)]
     #[inline(always)]
-    fn arithmetic_query_with_stack<Tree, A, T, O, D, QC, LS, const K2: usize, const B: usize>(
+    fn arithmetic_query_with_scratch<Tree, A, T, O, D, QC, LS, const K2: usize, const B: usize>(
         tree: &Tree,
         query_ctx: &mut QC,
         stack: &mut Self::Stack<O>,
@@ -423,7 +423,7 @@ pub trait StemStrategy: Clone + Sync + Send + 'static {
         LS: crate::LeafStrategy<A, T, Self, K2, B>,
         Self::Stack<O>: StackTrait<O, Self>,
     {
-        tree.arithmetic_query_with_stack_impl::<QC, O, D>(query_ctx, stack, process_leaf);
+        tree.arithmetic_query_with_scratch_impl::<QC, O, D>(query_ctx, stack, process_leaf);
     }
 }
 

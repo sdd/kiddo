@@ -35,6 +35,7 @@ pub use orchestrator::KdTreeQueryOps;
 pub use query::QueryBuilder;
 #[doc(hidden)]
 pub use query::{Exclude, Include, Projection};
+pub use query_stack::QueryScratch;
 #[doc(hidden)]
 pub use stem_leaf_resolution::OwnedStemLeafResolution;
 

@@ -92,6 +92,44 @@ where
     }
 
     #[inline]
+    pub(crate) fn within_unsorted_visit_impl_with_scratch<D, F, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        mut visitor: F,
+        stack: &mut SS::Stack<D::Output>,
+    ) where
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+        F: FnMut(QueryResultItem<(), T, D::Output>),
+    {
+        let mut req_ctx = WithinUnsortedVisitReqCtx::<A, D::Output, EXCLUSIVE, K> {
+            query,
+            max_dist,
+            _phantom: std::marker::PhantomData,
+        };
+
+        self.backtracking_query_with_scratch::<_, _, D>(
+            &mut req_ctx,
+            stack,
+            |leaf_idx, query_wide, req_ctx| {
+                self.process_leaf_within_unsorted_visit::<D, F, EXCLUSIVE>(
+                    leaf_idx,
+                    query_wide,
+                    req_ctx.max_dist(),
+                    &mut visitor,
+                );
+            },
+        );
+    }
+
+    #[inline]
     pub(crate) fn within_unsorted_impl<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
@@ -108,6 +146,32 @@ where
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
         self.nearest_n_within_impl::<D, EXCLUSIVE>(query, max_dist, NonZeroUsize::MAX, false)
+    }
+
+    #[inline]
+    pub(crate) fn within_unsorted_impl_with_scratch<D, const EXCLUSIVE: bool>(
+        &self,
+        query: &[A; K],
+        max_dist: D::Output,
+        stack: &mut SS::Stack<D::Output>,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS>,
+    {
+        self.nearest_n_within_impl_with_scratch::<D, EXCLUSIVE>(
+            query,
+            max_dist,
+            NonZeroUsize::MAX,
+            false,
+            stack,
+        )
     }
 
     /// Returns a streaming iterator over all points within a given distance, unsorted.
