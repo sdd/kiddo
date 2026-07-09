@@ -617,3 +617,7 @@ path = "tests/builder_ui.rs"
 [[test]]
 name = "custom_metric_block_fallback"
 path = "tests/custom_metric_block_fallback.rs"
+
+[[test]]
+name = "custom_query_metric"
+path = "tests/custom_query_metric.rs"

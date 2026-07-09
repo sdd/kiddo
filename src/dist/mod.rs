@@ -54,6 +54,9 @@ pub(crate) use distance_metric_core::DistanceMetricScalar as DistanceMetricCore;
 ))]
 use std::any::TypeId;
 
+use crate::leaf_view::TlsLeafScratch;
+use crate::stem_strategy::donnelly::simd_full::{BacktrackBlock3, BacktrackBlock4};
+use crate::stem_strategy::{SimdPrune, SimdSelectBestChildBlock3};
 use crate::Axis;
 #[cfg(any(
     all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
@@ -76,6 +79,78 @@ pub use manhattan::Manhattan;
 pub use minkowski::Minkowski;
 #[doc(inline)]
 pub use squared_euclidean::SquaredEuclidean;
+
+/// Widened distance/output types that Kiddo's executable query paths support.
+///
+/// This is mainly useful as part of [`QueryMetric`]. Most library users should
+/// not need to name this trait directly.
+pub trait QueryDistance:
+    SimdPrune + SimdSelectBestChildBlock3 + BacktrackBlock3 + BacktrackBlock4 + TlsLeafScratch + 'static
+{
+}
+
+impl<T> QueryDistance for T where
+    T: SimdPrune
+        + SimdSelectBestChildBlock3
+        + BacktrackBlock3
+        + BacktrackBlock4
+        + TlsLeafScratch
+        + 'static
+{
+}
+
+mod query_metric_sealed {
+    use super::{DistanceMetric, QueryDistance};
+
+    pub trait Sealed<A: Copy> {}
+
+    impl<T, A: Copy> Sealed<A> for T where T: DistanceMetric<A, Output: QueryDistance> {}
+}
+
+/// Public bound for distance metrics that can be used with query-builder APIs
+/// that finish with `.execute()` or `.execute_with_scratch(...)`.
+///
+/// Implementing [`DistanceMetric`] is still enough to define a custom metric.
+/// `QueryMetric` is the stronger bound required when a generic helper wants to
+/// execute a query built with that metric.
+///
+/// In practice, this means the metric's widened [`DistanceMetric::Output`] type
+/// must be one of Kiddo's supported query distance/output types. Metrics using
+/// the usual widened output types such as `f32` or `f64` continue to work.
+/// Metrics with a brand new output type will not satisfy this bound unless that
+/// output type also supports Kiddo's internal query-execution operations.
+///
+/// # Example
+///
+/// ```ignore
+/// use kiddo::KdTree;
+/// use kiddo::dist::{QueryMetric, SquaredEuclidean};
+/// use kiddo::Axis;
+/// use std::num::NonZeroUsize;
+///
+/// fn query<A, M, const K: usize>(
+///     tree: &KdTree<A, u32, _, _, K, 32>,
+///     point: &[A; K],
+///     n: NonZeroUsize,
+/// ) -> Vec<u32>
+/// where
+///     A: Axis<Coord = A> + Copy + 'static,
+///     M: QueryMetric<A>,
+/// {
+///     tree.query(point)
+///         .nearest_n::<M>(n)
+///         .execute()
+///         .into_iter()
+///         .map(|result| result.item)
+///         .collect()
+/// }
+/// ```
+pub trait QueryMetric<A: Copy>:
+    DistanceMetric<A, Output: QueryDistance> + query_metric_sealed::Sealed<A>
+{
+}
+
+impl<T, A: Copy> QueryMetric<A> for T where T: DistanceMetric<A, Output: QueryDistance> {}
 
 #[cfg(any(
     all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"),
@@ -1359,7 +1434,7 @@ impl<T, A: Copy> DistanceMetric<A> for T where
 mod tests {
     use super::{
         Chebyshev, DistanceMetric, DistanceMetricScalar, DotProduct, Manhattan, Minkowski,
-        SquaredEuclidean,
+        QueryMetric, SquaredEuclidean,
     };
 
     #[test]
@@ -1416,6 +1491,14 @@ mod tests {
         assert_unified::<SquaredEuclidean<f64>>();
         assert_unified::<Chebyshev<f64>>();
         assert_unified::<Minkowski<3, f64>>();
+    }
+
+    #[test]
+    fn v3_query_metric_bound_is_satisfied() {
+        fn assert_query_metric<M: QueryMetric<f64>>() {}
+        assert_query_metric::<SquaredEuclidean<f64>>();
+        assert_query_metric::<Chebyshev<f64>>();
+        assert_query_metric::<Minkowski<3, f64>>();
     }
 
     #[test]
