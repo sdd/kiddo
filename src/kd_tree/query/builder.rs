@@ -5,7 +5,7 @@ use std::collections::BinaryHeap;
 use std::marker::PhantomData;
 use std::num::{NonZero, NonZeroUsize};
 
-use crate::dist::{DistanceMetric, DistanceMetricCore};
+use crate::dist::{DistanceMetric, DistanceMetricCore, QueryMetric};
 use crate::kd_tree::query_stack::StackTrait;
 #[cfg(feature = "rkyv_08")]
 use crate::kd_tree::ArchivedKdTree;
@@ -1754,7 +1754,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderScratchTreeOps<A, T, SS, LS, K, B>,
-    D: DistanceMetric<A>,
+    D: QueryMetric<A>,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -2129,7 +2129,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: KdTreeAccessor<A, T, SS, LS, K, B>,
-    D: DistanceMetric<A>,
+    D: QueryMetric<A>,
     D::Output: crate::stem_strategy::SimdPrune
         + SimdSelectBestChildBlock3
         + BacktrackBlock3
@@ -3721,13 +3721,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderScratchTreeOps<A, T, SS, LS, K, B>,
-    D: DistanceMetric<A>,
-    D::Output: crate::stem_strategy::SimdPrune
-        + SimdSelectBestChildBlock3
-        + BacktrackBlock3
-        + BacktrackBlock4
-        + TlsLeafScratch
-        + 'static,
+    D: QueryMetric<A>,
     SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     I: ProjectionField<T>,
     Dp: ProjectionField<D::Output>,
@@ -3783,13 +3777,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderScratchTreeOps<A, T, SS, LS, K, B>,
-    D: DistanceMetric<A>,
-    D::Output: crate::stem_strategy::SimdPrune
-        + SimdSelectBestChildBlock3
-        + BacktrackBlock3
-        + BacktrackBlock4
-        + TlsLeafScratch
-        + 'static,
+    D: QueryMetric<A>,
     SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     I: ProjectionField<T>,
     Dp: ProjectionField<D::Output>,
@@ -3850,13 +3838,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderScratchTreeOps<A, T, SS, LS, K, B>,
-    D: DistanceMetric<A>,
-    D::Output: crate::stem_strategy::SimdPrune
-        + SimdSelectBestChildBlock3
-        + BacktrackBlock3
-        + BacktrackBlock4
-        + TlsLeafScratch
-        + 'static,
+    D: QueryMetric<A>,
     SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     I: ProjectionField<T>,
     Dp: ProjectionField<D::Output>,
@@ -3918,13 +3900,7 @@ where
     SS: StemStrategy,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderScratchTreeOps<A, T, SS, LS, K, B>,
-    D: DistanceMetric<A>,
-    D::Output: crate::stem_strategy::SimdPrune
-        + SimdSelectBestChildBlock3
-        + BacktrackBlock3
-        + BacktrackBlock4
-        + TlsLeafScratch
-        + 'static,
+    D: QueryMetric<A>,
     SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     I: ProjectionField<T>,
     Dp: ProjectionField<D::Output>,
@@ -4487,13 +4463,7 @@ where
     SS: StemStrategy + 'static,
     LS: LeafStrategy<A, T, SS, K, B>,
     Tree: QueryBuilderTreeOps<A, T, SS, LS, K, B>,
-    D: DistanceMetric<A>,
-    D::Output: crate::stem_strategy::SimdPrune
-        + SimdSelectBestChildBlock3
-        + BacktrackBlock3
-        + BacktrackBlock4
-        + TlsLeafScratch
-        + 'static,
+    D: QueryMetric<A>,
     SS::Stack<D::Output>: StackTrait<D::Output, SS> + Default + 'static,
     P: PointProjectionField<A, K>,
     I: ProjectionField<T>,
@@ -5498,7 +5468,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::dist::SquaredEuclidean;
+    use crate::dist::{QueryMetric, SquaredEuclidean};
     #[cfg(feature = "rkyv_08")]
     use crate::kd_tree::ArchivedKdTree;
     use crate::kd_tree::KdTree;
@@ -5506,6 +5476,7 @@ mod tests {
     use crate::leaf_strategy::VecOfArenas;
     use crate::leaf_strategy::{FlatVec, VecOfArrays};
     use crate::stem_strategy::Eytzinger;
+    use crate::Axis;
     use std::num::NonZeroUsize;
 
     type WrapTree = KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 2, 32>, 2, 32>;
@@ -5935,5 +5906,44 @@ mod tests {
                 .within(0.05)
                 .execute()
         );
+    }
+
+    #[test]
+    fn generic_query_metric_helper_can_execute_nearest_n() {
+        fn query<A, M, const K: usize>(
+            tree: &KdTree<A, u32, Eytzinger, VecOfArrays<A, u32, K, 32>, K, 32>,
+            point: &[A; K],
+            n: NonZeroUsize,
+        ) -> Vec<u32>
+        where
+            A: Axis<Coord = A> + Copy + 'static,
+            M: QueryMetric<A>,
+        {
+            tree.query(point)
+                .nearest_n::<M>(n)
+                .execute()
+                .into_iter()
+                .map(|result| result.item)
+                .collect()
+        }
+
+        let points = [
+            (10u32, [0.0f64, 0.0]),
+            (20u32, [1.0, 1.0]),
+            (30u32, [2.0, 2.0]),
+        ];
+        let tree =
+            KdTree::<f64, u32, Eytzinger, VecOfArrays<f64, u32, 2, 32>, 2, 32>::new_from_entries(
+                &points,
+            )
+            .unwrap();
+
+        let results = query::<f64, SquaredEuclidean<f64>, 2>(
+            &tree,
+            &[0.1, 0.1],
+            NonZeroUsize::new(2).unwrap(),
+        );
+
+        assert_eq!(results, vec![10, 20]);
     }
 }
