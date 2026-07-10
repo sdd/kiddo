@@ -145,7 +145,7 @@ where
             self.nearest_n_within_inner::<D, Vec<QueryResultItem<(), T, D::Output>>, EXCLUSIVE>(
                 query, max_dist, max_qty, sorted,
             )
-        } else if sorted {
+        } else {
             #[cfg(feature = "small_n_result_collectors")]
             if max_qty <= SMALL_RESULT_COLLECTION_MAX_QTY {
                 return self.nearest_n_within_inner::<
@@ -164,17 +164,9 @@ where
                 >(query, max_dist, max_qty, sorted);
             }
 
-            self.nearest_n_within_inner::<
-                D,
-                BinaryHeapResultCollection<QueryResultItem<(), T, D::Output>>,
-                EXCLUSIVE,
-            >(query, max_dist, max_qty, sorted)
-        } else {
-            self.nearest_n_within_inner::<
-                D,
-                BinaryHeapResultCollection<QueryResultItem<(), T, D::Output>>,
-                EXCLUSIVE,
-            >(query, max_dist, max_qty, sorted)
+            self.nearest_n_within_inner::<D, BinaryHeapResultCollection<QueryResultItem<(), T, D::Output>>, EXCLUSIVE>(
+                query, max_dist, max_qty, sorted,
+            )
         }
     }
 
@@ -204,7 +196,7 @@ where
                 Vec<QueryResultItem<(), T, D::Output>>,
                 EXCLUSIVE,
             >(query, max_dist, max_qty, sorted, stack)
-        } else if sorted {
+        } else {
             #[cfg(feature = "small_n_result_collectors")]
             if max_qty <= SMALL_RESULT_COLLECTION_MAX_QTY {
                 return self.nearest_n_within_inner_with_scratch::<
@@ -223,12 +215,6 @@ where
                 >(query, max_dist, max_qty, sorted, stack);
             }
 
-            self.nearest_n_within_inner_with_scratch::<
-                D,
-                BinaryHeapResultCollection<QueryResultItem<(), T, D::Output>>,
-                EXCLUSIVE,
-            >(query, max_dist, max_qty, sorted, stack)
-        } else {
             self.nearest_n_within_inner_with_scratch::<
                 D,
                 BinaryHeapResultCollection<QueryResultItem<(), T, D::Output>>,
