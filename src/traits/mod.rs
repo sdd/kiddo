@@ -19,10 +19,11 @@ pub mod dist;
 pub mod kd_tree;
 
 /// Trait implemented by leaf strategies (determines how leaf storage is laid out)
-#[doc(hidden)]
 pub mod leaf_strategy;
-#[doc(inline)]
-pub use leaf_strategy::{ConstructibleLeafStrategy, LeafStrategy, MutableLeafStrategy};
+#[doc(hidden)]
+pub use leaf_strategy::{
+    ConstructibleLeafStrategy, Immutable, LeafStrategy, Mutability, Mutable, MutableLeafStrategy,
+};
 
 ///Trait implemented by stem strategy (determines tree stem ordering and traversal)
 #[doc(hidden)]

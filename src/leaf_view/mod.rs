@@ -148,7 +148,7 @@ pub struct LeafArenaTile<'a, AX, T, const K: usize> {
 impl<'a, AX: Axis<Coord = AX>, T: Content, const K: usize, const B: usize>
     LeafView<'a, AX, T, K, B>
 {
-    pub(crate) fn new(points: [&'a [AX]; K], items: &'a [T]) -> Self {
+    pub fn new(points: [&'a [AX]; K], items: &'a [T]) -> Self {
         Self { points, items }
     }
 
