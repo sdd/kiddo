@@ -188,15 +188,17 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, QueryResultItem<(), T, O>>
         self.inner
     }
 
-    fn into_sorted_vec(mut self) -> Vec<QueryResultItem<(), T, O>> {
-        if self.inner.len() < self.max_qty {
-            self.inner.sort_unstable_by(|a, b| {
+    fn into_sorted_vec(self) -> Vec<QueryResultItem<(), T, O>> {
+        let max_qty = self.max_qty();
+        let mut vec = self.into_vec();
+        if vec.len() < max_qty {
+            vec.sort_unstable_by(|a, b| {
                 a.distance
                     .partial_cmp(&b.distance)
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
         }
-        self.inner
+        vec
     }
 }
 
