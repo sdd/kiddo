@@ -1166,7 +1166,10 @@ pub mod cargo_asm {
 impl<O: Axis<Coord = O>, E: Ord> ResultCollection<O, E> for Vec<E> {
     fn with_max_qty(max_qty: usize) -> Self {
         if max_qty == usize::MAX {
-            Vec::new()
+            // Unsorted query path: start with reasonable capacity to avoid
+            // the first several realloc waves when many candidates fall within
+            // the radius. 64 elements (1.55 KB at 24 B/elem) is negligible.
+            Vec::with_capacity(64)
         } else {
             Vec::with_capacity(max_qty)
         }
