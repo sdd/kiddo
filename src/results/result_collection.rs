@@ -127,34 +127,20 @@ where
 
 /// Vec-based result collection for small-k nearest_n queries.
 ///
-/// Inserts candidates via plain `Vec::push` (O(1)) and tracks the current
-/// k-th best distance via a full scan (O(k)) only when the collection is
-/// full. At extraction time `into_sorted_vec` does a
-/// `select_nth_unstable` + sort on at most k elements (k <= 20).
+/// Inserts candidates via plain `Vec::push` (O(1)) and tracks the threshold
+/// as the max distance of the first k accepted candidates. Once the
+/// initial k slots are filled, the threshold is frozen and only candidates
+/// closer than it are accepted. At extraction time `into_vec` does a
+/// `select_nth_unstable` + truncate on the oversized vec.
 ///
-/// Compared to `SortedVecResultCollection` (binary-search + memmove insert
-/// at O(k)), this is strictly cheaper for small k. The extra extraction
-/// cost (sorting k elements in O(k log k)) is negligible.
+/// This design relies on the tree visiting leaves in proximity order,
+/// so the first k candidates are representative of the true k nearest.
 #[cfg(not(feature = "small_n_result_collectors"))]
 #[derive(Debug)]
 pub(crate) struct ThresholdVecResultCollection<E, O> {
     max_qty: usize,
     inner: Vec<E>,
-    threshold: Option<O>,
-}
-
-#[cfg(not(feature = "small_n_result_collectors"))]
-impl<O: PartialOrd + Copy, T> ThresholdVecResultCollection<QueryResultItem<(), T, O>, O> {
-    #[inline]
-    fn farthest_idx(&self) -> usize {
-        let mut farthest = 0;
-        for i in 1..self.inner.len() {
-            if self.inner[i].distance > self.inner[farthest].distance {
-                farthest = i;
-            }
-        }
-        farthest
-    }
+    threshold: O,
 }
 
 #[cfg(not(feature = "small_n_result_collectors"))]
@@ -164,8 +150,8 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, QueryResultItem<(), T, O>>
     fn with_max_qty(max_qty: usize) -> Self {
         Self {
             max_qty,
-            inner: Vec::with_capacity(max_qty),
-            threshold: None,
+            inner: Vec::with_capacity(max_qty * 2),
+            threshold: O::min_value(),
         }
     }
 
@@ -178,36 +164,40 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, QueryResultItem<(), T, O>>
     }
 
     fn add(&mut self, entry: QueryResultItem<(), T, O>) {
-        match self.threshold {
-            None => {
-                if self.inner.len() < self.max_qty {
-                    self.inner.push(entry);
-                    if self.inner.len() == self.max_qty {
-                        self.threshold = Some(self.inner[self.farthest_idx()].distance);
-                    }
-                }
+        if self.inner.len() < self.max_qty {
+            if entry.distance > self.threshold {
+                self.threshold = entry.distance;
             }
-            Some(farthest_dist) if entry.distance < farthest_dist => {
-                let farthest = self.farthest_idx();
-                self.inner[farthest] = entry;
-                self.threshold = Some(self.inner[self.farthest_idx()].distance);
-            }
-            _ => {}
+            self.inner.push(entry);
+        } else if entry.distance < self.threshold {
+            self.inner.push(entry);
         }
     }
 
     fn threshold_distance(&self) -> Option<O> {
-        self.threshold
+        if self.inner.len() < self.max_qty {
+            None
+        } else {
+            Some(self.threshold)
+        }
     }
 
-    fn into_vec(self) -> Vec<QueryResultItem<(), T, O>> {
+    fn into_vec(mut self) -> Vec<QueryResultItem<(), T, O>> {
+        if self.inner.len() > self.max_qty {
+            self.inner.select_nth_unstable_by(self.max_qty - 1, |a, b| {
+                a.distance
+                    .partial_cmp(&b.distance)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            self.inner.truncate(self.max_qty);
+        }
         self.inner
     }
 
-    fn into_sorted_vec(mut self) -> Vec<QueryResultItem<(), T, O>> {
-        self.inner
-            .sort_unstable_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
-        self.inner
+    fn into_sorted_vec(self) -> Vec<QueryResultItem<(), T, O>> {
+        let mut result = self.into_vec();
+        result.sort_unstable_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
+        result
     }
 }
 
@@ -1373,7 +1363,7 @@ mod tests {
     }
 
     #[test]
-    fn threshold_vec_evicts_farthest() {
+    fn threshold_vec_select_nth_unstable() {
         let mut results =
             ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>, f64>::with_max_qty(3);
         for entry in INPUTS.iter().take(3) {
