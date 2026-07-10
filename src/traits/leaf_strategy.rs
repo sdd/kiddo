@@ -1,7 +1,10 @@
 use nonmax::NonMaxUsize;
 
-use crate::leaf_view::{LeafArena, LeafView};
+use crate::leaf_view::LeafArena;
 use crate::{Axis, Content, StemStrategy};
+
+#[doc(inline)]
+pub use crate::leaf_view::LeafView;
 
 mod sealed {
     pub trait Sealed {}
@@ -11,7 +14,7 @@ mod sealed {
 ///
 /// This trait is used to enable type-level distinction between mutable and
 /// immutable leaf strategies, allowing for optimized monomorphization.
-pub(crate) trait Mutability: sealed::Sealed + 'static {
+pub trait Mutability: sealed::Sealed + 'static {
     /// Returns true if this is a mutable strategy
     fn is_mutable() -> bool;
 
@@ -144,13 +147,16 @@ pub enum BucketLimitType {
 pub enum LeafProjection {
     /// Strategy exposes leaf data through [`LeafView`].
     LeafView,
-    /// Strategy exposes leaf data through [`LeafArena`].
+    /// Strategy exposes leaf data through an arena-backed internal layout.
+    ///
+    /// This is used by the [`VecOfArenas`](`crate::leaf_strategy::VecOfArenas`) leaf strategy
+    /// and can't be used by third-party leaf strategies.
     LeafArena,
 }
 
 /// Query/access strategy for how leaf storage is laid out.
 ///
-/// To see which stem strategies are available, see the [`leaf_strategy`](`crate::leaf_strategy`) module.
+/// To see which leaf strategies are available, see the [`leaf_strategies`](`crate::leaf_strategy`) module.
 ///
 /// The generic parameters are the same as those of [`KdTree`](`crate::kd_tree::KdTree`) and must match the tree with which
 /// they're being specified for. It is a bit verbose and clunky to have to repeat these parameters
@@ -158,6 +164,10 @@ pub enum LeafProjection {
 /// this has been the least worst option after having investigated implementations that would
 /// eliminate this duplication. Each provided leaf strategy also exposes a type alias that avoids
 /// this if you find that preferable.
+///
+/// Third-party leaf strategies should provide an implementation for [`LeafStrategy::leaf_view`] and
+/// ignore [`LeafStrategy::leaf_arena`], which is used by
+/// Kiddo's bundled [`VecOfArenas`](`crate::leaf_strategy::VecOfArenas`) leaf strategy.
 pub trait LeafStrategy<A, T, SS, const K: usize, const B: usize>
 where
     A: Axis<Coord = A>,
@@ -193,8 +203,8 @@ where
 
     /// Returns arena-backed access for the specified leaf.
     ///
-    /// Callers should only use this when [`Self::LEAF_PROJECTION`] is
-    /// [`LeafProjection::LeafArena`].
+    /// This is an internal optimisation path for [`VecOfArenas`](`crate::leaf_strategy::VecOfArenas`)
+    /// and cannot be re-implemented by third-party leaf strategies.
     #[inline(always)]
     fn leaf_arena(&self, _leaf_idx: usize) -> LeafArena<'_, A, T, K> {
         unimplemented!("leaf_arena is unsupported for this leaf strategy")

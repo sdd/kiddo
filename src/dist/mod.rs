@@ -114,7 +114,7 @@ mod query_metric_sealed {
 /// `QueryMetric` is the stronger bound required when a generic helper wants to
 /// execute a query built with that metric.
 ///
-/// In practice, this means the metric's widened [`DistanceMetric::Output`] type
+/// In practice, this means the metric's widened [`DistanceMetricScalar::Output`] type
 /// must be one of Kiddo's supported query distance/output types. Metrics using
 /// the usual widened output types such as `f32` or `f64` continue to work.
 /// Metrics with a brand new output type will not satisfy this bound unless that

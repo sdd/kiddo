@@ -8,7 +8,7 @@ use crate::{Axis, Content};
 /// Trait that needs to be implemented by any potential stem ordering
 /// algorithm used by a KdTree.
 ///
-/// To see which stem strategies are available, see the [`stem_strategy`](`crate::stem_strategy`) module.
+/// To see which stem strategies are available, see the [`stem_strategies`](`crate::stem_strategy`) module.
 pub trait StemStrategy: Clone + Sync + Send + 'static {
     /// The stem index of the root node of the tree
     const ROOT_IDX: usize = 0;

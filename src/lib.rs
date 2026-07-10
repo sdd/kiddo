@@ -304,5 +304,6 @@ pub mod test_utils;
 pub mod traits;
 #[doc(hidden)]
 pub use traits::{
-    Axis, ConstructibleLeafStrategy, Content, LeafStrategy, MutableLeafStrategy, StemStrategy,
+    Axis, ConstructibleLeafStrategy, Content, Immutable, LeafStrategy, Mutability, Mutable,
+    MutableLeafStrategy, StemStrategy,
 };

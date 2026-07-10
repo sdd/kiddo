@@ -621,3 +621,7 @@ path = "tests/custom_metric_block_fallback.rs"
 [[test]]
 name = "custom_query_metric"
 path = "tests/custom_query_metric.rs"
+
+[[test]]
+name = "custom_leaf_strategy"
+path = "tests/custom_leaf_strategy.rs"
