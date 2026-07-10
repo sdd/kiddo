@@ -40,6 +40,9 @@ jobs:
           toolchain: nightly
           components: rustfmt,clippy
 
+      - name: Prepare example artifacts
+        run: bash .github/scripts/prepare-example-artifacts.sh
+
       - name: Rustfmt Check
         uses: actions-rust-lang/rustfmt@v1
 
