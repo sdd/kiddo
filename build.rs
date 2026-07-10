@@ -71,6 +71,5 @@ fn main() {
             host, target
         );
     }
-
     println!("cargo:rerun-if-changed=build.rs");
 }
