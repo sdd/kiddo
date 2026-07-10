@@ -1338,9 +1338,12 @@ mod tests {
         let k = 3;
         let mut results =
             ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(k);
+        assert_eq!(results.max_qty(), k);
+        assert_eq!(results.len(), 0);
         for entry in INPUTS {
             results.add(entry);
         }
+        assert_eq!(results.len(), k);
         let sorted = results.into_sorted_vec();
         assert_eq!(sorted.len(), k);
         for i in 1..sorted.len() {
@@ -1352,12 +1355,17 @@ mod tests {
     fn threshold_vec_threshold_distance() {
         let mut results =
             ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(3);
+        assert_eq!(results.max_qty(), 3);
+        assert_eq!(results.len(), 0);
         assert!(results.threshold_distance().is_none());
         results.add(INPUTS[0]);
+        assert_eq!(results.len(), 1);
         assert!(results.threshold_distance().is_none());
         results.add(INPUTS[1]);
+        assert_eq!(results.len(), 2);
         assert!(results.threshold_distance().is_none());
         results.add(INPUTS[2]); // now full
+        assert_eq!(results.len(), 3);
         assert!(results.threshold_distance().is_some());
     }
 
@@ -1365,11 +1373,15 @@ mod tests {
     fn threshold_vec_select_nth_unstable() {
         let mut results =
             ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(3);
+        assert_eq!(results.max_qty(), 3);
+        assert_eq!(results.len(), 0);
         for entry in INPUTS.iter().take(3) {
             results.add(*entry); // 0.4, 0.1, 0.8: farthest is 0.8
         }
+        assert_eq!(results.len(), 3);
         // Add closer than farthest (0.3 < 0.8): should replace it
         results.add(INPUTS[3]); // 0.3
+        assert_eq!(results.len(), 3);
         let sorted = results.into_sorted_vec();
         assert_eq!(sorted.len(), 3);
         assert!(sorted.iter().any(|item| item.distance == 0.3));

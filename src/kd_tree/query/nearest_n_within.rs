@@ -511,6 +511,15 @@ mod tests {
             .within(radius)
             .execute();
         assert_eq!(results.len(), 10);
+
+        // Exercise BinaryHeapResultCollection fallback (k > MAX_VEC_RESULT_SIZE)
+        let max_qty_large = NonZeroUsize::new(21).unwrap();
+        let results_large = tree
+            .query(&query_point)
+            .nearest_n::<SquaredEuclidean<f32>>(max_qty_large)
+            .within(radius)
+            .execute();
+        assert_eq!(results_large.len(), 21);
     }
 
     #[test]
