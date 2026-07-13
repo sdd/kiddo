@@ -26,29 +26,6 @@ env:
   KIDDO_BENCH_LOG2_POINTS: "16"
 
 jobs:
-  walltime_benchmarks:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          show-progress: false
-
-      - name: Setup rust toolchain, cache and cargo-codspeed binary
-        uses: moonrepo/setup-rust@v1
-        with:
-          channel: stable
-          cache-target: release
-          bins: cargo-codspeed
-
-      - name: Build Benchmark Targets (Walltime)
-        run: cargo codspeed build -m walltime
-
-      - name: Run Benchmarks (Walltime)
-        uses: CodSpeedHQ/action@v4
-        with:
-          run: cargo codspeed run
-          token: ${{ secrets.CODSPEED_TOKEN }}
-          mode: walltime
   simulation_benchmarks:
     runs-on: ubuntu-latest
     steps:
