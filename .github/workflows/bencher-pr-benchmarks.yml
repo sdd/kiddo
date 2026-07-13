@@ -59,4 +59,4 @@ jobs:
           --error-on-alert \
           --adapter rust_criterion \
           --github-actions '${{ secrets.GITHUB_TOKEN }}' \
-          "cargo bench --bench profile_v6_nearest_one_eytzinger --features test_utils -- --noplot"
+          "cargo bench --bench profile_v6_nearest_one_eytzinger --bench profile_v6_nearest_n_eytzinger --features test_utils -- --noplot"
