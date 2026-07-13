@@ -2,8 +2,6 @@ env:
   LATEST_STABLE_RUST_VERSION: "TBD"
 
 on:
-  pull_request:
-    types: [opened, reopened, edited, synchronize]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -34,68 +32,16 @@ on:
 jobs:
   benchmark_pr_branch:
     name: Continuous Benchmarking PRs with Bencher
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event_name == 'pull_request' &&
-        (
-          github.event.pull_request.head.repo.full_name == github.repository ||
-          github.event.pull_request.author_association == 'OWNER' ||
-          github.event.pull_request.author_association == 'COLLABORATOR'
-        )
-      )
     permissions:
       contents: read
       checks: write
       pull-requests: write
     runs-on: [self-hosted]
     steps:
-      - id: target
-        name: Resolve benchmark target
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
-          INPUT_HEAD_SHA: ${{ inputs.head_sha }}
-          INPUT_HEAD_REF: ${{ inputs.head_ref }}
-          INPUT_HEAD_REPO: ${{ inputs.head_repo }}
-          INPUT_BASE_REF: ${{ inputs.base_ref }}
-          INPUT_BASE_SHA: ${{ inputs.base_sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            pr_number="$INPUT_PR_NUMBER"
-            head_sha="$INPUT_HEAD_SHA"
-            head_ref="$INPUT_HEAD_REF"
-            head_repo="$INPUT_HEAD_REPO"
-            base_ref="$INPUT_BASE_REF"
-            base_sha="$INPUT_BASE_SHA"
-          else
-            pr_number="$PR_NUMBER"
-            head_sha="$PR_HEAD_SHA"
-            head_ref="$PR_HEAD_REF"
-            head_repo="$PR_HEAD_REPO"
-            base_ref="$PR_BASE_REF"
-            base_sha="$PR_BASE_SHA"
-          fi
-
-          {
-            echo "pr_number=$pr_number"
-            echo "head_sha=$head_sha"
-            echo "head_ref=$head_ref"
-            echo "head_repo=$head_repo"
-            echo "base_ref=$base_ref"
-            echo "base_sha=$base_sha"
-          } >> "$GITHUB_OUTPUT"
-
       - uses: actions/checkout@v7
         with:
-          repository: ${{ steps.target.outputs.head_repo }}
-          ref: ${{ steps.target.outputs.head_sha }}
+          repository: ${{ inputs.head_repo }}
+          ref: ${{ inputs.head_sha }}
           show-progress: false
 
       - name: Get latest stable Rust version
@@ -125,13 +71,17 @@ jobs:
 
       - uses: bencherdev/bencher@main
       - name: Track PR Benchmarks with Bencher
+        env:
+          BENCH_HEAD_REF: ${{ inputs.head_ref }}
+          BENCH_BASE_REF: ${{ inputs.base_ref }}
+          BENCH_BASE_SHA: ${{ inputs.base_sha }}
         run: |
           bencher run \
           --project kiddo \
           --key '${{ secrets.BENCHER_API_KEY }}' \
-          --branch '${{ steps.target.outputs.head_ref }}' \
-          --start-point '${{ steps.target.outputs.base_ref }}' \
-          --start-point-hash '${{ steps.target.outputs.base_sha }}' \
+          --branch "$BENCH_HEAD_REF" \
+          --start-point "$BENCH_BASE_REF" \
+          --start-point-hash "$BENCH_BASE_SHA" \
           --start-point-clone-thresholds \
           --start-point-reset \
           --testbed ubuntu-latest \

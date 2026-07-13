@@ -28,10 +28,11 @@ env:
 jobs:
   simulation_benchmarks:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for OIDC authentication with CodSpeed
     steps:
       - uses: actions/checkout@v7
-        with:
-          show-progress: false
 
       - name: Setup rust toolchain, cache and cargo-codspeed binary
         uses: moonrepo/setup-rust@v1
@@ -47,5 +48,4 @@ jobs:
         uses: CodSpeedHQ/action@v4
         with:
           run: cargo codspeed run
-          token: ${{ secrets.CODSPEED_TOKEN }}
           mode: simulation
