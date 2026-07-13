@@ -1,0 +1,80 @@
+name: bencher-pr-benchmark-dispatch
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  dispatch_benchmark:
+    if: github.event.issue.pull_request && github.event.comment.body == '/benchmark'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate trigger and dispatch benchmark
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueNumber = context.payload.issue.number;
+            const commenter = context.payload.comment.user.login;
+
+            const permission = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner,
+              repo,
+              username: commenter,
+            });
+
+            const allowedCommenterPermissions = new Set(["admin", "maintain", "write"]);
+            if (!allowedCommenterPermissions.has(permission.data.permission)) {
+              core.setFailed(
+                `/${"benchmark"} requires write access or above. ${commenter} has ${permission.data.permission}.`
+              );
+              return;
+            }
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: issueNumber,
+            });
+
+            const trustedAssociations = new Set(["OWNER", "COLLABORATOR"]);
+            const isFork = pr.head.repo.full_name !== `${owner}/${repo}`;
+            const needsManualGate = isFork && !trustedAssociations.has(pr.author_association);
+
+            if (!needsManualGate) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body: "This PR already qualifies for automatic Bencher runs; no manual dispatch was needed.",
+              });
+              return;
+            }
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: "bencher-pr-benchmarks.yml",
+              ref: pr.base.ref,
+              inputs: {
+                pr_number: String(pr.number),
+                head_sha: pr.head.sha,
+                head_ref: pr.head.ref,
+                head_repo: pr.head.repo.full_name,
+                base_ref: pr.base.ref,
+                base_sha: pr.base.sha,
+              },
+            });
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              body: `Queued Bencher benchmarks for \`${pr.head.label}\` at \`${pr.head.sha.slice(0, 12)}\`.`,
+            });
