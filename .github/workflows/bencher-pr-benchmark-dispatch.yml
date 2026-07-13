@@ -29,10 +29,10 @@ jobs:
               username: commenter,
             });
 
-            const allowedCommenterPermissions = new Set(["admin", "maintain", "write"]);
+            const allowedCommenterPermissions = new Set(["admin"]);
             if (!allowedCommenterPermissions.has(permission.data.permission)) {
               core.setFailed(
-                `/${"benchmark"} requires write access or above. ${commenter} has ${permission.data.permission}.`
+                `/${"benchmark"} requires admin access. ${commenter} has ${permission.data.permission}.`
               );
               return;
             }
@@ -43,16 +43,32 @@ jobs:
               pull_number: issueNumber,
             });
 
-            const trustedAssociations = new Set(["OWNER", "COLLABORATOR"]);
             const isFork = pr.head.repo.full_name !== `${owner}/${repo}`;
-            const needsManualGate = isFork && !trustedAssociations.has(pr.author_association);
+            let isCollaborator = false;
+
+            if (isFork) {
+              try {
+                await github.rest.repos.checkCollaborator({
+                  owner,
+                  repo,
+                  username: pr.user.login,
+                });
+                isCollaborator = true;
+              } catch (error) {
+                if (error.status !== 404) {
+                  throw error;
+                }
+              }
+            }
+
+            const needsManualGate = isFork && !isCollaborator;
 
             if (!needsManualGate) {
               await github.rest.issues.createComment({
                 owner,
                 repo,
                 issue_number: issueNumber,
-                body: "This PR already qualifies for automatic Bencher runs; no manual dispatch was needed.",
+                body: "This PR already qualifies for automatic Bencher runs under the current trust policy; no manual dispatch was needed.",
               });
               return;
             }
