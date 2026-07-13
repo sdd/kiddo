@@ -161,7 +161,7 @@ serde_json = "1"
 tracing-subscriber = "0.3"
 trybuild = "1"
 ubyte = "0.10"
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "8", default-features = false, features = ["deflate"] }
 zzz = "0.3.2"
 
 [lints.rust]
