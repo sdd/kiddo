@@ -36,6 +36,14 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Ensure CMake is installed
+        run: |
+          if ! command -v cmake >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y cmake
+          fi
+          cmake --version
+
       - uses: bencherdev/bencher@main
       - name: Track PR Benchmarks with Bencher
         run: |
