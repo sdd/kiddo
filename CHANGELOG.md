@@ -1,5 +1,6 @@
 # Kiddo Changelog
 
+<<<<<<< Updated upstream
 ## [6.0.0-alpha.1] - 2026-06-30
 
 Almost a year in the making and counting, Kiddo v6 is effectively a full rewrite, addressing some
@@ -30,6 +31,27 @@ long-standing issues.
   Donnelly stem ordering via a family of stem strategies, featuring configurable pre-fetch and block size,
   unrolled traversal, SIMD descent, and full SIMD pruning and backtracking variants. The SIMD variant
   contains custom AVX2, AVX512, and NEON kernels.
+=======
+## [5.3.3] - 2026-07-13
+
+### Ci
+
+- Don't run comitlint for dependabot PRs
+
+### 🧹 Chore
+
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump rand deps
+- Bump criterion deps
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump codecov/codecov-action from 5 to 7, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump actions/checkout from 6 to 7, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump actions/cache from 5 to 6, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+>>>>>>> Stashed changes
 
 ## [5.3.2] - 2026-06-02
 
