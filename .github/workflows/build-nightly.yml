@@ -50,6 +50,9 @@ jobs:
           toolchain: nightly
           components: rustfmt, clippy
 
+      - name: Prepare example artifacts
+        run: bash .github/scripts/prepare-example-artifacts.sh
+
       - name: Clippy (Nightly)
         uses: LoliGothick/clippy-check@ad7a7d94820528f03680550b984f5b43dd8af294
         if: github.actor != 'dependabot[bot]'
@@ -102,13 +105,14 @@ jobs:
           toolchain: nightly
           components: rustfmt, clippy
 
+      - name: Prepare example artifacts
+        run: bash .github/scripts/prepare-example-artifacts.sh
+
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
 
       - name: Cargo nextest (dev build)
         run: |
-          cargo run --example build-float-doctest-tree-rkyv_08 --features="rkyv_08"
-          cargo run --example build-immutable-doctest-tree-rkyv_08 --features="rkyv_08"
           cargo nextest run --workspace --features "csv,f16,las,serde,simd,rkyv_08,test_utils"
 
       - name: Cargo nextest (release build)
