@@ -249,6 +249,12 @@ harness = false
 required-features = ["test_utils"]
 
 [[bench]]
+name = "profile_v6_nearest_n_eytzinger"
+path = "benches/profile_v6_nearest_n_eytzinger.rs"
+harness = false
+required-features = ["test_utils"]
+
+[[bench]]
 name = "profile_v6_leaf_strategies"
 path = "benches/profile_v6_leaf_strategies.rs"
 harness = false
