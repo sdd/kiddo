@@ -151,12 +151,17 @@ radians = "0.3"
 rand = "0.10"
 rand_distr = "0.6"
 rayon = "1"
+reqwest = { version = "0.12", default-features = false, features = [
+  "blocking",
+  "rustls-tls",
+] }
 rstest = "0.26"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 tracing-subscriber = "0.3"
 trybuild = "1"
 ubyte = "0.10"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 zzz = "0.3.2"
 
 [lints.rust]
@@ -501,6 +506,21 @@ required-features = ["rkyv_08"]
 name = "immutable-rkyv_08-deserialize"
 path = "examples/immutable-rkyv_08-deserialize.rs"
 required-features = ["rkyv_08"]
+
+[[example]]
+name = "embedded-rkyv_08-deserialize"
+path = "examples/embedded-rkyv_08-deserialize.rs"
+required-features = ["rkyv_08"]
+
+[[example]]
+name = "download-geonames-data"
+path = "examples/download-geonames-data.rs"
+required-features = ["csv"]
+
+[[example]]
+name = "build-geonames-embedded-rkyv"
+path = "examples/build-geonames-embedded-rkyv.rs"
+required-features = ["csv", "rkyv_08"]
 
 [[example]]
 name = "immutable-large-eytz-build-and-serialize-f32"
