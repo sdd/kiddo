@@ -178,6 +178,18 @@ name = "best_n"
 harness = false
 required-features = ["test_utils"]
 
+[[bench]]
+name = "profile_v5_nearest_one_eytzinger"
+path = "benches/profile_v5_nearest_one_eytzinger.rs"
+harness = false
+required-features = ["test_utils"]
+
+[[bench]]
+name = "profile_v5_nearest_n_eytzinger"
+path = "benches/profile_v5_nearest_n_eytzinger.rs"
+harness = false
+required-features = ["test_utils"]
+
 [[example]]
 name = "avx2-check"
 path = "examples/avx2-check.rs"
