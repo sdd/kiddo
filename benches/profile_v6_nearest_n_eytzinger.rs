@@ -110,7 +110,7 @@ fn run_queries_f32(
 }
 
 fn nearest_n(c: &mut Criterion) {
-    let query_count = read_usize_env("KIDDO_PROFILE_QUERIES", DEFAULT_QUERY_COUNT);
+    let query_count = read_usize_env("KIDDO_BENCH_QUERIES", DEFAULT_QUERY_COUNT);
 
     eprintln!(
         "benchmarking v6 nearest_n: dims={} tree_sizes=2^16..2^26 queries={} ks={:?} point_seed={} query_seed={}",

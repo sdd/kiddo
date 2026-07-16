@@ -3,6 +3,8 @@
 default:
   just --list
 
+benchmark_result_key := `date -u +%Y%m%dT%H%M%SZ`
+
 fmt:
     cargo fmt --all
     cargo sort -wg
@@ -116,6 +118,38 @@ asm-k6-nearest-one-donnelly-voarena-v3-avx512-clean:
 
 asm-k6-nearest-one-donnelly-blocksimd-voarena-v3-avx512-clean:
     RUSTC_WRAPPER= cargo asm --simplify --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "v6_nearest_one_donnelly_blocksimd_vec_of_arenas_cargo_asm_hook" | python3 scripts/clean_cargo_asm.py > v6_nearest_one_donnelly_blocksimd_vec_of_arenas_v3_avx512_clean.asm
+
+bench-v6-eytzinger-focus RESULT_KEY=benchmark_result_key FEATURES='simd,test_utils,logging_off' QUERIES='1000':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    result_key={{quote(RESULT_KEY)}}
+    if [[ ! "$result_key" =~ ^[A-Za-z0-9][A-Za-z0-9._+:-]*$ ]]; then
+        echo "RESULT_KEY must contain only letters, digits, '.', '_', '+', ':', or '-'" >&2
+        exit 2
+    fi
+    RUSTC_WRAPPER= \
+        KIDDO_BENCH_QUERIES={{quote(QUERIES)}} \
+        RUSTFLAGS='-C target-cpu=native' \
+        cargo criterion \
+            --bench profile_v6_nearest_n_eytzinger \
+            --features {{quote(FEATURES)}}
+    RUSTC_WRAPPER= \
+            KIDDO_BENCH_QUERIES={{quote(QUERIES)}} \
+            RUSTFLAGS='-C target-cpu=native' \
+            cargo criterion \
+                --bench profile_v6_nearest_one_eytzinger \
+                --features {{quote(FEATURES)}}
+    cargo run --quiet --manifest-path tools/criterion-export/Cargo.toml -- \
+            target/criterion \
+            "bench_result-v6-nearest_n-eytzinger-${result_key}.json" \
+            profile_v6_nearest_n_eytzinger
+    cargo run --quiet --manifest-path tools/criterion-export/Cargo.toml -- \
+        target/criterion \
+        "bench_result-v6-nearest_one-eytzinger-${result_key}.json" \
+        profile_v6_nearest_one_eytzinger
+
+chart-benchmark-results VARIANT_KEY:
+    python3 scripts/chart_benchmark_results.py {{quote(VARIANT_KEY)}}
 
 bench-v6-stem-strategies-focus FEATURES='simd,test_utils,logging_off' POINTS='4194304' QUERIES='10000':
     RUSTC_WRAPPER= \
