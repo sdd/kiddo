@@ -1,5 +1,55 @@
 # Kiddo Changelog
 
+## [6.0.0-alpha.2] - 2026-07-16
+
+### Ci
+
+- Prepare embedded example artifacts in CI
+- Add bencher for master push and non-fork PRs
+- Run codspeed in simulation mode only
+- Install cmake for bencher runner
+- Add eytzinger nearest_n bencher profiles
+- Allow bencher runs for collaborators or manually permissioned forks
+- Switch to standard collab model now that repo is in a personal org
+- Ensure examples/data is .gitignored
+
+### ⚡️ Performance
+
+- Pre-allocate unsorted result Vec with capacity 64
+- Use `select_nth_unstable` extraction in `ThresholdVecResultCollection`
+- Hybrid sorted-vec result collection for small-k `nearest_n`
+
+### ✨ Features
+
+- Configurable scratch location
+- Introduce QueryMetric public trait, Fixes:https://github.com/sdd/kiddo/issues/390
+- Ensure third-party leaf strategies can be used
+- Add example showing how to embed a kd-tree
+- Add ThresholdVecResultCollection for small-k `nearest_n`
+
+### 🐛 Bug Fixes
+
+- Add dafault impl of LeafStrategy::new_with_empty_leaf
+- Cache `threshold_distance` in `ThresholdVecResultCollection`
+- Apply `ThresholdVecResultCollection` to scratch-based `nearest_n` path
+- Dispatch `into_sorted_vec()` through `into_vec()` in ThresholdVec
+- Extend `ThresholdVec` optimisation to unsorted `nearest_n` path
+
+### 🧪 Testing
+
+- Add regression test to ensure KdTree::default works
+- Add k=21 nearest_n_within case for BinaryHeap coverage, remove padding test
+
+### 🧹 Chore
+
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+- Migrate config renovate.json
+- Move binaries to be examples or benches to avoid confusion in the crates.io page
+- Bump actions/github-script from 8 to 9, Signed-off-by:dependabot[bot] <support@github.com>
+- Bump LoliGothick/clippy-check, Signed-off-by:dependabot[bot] <support@github.com>
+- Update reqwest dep
+- Update rust crate zip to v8
+
 ## [6.0.0-alpha.1] - 2026-06-30
 
 Almost a year in the making and counting, Kiddo v6 is effectively a full rewrite, addressing some
