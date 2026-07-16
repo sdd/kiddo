@@ -1,0 +1,94 @@
+name: Release PR Intro
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-release-intro:
+    if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/intro') && github.event.comment.user.login == 'sdd'
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_PLZ_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN != '' && secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Resolve release PR branch
+        id: pr
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = context.payload.issue.number;
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number,
+            });
+
+            if (pr.head.repo.full_name !== `${owner}/${repo}`) {
+              core.setFailed("/intro only supports release PRs whose head branch lives in this repository.");
+              return;
+            }
+
+            if (!pr.head.ref.startsWith("release-plz-")) {
+              core.setFailed("/intro only supports release-plz PR branches.");
+              return;
+            }
+
+            core.setOutput("head_ref", pr.head.ref);
+            core.setOutput("head_sha", pr.head.sha);
+
+      - uses: actions/checkout@v7
+        with:
+          show-progress: false
+          fetch-depth: 0
+          ref: ${{ steps.pr.outputs.head_ref }}
+          token: ${{ env.RELEASE_PLZ_TOKEN }}
+
+      - name: Extract intro markdown from comment
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          event_path = Path(os.environ["GITHUB_EVENT_PATH"])
+          body = json.loads(event_path.read_text())["comment"]["body"]
+
+          prefix = "/intro"
+          intro = body[len(prefix):]
+          if intro.startswith("\r\n"):
+              intro = intro[2:]
+          elif intro.startswith("\n"):
+              intro = intro[1:]
+          elif intro.startswith(" "):
+              intro = intro[1:]
+
+          Path(".github/release-pr-intro.md").write_text(intro.rstrip() + "\n", encoding="utf-8")
+          PY
+
+      - name: Update release intro in changelog
+        run: python3 scripts/update_release_intro.py CHANGELOG.md .github/release-pr-intro.md
+
+      - name: Commit intro update
+        run: |
+          if git diff --quiet -- CHANGELOG.md; then
+            echo "CHANGELOG.md already matches requested intro."
+            exit 0
+          fi
+
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          if [ -s .github/release-pr-intro.md ]; then
+            git commit -am "docs: update release intro"
+          else
+            git commit -am "docs: remove release intro"
+          fi
+
+          git push origin "HEAD:${{ steps.pr.outputs.head_ref }}"
