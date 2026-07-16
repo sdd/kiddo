@@ -16,9 +16,16 @@ body = """
     {% endif %}\
 {% endif %}\
 {% for group, commits in commits | group_by(attribute="group") %}
-    ### {{ group | upper_first }}
+    ### {{ group | striptags | trim }}
     {% for commit in commits %}
         - {{ commit.message | upper_first }}\
+          {%- if commit.remote and commit.remote.username and commit.remote.pr_number and remote.github %}
+            [\\[@{{ commit.remote.username }}, #{{ commit.remote.pr_number }}\\]](https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/pull/{{ commit.remote.pr_number }})\
+          {%- elif commit.remote and commit.remote.username %}
+            [\\[@{{ commit.remote.username }}\\]](https://github.com/{{ commit.remote.username }})\
+          {%- elif commit.author and commit.author.name %}
+            [{{ commit.author.name }}]\
+          {%- endif %}\
           {% for footer in commit.footers -%}
             , {{ footer.token }}{{ footer.separator }}{{ footer.value }}\
           {% endfor %}\
@@ -33,14 +40,16 @@ conventional_commits = true
 filter_unconventional = true
 split_commits = false
 commit_parsers = [
-  { message = "^feat", group = "✨ Features" },
-  { message = "^fix", group = "🐛 Bug Fixes" },
-  { message = "^doc", group = "📝 Documentation" },
-  { message = "^perf", group = "⚡️ Performance" },
-  { message = "^refactor", group = "♻️ Refactor" },
-  { message = "^style", group = "💄 Styling" },
-  { message = "^test", group = "🧪 Testing" },
-  { message = "^chore", group = "🧹 Chore" },
+  { message = "^feat", group = "<!-- 0 --> ✨ Features" },
+  { message = "^fix", group = "<!-- 1 --> 🐛 Bug Fixes" },
+  { message = "^perf", group = "<!-- 2 --> ⚡️ Performance" },
+  { message = "^refactor", group = "<!-- 3 --> ♻️ Refactor" },
+  { message = "^test", group = "<!-- 4 --> 🧪 Testing" },
+  { message = "^ci", group = "<!-- 5 --> 🤖 CI" },
+  { message = "^chore", group = "<!-- 6 --> 🧹 Chore" },
+  { message = "^docs?", group = "<!-- 6 --> 🧹 Chore" },
+  { message = "^style", group = "<!-- 6 --> 🧹 Chore" },
+  { message = "^build", group = "<!-- 6 --> 🧹 Chore" },
 ]
 protect_breaking_commits = true
 tag_pattern = "v[0-9]\\.[0-9]\\.[0-9]"
