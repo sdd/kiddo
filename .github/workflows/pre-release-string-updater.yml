@@ -43,6 +43,9 @@ jobs:
           include: "src/lib.rs"
           replace: ${{ format('"https://docs.rs/kiddo/{0}"', steps.crate-version.outputs.version) }}
 
+      - name: Format changelog
+        run: npx --yes prettier --write CHANGELOG.md
+
       - name: Commit files
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"

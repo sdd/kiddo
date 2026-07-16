@@ -75,6 +75,9 @@ jobs:
       - name: Update release intro in changelog
         run: python3 scripts/update_release_intro.py CHANGELOG.md .github/release-pr-intro.md
 
+      - name: Format changelog
+        run: npx --yes prettier --write CHANGELOG.md
+
       - name: Commit intro update
         run: |
           if git diff --quiet -- CHANGELOG.md; then
