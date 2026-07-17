@@ -13,7 +13,7 @@ jobs:
     if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/intro') && github.event.comment.user.login == 'sdd'
     runs-on: ubuntu-latest
     env:
-      RELEASE_PLZ_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN != '' && secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
+      RELEASE_PLZ_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
     steps:
       - name: Resolve release PR branch
         id: pr
