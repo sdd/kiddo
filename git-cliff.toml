@@ -22,7 +22,7 @@ body = """
           {%- if commit.remote and commit.remote.username and commit.remote.pr_number and remote.github %}
             \n  [\\[@{{ commit.remote.username }}, #{{ commit.remote.pr_number }}\\]](https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/pull/{{ commit.remote.pr_number }})\
           {%- elif commit.remote and commit.remote.username %}
-            \n  [\\[@{{ commit.remote.username }}\\]](https://github.com/{{ commit.remote.username }})\
+            \n  [\\[@{{ commit.remote.username }}\\]](https://github.com/{{ commit.remote.username }})\n\
           {%- elif commit.author and commit.author.name %}
             \n  [{{ commit.author.name }}]\
           {%- endif %}\
