@@ -14,7 +14,6 @@
 
 - Add ThresholdVecResultCollection for small-k `nearest_n` ([@cbueth](https://github.com/cbueth))
 
-
 ### 🐛 Bug Fixes
 
 - Add dafault impl of LeafStrategy::new_with_empty_leaf ([@sdd](https://github.com/sdd))
@@ -27,7 +26,6 @@
 
 - Extend `ThresholdVec` optimisation to unsorted `nearest_n` path ([@cbueth](https://github.com/cbueth))
 
-
 ### ⚡️ Performance
 
 - Pre-allocate unsorted result Vec with capacity 64 ([@cbueth](https://github.com/cbueth))
@@ -36,13 +34,11 @@
 
 - Hybrid sorted-vec result collection for small-k `nearest_n` ([@cbueth](https://github.com/cbueth))
 
-
 ### 🧪 Testing
 
 - Add regression test to ensure KdTree::default works ([@sdd](https://github.com/sdd))
 
 - Add k=21 nearest_n_within case for BinaryHeap coverage, remove padding test ([@cbueth](https://github.com/cbueth))
-
 
 ### 🤖 CI
 
@@ -71,7 +67,6 @@
 - Git-cliff nicer formatting ([@sdd](https://github.com/sdd))
 
 - Git-cliff fix formatting yet again ([@sdd](https://github.com/sdd))
-
 
 ### 🧹 Chore
 
