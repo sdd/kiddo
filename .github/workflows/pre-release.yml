@@ -16,11 +16,13 @@ jobs:
       contents: write
     env:
       RUSTFLAGS: "-C target-feature=+avx2"
+      RELEASE_PLZ_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
           show-progress: false
           fetch-depth: 0
+          token: ${{ env.RELEASE_PLZ_TOKEN }}
 
       - name: Get date
         run: |
@@ -63,4 +65,4 @@ jobs:
         with:
           command: release-pr
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ env.RELEASE_PLZ_TOKEN }}

@@ -15,12 +15,12 @@ body = """
             [{{ commit_id | truncate(length=7, end="") }}]({{ commit_id }})
     {% endif %}\
 {% endif %}\
-{% for group, commits in commits | group_by(attribute="group") %}
+{%- for group, commits in commits | group_by(attribute="group") %}
     ### {{ group | striptags | trim }}
     {% for commit in commits %}
         - {{ commit.message | upper_first }}{%- if (commit.remote and commit.remote.username) or (commit.author and commit.author.name) or (commit.footers | length > 0) %} ({%- if commit.remote and commit.remote.username and commit.remote.pr_number and remote.github %}[@{{ commit.remote.username }}](https://github.com/{{ commit.remote.username }}), [PR #{{ commit.remote.pr_number }}](https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/pull/{{ commit.remote.pr_number }}){%- elif commit.remote and commit.remote.username %}[@{{ commit.remote.username }}](https://github.com/{{ commit.remote.username }}){%- elif commit.author and commit.author.name %}{{ commit.author.name }}{%- endif %}{%- for footer in commit.footers -%}{%- if (commit.remote and commit.remote.username) or (commit.author and commit.author.name) or not loop.first %}, {% endif %}{{ footer.token }}: {%- if footer.value is starting_with("https://github.com/") and "/issues/" in footer.value -%}[Issue #{{ footer.value | split(pat="/") | last }}]({{ footer.value }}){%- else -%}{{ footer.value }}{%- endif -%}{%- endfor -%}){%- endif %}
     {% endfor %}
-{% endfor %}
+{% endfor -%}
 """
 
 trim = true

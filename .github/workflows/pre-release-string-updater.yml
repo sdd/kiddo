@@ -11,10 +11,13 @@ jobs:
   pre-release-string-updater:
     name: Pre Release String Updater
     runs-on: ubuntu-latest
+    env:
+      RELEASE_PLZ_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
           show-progress: false
+          token: ${{ env.RELEASE_PLZ_TOKEN }}
 
       - name: Crate Version
         id: crate-version
@@ -55,5 +58,5 @@ jobs:
       - name: Push changes
         uses: ad-m/github-push-action@v1.3.0
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ env.RELEASE_PLZ_TOKEN }}
           branch: ${{ github.ref }}
