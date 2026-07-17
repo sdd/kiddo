@@ -1,5 +1,100 @@
 # Kiddo Changelog
 
+## [6.0.0-alpha.2] - 2026-07-17
+
+### ✨ Features
+
+- Configurable scratch location ([@sdd](https://github.com/sdd))
+
+- Introduce QueryMetric public trait ([@sdd](https://github.com/sdd), Fixes:[Issue #390](https://github.com/sdd/kiddo/issues/390))
+
+- Ensure third-party leaf strategies can be used ([@sdd](https://github.com/sdd))
+
+- Add example showing how to embed a kd-tree ([@sdd](https://github.com/sdd))
+
+- Add ThresholdVecResultCollection for small-k `nearest_n` ([@cbueth](https://github.com/cbueth))
+
+
+### 🐛 Bug Fixes
+
+- Add dafault impl of LeafStrategy::new_with_empty_leaf ([@sdd](https://github.com/sdd))
+
+- Cache `threshold_distance` in `ThresholdVecResultCollection` ([@cbueth](https://github.com/cbueth))
+
+- Apply `ThresholdVecResultCollection` to scratch-based `nearest_n` path ([@cbueth](https://github.com/cbueth))
+
+- Dispatch `into_sorted_vec()` through `into_vec()` in ThresholdVec ([@cbueth](https://github.com/cbueth))
+
+- Extend `ThresholdVec` optimisation to unsorted `nearest_n` path ([@cbueth](https://github.com/cbueth))
+
+
+### ⚡️ Performance
+
+- Pre-allocate unsorted result Vec with capacity 64 ([@cbueth](https://github.com/cbueth))
+
+- Use `select_nth_unstable` extraction in `ThresholdVecResultCollection` ([@cbueth](https://github.com/cbueth))
+
+- Hybrid sorted-vec result collection for small-k `nearest_n` ([@cbueth](https://github.com/cbueth))
+
+
+### 🧪 Testing
+
+- Add regression test to ensure KdTree::default works ([@sdd](https://github.com/sdd))
+
+- Add k=21 nearest_n_within case for BinaryHeap coverage, remove padding test ([@cbueth](https://github.com/cbueth))
+
+
+### 🤖 CI
+
+- Prepare embedded example artifacts in CI ([@sdd](https://github.com/sdd))
+
+- Add bencher for master push and non-fork PRs ([@sdd](https://github.com/sdd))
+
+- Run codspeed in simulation mode only ([@sdd](https://github.com/sdd))
+
+- Install cmake for bencher runner ([@sdd](https://github.com/sdd))
+
+- Add eytzinger nearest_n bencher profiles ([@sdd](https://github.com/sdd))
+
+- Allow bencher runs for collaborators or manually permissioned forks ([@sdd](https://github.com/sdd))
+
+- Switch to standard collab model now that repo is in a personal org ([@sdd](https://github.com/sdd))
+
+- Ensure examples/data is .gitignored ([@sdd](https://github.com/sdd))
+
+- Ensure git-cliff emits well-formatted md ([@sdd](https://github.com/sdd))
+
+- Ensure git-cliff emits well-formatted md ([@sdd](https://github.com/sdd))
+
+- Ensure git-cliff emits well-formatted md ([@sdd](https://github.com/sdd))
+
+- Git-cliff nicer formatting ([@sdd](https://github.com/sdd))
+
+- Git-cliff fix formatting yet again ([@sdd](https://github.com/sdd))
+
+
+### 🧹 Chore
+
+- Bump LoliGothick/clippy-check ([@dependabot[bot]](https://github.com/dependabot[bot]), Signed-off-by:dependabot[bot] <support@github.com>)
+
+- Migrate config renovate.json ([@renovate[bot]](https://github.com/renovate[bot]))
+
+- Move binaries to be examples or benches to avoid confusion in the crates.io page ([@sdd](https://github.com/sdd))
+
+- Bump actions/github-script from 8 to 9 ([@dependabot[bot]](https://github.com/dependabot[bot]), Signed-off-by:dependabot[bot] <support@github.com>)
+
+- Bump LoliGothick/clippy-check ([@dependabot[bot]](https://github.com/dependabot[bot]), Signed-off-by:dependabot[bot] <support@github.com>)
+
+- Update reqwest dep ([@sdd](https://github.com/sdd))
+
+- Update rust crate zip to v8 ([@renovate[bot]](https://github.com/renovate[bot]))
+
+- Update git-cliff config ([@sdd](https://github.com/sdd))
+
+- Workflow to permit /intro comments on release-plz prs ([@sdd](https://github.com/sdd))
+
+- Ensure release-plz and intro-comment format changelog ([@sdd](https://github.com/sdd))
+
 ## [6.0.0-alpha.1] - 2026-06-30
 
 Almost a year in the making and counting, Kiddo v6 is effectively a full rewrite, addressing some
