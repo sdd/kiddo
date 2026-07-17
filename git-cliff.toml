@@ -20,11 +20,11 @@ body = """
     {% for commit in commits %}
         - {{ commit.message | upper_first }}\
           {%- if commit.remote and commit.remote.username and commit.remote.pr_number and remote.github %}
-            [\\[@{{ commit.remote.username }}, #{{ commit.remote.pr_number }}\\]](https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/pull/{{ commit.remote.pr_number }})\
+            \n  [\\[@{{ commit.remote.username }}, #{{ commit.remote.pr_number }}\\]](https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/pull/{{ commit.remote.pr_number }})\
           {%- elif commit.remote and commit.remote.username %}
-            [\\[@{{ commit.remote.username }}\\]](https://github.com/{{ commit.remote.username }})\
+            \n  [\\[@{{ commit.remote.username }}\\]](https://github.com/{{ commit.remote.username }})\
           {%- elif commit.author and commit.author.name %}
-            [{{ commit.author.name }}]\
+            \n  [{{ commit.author.name }}]\
           {%- endif %}\
           {% for footer in commit.footers -%}
             , {{ footer.token }}{{ footer.separator }}{{ footer.value }}\
