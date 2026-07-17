@@ -84,7 +84,7 @@ optional = true
 features = ["num-traits"]
 
 [dependencies.las]
-version = "0.9"
+version = "0.10"
 optional = true
 features = ["laz-parallel"]
 
@@ -143,7 +143,7 @@ itertools = "0.15"
 # required to be able to run tests without specifying --features=test_utils
 # see https://github.com/rust-lang/cargo/issues/2911#issuecomment-749580481
 kiddo = { path = ".", features = ["test_utils"] }
-las = { version = "0.9", features = ["laz-parallel"] }
+las = { version = "0.10", features = ["laz-parallel"] }
 memmap = "0.7"
 postcard = { version = "1", features = ["alloc"] }
 proc-macro2 = { version = "1", features = ["default", "proc-macro"] }
