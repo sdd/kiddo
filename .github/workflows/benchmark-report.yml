@@ -1,0 +1,173 @@
+name: benchmark-report
+
+on:
+  push:
+    branches:
+      - master
+      - feature/**
+      - fix/**
+    paths:
+      - "src/**"
+      - "benches/**"
+      - "tools/criterion-export/**"
+      - "scripts/**"
+      - "justfile"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/benchmark-report.yml"
+      - "BENCHMARKING.md"
+  workflow_dispatch:
+
+concurrency:
+  group: benchmark-report-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  LATEST_STABLE_RUST_VERSION: "TBD"
+
+jobs:
+  benchmark:
+    runs-on: [self-hosted]
+    outputs:
+      variant_key: ${{ steps.meta.outputs.variant_key }}
+      site_url_base: ${{ steps.meta.outputs.site_url_base }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          show-progress: false
+
+      - name: Get latest stable Rust version
+        run: |
+          echo "LATEST_STABLE_RUST_VERSION=$(gh api /repos/rust-lang/rust/releases --jq ".[0].tag_name")" >> "$GITHUB_ENV"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Toolchain
+        uses: actions/cache@v6
+        with:
+          path: ~/.rustup
+          key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
+
+      - name: Install `stable` Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install `just`
+        uses: taiki-e/install-action@just
+
+      - name: Install `cargo-criterion`
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-criterion
+          version: "^1"
+
+      - name: Derive metadata
+        id: meta
+        run: |
+          variant_key=$(just --quiet benchmark-derive-key "${GITHUB_REF_NAME}")
+          repo_name="${GITHUB_REPOSITORY#*/}"
+          site_url_base="https://${GITHUB_REPOSITORY_OWNER}.github.io/${repo_name}"
+          echo "variant_key=$variant_key" >> "$GITHUB_OUTPUT"
+          echo "site_url_base=$site_url_base" >> "$GITHUB_OUTPUT"
+
+      - name: Run benchmark suite
+        run: |
+          just bench-v6-eytzinger-focus \
+            RESULT_KEY='${{ steps.meta.outputs.variant_key }}' \
+            OUTPUT_DIR=./target/benchmark-results \
+            FEATURES='simd,test_utils,logging_off' \
+            QUERIES='1000'
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/benchmark-results/
+          if-no-files-found: error
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: benchmark
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          show-progress: false
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install chart dependencies
+        run: python -m pip install matplotlib
+
+      - name: Install `just`
+        uses: taiki-e/install-action@just
+
+      - name: Download benchmark artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ./target/benchmark-results
+
+      - name: Prepare gh-pages worktree
+        run: |
+          git fetch origin gh-pages || true
+          rm -rf .benchmark-pages
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git worktree add .benchmark-pages origin/gh-pages
+          else
+            mkdir -p .benchmark-pages
+            cd .benchmark-pages
+            git init
+            git checkout --orphan gh-pages
+            git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          fi
+
+      - name: Find open PRs for branch
+        id: prs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          prs=$(python3 scripts/benchmark_site.py find-prs --repo "${GITHUB_REPOSITORY}" --ref-name "${GITHUB_REF_NAME}" || echo "[]")
+          echo "prs=$prs" >> "$GITHUB_OUTPUT"
+
+      - name: Publish run into gh-pages tree
+        env:
+          PRS_JSON: ${{ steps.prs.outputs.prs }}
+        run: |
+          PR_ARGS=$(python3 -c 'import json, os; print(" ".join(f"--pr-number {value}" for value in json.loads(os.environ["PRS_JSON"])))')
+          python3 scripts/benchmark_site.py publish-run \
+            --ref-name "${GITHUB_REF_NAME}" \
+            --sha "${GITHUB_SHA}" \
+            --results-dir ./target/benchmark-results \
+            --pages-root ./.benchmark-pages \
+            --site-url-base '${{ needs.benchmark.outputs.site_url_base }}' \
+            --summary-path ./target/benchmark-summary.json \
+            $PR_ARGS
+
+      - name: Commit and push gh-pages
+        run: |
+          git -C .benchmark-pages config user.name "github-actions[bot]"
+          git -C .benchmark-pages config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C .benchmark-pages add .
+          if git -C .benchmark-pages diff --cached --quiet; then
+            echo "No gh-pages changes to push"
+            exit 0
+          fi
+          git -C .benchmark-pages commit -m "benchmark: publish ${GITHUB_REF_NAME} ${GITHUB_SHA::12}"
+          git -C .benchmark-pages push origin HEAD:gh-pages
+
+      - name: Update sticky PR comments
+        if: github.ref_name != 'master'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRS_JSON: ${{ steps.prs.outputs.prs }}
+        run: |
+          python3 -c 'import json, os, subprocess; prs = json.loads(os.environ["PRS_JSON"]); [subprocess.run(["python3", "scripts/benchmark_site.py", "update-pr-comment", "--repo", "${{ github.repository }}", "--pr-number", str(pr), "--summary-path", "./target/benchmark-summary.json", "--site-url-base", "${{ needs.benchmark.outputs.site_url_base }}"], check=True) for pr in prs]'
