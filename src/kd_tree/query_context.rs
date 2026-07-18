@@ -14,6 +14,15 @@ pub trait QueryContext<A, O, const K: usize> {
     /// returns the distance to the best point found so far.
     fn max_dist(&self) -> O;
 
+    /// Returns true when the query starts without a meaningful pruning bound.
+    ///
+    /// Arithmetic traversal can then defer bound checks until the first leaf
+    /// establishes one. Radius-limited queries should retain the default.
+    #[inline]
+    fn initial_bound_is_unbounded(&self) -> bool {
+        false
+    }
+
     // TOOO: investigate into whether prune_on_equal_max_dist can be removed
     /// Returns true if branches with `rd == max_dist` should be pruned.
     ///
