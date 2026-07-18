@@ -78,11 +78,12 @@ jobs:
 
       - name: Run benchmark suite
         run: |
-          just bench-v6-eytzinger-focus \
+          just \
             RESULT_KEY=${{ steps.meta.outputs.variant_key }} \
             OUTPUT_DIR=./target/benchmark-results \
             FEATURES=simd,test_utils,logging_off \
-            QUERIES=1000
+            QUERIES=1000 \
+            bench-v6-eytzinger-focus
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
