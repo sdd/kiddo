@@ -14,5 +14,13 @@
     "latest_run_page_url": "https://sdd-org.github.io/kiddo/branches/feature-local-scratch-default/history/20260718T200052Z-4ad7224fb48e/index.html",
     "ref_name": "feature/local-scratch-default",
     "run_count": 1
+  },
+  {
+    "branch_path_key": "feature-relative-chart-scoring",
+    "latest_run_id": "20260718T205340Z-3b9ae7607071",
+    "latest_run_page_path": "branches/feature-relative-chart-scoring/history/20260718T205340Z-3b9ae7607071/index.html",
+    "latest_run_page_url": "https://sdd-org.github.io/kiddo/branches/feature-relative-chart-scoring/history/20260718T205340Z-3b9ae7607071/index.html",
+    "ref_name": "feature/relative-chart-scoring",
+    "run_count": 1
   }
 ]
