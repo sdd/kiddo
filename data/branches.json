@@ -9,11 +9,11 @@
   },
   {
     "branch_path_key": "feature-local-scratch-default",
-    "latest_run_id": "20260718T200052Z-4ad7224fb48e",
-    "latest_run_page_path": "branches/feature-local-scratch-default/history/20260718T200052Z-4ad7224fb48e/index.html",
-    "latest_run_page_url": "https://sdd-org.github.io/kiddo/branches/feature-local-scratch-default/history/20260718T200052Z-4ad7224fb48e/index.html",
+    "latest_run_id": "20260718T221630Z-e7dcbd84f939",
+    "latest_run_page_path": "branches/feature-local-scratch-default/history/20260718T221630Z-e7dcbd84f939/index.html",
+    "latest_run_page_url": "https://sdd-org.github.io/kiddo/branches/feature-local-scratch-default/history/20260718T221630Z-e7dcbd84f939/index.html",
     "ref_name": "feature/local-scratch-default",
-    "run_count": 1
+    "run_count": 2
   },
   {
     "branch_path_key": "feature-relative-chart-scoring",
