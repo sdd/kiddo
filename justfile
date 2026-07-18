@@ -117,6 +117,97 @@ asm-k6-nearest-one-donnelly-voarena-v3-avx512-clean:
 asm-k6-nearest-one-donnelly-blocksimd-voarena-v3-avx512-clean:
     RUSTC_WRAPPER= cargo asm --simplify --features simd,cargo_asm,logging_off --lib --target-cpu=native -C="opt-level=2" -C="target-cpu=native" "v6_nearest_one_donnelly_blocksimd_vec_of_arenas_cargo_asm_hook" | python3 scripts/clean_cargo_asm.py > v6_nearest_one_donnelly_blocksimd_vec_of_arenas_v3_avx512_clean.asm
 
+benchmark-derive-key REF_NAME PYTHON='python3':
+    {{quote(PYTHON)}} scripts/benchmark_site.py derive-key --ref-name {{quote(REF_NAME)}}
+
+benchmark-derive-path-key REF_NAME PYTHON='python3':
+    {{quote(PYTHON)}} scripts/benchmark_site.py derive-path-key --ref-name {{quote(REF_NAME)}}
+
+bench-v6-eytzinger-focus RESULT_KEY=benchmark_result_key OUTPUT_DIR='.' FEATURES='simd,test_utils,logging_off' QUERIES='1000':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    result_key={{quote(RESULT_KEY)}}
+    output_dir={{quote(OUTPUT_DIR)}}
+    if [[ ! "$result_key" =~ ^[A-Za-z0-9][A-Za-z0-9._+:-]*$ ]]; then
+        echo "RESULT_KEY must contain only letters, digits, '.', '_', '+', ':', or '-'" >&2
+        exit 2
+    fi
+    mkdir -p "$output_dir"
+    RUSTC_WRAPPER= \
+        KIDDO_BENCH_QUERIES={{quote(QUERIES)}} \
+        RUSTFLAGS='-C target-cpu=native' \
+        cargo criterion \
+            --bench profile_v6_nearest_n_eytzinger \
+            --features {{quote(FEATURES)}}
+    cargo run --quiet --manifest-path tools/criterion-export/Cargo.toml -- \
+        target/criterion \
+        "$output_dir/bench_result-v6-nearest_n-eytzinger-${result_key}.json" \
+        profile_v6_nearest_n_eytzinger
+    RUSTC_WRAPPER= \
+        KIDDO_BENCH_QUERIES={{quote(QUERIES)}} \
+        RUSTFLAGS='-C target-cpu=native' \
+        cargo criterion \
+            --bench profile_v6_nearest_one_eytzinger \
+            --features {{quote(FEATURES)}}
+    cargo run --quiet --manifest-path tools/criterion-export/Cargo.toml -- \
+        target/criterion \
+        "$output_dir/bench_result-v6-nearest_one-eytzinger-${result_key}.json" \
+        profile_v6_nearest_one_eytzinger
+
+chart-benchmark-results VARIANT_KEY RESULTS_DIR='.' OUTPUT_DIR='.' PYTHON='python3':
+    {{quote(PYTHON)}} scripts/chart_benchmark_results.py {{quote(VARIANT_KEY)}} --results-dir {{quote(RESULTS_DIR)}} --output-dir {{quote(OUTPUT_DIR)}}
+
+benchmark-site-build REF_NAME SHA RESULTS_DIR PAGES_ROOT SITE_URL_BASE='' PYTHON='python3':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    args=(publish-run --ref-name {{quote(REF_NAME)}} --sha {{quote(SHA)}} --results-dir {{quote(RESULTS_DIR)}} --pages-root {{quote(PAGES_ROOT)}})
+    if [[ -n {{quote(SITE_URL_BASE)}} ]]; then
+        args+=(--site-url-base {{quote(SITE_URL_BASE)}})
+    fi
+    {{quote(PYTHON)}} scripts/benchmark_site.py "${args[@]}"
+
+benchmark-site-serve SITE_ROOT PORT='8000' PYTHON='python3':
+    cd {{quote(SITE_ROOT)}} && {{quote(PYTHON)}} -m http.server {{quote(PORT)}}
+
+benchmark-pages-preview REF_NAME SHA RESULTS_DIR PAGES_ROOT SITE_URL_BASE='' PYTHON='python3':
+    just benchmark-site-build "{{REF_NAME}}" "{{SHA}}" "{{RESULTS_DIR}}" "{{PAGES_ROOT}}" "{{SITE_URL_BASE}}" "{{PYTHON}}"
+
+benchmark-pages-apply REF_NAME SHA RESULTS_DIR REPO DATA_BRANCH='gh-pages' SITE_URL_BASE='' PYTHON='python3':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    pages_root=.benchmark-pages
+    rm -rf "$pages_root"
+    git fetch "{{REPO}}" "{{DATA_BRANCH}}" || true
+    if git show-ref --verify --quiet "refs/remotes/origin/{{DATA_BRANCH}}"; then
+        git worktree add "$pages_root" "origin/{{DATA_BRANCH}}"
+    else
+        mkdir -p "$pages_root"
+        git -C "$pages_root" init
+        git -C "$pages_root" checkout --orphan "{{DATA_BRANCH}}"
+    fi
+    just benchmark-site-build "{{REF_NAME}}" "{{SHA}}" "{{RESULTS_DIR}}" "$pages_root" "{{SITE_URL_BASE}}" "{{PYTHON}}"
+    git -C "$pages_root" add .
+    if git -C "$pages_root" diff --cached --quiet; then
+        echo "No changes to publish"
+        exit 0
+    fi
+    git -C "$pages_root" commit -m "benchmark: publish {{REF_NAME}} {{SHA}}"
+    git -C "$pages_root" push "{{REPO}}" HEAD:"{{DATA_BRANCH}}"
+
+benchmark-pr-comment-preview REF_NAME SHA PR_NUMBER SITE_URL_BASE PAGES_ROOT PYTHON='python3':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    branch_path_key=$({{quote(PYTHON)}} scripts/benchmark_site.py derive-path-key --ref-name {{quote(REF_NAME)}})
+    summary_file={{quote(PAGES_ROOT)}}/branches/"$branch_path_key"/latest/run.json
+    {{quote(PYTHON)}} scripts/benchmark_site.py render-pr-comment --summary-path "$summary_file" --site-url-base {{quote(SITE_URL_BASE)}}
+
+benchmark-pr-comment-apply REF_NAME SHA PR_NUMBER REPO SITE_URL_BASE PAGES_ROOT PYTHON='python3':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    branch_path_key=$({{quote(PYTHON)}} scripts/benchmark_site.py derive-path-key --ref-name {{quote(REF_NAME)}})
+    summary_file={{quote(PAGES_ROOT)}}/branches/"$branch_path_key"/latest/run.json
+    {{quote(PYTHON)}} scripts/benchmark_site.py update-pr-comment --repo {{quote(REPO)}} --pr-number {{quote(PR_NUMBER)}} --summary-path "$summary_file" --site-url-base {{quote(SITE_URL_BASE)}}
+
 bench-v6-stem-strategies-focus FEATURES='simd,test_utils,logging_off' POINTS='4194304' QUERIES='10000':
     RUSTC_WRAPPER= \
     KIDDO_BENCH_POINTS={{POINTS}} \
