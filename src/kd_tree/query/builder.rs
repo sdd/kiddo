@@ -1273,17 +1273,13 @@ where
 /// Queries that involve backtracking need to store temporary state. The scratch
 /// strategy determines how this state is managed. Cartesian (ie not PBC),
 /// non-approximate queries that do not include point coordinates can
-/// choose how their traversal stack scratch is provided. All three options
+/// choose how their traversal stack scratch is provided. Both options
 /// avoid a heap allocation on the query path (unless your tree is _extremely_
 /// deep - typically deeper than you could ever find in a balanced tree and only
 /// something that you might find in a _very_ unbalanced tree).
 ///
-/// - By default, queries will use thread-local-storage scratch.
-///   This avoids allocating per query, but requires a TLS lookup, which may not
-///   be quite as fast as alternatives.
-/// - `with_stack_scratch()` stores scratch in the terminal call's stack frame,
-///   avoiding the TLS lookup. This avoids TLS lookup but increases the size of the
-///   query's stack frame.
+/// - By default, queries store scratch in the terminal call's stack frame.
+///   This keeps scratch local to each query without a thread-local lookup.
 /// - `with_scratch(&mut scratch)` uses caller-owned reusable scratch created by
 ///   `KdTree::create_scratch()` or the archived-tree method of the same name.
 ///   This is particularly suited to batches of compatible queries but can can
@@ -1494,15 +1490,6 @@ where
     fn execute_with_scratch(self, scratch: &mut QueryScratch<SS, O>) -> Self::Output;
 }
 
-/// Query builder adapter that uses per-call stack scratch instead of TLS.
-pub struct StackScratchQueryBuilder<B, SS, O>
-where
-    SS: StemStrategy,
-{
-    builder: B,
-    _phantom: PhantomData<(SS, O)>,
-}
-
 /// Query builder adapter that uses caller-owned reusable query scratch.
 pub struct ScratchQueryBuilder<'s, B, SS, O>
 where
@@ -1510,19 +1497,6 @@ where
 {
     builder: B,
     scratch: &'s mut QueryScratch<SS, O>,
-}
-
-impl<B, SS, O> StackScratchQueryBuilder<B, SS, O>
-where
-    SS: StemStrategy,
-    B: ExecuteQueryBuilderWithScratch<SS, O>,
-{
-    /// Executes the configured query with scratch stored in this call's stack frame.
-    #[inline]
-    pub fn execute(self) -> <B as ExecuteQueryBuilderWithScratch<SS, O>>::Output {
-        let mut scratch = QueryScratch::<SS, O>::new();
-        self.builder.execute_with_scratch(&mut scratch)
-    }
 }
 
 impl<B, SS, O> ScratchQueryBuilder<'_, B, SS, O>
@@ -1534,75 +1508,6 @@ where
     #[inline]
     pub fn execute(self) -> <B as ExecuteQueryBuilderWithScratch<SS, O>>::Output {
         self.builder.execute_with_scratch(self.scratch)
-    }
-}
-
-impl<'a, Tree, A, T, SS, LS, D, I, Dp, const EXCLUSIVE: bool, const K: usize, const B: usize>
-    StackScratchQueryBuilder<
-        QueryBuilder<
-            'a,
-            Tree,
-            A,
-            T,
-            SS,
-            LS,
-            SelectedMetric<D>,
-            WithinState,
-            CartesianSpace,
-            Projection<Exclude, I, Dp>,
-            false,
-            EXCLUSIVE,
-            K,
-            B,
-        >,
-        SS,
-        D::Output,
-    >
-where
-    A: Axis<Coord = A> + 'static,
-    T: Content + PartialOrd,
-    SS: StemStrategy,
-    LS: LeafStrategy<A, T, SS, K, B> + 'a,
-    Tree: QueryBuilderScratchTreeOps<A, T, SS, LS, K, B> + 'a,
-    D: DistanceMetric<A> + 'a,
-    D::Output: crate::stem_strategy::SimdPrune
-        + SimdSelectBestChildBlock3
-        + BacktrackBlock3
-        + BacktrackBlock4
-        + TlsLeafScratch
-        + 'static,
-    SS::Stack<D::Output>: StackTrait<D::Output, SS>,
-    I: ProjectionField<T> + 'a,
-    Dp: ProjectionField<D::Output> + 'a,
-{
-    /// Visits matching entries using per-call stack scratch instead of TLS.
-    #[inline]
-    pub fn visit<F>(self, mut visitor: F)
-    where
-        F: FnMut(QueryResultItem<(), I::Output, Dp::Output>),
-    {
-        let mut scratch = QueryScratch::<SS, D::Output>::new();
-        let builder = self.builder;
-        with_cleared_scratch(&mut scratch, |stack| {
-            builder
-                .tree
-                .qb_within_unsorted_visit_with_scratch::<D, _, EXCLUSIVE>(
-                    builder.query,
-                    builder.radius,
-                    move |result| {
-                        visitor(project_nearest_without_point::<
-                            A,
-                            T,
-                            D::Output,
-                            Exclude,
-                            I,
-                            Dp,
-                            K,
-                        >(result))
-                    },
-                    stack,
-                );
-        });
     }
 }
 
@@ -1766,24 +1671,7 @@ where
     Dp: ProjectionField<D::Output>,
     Family: ConfigurableScratchQueryFamily,
 {
-    /// Uses per-call stack scratch instead of the default thread-local scratch.
-    ///
-    /// This avoids the TLS lookup while keeping scratch lifetime scoped to the
-    /// terminal query call. The inline stack does not allocate unless traversal
-    /// depth exceeds its inline capacity.
-    ///
-    /// This alpha API is experimental; see the
-    /// [`QueryBuilder` scratch strategy section](QueryBuilder#scratch-strategy)
-    /// for the available strategies and current limitations.
-    #[inline]
-    pub fn with_stack_scratch(self) -> StackScratchQueryBuilder<Self, SS, D::Output> {
-        StackScratchQueryBuilder {
-            builder: self,
-            _phantom: PhantomData,
-        }
-    }
-
-    /// Uses caller-owned reusable scratch instead of the default thread-local scratch.
+    /// Uses caller-owned reusable scratch instead of per-call local scratch.
     ///
     /// Scratch must have been created for the same stem strategy and distance
     /// output type, for example with [`KdTree::create_scratch`] or the
@@ -2010,9 +1898,7 @@ where
     ///
     /// This is available only for non-periodic queries.
     ///
-    /// Scratch strategy selectors such as
-    /// [`with_stack_scratch`](Self::with_stack_scratch) and
-    /// [`with_scratch`](Self::with_scratch) are not currently available after
+    /// [`with_scratch`](Self::with_scratch) is not currently available after
     /// `with_points()`. Point-projected queries use a separate traversal and
     /// collection path that maintains more complex state than the stack-scratch
     /// query orchestrator. See the
@@ -5583,7 +5469,7 @@ mod tests {
     }
 
     #[test]
-    fn scratch_query_execution_matches_tls_for_cartesian_queries() {
+    fn reused_scratch_matches_local_scratch_for_cartesian_queries() {
         let entries = [
             (10u32, [0.0, 0.0]),
             (11u32, [0.2, 0.1]),
@@ -5604,28 +5490,10 @@ mod tests {
                 .execute(),
             tree.query(&query)
                 .nearest_one::<SquaredEuclidean<f64>>()
-                .with_stack_scratch()
-                .execute()
-        );
-        assert_eq!(
-            tree.query(&query)
-                .nearest_one::<SquaredEuclidean<f64>>()
-                .execute(),
-            tree.query(&query)
-                .nearest_one::<SquaredEuclidean<f64>>()
                 .with_scratch(&mut scratch)
                 .execute()
         );
 
-        assert_eq!(
-            tree.query(&query)
-                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
-                .execute(),
-            tree.query(&query)
-                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
-                .with_stack_scratch()
-                .execute()
-        );
         assert_eq!(
             tree.query(&query)
                 .nearest_n::<SquaredEuclidean<f64>>(max_qty)
@@ -5638,17 +5506,6 @@ mod tests {
                 .execute()
         );
 
-        assert_eq!(
-            tree.query(&query)
-                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
-                .within(radius)
-                .execute(),
-            tree.query(&query)
-                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
-                .within(radius)
-                .with_stack_scratch()
-                .execute()
-        );
         assert_eq!(
             tree.query(&query)
                 .within::<SquaredEuclidean<f64>>(radius)
@@ -5661,38 +5518,31 @@ mod tests {
                 .execute()
         );
 
-        let tls_best = tree
+        let local_best = tree
             .query(&query)
             .best_n_within::<SquaredEuclidean<f64>>(radius, max_qty)
             .execute()
             .into_sorted_vec();
-        let stack_best = tree
+        let reused_best = tree
             .query(&query)
             .best_n_within::<SquaredEuclidean<f64>>(radius, max_qty)
-            .with_stack_scratch()
+            .with_scratch(&mut scratch)
             .execute()
             .into_sorted_vec();
-        assert_eq!(tls_best, stack_best);
+        assert_eq!(local_best, reused_best);
 
-        let mut tls_visit = Vec::new();
+        let mut local_visit = Vec::new();
         tree.query(&query)
             .within::<SquaredEuclidean<f64>>(radius)
             .unsorted()
-            .visit(|result| tls_visit.push(result));
-        let mut stack_visit = Vec::new();
-        tree.query(&query)
-            .within::<SquaredEuclidean<f64>>(radius)
-            .unsorted()
-            .with_stack_scratch()
-            .visit(|result| stack_visit.push(result));
+            .visit(|result| local_visit.push(result));
         let mut scratch_visit = Vec::new();
         tree.query(&query)
             .within::<SquaredEuclidean<f64>>(radius)
             .unsorted()
             .with_scratch(&mut scratch)
             .visit(|result| scratch_visit.push(result));
-        assert_eq!(tls_visit, stack_visit);
-        assert_eq!(tls_visit, scratch_visit);
+        assert_eq!(local_visit, scratch_visit);
     }
 
     #[test]
@@ -5711,7 +5561,7 @@ mod tests {
         let mut scratch = tree.create_scratch::<SquaredEuclidean<f32>>();
         for query in [[0.1, 0.2], [0.45, 0.55], [0.8, 0.25]] {
             let max_qty = NonZeroUsize::new(5).unwrap();
-            let tls = tree
+            let local = tree
                 .query(&query)
                 .nearest_n::<SquaredEuclidean<f32>>(max_qty)
                 .within(0.4)
@@ -5722,7 +5572,7 @@ mod tests {
                 .within(0.4)
                 .with_scratch(&mut scratch)
                 .execute();
-            assert_eq!(tls, reused);
+            assert_eq!(local, reused);
         }
     }
 
@@ -5745,7 +5595,6 @@ mod tests {
         assert_eq!(
             tree.query(&query)
                 .within::<SquaredEuclidean<f64>>(0.25)
-                .with_stack_scratch()
                 .execute(),
             Vec::new()
         );
@@ -5753,7 +5602,7 @@ mod tests {
 
     #[cfg(feature = "rkyv_08")]
     #[test]
-    fn archived_scratch_query_execution_matches_tls_for_cartesian_queries() {
+    fn archived_reused_scratch_matches_local_scratch_for_cartesian_queries() {
         type Tree = KdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
         type ArchivedTree =
             ArchivedKdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, 2, 32>, 2, 32>;
@@ -5783,36 +5632,12 @@ mod tests {
         assert_eq!(
             archived
                 .query(&query)
-                .nearest_one::<SquaredEuclidean<f64>>()
-                .execute(),
-            archived
-                .query(&query)
-                .nearest_one::<SquaredEuclidean<f64>>()
-                .with_stack_scratch()
-                .execute()
-        );
-        assert_eq!(
-            archived
-                .query(&query)
                 .nearest_n::<SquaredEuclidean<f64>>(max_qty)
                 .execute(),
             archived
                 .query(&query)
                 .nearest_n::<SquaredEuclidean<f64>>(max_qty)
                 .with_scratch(&mut scratch)
-                .execute()
-        );
-        assert_eq!(
-            archived
-                .query(&query)
-                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
-                .within(radius)
-                .execute(),
-            archived
-                .query(&query)
-                .nearest_n::<SquaredEuclidean<f64>>(max_qty)
-                .within(radius)
-                .with_stack_scratch()
                 .execute()
         );
         assert_eq!(
@@ -5829,25 +5654,25 @@ mod tests {
                 .execute()
         );
 
-        let tls_best = archived
+        let local_best = archived
             .query(&query)
             .best_n_within::<SquaredEuclidean<f64>>(radius, max_qty)
             .execute()
             .into_sorted_vec();
-        let stack_best = archived
+        let reused_best = archived
             .query(&query)
             .best_n_within::<SquaredEuclidean<f64>>(radius, max_qty)
-            .with_stack_scratch()
+            .with_scratch(&mut scratch)
             .execute()
             .into_sorted_vec();
-        assert_eq!(tls_best, stack_best);
+        assert_eq!(local_best, reused_best);
 
-        let mut tls_visit = Vec::new();
+        let mut local_visit = Vec::new();
         archived
             .query(&query)
             .within::<SquaredEuclidean<f64>>(radius)
             .unsorted()
-            .visit(|result| tls_visit.push(result));
+            .visit(|result| local_visit.push(result));
         let mut scratch_visit = Vec::new();
         archived
             .query(&query)
@@ -5855,7 +5680,7 @@ mod tests {
             .unsorted()
             .with_scratch(&mut scratch)
             .visit(|result| scratch_visit.push(result));
-        assert_eq!(tls_visit, scratch_visit);
+        assert_eq!(local_visit, scratch_visit);
     }
 
     #[cfg(feature = "rkyv_08")]

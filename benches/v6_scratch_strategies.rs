@@ -30,27 +30,7 @@ fn build_queries() -> Vec<[f64; K]> {
     (0..QUERY_COUNT).map(|_| rng.random::<[f64; K]>()).collect()
 }
 
-fn run_tls_default(tree: &Tree, queries: &[[f64; K]], max_qty: NonZeroUsize) -> (usize, u64, f64) {
-    let mut checksum_len = 0usize;
-    let mut checksum_item = 0u64;
-    let mut checksum_dist = 0.0f64;
-
-    for query in queries {
-        let results = tree
-            .query(black_box(query))
-            .nearest_n::<SquaredEuclidean<f64>>(max_qty)
-            .execute();
-        checksum_len = checksum_len.wrapping_add(results.len());
-        for result in results {
-            checksum_item = checksum_item.wrapping_add(result.item as u64);
-            checksum_dist += result.distance;
-        }
-    }
-
-    (checksum_len, checksum_item, checksum_dist)
-}
-
-fn run_stack_scratch(
+fn run_local_default(
     tree: &Tree,
     queries: &[[f64; K]],
     max_qty: NonZeroUsize,
@@ -63,7 +43,6 @@ fn run_stack_scratch(
         let results = tree
             .query(black_box(query))
             .nearest_n::<SquaredEuclidean<f64>>(max_qty)
-            .with_stack_scratch()
             .execute();
         checksum_len = checksum_len.wrapping_add(results.len());
         for result in results {
@@ -110,12 +89,8 @@ fn scratch_strategies(c: &mut Criterion) {
     let mut group = c.benchmark_group("v6 scratch strategies");
     group.throughput(Throughput::Elements(QUERY_COUNT as u64));
 
-    group.bench_function("nearest_n tls default", |b| {
-        b.iter(|| black_box(run_tls_default(&tree, &queries, max_qty)));
-    });
-
-    group.bench_function("nearest_n stack scratch", |b| {
-        b.iter(|| black_box(run_stack_scratch(&tree, &queries, max_qty)));
+    group.bench_function("nearest_n local default", |b| {
+        b.iter(|| black_box(run_local_default(&tree, &queries, max_qty)));
     });
 
     let mut scratch = tree.create_scratch::<SquaredEuclidean<f64>>();
