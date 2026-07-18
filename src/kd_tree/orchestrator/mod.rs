@@ -1,8 +1,5 @@
 mod simd;
 
-use std::any::{Any, TypeId};
-use std::cell::UnsafeCell;
-use std::collections::HashMap;
 use std::ptr::NonNull;
 
 use crate::dist::DistanceMetric;
@@ -17,28 +14,6 @@ use crate::stem_strategy::{
     SimdPrune, SimdSelectBestChildBlock3,
 };
 use crate::{Axis, Content, LeafStrategy, StemStrategy};
-
-thread_local! {
-    static QUERY_STACKS: UnsafeCell<HashMap<TypeId, Box<dyn Any>>> =
-        UnsafeCell::new(HashMap::new());
-}
-
-#[inline]
-pub(crate) fn with_tls_query_stack<S, R>(f: impl FnOnce(&mut S) -> R) -> R
-where
-    S: Default + 'static,
-{
-    QUERY_STACKS.with(|stacks| {
-        let stacks = unsafe { &mut *stacks.get() };
-        let entry = stacks
-            .entry(TypeId::of::<S>())
-            .or_insert_with(|| Box::new(S::default()));
-        let stack = entry
-            .downcast_mut::<S>()
-            .expect("query stack type mismatch");
-        f(stack)
-    })
-}
 
 #[derive(Clone, Copy, Debug)]
 struct Block3PendingSelection<O> {
@@ -242,17 +217,15 @@ where
             + BacktrackBlock3
             + BacktrackBlock4,
         D: DistanceMetric<A, Output = O>,
-        SS::Stack<O>: StackTrait<O, SS> + Default + 'static,
+        SS::Stack<O>: StackTrait<O, SS> + Default,
     {
         if self.stem_leaf_resolution().uses_arithmetic() && SS::BLOCK_SIZE == 1 {
             self.arithmetic_query::<QC, O, D>(query_ctx, process_leaf);
             return;
         }
 
-        with_tls_query_stack::<SS::Stack<O>, _>(|stack| {
-            stack.clear();
-            self.backtracking_query_with_scratch::<QC, O, D>(query_ctx, stack, process_leaf);
-        });
+        let mut stack = SS::Stack::<O>::default();
+        self.backtracking_query_with_scratch::<QC, O, D>(query_ctx, &mut stack, process_leaf);
     }
 
     /// Backtracking query with explicit stack
@@ -381,11 +354,10 @@ where
         QC: QueryContext<A, O, K>,
         O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
         D: DistanceMetric<A, Output = O>,
-        SS::Stack<O>: StackTrait<O, SS> + Default + 'static,
+        SS::Stack<O>: StackTrait<O, SS> + Default,
     {
-        with_tls_query_stack::<SS::Stack<O>, _>(|stack| {
-            self.arithmetic_query_with_scratch::<QC, O, D>(query_ctx, stack, process_leaf);
-        });
+        let mut stack = SS::Stack::<O>::default();
+        self.arithmetic_query_with_scratch::<QC, O, D>(query_ctx, &mut stack, process_leaf);
     }
 
     /// Arithmetic-resolution backtracking query with explicit stack.
