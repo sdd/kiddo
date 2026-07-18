@@ -339,6 +339,11 @@ where
         self.best_dist
     }
 
+    #[inline]
+    fn initial_bound_is_unbounded(&self) -> bool {
+        true
+    }
+
     // TOOO: investigate into whether this can be removed
     #[inline]
     fn prune_on_equal_max_dist(&self) -> bool {

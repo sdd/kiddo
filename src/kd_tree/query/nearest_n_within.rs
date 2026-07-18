@@ -412,6 +412,11 @@ where
     }
 
     #[inline]
+    fn initial_bound_is_unbounded(&self) -> bool {
+        self.max_dist == O::max_value()
+    }
+
+    #[inline]
     fn prune_on_equal_max_dist(&self) -> bool {
         EXCLUSIVE
     }

@@ -421,78 +421,33 @@ where
         let mut far_stack = ScalarContinuationFarStack::<O, SS::DeferredState>::default();
 
         let mut rd = O::zero();
+        let leaf_idx = if query_ctx.initial_bound_is_unbounded() {
+            self.arithmetic_descend_to_leaf::<QC, O, D, false>(
+                &query,
+                &query_wide,
+                query_ctx,
+                &mut stem_strat,
+                &off,
+                rd,
+                &mut restore_stack,
+                &mut far_stack,
+            )
+        } else {
+            self.arithmetic_descend_to_leaf::<QC, O, D, true>(
+                &query,
+                &query_wide,
+                query_ctx,
+                &mut stem_strat,
+                &off,
+                rd,
+                &mut restore_stack,
+                &mut far_stack,
+            )
+        };
+        process_leaf(leaf_idx, &query_wide, query_ctx);
+
         let mut dim = stem_strat.dim::<K>();
-
         'query: loop {
-            loop {
-                if stem_strat.level() > self.max_stem_level() {
-                    break;
-                }
-
-                #[cfg(feature = "result_collection_stats")]
-                crate::results::result_collection_stats::record_query_scalar_traverse_step();
-
-                #[cfg(feature = "result_collection_stats")]
-                {
-                    let rd_from_off = D::rect_dist_from_off(&off);
-                    crate::results::result_collection_stats::record_query_scalar_rd_off_check(
-                        O::cmp(rd_from_off, rd),
-                    );
-                }
-
-                let pivot = unsafe { *self.stems().get_unchecked(stem_strat.stem_idx()) };
-                if pivot < A::max_value() {
-                    let query_elem = unsafe { *query.get_unchecked(dim) };
-                    let is_right_child = query_elem >= pivot;
-                    let far_ctx = stem_strat.branch_relative::<A, K>(is_right_child);
-
-                    let pivot_wide = D::widen_coord(pivot);
-                    let query_elem_wide = unsafe { *query_wide.get_unchecked(dim) };
-                    let new_off = O::saturating_dist(query_elem_wide, pivot_wide);
-                    let old_off = unsafe { *off.get_unchecked(dim) };
-                    let rd_far = D::rect_dist_after_update(rd, &off, dim, new_off);
-
-                    if O::cmp(rd_far, query_ctx.max_dist()) != std::cmp::Ordering::Greater {
-                        #[cfg(feature = "result_collection_stats")]
-                        crate::results::result_collection_stats::record_query_scalar_far_child_candidate();
-                        restore_stack
-                            .push_unchecked_inline(ScalarContinuationRestore::with_far(old_off));
-                        far_stack.push_unchecked_inline(ScalarContinuationFar {
-                            stem_state: far_ctx.deferred_state(),
-                            far_off: new_off,
-                            rd: rd_far,
-                        });
-                    } else {
-                        #[cfg(feature = "result_collection_stats")]
-                        crate::results::result_collection_stats::record_query_scalar_far_child_reject();
-                        restore_stack.push_unchecked_inline(
-                            ScalarContinuationRestore::restore_only(old_off),
-                        );
-                    }
-                    #[cfg(feature = "result_collection_stats")]
-                    crate::results::result_collection_stats::record_query_scalar_continuation_frame_push();
-                } else {
-                    let old_off = unsafe { *off.get_unchecked(dim) };
-                    restore_stack
-                        .push_unchecked_inline(ScalarContinuationRestore::restore_only(old_off));
-                    #[cfg(feature = "result_collection_stats")]
-                    crate::results::result_collection_stats::record_query_scalar_continuation_frame_push();
-                    stem_strat.traverse::<A, K>(false);
-                }
-
-                dim = stem_strat.dim::<K>();
-            }
-
-            let leaf_idx = stem_strat.leaf_idx();
-            debug_assert!(
-                leaf_idx < self.leaf_count(),
-                "arithmetic query resolved invalid leaf_idx={} leaf_count={}",
-                leaf_idx,
-                self.leaf_count()
-            );
-
-            process_leaf(leaf_idx, &query_wide, query_ctx);
-
             while let Some(frame) = restore_stack.pop() {
                 #[cfg(feature = "result_collection_stats")]
                 crate::results::result_collection_stats::record_query_scalar_continuation_frame_pop(
@@ -535,17 +490,116 @@ where
                 unsafe { *off.get_unchecked_mut(restore_dim) = far.far_off };
                 stem_strat.rehydrate_deferred_state(far.stem_state);
                 rd = far.rd;
-                dim = stem_strat.dim::<K>();
 
                 #[cfg(feature = "result_collection_stats")]
                 crate::results::result_collection_stats::record_query_scalar_continuation_far_enter(
                 );
+
+                let leaf_idx = self.arithmetic_descend_to_leaf::<QC, O, D, true>(
+                    &query,
+                    &query_wide,
+                    query_ctx,
+                    &mut stem_strat,
+                    &off,
+                    rd,
+                    &mut restore_stack,
+                    &mut far_stack,
+                );
+                process_leaf(leaf_idx, &query_wide, query_ctx);
+                dim = stem_strat.dim::<K>();
 
                 continue 'query;
             }
 
             break;
         }
+    }
+
+    #[allow(private_interfaces)]
+    #[inline(always)]
+    fn arithmetic_descend_to_leaf<QC, O, D, const CHECK_BOUND: bool>(
+        &self,
+        query: &[A; K],
+        query_wide: &[O; K],
+        query_ctx: &QC,
+        stem_strat: &mut SS,
+        off: &[O; K],
+        rd: O,
+        restore_stack: &mut ScalarContinuationRestoreStack<O>,
+        far_stack: &mut ScalarContinuationFarStack<O, SS::DeferredState>,
+    ) -> usize
+    where
+        QC: QueryContext<A, O, K>,
+        O: Axis<Coord = O> + BacktrackBlock3 + BacktrackBlock4,
+        D: DistanceMetric<A, Output = O>,
+    {
+        while stem_strat.level() <= self.max_stem_level() {
+            #[cfg(feature = "result_collection_stats")]
+            crate::results::result_collection_stats::record_query_scalar_traverse_step();
+
+            #[cfg(feature = "result_collection_stats")]
+            {
+                let rd_from_off = D::rect_dist_from_off(off);
+                crate::results::result_collection_stats::record_query_scalar_rd_off_check(O::cmp(
+                    rd_from_off,
+                    rd,
+                ));
+            }
+
+            let dim = stem_strat.dim::<K>();
+            let pivot = unsafe { *self.stems().get_unchecked(stem_strat.stem_idx()) };
+            if pivot < A::max_value() {
+                let query_elem = unsafe { *query.get_unchecked(dim) };
+                let is_right_child = query_elem >= pivot;
+                let far_ctx = stem_strat.branch_relative::<A, K>(is_right_child);
+
+                let pivot_wide = D::widen_coord(pivot);
+                let query_elem_wide = unsafe { *query_wide.get_unchecked(dim) };
+                let new_off = O::saturating_dist(query_elem_wide, pivot_wide);
+                let old_off = unsafe { *off.get_unchecked(dim) };
+                let rd_far = D::rect_dist_after_update(rd, off, dim, new_off);
+                let far_is_candidate = if CHECK_BOUND {
+                    O::cmp(rd_far, query_ctx.max_dist()) != std::cmp::Ordering::Greater
+                } else {
+                    true
+                };
+
+                if far_is_candidate {
+                    #[cfg(feature = "result_collection_stats")]
+                    crate::results::result_collection_stats::record_query_scalar_far_child_candidate();
+                    restore_stack
+                        .push_unchecked_inline(ScalarContinuationRestore::with_far(old_off));
+                    far_stack.push_unchecked_inline(ScalarContinuationFar {
+                        stem_state: far_ctx.deferred_state(),
+                        far_off: new_off,
+                        rd: rd_far,
+                    });
+                } else {
+                    #[cfg(feature = "result_collection_stats")]
+                    crate::results::result_collection_stats::record_query_scalar_far_child_reject();
+                    restore_stack
+                        .push_unchecked_inline(ScalarContinuationRestore::restore_only(old_off));
+                }
+                #[cfg(feature = "result_collection_stats")]
+                crate::results::result_collection_stats::record_query_scalar_continuation_frame_push();
+            } else {
+                let old_off = unsafe { *off.get_unchecked(dim) };
+                restore_stack
+                    .push_unchecked_inline(ScalarContinuationRestore::restore_only(old_off));
+                #[cfg(feature = "result_collection_stats")]
+                crate::results::result_collection_stats::record_query_scalar_continuation_frame_push();
+                stem_strat.traverse::<A, K>(false);
+            }
+        }
+
+        let leaf_idx = stem_strat.leaf_idx();
+        debug_assert!(
+            leaf_idx < self.leaf_count(),
+            "arithmetic query resolved invalid leaf_idx={} leaf_count={}",
+            leaf_idx,
+            self.leaf_count()
+        );
+        leaf_idx
     }
 
     /// traverse to leaf
