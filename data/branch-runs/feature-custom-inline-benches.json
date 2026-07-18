@@ -1,0 +1,23 @@
+[
+  {
+    "baseline_run_id": null,
+    "branch_path_key": "feature-custom-inline-benches",
+    "chart_files": [],
+    "created_at": "2026-07-18T18:22:32Z",
+    "featured_chart_file": null,
+    "is_baseline": false,
+    "pr_numbers": [
+      429
+    ],
+    "ref_name": "feature/custom-inline-benches",
+    "result_files": [
+      "bench_result-v6-nearest_n-eytzinger-custom-inline-benches.json",
+      "bench_result-v6-nearest_one-eytzinger-custom-inline-benches.json"
+    ],
+    "run_id": "20260718T182232Z-e649b4957770",
+    "run_page_path": "branches/feature-custom-inline-benches/history/20260718T182232Z-e649b4957770/index.html",
+    "run_page_url": "https://sdd-org.github.io/kiddo/branches/feature-custom-inline-benches/history/20260718T182232Z-e649b4957770/index.html",
+    "sha": "e649b495777029265a9057696b8083800dc34295",
+    "variant_key": "custom-inline-benches"
+  }
+]
