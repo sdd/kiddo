@@ -127,11 +127,13 @@ jobs:
           if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
             git worktree add .benchmark-pages origin/gh-pages
           else
+            checkout_auth=$(git config --get-urlmatch http.extraheader "${GITHUB_SERVER_URL}")
             mkdir -p .benchmark-pages
             cd .benchmark-pages
             git init
             git checkout --orphan gh-pages
             git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+            git config "http.${GITHUB_SERVER_URL}/.extraheader" "$checkout_auth"
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           fi
