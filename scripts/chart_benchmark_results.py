@@ -253,8 +253,10 @@ def change_score(baseline: list[Point], variant: list[Point]) -> float:
     for baseline_point, variant_point in zip(baseline, variant):
         if baseline_point.tree_log2 != variant_point.tree_log2:
             raise RuntimeError("cannot score series with mismatched tree sizes")
-        delta = variant_point.duration_ns - baseline_point.duration_ns
-        score += delta * delta
+        delta_fraction = (
+            variant_point.duration_ns - baseline_point.duration_ns
+        ) / baseline_point.duration_ns
+        score += delta_fraction * delta_fraction
     return score
 
 
