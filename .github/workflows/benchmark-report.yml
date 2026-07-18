@@ -70,7 +70,7 @@ jobs:
       - name: Derive metadata
         id: meta
         run: |
-          variant_key=$(just --quiet benchmark-derive-key "${GITHUB_REF_NAME}")
+          variant_key=$(python3 scripts/benchmark_site.py derive-key --ref-name "${GITHUB_REF_NAME}")
           repo_name="${GITHUB_REPOSITORY#*/}"
           site_url_base="https://${GITHUB_REPOSITORY_OWNER}.github.io/${repo_name}"
           echo "variant_key=$variant_key" >> "$GITHUB_OUTPUT"
