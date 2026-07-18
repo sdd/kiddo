@@ -3,6 +3,8 @@
 default:
   just --list
 
+benchmark_result_key := `date -u +%Y%m%dT%H%M%SZ`
+
 fmt:
     cargo fmt --all
     cargo sort -wg
