@@ -1,0 +1,32 @@
+[
+  {
+    "baseline_run_id": "20260718T193341Z-18286c58ca74",
+    "branch_path_key": "feature-local-scratch-default",
+    "chart_files": [
+      "bench_result-v6-nearest_n-eytzinger-f32-nearest_n_k20-local-scratch-default.png",
+      "bench_result-v6-nearest_n-eytzinger-f32-nearest_n_k5-local-scratch-default.png",
+      "bench_result-v6-nearest_n-eytzinger-f32-nearest_n_k50-local-scratch-default.png",
+      "bench_result-v6-nearest_n-eytzinger-f64-nearest_n_k20-local-scratch-default.png",
+      "bench_result-v6-nearest_n-eytzinger-f64-nearest_n_k5-local-scratch-default.png",
+      "bench_result-v6-nearest_n-eytzinger-f64-nearest_n_k50-local-scratch-default.png",
+      "bench_result-v6-nearest_one-eytzinger-f32-nearest_one-local-scratch-default.png",
+      "bench_result-v6-nearest_one-eytzinger-f64-nearest_one-local-scratch-default.png"
+    ],
+    "created_at": "2026-07-18T20:00:52Z",
+    "featured_chart_file": "bench_result-v6-nearest_n-eytzinger-f32-nearest_n_k50-local-scratch-default.png",
+    "is_baseline": false,
+    "pr_numbers": [
+      430
+    ],
+    "ref_name": "feature/local-scratch-default",
+    "result_files": [
+      "bench_result-v6-nearest_n-eytzinger-local-scratch-default.json",
+      "bench_result-v6-nearest_one-eytzinger-local-scratch-default.json"
+    ],
+    "run_id": "20260718T200052Z-4ad7224fb48e",
+    "run_page_path": "branches/feature-local-scratch-default/history/20260718T200052Z-4ad7224fb48e/index.html",
+    "run_page_url": "https://sdd-org.github.io/kiddo/branches/feature-local-scratch-default/history/20260718T200052Z-4ad7224fb48e/index.html",
+    "sha": "4ad7224fb48e203b1768222e287aea1a422bce74",
+    "variant_key": "local-scratch-default"
+  }
+]
