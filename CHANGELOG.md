@@ -1,5 +1,53 @@
 # Kiddo Changelog
 
+## [6.0.0-alpha.3] - 2026-07-19
+
+### ✨ Features
+
+- Make local query scratch the default ([@sdd](https://github.com/sdd))
+
+
+### 🐛 Bug Fixes
+
+- Remove broken dot product dist metric and associated code ([@sdd](https://github.com/sdd))
+
+
+### ⚡️ Performance
+
+- Alternate path to avoid wasted calcs on descent ([@sdd](https://github.com/sdd))
+
+
+### 🤖 CI
+
+- Harden pre-release string updater workflow against no changes ([@sdd](https://github.com/sdd))
+
+- Publish custom benchmark reports ([@sdd](https://github.com/sdd))
+
+- Add bench chart justfile tasks ([@sdd](https://github.com/sdd))
+
+- Fix benchmark workflow bootstrap ([@sdd](https://github.com/sdd))
+
+- Derive benchmark key without just ([@sdd](https://github.com/sdd))
+
+- Pass benchmark args to just correctly ([@sdd](https://github.com/sdd))
+
+- Pass benchmark recipe arguments positionally ([@sdd](https://github.com/sdd))
+
+- Authenticate initial benchmark pages push ([@sdd](https://github.com/sdd))
+
+- Rank featured chart by relative change ([@sdd](https://github.com/sdd))
+
+- Add distance metric ISA matrix ([@sdd](https://github.com/sdd))
+
+- Fix distance metric ISA benchmark builds ([@sdd](https://github.com/sdd))
+
+
+### 🧹 Chore
+
+- Bump actions/setup-node from 6 to 7 ([@dependabot[bot]](https://github.com/dependabot[bot]), Signed-off-by:dependabot[bot] <support@github.com>)
+
+- Update las requirement in the cargo-dependencies group ([@dependabot[bot]](https://github.com/dependabot[bot]), Signed-off-by:dependabot[bot] <support@github.com>)
+
 ## [6.0.0-alpha.2] - 2026-07-17
 
 ### ✨ Features
