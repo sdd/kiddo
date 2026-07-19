@@ -83,6 +83,10 @@ jobs:
             ./target/benchmark-results \
             simd,test_utils,logging_off \
             1000
+          just bench-v6-dist-metrics \
+            "${{ steps.meta.outputs.variant_key }}" \
+            ./target/benchmark-results \
+            1000
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
