@@ -6,16 +6,13 @@
 
 - Make local query scratch the default ([@sdd](https://github.com/sdd))
 
-
 ### 🐛 Bug Fixes
 
 - Remove broken dot product dist metric and associated code ([@sdd](https://github.com/sdd))
 
-
 ### ⚡️ Performance
 
 - Alternate path to avoid wasted calcs on descent ([@sdd](https://github.com/sdd))
-
 
 ### 🤖 CI
 
@@ -40,7 +37,6 @@
 - Add distance metric ISA matrix ([@sdd](https://github.com/sdd))
 
 - Fix distance metric ISA benchmark builds ([@sdd](https://github.com/sdd))
-
 
 ### 🧹 Chore
 
