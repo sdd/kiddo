@@ -19,6 +19,25 @@ RESULT_PREFIX = "bench_result-"
 BASELINE_SUFFIX = "-baseline.json"
 SAFE_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+:-]*$")
 NS_PER_US = 1_000.0
+DIST_METRIC_SUITE_PREFIX = "v6-dist-metrics-"
+DIST_METRIC_ISA_ORDER = ("scalar", "avx2", "avx512", "neon")
+DIST_METRIC_REQUIRED_ISAS = ("scalar", "avx2", "avx512")
+DIST_METRIC_GROUP_ID = "profile_v6_dist_metrics/f64"
+DIST_METRIC_ORDER = (
+    "squared_euclidean",
+    "manhattan",
+    "chebyshev",
+    "minkowski_p3",
+    "dot_product",
+)
+MATRIX_COLORS = (
+    "#3264a8",
+    "#d35400",
+    "#1f8f3a",
+    "#8e44ad",
+    "#7f5f00",
+    "#00838f",
+)
 
 
 @dataclass(frozen=True)
@@ -246,6 +265,72 @@ def render_chart(
     plt.close(figure)
 
 
+def validate_series_pair(
+    baseline: list[Point],
+    variant: list[Point],
+    description: str,
+) -> None:
+    if len(baseline) != len(variant):
+        raise RuntimeError(f"baseline/variant point count mismatch for {description}")
+    for baseline_point, variant_point in zip(baseline, variant):
+        if baseline_point.tree_log2 != variant_point.tree_log2:
+            raise RuntimeError(f"baseline/variant tree sizes differ for {description}")
+
+
+def render_matrix_chart(
+    plt: Any,
+    title: str,
+    series: list[tuple[str, list[Point], list[Point]]],
+    variant_key: str,
+    output_path: Path,
+) -> None:
+    figure, axis = plt.subplots(figsize=(11, 7))
+    x_ticks: set[float] = set()
+
+    for index, (series_name, baseline, variant) in enumerate(series):
+        validate_series_pair(baseline, variant, f"{title}: {series_name}")
+        color = MATRIX_COLORS[index % len(MATRIX_COLORS)]
+        label = series_name.replace("_", " ")
+        x = [point.tree_log2 for point in baseline]
+        x_ticks.update(x)
+
+        for run_label, points, line_style, alpha in (
+            ("baseline", baseline, "--", 0.72),
+            (variant_key, variant, "-", 1.0),
+        ):
+            y = [point.duration_ns / NS_PER_US for point in points]
+            lower = [point.lower_ns / NS_PER_US for point in points]
+            upper = [point.upper_ns / NS_PER_US for point in points]
+            axis.plot(
+                x,
+                y,
+                marker="o",
+                linewidth=2,
+                linestyle=line_style,
+                alpha=alpha,
+                label=f"{label} / {run_label}",
+                color=color,
+            )
+            axis.fill_between(x, lower, upper, color=color, alpha=0.045)
+
+    sorted_ticks = sorted(x_ticks)
+    axis.set_xticks(sorted_ticks)
+    axis.set_xticklabels([f"{value:g}" for value in sorted_ticks])
+    axis.set_yscale("log")
+    axis.set_xlabel("log2(tree size)")
+    axis.set_ylabel("Mean duration per query (us, log scale)")
+    axis.set_title(title)
+    axis.grid(True, which="both", alpha=0.25)
+    axis.legend(fontsize=8, ncol=2)
+    figure.tight_layout()
+    figure.savefig(output_path, dpi=140)
+    plt.close(figure)
+
+
+def matrix_change_score(series: list[tuple[str, list[Point], list[Point]]]) -> float:
+    return sum(change_score(baseline, variant) for _, baseline, variant in series)
+
+
 def change_score(baseline: list[Point], variant: list[Point]) -> float:
     if len(baseline) != len(variant):
         raise RuntimeError("cannot score unmatched baseline/variant series")
@@ -311,6 +396,126 @@ def import_matplotlib() -> tuple[Any, Any]:
     return matplotlib, plt
 
 
+def dist_metric_isa(suite: str) -> str | None:
+    if not suite.startswith(DIST_METRIC_SUITE_PREFIX):
+        return None
+    isa = suite.removeprefix(DIST_METRIC_SUITE_PREFIX)
+    return isa if isa in DIST_METRIC_ISA_ORDER else None
+
+
+def generate_dist_metric_matrix_charts(
+    plt: Any,
+    variant_key: str,
+    output_dir: Path,
+    pairs: dict[str, tuple[Path, Path]],
+    paths_seen: set[Path],
+) -> tuple[list[tuple[str, Path]], list[dict[str, str | float]]]:
+    if not pairs:
+        return [], []
+
+    missing_isas = set(DIST_METRIC_REQUIRED_ISAS) - pairs.keys()
+    if missing_isas:
+        missing = ", ".join(sorted(missing_isas))
+        raise RuntimeError(f"distance metric result matrix is missing ISA modes: {missing}")
+
+    loaded: dict[
+        str,
+        tuple[dict[SeriesKey, list[Point]], dict[SeriesKey, list[Point]]],
+    ] = {}
+    for isa in DIST_METRIC_ISA_ORDER:
+        pair = pairs.get(isa)
+        if pair is not None:
+            loaded[isa] = (result_series(pair[0]), result_series(pair[1]))
+
+    charts: list[tuple[str, Path]] = []
+    metadata: list[dict[str, str | float]] = []
+    expected_keys = [
+        SeriesKey(DIST_METRIC_GROUP_ID, function_id)
+        for function_id in DIST_METRIC_ORDER
+    ]
+    for isa, (baseline_series, variant_series) in loaded.items():
+        for run_label, result in (
+            ("baseline", baseline_series),
+            (variant_key, variant_series),
+        ):
+            missing_metrics = [
+                key.function_id for key in expected_keys if key not in result
+            ]
+            if missing_metrics:
+                missing = ", ".join(missing_metrics)
+                raise RuntimeError(
+                    f"distance metric {isa}/{run_label} result is missing metrics: {missing}"
+                )
+
+    for key in expected_keys:
+        series = [
+            (
+                isa,
+                loaded[isa][0][key],
+                loaded[isa][1][key],
+            )
+            for isa in DIST_METRIC_ISA_ORDER
+            if isa in loaded and key in loaded[isa][0] and key in loaded[isa][1]
+        ]
+        chart_key = SeriesKey("v6-dist-metrics/metric", key.function_id)
+        chart_path = unique_chart_path(
+            output_dir,
+            "v6-dist-metrics",
+            chart_key,
+            variant_key,
+            paths_seen,
+        )
+        title = f"Distance metric {key.function_id}: ISA comparison"
+        render_matrix_chart(plt, title, series, variant_key, chart_path)
+        charts.append((title, chart_path))
+        metadata.append(
+            {
+                "title": title,
+                "file_name": chart_path.name,
+                "suite": "v6-dist-metrics",
+                "group_id": "metric",
+                "function_id": key.function_id,
+                "change_score": matrix_change_score(series),
+            }
+        )
+
+    for isa in DIST_METRIC_ISA_ORDER:
+        if isa not in loaded:
+            continue
+        baseline_series, variant_series = loaded[isa]
+        series = [
+            (
+                key.function_id,
+                baseline_series[key],
+                variant_series[key],
+            )
+            for key in expected_keys
+        ]
+        chart_key = SeriesKey("v6-dist-metrics/isa", isa)
+        chart_path = unique_chart_path(
+            output_dir,
+            "v6-dist-metrics",
+            chart_key,
+            variant_key,
+            paths_seen,
+        )
+        title = f"Distance metrics: {isa} comparison"
+        render_matrix_chart(plt, title, series, variant_key, chart_path)
+        charts.append((title, chart_path))
+        metadata.append(
+            {
+                "title": title,
+                "file_name": chart_path.name,
+                "suite": "v6-dist-metrics",
+                "group_id": "isa",
+                "function_id": isa,
+                "change_score": matrix_change_score(series),
+            }
+        )
+
+    return charts, metadata
+
+
 def generate_charts(
     variant_key: str,
     results_dir: Path,
@@ -329,19 +534,24 @@ def generate_charts(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     pairs: list[tuple[str, Path, Path]] = []
+    dist_metric_pairs: dict[str, tuple[Path, Path]] = {}
     for baseline_path in sorted(results_dir.glob(f"{RESULT_PREFIX}*{BASELINE_SUFFIX}")):
         suite = baseline_path.name[len(RESULT_PREFIX) : -len(BASELINE_SUFFIX)]
         variant_path = results_dir / f"{RESULT_PREFIX}{suite}-{variant_key}.json"
         if variant_path.is_file():
-            pairs.append((suite, baseline_path, variant_path))
+            isa = dist_metric_isa(suite)
+            if isa is None:
+                pairs.append((suite, baseline_path, variant_path))
+            else:
+                dist_metric_pairs[isa] = (baseline_path, variant_path)
 
-    if not pairs:
+    if not pairs and not dist_metric_pairs:
         raise RuntimeError(
             f"no baseline/result pairs found for variant {variant_key!r} in {results_dir}"
         )
 
     charts: list[tuple[str, Path]] = []
-    metadata: list[dict[str, str]] = []
+    metadata: list[dict[str, str | float]] = []
     paths_seen: set[Path] = set()
     for suite, baseline_path, variant_path in pairs:
         baseline_series = result_series(baseline_path)
@@ -373,6 +583,16 @@ def generate_charts(
                     "change_score": change_score(baseline_series[key], variant_series[key]),
                 }
             )
+
+    matrix_charts, matrix_metadata = generate_dist_metric_matrix_charts(
+        plt,
+        variant_key,
+        output_dir,
+        dist_metric_pairs,
+        paths_seen,
+    )
+    charts.extend(matrix_charts)
+    metadata.extend(matrix_metadata)
 
     if not charts:
         raise RuntimeError("matching result files contained no common benchmark series")
