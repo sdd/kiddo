@@ -33,6 +33,12 @@ pub trait Axis:
     + crate::stem_strategy::CompareBlock3
     + crate::stem_strategy::CompareBlock4
 {
+    /// Whether subtraction can represent a negative result.
+    ///
+    /// Custom axes default to unsigned semantics so generic algorithms retain
+    /// their conservative ordered-subtraction paths unless explicitly opted in.
+    const IS_SIGNED: bool = false;
+
     const VALUE_WIDTH_BYTES: usize = size_of::<Self::Coord>();
 
     /// Coordinate scalar type stored in the tree and queries.
@@ -75,6 +81,8 @@ macro_rules! impl_axis_float {
 
     ($t:ty) => {
         impl Axis for $t {
+            const IS_SIGNED: bool = true;
+
             type Coord = $t;
 
             #[inline(always)]
@@ -137,8 +145,8 @@ impl_axis_float!(f64);
 /// Macro to implement AxisUnified for fixed-point types.
 macro_rules! impl_axis_fixed {
     // Pattern with SIMD block support
-    ($t:ty, SIMD_BLOCK_SUPPORT => ( $( $block_size:literal => ($prune_fn:path, $compare_fn:path) ),* $(,)? )) => {
-        impl_axis_fixed!($t); // First implement the basic AxisUnified trait
+    ($t:ty, $is_signed:literal, SIMD_BLOCK_SUPPORT => ( $( $block_size:literal => ($prune_fn:path, $compare_fn:path) ),* $(,)? )) => {
+        impl_axis_fixed!($t, $is_signed); // First implement the basic AxisUnified trait
 
         // Then implement SIMD block support for each specified block size
         $(
@@ -147,9 +155,11 @@ macro_rules! impl_axis_fixed {
     };
 
     // Base pattern without SIMD block support (uses default unimplemented!() from traits)
-    ($t:ty) => {
+    ($t:ty, $is_signed:literal) => {
         #[cfg(feature = "fixed")]
         impl Axis for $t {
+            const IS_SIGNED: bool = $is_signed;
+
             type Coord = $t;
 
             #[inline(always)]
@@ -200,14 +210,16 @@ macro_rules! impl_axis_fixed {
 }
 
 #[cfg(feature = "fixed")]
-impl_axis_fixed!(FixedI32<U16>);
+impl_axis_fixed!(FixedI32<U16>, true);
 #[cfg(feature = "fixed")]
-impl_axis_fixed!(FixedI32<U0>);
+impl_axis_fixed!(FixedI32<U0>, true);
 #[cfg(feature = "fixed")]
-impl_axis_fixed!(FixedU16<U8>);
+impl_axis_fixed!(FixedU16<U8>, false);
 
 #[cfg(feature = "f16")]
 impl Axis for half::f16 {
+    const IS_SIGNED: bool = true;
+
     type Coord = half::f16;
 
     #[inline(always)]
@@ -341,6 +353,7 @@ mod tests {
 
     #[test]
     fn float_axis_helpers_behave_as_expected() {
+        assert!(<f32 as Axis>::IS_SIGNED);
         assert_eq!(<f32 as Axis>::zero(), 0.0);
         assert!(<f32 as Axis>::is_max_value(<f32 as Axis>::max_value()));
         assert_eq!(<f32 as Axis>::cmp(1.0, 2.0), std::cmp::Ordering::Less);
@@ -357,6 +370,7 @@ mod tests {
 
     #[test]
     fn unsigned_axis_helpers_behave_as_expected() {
+        assert!(!<u8 as Axis>::IS_SIGNED);
         assert_eq!(<u8 as Axis>::zero(), 0);
         assert_eq!(<u8 as Axis>::min_value(), 0);
         assert_eq!(<u8 as Axis>::max_value(), u8::MAX);
@@ -373,6 +387,8 @@ mod tests {
     #[cfg(feature = "fixed")]
     #[test]
     fn fixed_axis_helpers_behave_as_expected() {
+        assert!(<fixed::FixedI32<fixed::types::extra::U16> as Axis>::IS_SIGNED);
+        assert!(!<fixed::FixedU16<fixed::types::extra::U8> as Axis>::IS_SIGNED);
         let a = fixed::FixedI32::<fixed::types::extra::U16>::from_num(1.5);
         let b = fixed::FixedI32::<fixed::types::extra::U16>::from_num(0.25);
         assert_eq!(
