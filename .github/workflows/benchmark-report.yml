@@ -31,7 +31,7 @@ env:
 
 jobs:
   benchmark:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, Linux, X64]
     outputs:
       variant_key: ${{ steps.meta.outputs.variant_key }}
       site_url_base: ${{ steps.meta.outputs.site_url_base }}

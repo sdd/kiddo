@@ -176,12 +176,15 @@ bench-v6-dist-metrics RESULT_KEY=benchmark_result_key OUTPUT_DIR='.' QUERIES='10
 
     run_mode() {
         local mode=$1
-        local target_cpu=$2
+        local rustflags=$2
         local features=$3
+
+        # An explicit target keeps ISA flags off host build scripts and proc macros.
         RUSTC_WRAPPER= \
             KIDDO_PROFILE_QUERIES={{quote(QUERIES)}} \
-            RUSTFLAGS="-C target-cpu=$target_cpu" \
+            RUSTFLAGS="$rustflags" \
             cargo criterion \
+                --target "$host" \
                 --bench profile_v6_dist_metrics \
                 --features "$features"
         cargo run --quiet --manifest-path tools/criterion-export/Cargo.toml -- \
@@ -190,9 +193,9 @@ bench-v6-dist-metrics RESULT_KEY=benchmark_result_key OUTPUT_DIR='.' QUERIES='10
             profile_v6_dist_metrics
     }
 
-    run_mode scalar x86-64-v2 "$scalar_features"
-    run_mode avx2 x86-64-v3 "$simd_features"
-    run_mode avx512 x86-64-v4 "$simd_features"
+    run_mode scalar "-C target-cpu=x86-64-v2" "$scalar_features"
+    run_mode avx2 "-C target-cpu=x86-64-v2 -C target-feature=+avx2" "$simd_features"
+    run_mode avx512 "-C target-cpu=native" "$simd_features"
 
 chart-benchmark-results VARIANT_KEY RESULTS_DIR='.' OUTPUT_DIR='.' PYTHON='python3':
     {{quote(PYTHON)}} scripts/chart_benchmark_results.py {{quote(VARIANT_KEY)}} --results-dir {{quote(RESULTS_DIR)}} --output-dir {{quote(OUTPUT_DIR)}}
