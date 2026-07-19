@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use kiddo::dist::{
     DistanceMetric, DistanceMetricAvx2, DistanceMetricAvx512, DistanceMetricNeon,
     DistanceMetricScalar,
@@ -12,7 +10,6 @@ struct AbsDistance;
 
 impl DistanceMetricScalar<f64> for AbsDistance {
     type Output = f64;
-    const ORDERING: Ordering = Ordering::Less;
 
     fn widen_coord(a: f64) -> Self::Output {
         a

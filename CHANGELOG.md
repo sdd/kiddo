@@ -113,7 +113,7 @@ long-standing issues.
   conditions, the `within_unsorted_visit` result mode to avoid materialization of results, `TryFrom`
   for converting between different `KdTree` types, `new_from_source`, and `replace_item`.
 - Distance metric coverage has also been expanded and tidied up, including the addition of Chebyshev
-  Minkowski, and Dot Product metrics and support for queries whose result type is wider than the
+  and Minkowski metrics and support for queries whose result type is wider than the
   stored coordinate type, which is especially important for fixed-point trees.
 - With regard to the Stem Strategy trait system, alongside the Eytzinger ordering from v5 and prior
   is still available but now supports configurable prefetch behaviour. I've introduced the new

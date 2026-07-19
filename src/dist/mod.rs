@@ -19,10 +19,6 @@ pub mod distance_metric_core;
 #[doc(hidden)]
 pub mod distance_metric_neon;
 
-/// Dot Product distance metric
-#[doc(hidden)]
-pub mod dot_product;
-
 /// Chebyshev distance metric
 #[doc(hidden)]
 pub mod chebyshev;
@@ -71,8 +67,6 @@ use crate::{
 
 #[doc(inline)]
 pub use chebyshev::Chebyshev;
-#[doc(inline)]
-pub use dot_product::DotProduct;
 #[doc(inline)]
 pub use manhattan::Manhattan;
 #[doc(inline)]
@@ -1433,8 +1427,8 @@ impl<T, A: Copy> DistanceMetric<A> for T where
 #[cfg(test)]
 mod tests {
     use super::{
-        Chebyshev, DistanceMetric, DistanceMetricScalar, DotProduct, Manhattan, Minkowski,
-        QueryMetric, SquaredEuclidean,
+        Chebyshev, DistanceMetric, DistanceMetricScalar, Manhattan, Minkowski, QueryMetric,
+        SquaredEuclidean,
     };
 
     #[test]
@@ -1499,17 +1493,5 @@ mod tests {
         assert_query_metric::<SquaredEuclidean<f64>>();
         assert_query_metric::<Chebyshev<f64>>();
         assert_query_metric::<Minkowski<3, f64>>();
-    }
-
-    #[test]
-    fn v3_dot_product_f64_works() {
-        type M = DotProduct<f64>;
-        let a = [1.0, 2.0, 3.0];
-        let b = [4.0, 2.0, -1.0];
-
-        let aw = a.map(M::widen_coord);
-        let bw = b.map(M::widen_coord);
-        let d = <M as DistanceMetricScalar<f64>>::dist::<3>(&aw, &bw);
-        assert_eq!(d, 5.0);
     }
 }

@@ -6,7 +6,7 @@ use kiddo::dist::{DistanceMetricScalar, QueryMetric};
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::FlatVec;
 use kiddo::stem_strategy::Eytzinger;
-use kiddo::{Chebyshev, DotProduct, Manhattan, Minkowski, SquaredEuclidean};
+use kiddo::{Chebyshev, Manhattan, Minkowski, SquaredEuclidean};
 use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use std::hint::black_box;
@@ -80,9 +80,6 @@ fn dist_metrics(c: &mut Criterion) {
         });
         group.bench_function(BenchmarkId::new("minkowski_p3", point_count), |b| {
             b.iter(|| black_box(run_queries::<Minkowski<3, f64>>(&tree, &queries)))
-        });
-        group.bench_function(BenchmarkId::new("dot_product", point_count), |b| {
-            b.iter(|| black_box(run_queries::<DotProduct<f64>>(&tree, &queries)))
         });
     }
 

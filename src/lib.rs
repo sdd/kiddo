@@ -220,8 +220,6 @@ pub mod dist;
 #[doc(hidden)]
 pub type Chebyshev<R> = crate::dist::Chebyshev<R>;
 #[doc(hidden)]
-pub type DotProduct<R> = crate::dist::DotProduct<R>;
-#[doc(hidden)]
 pub type Manhattan<R> = crate::dist::Manhattan<R>;
 #[doc(hidden)]
 pub type Minkowski<const P: u32, R> = crate::dist::Minkowski<P, R>;

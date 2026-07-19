@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, ops::Add};
+use std::ops::Add;
 
 use fixed::traits::LossyFrom;
 
@@ -26,7 +26,6 @@ where
     R: Axis<Coord = R> + LossyFrom<A> + Add<Output = R>,
 {
     type Output = R;
-    const ORDERING: Ordering = Ordering::Less;
 
     #[inline(always)]
     fn widen_coord(a: A) -> R {
