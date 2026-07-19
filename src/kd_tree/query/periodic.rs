@@ -25,48 +25,6 @@ use super::builder::{boundary_accepts, BoundaryMode, PeriodicAxis, QueryBuilderT
 #[cfg(not(feature = "small_n_result_collectors"))]
 const MAX_VEC_RESULT_SIZE: usize = 20;
 
-fn with_wrapped_queries<A: PeriodicAxis, F, const K: usize>(
-    query: &[A; K],
-    box_size: &[A; K],
-    mut f: F,
-) where
-    F: FnMut(&[A; K]),
-{
-    fn recurse<A: PeriodicAxis, F, const K: usize>(
-        query: &[A; K],
-        box_size: &[A; K],
-        axis: usize,
-        wrapped_query: &mut [A; K],
-        f: &mut F,
-    ) where
-        F: FnMut(&[A; K]),
-    {
-        if axis == K {
-            f(wrapped_query);
-            return;
-        }
-
-        let original = query[axis];
-        let axis_len = box_size[axis];
-
-        wrapped_query[axis] = original - axis_len;
-        recurse(query, box_size, axis + 1, wrapped_query, f);
-
-        wrapped_query[axis] = original;
-        recurse(query, box_size, axis + 1, wrapped_query, f);
-
-        let mut plus = original;
-        plus += axis_len;
-        wrapped_query[axis] = plus;
-        recurse(query, box_size, axis + 1, wrapped_query, f);
-
-        wrapped_query[axis] = original;
-    }
-
-    let mut wrapped_query = *query;
-    recurse(query, box_size, 0, &mut wrapped_query, &mut f);
-}
-
 #[inline(always)]
 fn periodic_image_axis_offset<A: PeriodicAxis>(wrapped_coord: A, axis_len: A) -> A {
     if A::cmp(wrapped_coord, A::zero()) == Ordering::Less {
@@ -220,24 +178,6 @@ where
         A::periodic_box_is_valid(box_size),
         "periodic box sizes must be strictly positive"
     );
-
-    if D::ORDERING != Ordering::Less {
-        let mut best_result = QueryResultItem {
-            point: (),
-            item: T::default(),
-            distance: D::Output::max_value(),
-        };
-
-        with_wrapped_queries::<A, _, K>(query, box_size, |wrapped_query| {
-            let (distance, item) = tree.qb_nearest_one::<D>(wrapped_query);
-            if D::Output::cmp(distance, best_result.distance) == Ordering::Less {
-                best_result.distance = distance;
-                best_result.item = item;
-            }
-        });
-
-        return best_result;
-    }
 
     let (home_distance, home_item) = tree.qb_nearest_one::<D>(query);
     let mut best_result = QueryResultItem {

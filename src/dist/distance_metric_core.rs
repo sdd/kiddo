@@ -13,11 +13,6 @@ pub trait DistanceMetricScalar<A: Copy> {
     /// Accumulator / distance scalar type.
     type Output: Axis<Coord = Self::Output>;
 
-    /// Desired ordering semantics for this metric.
-    /// - `Less`: smaller value is better (distance metrics)
-    /// - `Greater`: larger value is better (similarity metrics)
-    const ORDERING: Ordering;
-
     /// Widen a coordinate to the output type.
     fn widen_coord(a: A) -> Self::Output;
 
@@ -102,17 +97,7 @@ pub trait DistanceMetricScalar<A: Copy> {
         Self::Output::saturating_add(rd - old_dist1, new_dist1)
     }
 
-    /// Returns true if `a` is better than `b` under this metric ordering.
-    #[inline(always)]
-    fn better(a: Self::Output, b: Self::Output) -> bool {
-        match Self::ORDERING {
-            Ordering::Less => a < b,
-            Ordering::Greater => a > b,
-            Ordering::Equal => false,
-        }
-    }
-
-    /// Ordering-compatible comparison helper.
+    /// Distance comparison helper.
     #[inline(always)]
     fn cmp(a: Self::Output, b: Self::Output) -> Ordering {
         a.partial_cmp(&b).unwrap_or(Ordering::Equal)
@@ -125,11 +110,9 @@ mod tests {
     use std::cmp::Ordering;
 
     struct DummyLessMetric;
-    struct DummyGreaterMetric;
 
     impl DistanceMetricScalar<i16> for DummyLessMetric {
         type Output = f64;
-        const ORDERING: Ordering = Ordering::Less;
 
         fn widen_coord(a: i16) -> Self::Output {
             a as f64
@@ -140,33 +123,12 @@ mod tests {
         }
     }
 
-    impl DistanceMetricScalar<i16> for DummyGreaterMetric {
-        type Output = f64;
-        const ORDERING: Ordering = Ordering::Greater;
-
-        fn widen_coord(a: i16) -> Self::Output {
-            a as f64
-        }
-
-        fn dist1(a: Self::Output, b: Self::Output) -> Self::Output {
-            a - b
-        }
-    }
-
     #[test]
     fn default_widen_axis_bulk_widens() {
         let axis = [1i16, -2, 7];
         let mut out = [0.0f64; 3];
         DummyLessMetric::widen_axis(&axis, &mut out);
         assert_eq!(out, [1.0, -2.0, 7.0]);
-    }
-
-    #[test]
-    fn default_better_respects_ordering() {
-        assert!(DummyLessMetric::better(2.0, 5.0));
-        assert!(!DummyLessMetric::better(5.0, 2.0));
-        assert!(DummyGreaterMetric::better(5.0, 2.0));
-        assert!(!DummyGreaterMetric::better(2.0, 5.0));
     }
 
     #[test]

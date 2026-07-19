@@ -28,7 +28,6 @@ DIST_METRIC_ORDER = (
     "manhattan",
     "chebyshev",
     "minkowski_p3",
-    "dot_product",
 )
 MATRIX_COLORS = (
     "#3264a8",
