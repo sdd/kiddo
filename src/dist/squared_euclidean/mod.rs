@@ -34,8 +34,50 @@ where
 
     #[inline(always)]
     fn dist1(a: R, b: R) -> R {
-        let d = if a >= b { a - b } else { b - a };
+        let d = if R::IS_SIGNED || a >= b { a - b } else { b - a };
         d * d
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SquaredEuclidean;
+    use crate::dist::DistanceMetricScalar;
+
+    #[test]
+    fn signed_dist1_squares_direct_delta_in_both_directions() {
+        type Metric = SquaredEuclidean<f64>;
+
+        assert_eq!(<Metric as DistanceMetricScalar<f64>>::dist1(5.0, 2.0), 9.0);
+        assert_eq!(<Metric as DistanceMetricScalar<f64>>::dist1(2.0, 5.0), 9.0);
+    }
+
+    #[test]
+    fn unsigned_dist1_uses_ordered_subtraction() {
+        type Metric = SquaredEuclidean<u16>;
+
+        assert_eq!(<Metric as DistanceMetricScalar<u16>>::dist1(5, 2), 9);
+        assert_eq!(<Metric as DistanceMetricScalar<u16>>::dist1(2, 5), 9);
+    }
+
+    #[cfg(feature = "fixed")]
+    #[test]
+    fn signed_fixed_dist1_squares_direct_delta() {
+        use fixed::{types::extra::U16, FixedI32};
+
+        type Output = FixedI32<U16>;
+        type Metric = SquaredEuclidean<Output>;
+        let a = Output::from_num(-1.5);
+        let b = Output::from_num(0.5);
+
+        assert_eq!(
+            <Metric as DistanceMetricScalar<Output>>::dist1(a, b),
+            Output::from_num(4)
+        );
+        assert_eq!(
+            <Metric as DistanceMetricScalar<Output>>::dist1(b, a),
+            Output::from_num(4)
+        );
     }
 }
 
@@ -73,4 +115,22 @@ where
 
     #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
     type NeonF32Ops = neon::SquaredEuclideanNeonF32LeafOps;
+}
+
+#[cfg(feature = "cargo_asm")]
+pub mod cargo_asm {
+    use super::SquaredEuclidean;
+    use crate::dist::DistanceMetricScalar;
+
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_squared_euclidean_dist1_f64_cargo_asm_hook(a: f64, b: f64) -> f64 {
+        <SquaredEuclidean<f64> as DistanceMetricScalar<f64>>::dist1(a, b)
+    }
+
+    #[inline(never)]
+    #[unsafe(no_mangle)]
+    pub fn v6_squared_euclidean_dist1_u16_cargo_asm_hook(a: u16, b: u16) -> u16 {
+        <SquaredEuclidean<u16> as DistanceMetricScalar<u16>>::dist1(a, b)
+    }
 }
