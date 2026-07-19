@@ -32,11 +32,7 @@ where
 
     #[inline(always)]
     fn dist1(a: R, b: R) -> R {
-        if a >= b {
-            a - b
-        } else {
-            b - a
-        }
+        R::saturating_dist(a, b)
     }
 
     #[inline(always)]
