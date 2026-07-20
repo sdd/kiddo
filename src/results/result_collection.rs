@@ -130,9 +130,12 @@ where
 /// Inserts candidates via plain `Vec::push` (O(1)) during the fill phase.
 /// Once `max_qty` items have been collected, the vec is sorted once.
 /// Subsequent insertions that beat the current threshold (last/farthest
-/// element) are inserted via `partition_point` + `insert`, maintaining
-/// sorted order. The threshold is always accurate (the farthest of the
-/// current top-k), enabling effective branch pruning during tree traversal.
+/// element) are inserted by scanning backward while shifting larger entries,
+/// maintaining sorted order in a single pass. The threshold is always accurate
+/// (the farthest of the current top-k), enabling effective branch pruning during
+/// tree traversal.
+/// A separate backward scan followed by `copy_within` was also benchmarked, but
+/// was consistently and materially slower for result sizes through 256.
 #[cfg(not(feature = "small_n_result_collectors"))]
 #[derive(Debug)]
 pub(crate) struct ThresholdVecResultCollection<E> {
@@ -141,7 +144,7 @@ pub(crate) struct ThresholdVecResultCollection<E> {
 }
 
 #[cfg(not(feature = "small_n_result_collectors"))]
-impl<O: Axis<Coord = O>, T> ResultCollection<O, QueryResultItem<(), T, O>>
+impl<O: Axis<Coord = O>, T: Copy> ResultCollection<O, QueryResultItem<(), T, O>>
     for ThresholdVecResultCollection<QueryResultItem<(), T, O>>
 {
     fn with_max_qty(max_qty: usize) -> Self {
@@ -170,9 +173,12 @@ impl<O: Axis<Coord = O>, T> ResultCollection<O, QueryResultItem<(), T, O>>
                 });
             }
         } else if entry < self.inner[self.max_qty - 1] {
-            self.inner.pop();
-            let idx = self.inner.partition_point(|existing| *existing <= entry);
-            self.inner.insert(idx, entry);
+            let mut idx = self.max_qty - 1;
+            while idx > 0 && self.inner[idx - 1] > entry {
+                self.inner[idx] = self.inner[idx - 1];
+                idx -= 1;
+            }
+            self.inner[idx] = entry;
         }
     }
 
@@ -1386,5 +1392,62 @@ mod tests {
         assert_eq!(sorted.len(), 3);
         assert!(sorted.iter().any(|item| item.distance == 0.3));
         assert!(!sorted.iter().any(|item| item.distance == 0.8));
+    }
+
+    fn result_item(item: u32, distance: f64) -> QueryResultItem<(), u32, f64> {
+        QueryResultItem {
+            point: (),
+            item,
+            distance,
+        }
+    }
+
+    #[test]
+    fn threshold_vec_linear_insertion_handles_front_middle_tail_and_ties() {
+        let mut results =
+            ThresholdVecResultCollection::<QueryResultItem<(), u32, f64>>::with_max_qty(4);
+        for (item, distance) in [(1, 1.0), (2, 2.0), (3, 3.0), (4, 4.0)] {
+            results.add(result_item(item, distance));
+        }
+
+        results.add(result_item(5, 3.5));
+        assert_eq!(
+            results
+                .inner
+                .iter()
+                .map(|entry| (entry.item, entry.distance))
+                .collect::<Vec<_>>(),
+            [(1, 1.0), (2, 2.0), (3, 3.0), (5, 3.5)]
+        );
+
+        results.add(result_item(6, 1.5));
+        assert_eq!(
+            results
+                .inner
+                .iter()
+                .map(|entry| (entry.item, entry.distance))
+                .collect::<Vec<_>>(),
+            [(1, 1.0), (6, 1.5), (2, 2.0), (3, 3.0)]
+        );
+
+        results.add(result_item(7, 0.5));
+        assert_eq!(
+            results
+                .inner
+                .iter()
+                .map(|entry| (entry.item, entry.distance))
+                .collect::<Vec<_>>(),
+            [(7, 0.5), (1, 1.0), (6, 1.5), (2, 2.0)]
+        );
+
+        results.add(result_item(8, 1.0));
+        assert_eq!(
+            results
+                .inner
+                .iter()
+                .map(|entry| (entry.item, entry.distance))
+                .collect::<Vec<_>>(),
+            [(7, 0.5), (1, 1.0), (8, 1.0), (6, 1.5)]
+        );
     }
 }
