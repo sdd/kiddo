@@ -388,6 +388,15 @@ profile-v6-result-collection-stats FEATURES='rkyv_08,simd,test_utils,result_coll
     RUSTFLAGS='-C target-cpu=native' \
     cargo bench --bench profile_v6_result_collection_stats --features {{FEATURES}}
 
+profile-v6-result-collection-thresholds FEATURES='test_utils,logging_off' TREE_SIZES='262144,1048576,4194304' QUERIES='1024' SAMPLES='5' MAX_QTYS='16,20,24,32,48,64,80,96,112,128,144,160,176,192,208,224,256':
+    RUSTC_WRAPPER= \
+    KIDDO_PROFILE_TREE_SIZES={{quote(TREE_SIZES)}} \
+    KIDDO_PROFILE_QUERIES={{quote(QUERIES)}} \
+    KIDDO_PROFILE_SAMPLES={{quote(SAMPLES)}} \
+    KIDDO_PROFILE_MAX_QTYS={{quote(MAX_QTYS)}} \
+    RUSTFLAGS='-C target-cpu=native' \
+    cargo bench --bench profile_v6_result_collection_thresholds --features {{FEATURES}}
+
 build-v6-hugepage-archives FEATURES='rkyv_08,test_utils,logging_off' POINTS='33554432' QUERIES='100000' PREFIX='./target/kiddo-hugepage-v6':
     RUSTC_WRAPPER= \
     KIDDO_PROFILE_POINTS={{POINTS}} \

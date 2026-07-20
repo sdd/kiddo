@@ -291,6 +291,12 @@ harness = false
 required-features = ["rkyv_08", "simd", "test_utils", "result_collection_stats"]
 
 [[bench]]
+name = "profile_v6_result_collection_thresholds"
+path = "benches/profile_v6_result_collection_thresholds.rs"
+harness = false
+required-features = ["test_utils"]
+
+[[bench]]
 name = "profile_v6_archived_huge_pages"
 path = "benches/profile_v6_archived_huge_pages.rs"
 harness = false

@@ -8,7 +8,7 @@ use crate::leaf_view::TlsLeafScratch;
 use crate::leaf_view_chunked::nearest_n_within::{
     nearest_n_within_with_query_wide, nearest_n_within_with_query_wide_arena,
 };
-#[cfg(not(feature = "small_n_result_collectors"))]
+#[cfg(any(not(feature = "small_n_result_collectors"), feature = "test_utils"))]
 use crate::results::result_collection::ThresholdVecResultCollection;
 use crate::results::result_collection::{BinaryHeapResultCollection, ResultCollection};
 #[cfg(feature = "small_n_result_collectors")]
@@ -234,6 +234,46 @@ where
                 BinaryHeapResultCollection<QueryResultItem<(), T, D::Output>>,
                 EXCLUSIVE,
             >(query, max_dist, max_qty, sorted, stack)
+        }
+    }
+
+    /// Executes an unbounded nearest-n query with an explicitly selected result
+    /// collector. This is only exposed for cross-architecture threshold profiling.
+    #[cfg(feature = "test_utils")]
+    #[doc(hidden)]
+    pub fn nearest_n_with_forced_collector<D>(
+        &self,
+        query: &[A; K],
+        max_qty: NonZeroUsize,
+        sorted: bool,
+        collector: crate::test_utils::NearestNBenchmarkCollector,
+    ) -> Vec<QueryResultItem<(), T, D::Output>>
+    where
+        D: DistanceMetric<A>,
+        D::Output: crate::stem_strategy::SimdPrune
+            + SimdSelectBestChildBlock3
+            + BacktrackBlock3
+            + BacktrackBlock4
+            + TlsLeafScratch
+            + 'static,
+        SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
+    {
+        let max_qty = max_qty.get();
+        let max_dist = D::Output::max_value();
+
+        match collector {
+            crate::test_utils::NearestNBenchmarkCollector::BinaryHeap => self
+                .nearest_n_within_inner::<
+                    D,
+                    BinaryHeapResultCollection<QueryResultItem<(), T, D::Output>>,
+                    false,
+                >(query, max_dist, max_qty, sorted),
+            crate::test_utils::NearestNBenchmarkCollector::ThresholdVecFused => self
+                .nearest_n_within_inner::<
+                    D,
+                    ThresholdVecResultCollection<QueryResultItem<(), T, D::Output>>,
+                    false,
+                >(query, max_dist, max_qty, sorted),
         }
     }
 
