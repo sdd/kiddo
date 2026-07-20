@@ -22,7 +22,9 @@ use crate::traits::leaf_strategy::LeafProjection;
 use crate::{Axis, Content, KdTree, LeafStrategy, QueryResultItem, StemStrategy};
 
 #[cfg(not(feature = "small_n_result_collectors"))]
-const MAX_VEC_RESULT_SIZE: usize = 20;
+const MAX_SORTED_VEC_RESULT_SIZE: usize = 192;
+#[cfg(not(feature = "small_n_result_collectors"))]
+const MAX_UNSORTED_VEC_RESULT_SIZE: usize = 24;
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
@@ -156,7 +158,13 @@ where
             }
 
             #[cfg(not(feature = "small_n_result_collectors"))]
-            if max_qty <= MAX_VEC_RESULT_SIZE {
+            if max_qty
+                <= if sorted {
+                    MAX_SORTED_VEC_RESULT_SIZE
+                } else {
+                    MAX_UNSORTED_VEC_RESULT_SIZE
+                }
+            {
                 return self.nearest_n_within_inner::<
                     D,
                     ThresholdVecResultCollection<QueryResultItem<(), T, D::Output>>,
@@ -207,7 +215,13 @@ where
             }
 
             #[cfg(not(feature = "small_n_result_collectors"))]
-            if max_qty <= MAX_VEC_RESULT_SIZE {
+            if max_qty
+                <= if sorted {
+                    MAX_SORTED_VEC_RESULT_SIZE
+                } else {
+                    MAX_UNSORTED_VEC_RESULT_SIZE
+                }
+            {
                 return self.nearest_n_within_inner_with_scratch::<
                     D,
                     ThresholdVecResultCollection<QueryResultItem<(), T, D::Output>>,
@@ -517,14 +531,18 @@ mod tests {
             .execute();
         assert_eq!(results.len(), 10);
 
-        // Exercise BinaryHeapResultCollection fallback (k > MAX_VEC_RESULT_SIZE)
-        let max_qty_large = NonZeroUsize::new(21).unwrap();
+        // Exercise the sorted BinaryHeapResultCollection fallback.
+        #[cfg(not(feature = "small_n_result_collectors"))]
+        let heap_threshold = super::MAX_SORTED_VEC_RESULT_SIZE;
+        #[cfg(feature = "small_n_result_collectors")]
+        let heap_threshold = super::SMALL_RESULT_COLLECTION_MAX_QTY;
+        let max_qty_large = NonZeroUsize::new(heap_threshold + 1).unwrap();
         let results_large = tree
             .query(&query_point)
             .nearest_n::<SquaredEuclidean<f32>>(max_qty_large)
             .within(radius)
             .execute();
-        assert_eq!(results_large.len(), 21);
+        assert_eq!(results_large.len(), max_qty_large.get());
     }
 
     #[test]
