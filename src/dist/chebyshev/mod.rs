@@ -53,7 +53,7 @@ where
 
         for axis in 0..K {
             let off_val = if axis == dim { new_off } else { off[axis] };
-            Self::combine_component(&mut acc, Self::dist1(off_val, Self::Output::zero()));
+            Self::combine_component(&mut acc, off_val);
         }
 
         acc
