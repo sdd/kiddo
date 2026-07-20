@@ -104,11 +104,13 @@ jobs:
           variant_key=$(python3 scripts/benchmark_site.py derive-key --ref-name "$ref_name")
           repo_name="${GITHUB_REPOSITORY#*/}"
           site_url_base="https://${GITHUB_REPOSITORY_OWNER}.github.io/${repo_name}"
-          echo "benchmark_variant=$benchmark_variant" >> "$GITHUB_OUTPUT"
-          echo "ref_name=$ref_name" >> "$GITHUB_OUTPUT"
-          echo "run_sha=$run_sha" >> "$GITHUB_OUTPUT"
-          echo "variant_key=$variant_key" >> "$GITHUB_OUTPUT"
-          echo "site_url_base=$site_url_base" >> "$GITHUB_OUTPUT"
+          {
+            echo "benchmark_variant=$benchmark_variant"
+            echo "ref_name=$ref_name"
+            echo "run_sha=$run_sha"
+            echo "variant_key=$variant_key"
+            echo "site_url_base=$site_url_base"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Run benchmark suite
         run: |
