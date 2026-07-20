@@ -4,6 +4,14 @@ pub mod cache_simulator;
 pub mod exact_query_stats;
 pub mod exact_query_trace;
 
+/// Result collector forced by nearest-n threshold crossover benchmarks.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NearestNBenchmarkCollector {
+    BinaryHeap,
+    ThresholdVecFused,
+}
+
 #[doc(hidden)]
 #[macro_export]
 macro_rules! size_t_idx {

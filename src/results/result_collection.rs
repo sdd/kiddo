@@ -136,14 +136,14 @@ where
 /// tree traversal.
 /// A separate backward scan followed by `copy_within` was also benchmarked, but
 /// was consistently and materially slower for result sizes through 256.
-#[cfg(not(feature = "small_n_result_collectors"))]
+#[cfg(any(not(feature = "small_n_result_collectors"), feature = "test_utils"))]
 #[derive(Debug)]
 pub(crate) struct ThresholdVecResultCollection<E> {
     max_qty: usize,
     inner: Vec<E>,
 }
 
-#[cfg(not(feature = "small_n_result_collectors"))]
+#[cfg(any(not(feature = "small_n_result_collectors"), feature = "test_utils"))]
 impl<O: Axis<Coord = O>, T: Copy> ResultCollection<O, QueryResultItem<(), T, O>>
     for ThresholdVecResultCollection<QueryResultItem<(), T, O>>
 {
