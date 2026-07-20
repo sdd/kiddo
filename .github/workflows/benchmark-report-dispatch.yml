@@ -1,0 +1,74 @@
+name: benchmark-report-dispatch
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  dispatch-benchmark-report:
+    if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/benchmark')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate trigger and dispatch benchmark report
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueNumber = context.payload.issue.number;
+            const comment = context.payload.comment;
+            const body = comment.body.trim();
+            const association = comment.author_association;
+            const allowedAssociations = new Set(["OWNER", "COLLABORATOR", "CONTRIBUTOR"]);
+
+            if (!allowedAssociations.has(association)) {
+              core.setFailed(
+                `/${"benchmark"} requires OWNER, COLLABORATOR, or CONTRIBUTOR status. ${comment.user.login} is ${association}.`
+              );
+              return;
+            }
+
+            let benchmarkVariant;
+            if (body === "/benchmark") {
+              benchmarkVariant = "eytzinger";
+            } else if (body === "/benchmark dist") {
+              benchmarkVariant = "dist";
+            } else {
+              core.setFailed("Unsupported benchmark command. Use `/benchmark` or `/benchmark dist`.");
+              return;
+            }
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: issueNumber,
+            });
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: "benchmark-report.yml",
+              ref: pr.base.ref,
+              inputs: {
+                pr_number: String(pr.number),
+                head_sha: pr.head.sha,
+                head_ref: pr.head.ref,
+                head_repo: pr.head.repo.full_name,
+                benchmark_variant: benchmarkVariant,
+              },
+            });
+
+            const benchmarkLabel =
+              benchmarkVariant === "dist" ? "dist-focussed" : "eytzinger-focus";
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              body: `Queued ${benchmarkLabel} benchmark-report run for \`${pr.head.label}\` at \`${pr.head.sha.slice(0, 12)}\`.`,
+            });

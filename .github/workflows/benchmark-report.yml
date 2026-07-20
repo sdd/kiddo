@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - master
-      - feature/**
-      - fix/**
     paths:
       - "src/**"
       - "benches/**"
@@ -17,9 +15,34 @@ on:
       - ".github/workflows/benchmark-report.yml"
       - "BENCHMARKING.md"
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull request number for comment-dispatched benchmark runs"
+        required: false
+        type: string
+      head_sha:
+        description: "Head commit SHA to benchmark"
+        required: false
+        type: string
+      head_ref:
+        description: "Head branch name to benchmark"
+        required: false
+        type: string
+      head_repo:
+        description: "Head repository full name to benchmark"
+        required: false
+        type: string
+      benchmark_variant:
+        description: "Benchmark suite variant"
+        required: false
+        type: choice
+        default: eytzinger
+        options:
+          - eytzinger
+          - dist
 
 concurrency:
-  group: benchmark-report-${{ github.ref }}
+  group: benchmark-report-${{ inputs.head_ref || github.ref_name }}-${{ inputs.benchmark_variant || 'eytzinger' }}
   cancel-in-progress: false
 
 permissions:
@@ -33,11 +56,16 @@ jobs:
   benchmark:
     runs-on: [self-hosted, Linux, X64]
     outputs:
+      benchmark_variant: ${{ steps.meta.outputs.benchmark_variant }}
+      ref_name: ${{ steps.meta.outputs.ref_name }}
+      run_sha: ${{ steps.meta.outputs.run_sha }}
       variant_key: ${{ steps.meta.outputs.variant_key }}
       site_url_base: ${{ steps.meta.outputs.site_url_base }}
     steps:
       - uses: actions/checkout@v7
         with:
+          repository: ${{ inputs.head_repo || github.repository }}
+          ref: ${{ inputs.head_sha || github.sha }}
           show-progress: false
 
       - name: Get latest stable Rust version
@@ -70,23 +98,39 @@ jobs:
       - name: Derive metadata
         id: meta
         run: |
-          variant_key=$(python3 scripts/benchmark_site.py derive-key --ref-name "${GITHUB_REF_NAME}")
+          ref_name="${{ inputs.head_ref || github.ref_name }}"
+          run_sha="${{ inputs.head_sha || github.sha }}"
+          benchmark_variant="${{ inputs.benchmark_variant || 'eytzinger' }}"
+          variant_key=$(python3 scripts/benchmark_site.py derive-key --ref-name "$ref_name")
           repo_name="${GITHUB_REPOSITORY#*/}"
           site_url_base="https://${GITHUB_REPOSITORY_OWNER}.github.io/${repo_name}"
+          echo "benchmark_variant=$benchmark_variant" >> "$GITHUB_OUTPUT"
+          echo "ref_name=$ref_name" >> "$GITHUB_OUTPUT"
+          echo "run_sha=$run_sha" >> "$GITHUB_OUTPUT"
           echo "variant_key=$variant_key" >> "$GITHUB_OUTPUT"
           echo "site_url_base=$site_url_base" >> "$GITHUB_OUTPUT"
 
       - name: Run benchmark suite
         run: |
-          just bench-v6-eytzinger-focus \
-            "${{ steps.meta.outputs.variant_key }}" \
-            ./target/benchmark-results \
-            simd,test_utils,logging_off \
-            1000
-          just bench-v6-dist-metrics \
-            "${{ steps.meta.outputs.variant_key }}" \
-            ./target/benchmark-results \
-            1000
+          case "${{ steps.meta.outputs.benchmark_variant }}" in
+            eytzinger)
+              just bench-v6-eytzinger-focus \
+                "${{ steps.meta.outputs.variant_key }}" \
+                ./target/benchmark-results \
+                simd,test_utils,logging_off \
+                1000
+              ;;
+            dist)
+              just bench-v6-dist-metrics \
+                "${{ steps.meta.outputs.variant_key }}" \
+                ./target/benchmark-results \
+                1000
+              ;;
+            *)
+              echo "Unknown benchmark variant: ${{ steps.meta.outputs.benchmark_variant }}" >&2
+              exit 2
+              ;;
+          esac
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
@@ -147,7 +191,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          prs=$(python3 scripts/benchmark_site.py find-prs --repo "${GITHUB_REPOSITORY}" --ref-name "${GITHUB_REF_NAME}" || echo "[]")
+          if [[ -n "${{ inputs.pr_number }}" ]]; then
+            prs='[${{ inputs.pr_number }}]'
+          else
+            prs=$(python3 scripts/benchmark_site.py find-prs --repo "${GITHUB_REPOSITORY}" --ref-name "${{ needs.benchmark.outputs.ref_name }}" || echo "[]")
+          fi
           echo "prs=$prs" >> "$GITHUB_OUTPUT"
 
       - name: Publish run into gh-pages tree
@@ -162,8 +210,8 @@ jobs:
             PR_ARGS+=(--pr-number "$pr")
           done
           python3 scripts/benchmark_site.py publish-run \
-            --ref-name "${GITHUB_REF_NAME}" \
-            --sha "${GITHUB_SHA}" \
+            --ref-name "${{ needs.benchmark.outputs.ref_name }}" \
+            --sha "${{ needs.benchmark.outputs.run_sha }}" \
             --results-dir ./target/benchmark-results \
             --pages-root ./.benchmark-pages \
             --site-url-base '${{ needs.benchmark.outputs.site_url_base }}' \
@@ -179,11 +227,11 @@ jobs:
             echo "No gh-pages changes to push"
             exit 0
           fi
-          git -C .benchmark-pages commit -m "benchmark: publish ${GITHUB_REF_NAME} ${GITHUB_SHA::12}"
+          git -C .benchmark-pages commit -m "benchmark: publish ${{ needs.benchmark.outputs.ref_name }} ${{ needs.benchmark.outputs.run_sha }}"
           git -C .benchmark-pages push origin HEAD:gh-pages
 
       - name: Update sticky PR comments
-        if: github.ref_name != 'master'
+        if: needs.benchmark.outputs.ref_name != 'master'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PRS_JSON: ${{ steps.prs.outputs.prs }}
