@@ -1456,6 +1456,17 @@ mod tests {
     }
 
     #[test]
+    fn v3_manhattan_rect_dist_update_uses_offsets_directly() {
+        type M = Manhattan<f64>;
+        let off = [0.0, 2.0, 5.0];
+
+        assert_eq!(
+            <M as DistanceMetricScalar<f64>>::rect_dist_after_update(7.0, &off, 1, 4.0),
+            9.0
+        );
+    }
+
+    #[test]
     fn v3_chebyshev_f64_works() {
         type M = Chebyshev<f64>;
         let a = [1.0, 2.0, 3.0];
@@ -1465,6 +1476,21 @@ mod tests {
         let bw = b.map(M::widen_coord);
         let d = <M as DistanceMetricScalar<f64>>::dist::<3>(&aw, &bw);
         assert_eq!(d, 4.0);
+    }
+
+    #[test]
+    fn v3_chebyshev_rect_dist_update_rescans_offsets_directly() {
+        type M = Chebyshev<f64>;
+        let off = [0.0, 2.0, 5.0];
+
+        assert_eq!(
+            <M as DistanceMetricScalar<f64>>::rect_dist_after_update(5.0, &off, 2, 1.0),
+            2.0
+        );
+        assert_eq!(
+            <M as DistanceMetricScalar<f64>>::rect_dist_after_update(5.0, &off, 0, 6.0),
+            6.0
+        );
     }
 
     #[test]

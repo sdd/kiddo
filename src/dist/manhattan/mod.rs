@@ -36,6 +36,16 @@ where
     fn dist1(a: R, b: R) -> R {
         R::saturating_dist(a, b)
     }
+
+    #[inline(always)]
+    fn rect_dist_after_update<const K: usize>(
+        rd: Self::Output,
+        off: &[Self::Output; K],
+        dim: usize,
+        new_off: Self::Output,
+    ) -> Self::Output {
+        Self::Output::saturating_add(rd - off[dim], new_off)
+    }
 }
 
 impl<A, R> DistanceMetricAvx512<A> for Manhattan<R>
