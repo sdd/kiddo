@@ -1,5 +1,7 @@
 name: benchmark-report
 
+run-name: benchmark-report (${{ inputs.benchmark_variant || 'eytzinger' }}) for ${{ inputs.head_ref || github.ref_name }} @ ${{ inputs.head_sha || github.sha }}
+
 on:
   push:
     branches:
