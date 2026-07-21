@@ -6,11 +6,9 @@
 
 - Make local query scratch the default ([@sdd](https://github.com/sdd))
 
-
 ### 🐛 Bug Fixes
 
 - Remove broken dot product dist metric and associated code ([@sdd](https://github.com/sdd))
-
 
 ### ⚡️ Performance
 
@@ -25,7 +23,6 @@
 - Use fused linear insertion for threshold vec results ([@sdd](https://github.com/sdd))
 
 - Tune sorted and unsorted threshold vec limits ([@sdd](https://github.com/sdd))
-
 
 ### 🤖 CI
 
@@ -68,7 +65,6 @@
 - Clarify benchmark run names ([@sdd](https://github.com/sdd))
 
 - Split nightly debug and release tests ([@sdd](https://github.com/sdd))
-
 
 ### 🧹 Chore
 
