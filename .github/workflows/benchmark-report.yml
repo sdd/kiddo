@@ -138,7 +138,9 @@ jobs:
                 just bench-v6-dist-metrics \
                   "${{ steps.meta.outputs.variant_key }}" \
                   ./target/benchmark-results \
-                  1000
+                  1000 \
+                  test_utils,logging_off \
+                  simd,test_utils,logging_off
                 ;;
               leaf)
                 just bench-v6-leaf-strategies \
@@ -151,7 +153,9 @@ jobs:
                 just bench-v6-stem-strategies \
                   "${{ steps.meta.outputs.variant_key }}" \
                   ./target/benchmark-results \
-                  1000
+                  1000 \
+                  simd,test_utils,logging_off \
+                  simd,test_utils,logging_off
                 ;;
               *)
                 echo "Unknown benchmark variant: $1" >&2
