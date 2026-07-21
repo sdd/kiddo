@@ -1,5 +1,81 @@
 # Kiddo Changelog
 
+## [6.0.0-alpha.3] - 2026-07-21
+
+### ✨ Features
+
+- Make local query scratch the default ([@sdd](https://github.com/sdd))
+
+
+### 🐛 Bug Fixes
+
+- Remove broken dot product dist metric and associated code ([@sdd](https://github.com/sdd))
+
+
+### ⚡️ Performance
+
+- Alternate path to avoid wasted calcs on descent ([@sdd](https://github.com/sdd))
+
+- Add IS_SIGNED assoc value to Axis ([@sdd](https://github.com/sdd))
+
+- Dist1 on Manhattan and Chebyshev use saturating_dist ([@sdd](https://github.com/sdd))
+
+- Improved offset update for Chebyshev and Manhattah ([@sdd](https://github.com/sdd))
+
+- Use fused linear insertion for threshold vec results ([@sdd](https://github.com/sdd))
+
+- Tune sorted and unsorted threshold vec limits ([@sdd](https://github.com/sdd))
+
+
+### 🤖 CI
+
+- Harden pre-release string updater workflow against no changes ([@sdd](https://github.com/sdd))
+
+- Publish custom benchmark reports ([@sdd](https://github.com/sdd))
+
+- Add bench chart justfile tasks ([@sdd](https://github.com/sdd))
+
+- Fix benchmark workflow bootstrap ([@sdd](https://github.com/sdd))
+
+- Derive benchmark key without just ([@sdd](https://github.com/sdd))
+
+- Pass benchmark args to just correctly ([@sdd](https://github.com/sdd))
+
+- Pass benchmark recipe arguments positionally ([@sdd](https://github.com/sdd))
+
+- Authenticate initial benchmark pages push ([@sdd](https://github.com/sdd))
+
+- Rank featured chart by relative change ([@sdd](https://github.com/sdd))
+
+- Add distance metric ISA matrix ([@sdd](https://github.com/sdd))
+
+- Fix distance metric ISA benchmark builds ([@sdd](https://github.com/sdd))
+
+- Simplify benchmark workflows ([@sdd](https://github.com/sdd))
+
+- Fix benchmark workflow shellcheck ([@sdd](https://github.com/sdd))
+
+- Suggest benchmarks for performance-sensitive PRs ([@sdd](https://github.com/sdd))
+
+- Use heuristic benchmark suggestions ([@sdd](https://github.com/sdd))
+
+- Allow benchmark suggestion comment updates ([@sdd](https://github.com/sdd))
+
+- Add leaf strategy benchmark variant ([@sdd](https://github.com/sdd))
+
+- Allow org members to trigger benchmark runs ([@sdd](https://github.com/sdd))
+
+- Clarify benchmark run names ([@sdd](https://github.com/sdd))
+
+- Split nightly debug and release tests ([@sdd](https://github.com/sdd))
+
+
+### 🧹 Chore
+
+- Bump actions/setup-node from 6 to 7 ([@dependabot[bot]](https://github.com/dependabot[bot]), Signed-off-by:dependabot[bot] <support@github.com>)
+
+- Update las requirement in the cargo-dependencies group ([@dependabot[bot]](https://github.com/dependabot[bot]), Signed-off-by:dependabot[bot] <support@github.com>)
+
 ## [6.0.0-alpha.2] - 2026-07-17
 
 ### ✨ Features
