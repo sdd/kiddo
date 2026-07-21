@@ -40,7 +40,9 @@ jobs:
 
             let benchmarkVariant;
             if (body === "/benchmark") {
-              benchmarkVariant = "eytzinger";
+              benchmarkVariant = "basic";
+            } else if (body === "/benchmark basic") {
+              benchmarkVariant = "basic";
             } else if (body === "/benchmark dist") {
               benchmarkVariant = "dist";
             } else if (body === "/benchmark leaf") {
@@ -48,7 +50,7 @@ jobs:
             } else if (body === "/benchmark stems") {
               benchmarkVariant = "stems";
             } else {
-              core.setFailed("Unsupported benchmark command. Use `/benchmark`, `/benchmark dist`, `/benchmark leaf`, or `/benchmark stems`.");
+              core.setFailed("Unsupported benchmark command. Use `/benchmark`, `/benchmark basic`, `/benchmark dist`, `/benchmark leaf`, or `/benchmark stems`.");
               return;
             }
 
@@ -79,7 +81,7 @@ jobs:
                   ? "leaf-strategy"
                   : benchmarkVariant === "stems"
                     ? "stem-strategy"
-                  : "eytzinger-focus";
+                  : "basic";
 
             await github.rest.issues.createComment({
               owner,

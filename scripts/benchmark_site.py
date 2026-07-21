@@ -15,7 +15,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Iterable
@@ -42,6 +42,7 @@ class RunSummary:
     run_id: str
     ref_name: str
     sha: str
+    benchmark_variant: str
     variant_key: str
     branch_path_key: str
     is_baseline: bool
@@ -56,7 +57,7 @@ class RunSummary:
 
 
 def now_utc() -> datetime:
-    return datetime.now(UTC).replace(microsecond=0)
+    return datetime.now(timezone.utc).replace(microsecond=0)
 
 
 def format_timestamp(value: datetime) -> str:
@@ -133,11 +134,27 @@ def write_text(path: Path, value: str) -> None:
 
 def load_run_summary(path: Path) -> RunSummary:
     value = read_json(path)
+    value.setdefault("benchmark_variant", infer_benchmark_variant(value))
     return RunSummary(**value)
 
 
 def save_run_summary(path: Path, summary: RunSummary) -> None:
     write_json(path, asdict(summary))
+
+
+def infer_benchmark_variant(value: dict[str, Any]) -> str:
+    result_files = value.get("result_files")
+    if not isinstance(result_files, list):
+        return "basic"
+
+    names = [name for name in result_files if isinstance(name, str)]
+    if any(name.startswith("bench_result-v6-dist-metrics-") for name in names):
+        return "dist"
+    if any(name.startswith("bench_result-v6-leaf-strategies-") for name in names):
+        return "leaf"
+    if any(name.startswith("bench_result-v6-stem-strategies-") for name in names):
+        return "stems"
+    return "basic"
 
 
 def run_dirs_for(summary: RunSummary) -> tuple[Path, Path]:
@@ -271,13 +288,15 @@ def render_run_page(
         if summary.baseline_run_id
         else "<p>No baseline comparison was available for this run.</p>"
     )
+    run_link = f'<a href="{run_url}">{run_url}</a>' if run_url else ""
     body = f"""
 <p><a href="{home_rel}">Home</a></p>
 <h1>Benchmark run: {summary.ref_name}</h1>
 <p class="meta"><code>{summary.sha}</code> · {summary.created_at}</p>
+<p>Benchmark suite: <code>{summary.benchmark_variant}</code></p>
 <p>{'Baseline publication' if summary.is_baseline else 'Branch comparison run'}</p>
 {baseline_text}
-<p>{f'<a href="{run_url}">{run_url}</a>' if run_url else ''}</p>
+<p>{run_link}</p>
 <section>
   <h2>Result exports</h2>
   <ul>{results_links}</ul>
@@ -300,14 +319,16 @@ def render_branch_index(
     for run in runs:
         run_dir, _ = run_dirs_for(run)
         run_url = site_join(site_url_base, (run_dir / "index.html").as_posix())
+        public_link = f'<a href="{run_url}">public</a>' if run_url else "—"
         rows.append(
             "<tr>"
             f"<td><a href=\"history/{run.run_id}/index.html\">{run.run_id}</a></td>"
+            f"<td><code>{run.benchmark_variant}</code></td>"
             f"<td><code>{run.sha[:12]}</code></td>"
             f"<td>{run.created_at}</td>"
             f"<td>{len(run.chart_files)}</td>"
             f"<td>{run.baseline_run_id or '—'}</td>"
-            f"<td>{f'<a href=\"{run_url}\">public</a>' if run_url else '—'}</td>"
+            f"<td>{public_link}</td>"
             "</tr>"
         )
     body = f"""
@@ -318,7 +339,7 @@ def render_branch_index(
 <section>
   <table>
     <thead>
-      <tr><th>Run</th><th>SHA</th><th>Created</th><th>Charts</th><th>Baseline</th><th>Public URL</th></tr>
+      <tr><th>Run</th><th>Suite</th><th>SHA</th><th>Created</th><th>Charts</th><th>Baseline</th><th>Public URL</th></tr>
     </thead>
     <tbody>{''.join(rows)}</tbody>
   </table>
@@ -342,7 +363,9 @@ def render_baseline_trends(pages_root: Path) -> list[str]:
     _, plt = import_matplotlib()
     trends: dict[tuple[str, str, str], list[tuple[datetime, str, list[Point]]]] = {}
     for run in reversed(runs):
-        run_dt = datetime.strptime(run.created_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        run_dt = datetime.strptime(run.created_at, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=timezone.utc
+        )
         run_dir, _ = run_dirs_for(run)
         suites = load_suite_series(pages_root / run_dir / "results")
         for suite, series_map in suites.items():
@@ -427,6 +450,7 @@ def render_root_index(pages_root: Path, site_url_base: str | None) -> None:
             {
                 "branch_path_key": branch_key,
                 "ref_name": latest.ref_name,
+                "benchmark_variant": latest.benchmark_variant,
                 "latest_run_id": latest.run_id,
                 "latest_run_page_path": (run_dir / "index.html").as_posix(),
                 "latest_run_page_url": site_join(site_url_base, (run_dir / "index.html").as_posix()),
@@ -436,6 +460,7 @@ def render_root_index(pages_root: Path, site_url_base: str | None) -> None:
         branch_rows.append(
             "<tr>"
             f"<td><a href=\"branches/{branch_key}/index.html\">{latest.ref_name}</a></td>"
+            f"<td><code>{latest.benchmark_variant}</code></td>"
             f"<td>{len(runs)}</td>"
             f"<td><a href=\"branches/{branch_key}/latest/index.html\">{latest.run_id}</a></td>"
             f"<td><code>{latest.sha[:12]}</code></td>"
@@ -456,19 +481,25 @@ def render_root_index(pages_root: Path, site_url_base: str | None) -> None:
                 [asdict(run) for run in runs],
             )
 
+    latest_baseline_text = (
+        f'Latest baseline run: <a href="baseline/latest/index.html">{baseline_latest.run_id}</a> '
+        f'· <code>{baseline_latest.sha[:12]}</code> · suite <code>{baseline_latest.benchmark_variant}</code>'
+        if baseline_latest
+        else "No baseline runs published yet."
+    )
     body = f"""
 <h1>Kiddo benchmark reports</h1>
 <p>This site publishes Criterion exports, branch-vs-baseline comparisons, and baseline history from the repo benchmark workflow.</p>
 <section>
   <h2>Baseline</h2>
-  <p>{f'Latest baseline run: <a href="baseline/latest/index.html">{baseline_latest.run_id}</a> · <code>{baseline_latest.sha[:12]}</code>' if baseline_latest else 'No baseline runs published yet.'}</p>
+  <p>{latest_baseline_text}</p>
   <p><a href="baseline/trends/index.html">View baseline history and trend charts</a></p>
 </section>
 <section>
   <h2>Branches</h2>
   <table>
-    <thead><tr><th>Branch</th><th>Runs</th><th>Latest run</th><th>SHA</th><th>Created</th></tr></thead>
-    <tbody>{''.join(branch_rows) if branch_rows else '<tr><td colspan="5">No branch runs published yet.</td></tr>'}</tbody>
+    <thead><tr><th>Branch</th><th>Latest suite</th><th>Runs</th><th>Latest run</th><th>SHA</th><th>Created</th></tr></thead>
+    <tbody>{''.join(branch_rows) if branch_rows else '<tr><td colspan="6">No branch runs published yet.</td></tr>'}</tbody>
   </table>
 </section>
 """
@@ -503,6 +534,7 @@ def rebuild_site(pages_root: Path, site_url_base: str | None) -> None:
 def publish_run(
     ref_name: str,
     sha: str,
+    benchmark_variant: str,
     results_dir: Path,
     pages_root: Path,
     site_url_base: str | None,
@@ -524,6 +556,7 @@ def publish_run(
         run_id=run_id,
         ref_name=ref_name,
         sha=sha,
+        benchmark_variant=benchmark_variant,
         variant_key=variant_key,
         branch_path_key=branch_path_key,
         is_baseline=is_baseline,
@@ -586,6 +619,7 @@ def render_pr_comment(summary: RunSummary, site_url_base: str | None) -> str:
         "## Benchmark report",
         "",
         f"- Branch: `{summary.ref_name}`",
+        f"- Benchmark suite: `{summary.benchmark_variant}`",
         f"- Commit: `{summary.sha[:12]}`",
         f"- Published run: `{summary.run_id}`",
     ]
@@ -697,7 +731,7 @@ def find_pr_numbers(repo: str, ref_name: str) -> list[int]:
 def parse_timestamp(value: str | None) -> datetime | None:
     if value is None:
         return None
-    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
 
 
 def args_parser() -> argparse.ArgumentParser:
@@ -713,6 +747,7 @@ def args_parser() -> argparse.ArgumentParser:
     publish = subparsers.add_parser("publish-run", help="publish one benchmark run into a pages tree")
     publish.add_argument("--ref-name", required=True)
     publish.add_argument("--sha", required=True)
+    publish.add_argument("--benchmark-variant", required=True)
     publish.add_argument("--results-dir", type=Path, required=True)
     publish.add_argument("--pages-root", type=Path, required=True)
     publish.add_argument("--site-url-base")
@@ -754,6 +789,7 @@ def main(argv: list[str] | None = None) -> int:
         summary = publish_run(
             ref_name=args.ref_name,
             sha=args.sha,
+            benchmark_variant=args.benchmark_variant,
             results_dir=args.results_dir,
             pages_root=args.pages_root,
             site_url_base=args.site_url_base,
