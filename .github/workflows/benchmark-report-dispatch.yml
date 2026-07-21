@@ -24,11 +24,16 @@ jobs:
             const comment = context.payload.comment;
             const body = comment.body.trim();
             const association = comment.author_association;
-            const allowedAssociations = new Set(["OWNER", "COLLABORATOR", "CONTRIBUTOR"]);
+            const allowedAssociations = new Set([
+              "OWNER",
+              "MEMBER",
+              "COLLABORATOR",
+              "CONTRIBUTOR",
+            ]);
 
             if (!allowedAssociations.has(association)) {
               core.setFailed(
-                `/${"benchmark"} requires OWNER, COLLABORATOR, or CONTRIBUTOR status. ${comment.user.login} is ${association}.`
+                `/${"benchmark"} requires OWNER, MEMBER, COLLABORATOR, or CONTRIBUTOR status. ${comment.user.login} is ${association}.`
               );
               return;
             }
