@@ -267,6 +267,12 @@ harness = false
 required-features = ["test_utils"]
 
 [[bench]]
+name = "profile_v6_leaf_strategies_criterion"
+path = "benches/profile_v6_leaf_strategies_criterion.rs"
+harness = false
+required-features = ["test_utils"]
+
+[[bench]]
 name = "profile_v6_stem_exact_stats"
 path = "benches/profile_v6_stem_exact_stats.rs"
 harness = false
