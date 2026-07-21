@@ -1,6 +1,6 @@
 name: benchmark-report
 
-run-name: benchmark-report (${{ inputs.benchmark_variant || 'eytzinger' }}) for ${{ inputs.head_ref || github.ref_name }} @ ${{ inputs.head_sha || github.sha }}
+run-name: benchmark-report (${{ inputs.benchmark_variant || 'basic' }}) for ${{ inputs.head_ref || github.ref_name }} @ ${{ inputs.head_sha || github.sha }}
 
 on:
   push:
@@ -38,15 +38,15 @@ on:
         description: "Benchmark suite variant"
         required: false
         type: choice
-        default: eytzinger
+        default: basic
         options:
-          - eytzinger
+          - basic
           - dist
           - leaf
           - stems
 
 concurrency:
-  group: benchmark-report-${{ inputs.head_ref || github.ref_name }}-${{ inputs.benchmark_variant || 'eytzinger' }}
+  group: benchmark-report-${{ inputs.head_ref || github.ref_name }}-${{ inputs.benchmark_variant || 'basic' }}
   cancel-in-progress: false
 
 permissions:
@@ -61,6 +61,7 @@ jobs:
     runs-on: [self-hosted, Linux, X64]
     outputs:
       benchmark_variant: ${{ steps.meta.outputs.benchmark_variant }}
+      published_variant: ${{ steps.meta.outputs.published_variant }}
       ref_name: ${{ steps.meta.outputs.ref_name }}
       run_sha: ${{ steps.meta.outputs.run_sha }}
       variant_key: ${{ steps.meta.outputs.variant_key }}
@@ -104,12 +105,18 @@ jobs:
         run: |
           ref_name="${{ inputs.head_ref || github.ref_name }}"
           run_sha="${{ inputs.head_sha || github.sha }}"
-          benchmark_variant="${{ inputs.benchmark_variant || 'eytzinger' }}"
+          benchmark_variant="${{ inputs.benchmark_variant || 'basic' }}"
           variant_key=$(python3 scripts/benchmark_site.py derive-key --ref-name "$ref_name")
           repo_name="${GITHUB_REPOSITORY#*/}"
           site_url_base="https://${GITHUB_REPOSITORY_OWNER}.github.io/${repo_name}"
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_NAME}" == "master" ]]; then
+            published_variant="all"
+          else
+            published_variant="$benchmark_variant"
+          fi
           {
             echo "benchmark_variant=$benchmark_variant"
+            echo "published_variant=$published_variant"
             echo "ref_name=$ref_name"
             echo "run_sha=$run_sha"
             echo "variant_key=$variant_key"
@@ -118,38 +125,49 @@ jobs:
 
       - name: Run benchmark suite
         run: |
-          case "${{ steps.meta.outputs.benchmark_variant }}" in
-            eytzinger)
-              just bench-v6-eytzinger-focus \
-                "${{ steps.meta.outputs.variant_key }}" \
-                ./target/benchmark-results \
-                simd,test_utils,logging_off \
-                1000
-              ;;
-            dist)
-              just bench-v6-dist-metrics \
-                "${{ steps.meta.outputs.variant_key }}" \
-                ./target/benchmark-results \
-                1000
-              ;;
-            leaf)
-              just bench-v6-leaf-strategies \
-                "${{ steps.meta.outputs.variant_key }}" \
-                ./target/benchmark-results \
-                simd,test_utils,logging_off \
-                1000
-              ;;
-            stems)
-              just bench-v6-stem-strategies \
-                "${{ steps.meta.outputs.variant_key }}" \
-                ./target/benchmark-results \
-                1000
-              ;;
-            *)
-              echo "Unknown benchmark variant: ${{ steps.meta.outputs.benchmark_variant }}" >&2
-              exit 2
-              ;;
-          esac
+          run_variant() {
+            case "$1" in
+              basic)
+                just bench-v6-eytzinger-focus \
+                  "${{ steps.meta.outputs.variant_key }}" \
+                  ./target/benchmark-results \
+                  simd,test_utils,logging_off \
+                  1000
+                ;;
+              dist)
+                just bench-v6-dist-metrics \
+                  "${{ steps.meta.outputs.variant_key }}" \
+                  ./target/benchmark-results \
+                  1000
+                ;;
+              leaf)
+                just bench-v6-leaf-strategies \
+                  "${{ steps.meta.outputs.variant_key }}" \
+                  ./target/benchmark-results \
+                  simd,test_utils,logging_off \
+                  1000
+                ;;
+              stems)
+                just bench-v6-stem-strategies \
+                  "${{ steps.meta.outputs.variant_key }}" \
+                  ./target/benchmark-results \
+                  1000
+                ;;
+              *)
+                echo "Unknown benchmark variant: $1" >&2
+                exit 2
+                ;;
+            esac
+          }
+
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_NAME}" == "master" ]]; then
+            run_variant basic
+            run_variant dist
+            run_variant leaf
+            run_variant stems
+          else
+            run_variant "${{ steps.meta.outputs.benchmark_variant }}"
+          fi
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
@@ -231,6 +249,7 @@ jobs:
           python3 scripts/benchmark_site.py publish-run \
             --ref-name "${{ needs.benchmark.outputs.ref_name }}" \
             --sha "${{ needs.benchmark.outputs.run_sha }}" \
+            --benchmark-variant "${{ needs.benchmark.outputs.published_variant }}" \
             --results-dir ./target/benchmark-results \
             --pages-root ./.benchmark-pages \
             --site-url-base '${{ needs.benchmark.outputs.site_url_base }}' \
