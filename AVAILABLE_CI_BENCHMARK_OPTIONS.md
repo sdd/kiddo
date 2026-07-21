@@ -27,6 +27,11 @@ rules:
     match_any:
       - src/kd_tree/leaf_strategies/**
 
+  - command: /benchmark extended
+    reason: Changes under `src/kd_tree/query/` can affect within/nearest-within query performance and should use the extended query-family benchmark suite.
+    match_any:
+      - src/kd_tree/query/**
+
   - command: /benchmark
     reason: Changes under `src/` or to `Cargo.toml` can affect core runtime performance and should use the basic benchmark suite.
     match_any:
@@ -44,5 +49,6 @@ rules:
 - `/benchmark dist` is reserved for distance-metric-focused changes and should stay above broader rules.
 - `/benchmark stems` is reserved for stem-strategy-specific changes and should stay above the broader `/benchmark` rule.
 - `/benchmark leaf` is reserved for leaf-strategy-specific changes and should stay above the broader `/benchmark` rule.
+- `/benchmark extended` is reserved for query-pipeline changes and should stay above the broader `/benchmark` rule.
 - `/benchmark` is the default command for the basic benchmark suite and for general source changes.
 - If you add more benchmark commands later, insert the more specific ones above the broader defaults.

@@ -249,6 +249,12 @@ harness = false
 required-features = ["test_utils"]
 
 [[bench]]
+name = "profile_v6_approx_nearest_one_eytzinger"
+path = "benches/profile_v6_approx_nearest_one_eytzinger.rs"
+harness = false
+required-features = ["test_utils"]
+
+[[bench]]
 name = "profile_v6_dist_metrics"
 path = "benches/profile_v6_dist_metrics.rs"
 harness = false
@@ -257,6 +263,12 @@ required-features = ["test_utils"]
 [[bench]]
 name = "profile_v6_nearest_n_eytzinger"
 path = "benches/profile_v6_nearest_n_eytzinger.rs"
+harness = false
+required-features = ["test_utils"]
+
+[[bench]]
+name = "profile_v6_query_family_eytzinger"
+path = "benches/profile_v6_query_family_eytzinger.rs"
 harness = false
 required-features = ["test_utils"]
 

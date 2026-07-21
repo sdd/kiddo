@@ -38,33 +38,55 @@ jobs:
               return;
             }
 
-            let benchmarkVariant;
-            if (body === "/benchmark") {
-              benchmarkVariant = "basic";
-            } else if (body === "/benchmark basic") {
-              benchmarkVariant = "basic";
-            } else if (body === "/benchmark dist") {
-              benchmarkVariant = "dist";
-            } else if (body === "/benchmark leaf") {
-              benchmarkVariant = "leaf";
-            } else if (body === "/benchmark stems") {
-              benchmarkVariant = "stems";
-            } else {
-              core.setFailed("Unsupported benchmark command. Use `/benchmark`, `/benchmark basic`, `/benchmark dist`, `/benchmark leaf`, or `/benchmark stems`.");
-              return;
-            }
-
             const { data: pr } = await github.rest.pulls.get({
               owner,
               repo,
               pull_number: issueNumber,
             });
 
+            const workflowRef = pr.base.ref;
+            const supportedCommandsByRef = new Map([
+              [
+                "master",
+                new Map([
+                  ["/benchmark", "basic"],
+                  ["/benchmark basic", "basic"],
+                  ["/benchmark extended", "extended"],
+                  ["/benchmark dist", "dist"],
+                  ["/benchmark leaf", "leaf"],
+                  ["/benchmark stems", "stems"],
+                ]),
+              ],
+              [
+                "v5.x.x",
+                new Map([
+                  ["/benchmark", "basic"],
+                  ["/benchmark basic", "basic"],
+                  ["/benchmark extended", "extended"],
+                ]),
+              ],
+            ]);
+            const supportedCommands = supportedCommandsByRef.get(workflowRef);
+            if (!supportedCommands) {
+              core.setFailed(
+                `No benchmark workflow is configured for PR base branch ${workflowRef}.`
+              );
+              return;
+            }
+
+            const benchmarkVariant = supportedCommands.get(body);
+            if (!benchmarkVariant) {
+              core.setFailed(
+                `Unsupported benchmark command for ${workflowRef}. Allowed commands: ${[...supportedCommands.keys()].join(", ")}.`
+              );
+              return;
+            }
+
             await github.rest.actions.createWorkflowDispatch({
               owner,
               repo,
               workflow_id: "benchmark-report.yml",
-              ref: pr.base.ref,
+              ref: workflowRef,
               inputs: {
                 pr_number: String(pr.number),
                 head_sha: pr.head.sha,
@@ -77,6 +99,8 @@ jobs:
             const benchmarkLabel =
               benchmarkVariant === "dist"
                 ? "dist-focussed"
+                : benchmarkVariant === "extended"
+                  ? "query-family"
                 : benchmarkVariant === "leaf"
                   ? "leaf-strategy"
                   : benchmarkVariant === "stems"

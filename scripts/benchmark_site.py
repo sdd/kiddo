@@ -43,6 +43,7 @@ class RunSummary:
     ref_name: str
     sha: str
     benchmark_variant: str
+    baseline_ref_name: str
     variant_key: str
     branch_path_key: str
     is_baseline: bool
@@ -75,8 +76,8 @@ def sanitize_branch_component(value: str) -> str:
     return value or "branch"
 
 
-def derive_variant_key(ref_name: str) -> str:
-    if ref_name == "master":
+def derive_variant_key(ref_name: str, baseline_ref_name: str) -> str:
+    if ref_name == baseline_ref_name:
         return "baseline"
     stripped = re.sub(r"^(feature|fix)/", "", ref_name, count=1)
     return sanitize_branch_component(stripped)
@@ -135,6 +136,7 @@ def write_text(path: Path, value: str) -> None:
 def load_run_summary(path: Path) -> RunSummary:
     value = read_json(path)
     value.setdefault("benchmark_variant", infer_benchmark_variant(value))
+    value.setdefault("baseline_ref_name", "master")
     return RunSummary(**value)
 
 
@@ -150,10 +152,16 @@ def infer_benchmark_variant(value: dict[str, Any]) -> str:
     names = [name for name in result_files if isinstance(name, str)]
     if any(name.startswith("bench_result-v6-dist-metrics-") for name in names):
         return "dist"
+    if any(name.startswith("bench_result-v5-dist-metrics-") for name in names):
+        return "dist"
     if any(name.startswith("bench_result-v6-leaf-strategies-") for name in names):
         return "leaf"
     if any(name.startswith("bench_result-v6-stem-strategies-") for name in names):
         return "stems"
+    if any(name.startswith("bench_result-v6-query-family-") for name in names):
+        return "extended"
+    if any(name.startswith("bench_result-v5-query-family-") for name in names):
+        return "extended"
     return "basic"
 
 
@@ -294,7 +302,7 @@ def render_run_page(
 <h1>Benchmark run: {summary.ref_name}</h1>
 <p class="meta"><code>{summary.sha}</code> · {summary.created_at}</p>
 <p>Benchmark suite: <code>{summary.benchmark_variant}</code></p>
-<p>{'Baseline publication' if summary.is_baseline else 'Branch comparison run'}</p>
+<p>{f'Baseline publication for {summary.baseline_ref_name}' if summary.is_baseline else 'Branch comparison run'}</p>
 {baseline_text}
 <p>{run_link}</p>
 <section>
@@ -535,6 +543,7 @@ def publish_run(
     ref_name: str,
     sha: str,
     benchmark_variant: str,
+    baseline_ref_name: str,
     results_dir: Path,
     pages_root: Path,
     site_url_base: str | None,
@@ -542,7 +551,7 @@ def publish_run(
     created_at: datetime | None = None,
 ) -> RunSummary:
     created_at = created_at or now_utc()
-    variant_key = derive_variant_key(ref_name)
+    variant_key = derive_variant_key(ref_name, baseline_ref_name)
     branch_path_key = derive_branch_path_key(ref_name)
     if not SAFE_KEY.fullmatch(variant_key):
         raise RuntimeError(f"derived variant key is invalid: {variant_key}")
@@ -557,6 +566,7 @@ def publish_run(
         ref_name=ref_name,
         sha=sha,
         benchmark_variant=benchmark_variant,
+        baseline_ref_name=baseline_ref_name,
         variant_key=variant_key,
         branch_path_key=branch_path_key,
         is_baseline=is_baseline,
@@ -645,7 +655,7 @@ def render_pr_comment(summary: RunSummary, site_url_base: str | None) -> str:
             [
                 "No comparison charts were generated for this run.",
                 "",
-                "This usually means there is no published `master` baseline yet.",
+                f"This usually means there is no published `{summary.baseline_ref_name}` baseline yet.",
                 "",
             ]
         )
@@ -740,6 +750,7 @@ def args_parser() -> argparse.ArgumentParser:
 
     derive = subparsers.add_parser("derive-key", help="derive the benchmark variant key")
     derive.add_argument("--ref-name", required=True)
+    derive.add_argument("--baseline-ref-name", default="master")
 
     derive_path = subparsers.add_parser("derive-path-key", help="derive the published branch path key")
     derive_path.add_argument("--ref-name", required=True)
@@ -748,6 +759,7 @@ def args_parser() -> argparse.ArgumentParser:
     publish.add_argument("--ref-name", required=True)
     publish.add_argument("--sha", required=True)
     publish.add_argument("--benchmark-variant", required=True)
+    publish.add_argument("--baseline-ref-name", default="master")
     publish.add_argument("--results-dir", type=Path, required=True)
     publish.add_argument("--pages-root", type=Path, required=True)
     publish.add_argument("--site-url-base")
@@ -777,7 +789,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = args_parser()
     args = parser.parse_args(argv)
     if args.command == "derive-key":
-        print(derive_variant_key(args.ref_name))
+        print(derive_variant_key(args.ref_name, args.baseline_ref_name))
         return 0
     if args.command == "derive-path-key":
         print(derive_branch_path_key(args.ref_name))
@@ -790,6 +802,7 @@ def main(argv: list[str] | None = None) -> int:
             ref_name=args.ref_name,
             sha=args.sha,
             benchmark_variant=args.benchmark_variant,
+            baseline_ref_name=args.baseline_ref_name,
             results_dir=args.results_dir,
             pages_root=args.pages_root,
             site_url_base=args.site_url_base,
