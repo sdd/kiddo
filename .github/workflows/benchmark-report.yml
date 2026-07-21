@@ -1,0 +1,268 @@
+name: benchmark-report
+
+run-name: benchmark-report (${{ inputs.benchmark_variant || 'basic' }}) for ${{ inputs.head_ref || github.ref_name }} @ ${{ inputs.head_sha || github.sha }}
+
+on:
+  push:
+    branches:
+      - v5.x.x
+    paths:
+      - "src/**"
+      - "benches/**"
+      - "tools/criterion-export/**"
+      - "scripts/**"
+      - "justfile"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/benchmark-report.yml"
+      - "BENCHMARKING.md"
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull request number for comment-dispatched benchmark runs"
+        required: false
+        type: string
+      head_sha:
+        description: "Head commit SHA to benchmark"
+        required: false
+        type: string
+      head_ref:
+        description: "Head branch name to benchmark"
+        required: false
+        type: string
+      head_repo:
+        description: "Head repository full name to benchmark"
+        required: false
+        type: string
+      benchmark_variant:
+        description: "Benchmark suite variant"
+        required: false
+        type: choice
+        default: basic
+        options:
+          - basic
+          - extended
+
+concurrency:
+  group: benchmark-report-${{ inputs.head_ref || github.ref_name }}-${{ inputs.benchmark_variant || 'basic' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  LATEST_STABLE_RUST_VERSION: "TBD"
+
+jobs:
+  benchmark:
+    runs-on: [self-hosted, Linux, X64]
+    outputs:
+      benchmark_variant: ${{ steps.meta.outputs.benchmark_variant }}
+      published_variant: ${{ steps.meta.outputs.published_variant }}
+      ref_name: ${{ steps.meta.outputs.ref_name }}
+      run_sha: ${{ steps.meta.outputs.run_sha }}
+      variant_key: ${{ steps.meta.outputs.variant_key }}
+      site_url_base: ${{ steps.meta.outputs.site_url_base }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ inputs.head_repo || github.repository }}
+          ref: ${{ inputs.head_sha || github.sha }}
+          show-progress: false
+
+      - name: Get latest stable Rust version
+        run: |
+          echo "LATEST_STABLE_RUST_VERSION=$(gh api /repos/rust-lang/rust/releases --jq ".[0].tag_name")" >> "$GITHUB_ENV"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Toolchain
+        uses: actions/cache@v6
+        with:
+          path: ~/.rustup
+          key: toolchain-x86-64-${{ env.LATEST_STABLE_RUST_VERSION }}
+
+      - name: Install `stable` Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install `just`
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: just
+          version: "^1"
+
+      - name: Install `cargo-criterion`
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-criterion
+          version: "^1"
+
+      - name: Derive metadata
+        id: meta
+        run: |
+          ref_name="${{ inputs.head_ref || github.ref_name }}"
+          run_sha="${{ inputs.head_sha || github.sha }}"
+          benchmark_variant="${{ inputs.benchmark_variant || 'basic' }}"
+          variant_key=$(python3 scripts/benchmark_site.py derive-key --ref-name "$ref_name" --baseline-ref-name v5.x.x)
+          repo_name="${GITHUB_REPOSITORY#*/}"
+          site_url_base="https://${GITHUB_REPOSITORY_OWNER}.github.io/${repo_name}"
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_NAME}" == "v5.x.x" ]]; then
+            published_variant="all"
+          else
+            published_variant="$benchmark_variant"
+          fi
+          {
+            echo "benchmark_variant=$benchmark_variant"
+            echo "published_variant=$published_variant"
+            echo "ref_name=$ref_name"
+            echo "run_sha=$run_sha"
+            echo "variant_key=$variant_key"
+            echo "site_url_base=$site_url_base"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run benchmark suite
+        run: |
+          run_variant() {
+            case "$1" in
+              basic)
+                just bench-v5-basic \
+                  "${{ steps.meta.outputs.variant_key }}" \
+                  ./target/benchmark-results \
+                  test_utils \
+                  1000
+                ;;
+              extended)
+                just bench-v5-query-family \
+                  "${{ steps.meta.outputs.variant_key }}" \
+                  ./target/benchmark-results \
+                  test_utils \
+                  1000
+                ;;
+              *)
+                echo "Unknown benchmark variant: $1" >&2
+                exit 2
+                ;;
+            esac
+          }
+
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_NAME}" == "v5.x.x" ]]; then
+            run_variant basic
+            run_variant extended
+          else
+            run_variant "${{ steps.meta.outputs.benchmark_variant }}"
+          fi
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/benchmark-results/
+          if-no-files-found: error
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: benchmark
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          show-progress: false
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install chart dependencies
+        run: python -m pip install matplotlib
+
+      - name: Install `just`
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: just
+          version: "^1"
+
+      - name: Download benchmark artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ./target/benchmark-results
+
+      - name: Prepare gh-pages worktree
+        run: |
+          git fetch origin gh-pages || true
+          rm -rf .benchmark-pages
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git worktree add .benchmark-pages origin/gh-pages
+          else
+            checkout_auth=$(git config --get-urlmatch http.extraheader "${GITHUB_SERVER_URL}")
+            mkdir -p .benchmark-pages
+            cd .benchmark-pages
+            git init
+            git checkout --orphan gh-pages
+            git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+            git config "http.${GITHUB_SERVER_URL}/.extraheader" "$checkout_auth"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          fi
+
+      - name: Find open PRs for branch
+        id: prs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ -n "${{ inputs.pr_number }}" ]]; then
+            prs='[${{ inputs.pr_number }}]'
+          else
+            prs=$(python3 scripts/benchmark_site.py find-prs --repo "${GITHUB_REPOSITORY}" --ref-name "${{ needs.benchmark.outputs.ref_name }}" || echo "[]")
+          fi
+          echo "prs=$prs" >> "$GITHUB_OUTPUT"
+
+      - name: Publish run into gh-pages tree
+        env:
+          PRS_JSON: ${{ steps.prs.outputs.prs }}
+        run: |
+          mapfile -t PR_NUMBERS < <(
+            python3 -c 'import json, os; [print(value) for value in json.loads(os.environ["PRS_JSON"])]'
+          )
+          PR_ARGS=()
+          for pr in "${PR_NUMBERS[@]}"; do
+            PR_ARGS+=(--pr-number "$pr")
+          done
+          python3 scripts/benchmark_site.py publish-run \
+            --ref-name "${{ needs.benchmark.outputs.ref_name }}" \
+            --sha "${{ needs.benchmark.outputs.run_sha }}" \
+            --benchmark-variant "${{ needs.benchmark.outputs.published_variant }}" \
+            --baseline-ref-name v5.x.x \
+            --results-dir ./target/benchmark-results \
+            --pages-root ./.benchmark-pages/v5 \
+            --site-url-base '${{ needs.benchmark.outputs.site_url_base }}/v5' \
+            --summary-path ./target/benchmark-summary.json \
+            "${PR_ARGS[@]}"
+
+      - name: Rebuild top-level benchmark index
+        run: |
+          python3 scripts/benchmark_site_root.py \
+            --pages-root ./.benchmark-pages \
+            --site-url-base '${{ needs.benchmark.outputs.site_url_base }}'
+
+      - name: Commit and push gh-pages
+        run: |
+          git -C .benchmark-pages config user.name "github-actions[bot]"
+          git -C .benchmark-pages config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C .benchmark-pages add .
+          if git -C .benchmark-pages diff --cached --quiet; then
+            echo "No gh-pages changes to push"
+            exit 0
+          fi
+          git -C .benchmark-pages commit -m "benchmark: publish ${{ needs.benchmark.outputs.ref_name }} ${{ needs.benchmark.outputs.run_sha }}"
+          git -C .benchmark-pages push origin HEAD:gh-pages
+
+      - name: Update sticky PR comments
+        if: needs.benchmark.outputs.ref_name != 'v5.x.x'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRS_JSON: ${{ steps.prs.outputs.prs }}
+        run: |
+          python3 -c 'import json, os, subprocess; prs = json.loads(os.environ["PRS_JSON"]); [subprocess.run(["python3", "scripts/benchmark_site.py", "update-pr-comment", "--repo", "${{ github.repository }}", "--pr-number", str(pr), "--summary-path", "./target/benchmark-summary.json", "--site-url-base", "${{ needs.benchmark.outputs.site_url_base }}"], check=True) for pr in prs]'
