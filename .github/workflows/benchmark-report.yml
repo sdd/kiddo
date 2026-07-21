@@ -40,6 +40,7 @@ on:
         options:
           - eytzinger
           - dist
+          - leaf
 
 concurrency:
   group: benchmark-report-${{ inputs.head_ref || github.ref_name }}-${{ inputs.benchmark_variant || 'eytzinger' }}
@@ -126,6 +127,13 @@ jobs:
               just bench-v6-dist-metrics \
                 "${{ steps.meta.outputs.variant_key }}" \
                 ./target/benchmark-results \
+                1000
+              ;;
+            leaf)
+              just bench-v6-leaf-strategies \
+                "${{ steps.meta.outputs.variant_key }}" \
+                ./target/benchmark-results \
+                simd,test_utils,logging_off \
                 1000
               ;;
             *)

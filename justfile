@@ -197,6 +197,27 @@ bench-v6-dist-metrics RESULT_KEY=benchmark_result_key OUTPUT_DIR='.' QUERIES='10
     run_mode avx2 "-C target-cpu=x86-64-v2 -C target-feature=+avx2" "$simd_features"
     run_mode avx512 "-C target-cpu=native" "$simd_features"
 
+bench-v6-leaf-strategies RESULT_KEY=benchmark_result_key OUTPUT_DIR='.' FEATURES='simd,test_utils,logging_off' QUERIES='1000':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    result_key={{quote(RESULT_KEY)}}
+    output_dir={{quote(OUTPUT_DIR)}}
+    if [[ ! "$result_key" =~ ^[A-Za-z0-9][A-Za-z0-9._+:-]*$ ]]; then
+        echo "RESULT_KEY must contain only letters, digits, '.', '_', '+', ':', or '-'" >&2
+        exit 2
+    fi
+    mkdir -p "$output_dir"
+    RUSTC_WRAPPER= \
+        KIDDO_PROFILE_QUERIES={{quote(QUERIES)}} \
+        RUSTFLAGS='-C target-cpu=native' \
+        cargo criterion \
+            --bench profile_v6_leaf_strategies_criterion \
+            --features {{quote(FEATURES)}}
+    cargo run --quiet --manifest-path tools/criterion-export/Cargo.toml -- \
+        target/criterion \
+        "$output_dir/bench_result-v6-leaf-strategies-${result_key}.json" \
+        profile_v6_leaf_strategies_criterion
+
 chart-benchmark-results VARIANT_KEY RESULTS_DIR='.' OUTPUT_DIR='.' PYTHON='python3':
     {{quote(PYTHON)}} scripts/chart_benchmark_results.py {{quote(VARIANT_KEY)}} --results-dir {{quote(RESULTS_DIR)}} --output-dir {{quote(OUTPUT_DIR)}}
 

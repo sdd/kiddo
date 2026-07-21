@@ -38,8 +38,10 @@ jobs:
               benchmarkVariant = "eytzinger";
             } else if (body === "/benchmark dist") {
               benchmarkVariant = "dist";
+            } else if (body === "/benchmark leaf") {
+              benchmarkVariant = "leaf";
             } else {
-              core.setFailed("Unsupported benchmark command. Use `/benchmark` or `/benchmark dist`.");
+              core.setFailed("Unsupported benchmark command. Use `/benchmark`, `/benchmark dist`, or `/benchmark leaf`.");
               return;
             }
 
@@ -64,7 +66,11 @@ jobs:
             });
 
             const benchmarkLabel =
-              benchmarkVariant === "dist" ? "dist-focussed" : "eytzinger-focus";
+              benchmarkVariant === "dist"
+                ? "dist-focussed"
+                : benchmarkVariant === "leaf"
+                  ? "leaf-strategy"
+                  : "eytzinger-focus";
 
             await github.rest.issues.createComment({
               owner,
