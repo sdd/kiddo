@@ -218,6 +218,47 @@ bench-v6-leaf-strategies RESULT_KEY=benchmark_result_key OUTPUT_DIR='.' FEATURES
         "$output_dir/bench_result-v6-leaf-strategies-${result_key}.json" \
         profile_v6_leaf_strategies_criterion
 
+bench-v6-stem-strategies RESULT_KEY=benchmark_result_key OUTPUT_DIR='.' QUERIES='1000' SCALAR_FEATURES='simd,test_utils,logging_off' SIMD_FEATURES='simd,test_utils,logging_off':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    result_key={{quote(RESULT_KEY)}}
+    output_dir={{quote(OUTPUT_DIR)}}
+    scalar_features={{quote(SCALAR_FEATURES)}}
+    simd_features={{quote(SIMD_FEATURES)}}
+    if [[ ! "$result_key" =~ ^[A-Za-z0-9][A-Za-z0-9._+:-]*$ ]]; then
+        echo "RESULT_KEY must contain only letters, digits, '.', '_', '+', ':', or '-'" >&2
+        exit 2
+    fi
+    host=$(rustc -vV | sed -n 's/^host: //p')
+    if [[ "$host" != x86_64-* ]]; then
+        echo "bench-v6-stem-strategies currently requires an x86-64 host; found $host" >&2
+        exit 2
+    fi
+    mkdir -p "$output_dir"
+
+    run_mode() {
+        local mode=$1
+        local rustflags=$2
+        local features=$3
+
+        RUSTC_WRAPPER= \
+            KIDDO_STEM_BENCH_MODE="$mode" \
+            KIDDO_PROFILE_QUERIES={{quote(QUERIES)}} \
+            RUSTFLAGS="$rustflags" \
+            cargo criterion \
+                --target "$host" \
+                --bench profile_v6_stem_strategies \
+                --features "$features"
+        cargo run --quiet --manifest-path tools/criterion-export/Cargo.toml -- \
+            target/criterion \
+            "$output_dir/bench_result-v6-stem-strategies-${mode}-${result_key}.json" \
+            profile_v6_stem_strategies
+    }
+
+    run_mode scalar "-C target-cpu=x86-64-v2" "$scalar_features"
+    run_mode avx2 "-C target-cpu=x86-64-v2 -C target-feature=+avx2" "$simd_features"
+    run_mode avx512 "-C target-cpu=native" "$simd_features"
+
 chart-benchmark-results VARIANT_KEY RESULTS_DIR='.' OUTPUT_DIR='.' PYTHON='python3':
     {{quote(PYTHON)}} scripts/chart_benchmark_results.py {{quote(VARIANT_KEY)}} --results-dir {{quote(RESULTS_DIR)}} --output-dir {{quote(OUTPUT_DIR)}}
 
