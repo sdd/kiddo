@@ -1,0 +1,23 @@
+{
+  "baseline_ref_name": "v5.x.x",
+  "baseline_run_id": null,
+  "benchmark_variant": "all",
+  "branch_path_key": "v5-x-x",
+  "chart_files": [],
+  "created_at": "2026-07-21T23:40:50Z",
+  "featured_chart_file": null,
+  "is_baseline": true,
+  "pr_numbers": [],
+  "ref_name": "v5.x.x",
+  "result_files": [
+    "bench_result-v5-approx_nearest_one-eytzinger-baseline.json",
+    "bench_result-v5-nearest_n-eytzinger-baseline.json",
+    "bench_result-v5-nearest_one-eytzinger-baseline.json",
+    "bench_result-v5-query-family-eytzinger-baseline.json"
+  ],
+  "run_id": "20260721T234050Z-922c191ff115",
+  "run_page_path": "baseline/history/20260721T234050Z-922c191ff115/index.html",
+  "run_page_url": "https://sdd-org.github.io/kiddo/v5/baseline/history/20260721T234050Z-922c191ff115/index.html",
+  "sha": "922c191ff1150d58896679971c7649a1c60e0ecf",
+  "variant_key": "baseline"
+}
