@@ -41,6 +41,7 @@ on:
         default: basic
         options:
           - basic
+          - extended
           - dist
           - leaf
           - stems
@@ -142,6 +143,13 @@ jobs:
                   test_utils,logging_off \
                   simd,test_utils,logging_off
                 ;;
+              extended)
+                just bench-v6-query-family \
+                  "${{ steps.meta.outputs.variant_key }}" \
+                  ./target/benchmark-results \
+                  simd,test_utils,logging_off \
+                  1000
+                ;;
               leaf)
                 just bench-v6-leaf-strategies \
                   "${{ steps.meta.outputs.variant_key }}" \
@@ -166,6 +174,7 @@ jobs:
 
           if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_NAME}" == "master" ]]; then
             run_variant basic
+            run_variant extended
             run_variant dist
             run_variant leaf
             run_variant stems
@@ -239,6 +248,19 @@ jobs:
           fi
           echo "prs=$prs" >> "$GITHUB_OUTPUT"
 
+      - name: Migrate legacy v6 gh-pages layout
+        run: |
+          mkdir -p ./.benchmark-pages/v6
+          if [[ ! -e ./.benchmark-pages/v6/baseline && -d ./.benchmark-pages/baseline ]]; then
+            mv ./.benchmark-pages/baseline ./.benchmark-pages/v6/
+          fi
+          if [[ ! -e ./.benchmark-pages/v6/branches && -d ./.benchmark-pages/branches ]]; then
+            mv ./.benchmark-pages/branches ./.benchmark-pages/v6/
+          fi
+          if [[ ! -e ./.benchmark-pages/v6/data && -d ./.benchmark-pages/data ]]; then
+            mv ./.benchmark-pages/data ./.benchmark-pages/v6/
+          fi
+
       - name: Publish run into gh-pages tree
         env:
           PRS_JSON: ${{ steps.prs.outputs.prs }}
@@ -254,11 +276,18 @@ jobs:
             --ref-name "${{ needs.benchmark.outputs.ref_name }}" \
             --sha "${{ needs.benchmark.outputs.run_sha }}" \
             --benchmark-variant "${{ needs.benchmark.outputs.published_variant }}" \
+            --baseline-ref-name master \
             --results-dir ./target/benchmark-results \
-            --pages-root ./.benchmark-pages \
-            --site-url-base '${{ needs.benchmark.outputs.site_url_base }}' \
+            --pages-root ./.benchmark-pages/v6 \
+            --site-url-base '${{ needs.benchmark.outputs.site_url_base }}/v6' \
             --summary-path ./target/benchmark-summary.json \
             "${PR_ARGS[@]}"
+
+      - name: Rebuild top-level benchmark index
+        run: |
+          python3 scripts/benchmark_site_root.py \
+            --pages-root ./.benchmark-pages \
+            --site-url-base '${{ needs.benchmark.outputs.site_url_base }}'
 
       - name: Commit and push gh-pages
         run: |
