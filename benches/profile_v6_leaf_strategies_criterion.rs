@@ -16,7 +16,7 @@ const DEFAULT_QUERY_COUNT: usize = 1_000;
 const DEFAULT_MAX_LOG2_POINTS: usize = 26;
 const POINT_SEED: u64 = 0x5eed_0000_0000_0201;
 const QUERY_SEED: u64 = 0x5eed_0000_0000_0202;
-const TREE_SIZES: [usize; 6] = [1 << 16, 1 << 18, 1 << 20, 1 << 22, 1 << 24, 1 << 26];
+const TREE_SIZES: [usize; 6] = [1 << 16, 1 << 18, 1 << 20, 1 << 22, 1 << 24, 1 << 25];
 
 type FlatTree = KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, K, B>, K, B>;
 type ArenaTree = KdTree<f64, u32, Eytzinger, VecOfArenas<f64, u32, K, B>, K, B>;

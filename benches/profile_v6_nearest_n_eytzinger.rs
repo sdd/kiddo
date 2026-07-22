@@ -16,7 +16,7 @@ const B: usize = 32;
 const DEFAULT_QUERY_COUNT: usize = 1_000;
 const POINT_SEED: u64 = 0x5eed_0000_0000_0001;
 const QUERY_SEED: u64 = 0x5eed_0000_0000_0002;
-const TREE_SIZES: [usize; 11] = [
+const TREE_SIZES: [usize; 10] = [
     1 << 16,
     1 << 17,
     1 << 18,
@@ -27,7 +27,6 @@ const TREE_SIZES: [usize; 11] = [
     1 << 23,
     1 << 24,
     1 << 25,
-    1 << 26,
 ];
 const MAX_QTYS: [usize; 3] = [5, 20, 50];
 
