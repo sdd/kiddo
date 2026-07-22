@@ -21,7 +21,7 @@ const B: usize = 32;
 const DEFAULT_QUERY_COUNT: usize = 1_000;
 const POINT_SEED: u64 = 0x5eed_0000_0000_0301;
 const QUERY_SEED: u64 = 0x5eed_0000_0000_0302;
-const TREE_SIZES: [usize; 11] = [
+const TREE_SIZES: [usize; 10] = [
     1 << 16,
     1 << 17,
     1 << 18,
@@ -32,7 +32,6 @@ const TREE_SIZES: [usize; 11] = [
     1 << 23,
     1 << 24,
     1 << 25,
-    1 << 26,
 ];
 
 type F64Tree<SS> = KdTree<f64, u32, SS, FlatVec<f64, u32, K, B>, K, B>;
