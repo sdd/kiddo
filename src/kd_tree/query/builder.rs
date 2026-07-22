@@ -310,6 +310,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
+        result_capacity: Option<NonZeroUsize>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
@@ -326,6 +327,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
+        result_capacity: Option<NonZeroUsize>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
@@ -438,6 +440,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
+        result_capacity: Option<NonZeroUsize>,
         stack: &mut SS::Stack<D::Output>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
@@ -455,6 +458,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
+        result_capacity: Option<NonZeroUsize>,
         stack: &mut SS::Stack<D::Output>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
@@ -586,6 +590,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
+        result_capacity: Option<NonZeroUsize>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
@@ -598,7 +603,7 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.within_impl::<D, EXCLUSIVE>(query, radius)
+        self.within_impl::<D, EXCLUSIVE>(query, radius, result_capacity)
     }
 
     #[inline]
@@ -606,6 +611,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
+        result_capacity: Option<NonZeroUsize>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
@@ -618,7 +624,7 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.within_unsorted_impl::<D, EXCLUSIVE>(query, radius)
+        self.within_unsorted_impl::<D, EXCLUSIVE>(query, radius, result_capacity)
     }
 
     #[inline]
@@ -744,6 +750,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
+        result_capacity: Option<NonZeroUsize>,
         stack: &mut SS::Stack<D::Output>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
@@ -757,7 +764,7 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
-        self.within_impl_with_scratch::<D, EXCLUSIVE>(query, radius, stack)
+        self.within_impl_with_scratch::<D, EXCLUSIVE>(query, radius, result_capacity, stack)
     }
 
     #[inline]
@@ -765,6 +772,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
+        result_capacity: Option<NonZeroUsize>,
         stack: &mut SS::Stack<D::Output>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
@@ -778,7 +786,12 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
-        self.within_unsorted_impl_with_scratch::<D, EXCLUSIVE>(query, radius, stack)
+        self.within_unsorted_impl_with_scratch::<D, EXCLUSIVE>(
+            query,
+            radius,
+            result_capacity,
+            stack,
+        )
     }
 
     #[inline]
@@ -912,6 +925,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
+        result_capacity: Option<NonZeroUsize>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
@@ -924,7 +938,7 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.within_impl::<D, EXCLUSIVE>(query, radius)
+        self.within_impl::<D, EXCLUSIVE>(query, radius, result_capacity)
     }
 
     #[inline]
@@ -932,6 +946,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
+        result_capacity: Option<NonZeroUsize>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         T: PartialOrd,
@@ -944,7 +959,7 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.within_unsorted_impl::<D, EXCLUSIVE>(query, radius)
+        self.within_unsorted_impl::<D, EXCLUSIVE>(query, radius, result_capacity)
     }
 
     #[inline]
@@ -1073,6 +1088,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
+        result_capacity: Option<NonZeroUsize>,
         stack: &mut SS::Stack<D::Output>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
@@ -1086,7 +1102,7 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
-        self.within_impl_with_scratch::<D, EXCLUSIVE>(query, radius, stack)
+        self.within_impl_with_scratch::<D, EXCLUSIVE>(query, radius, result_capacity, stack)
     }
 
     #[inline]
@@ -1094,6 +1110,7 @@ where
         &self,
         query: &[A; K],
         radius: D::Output,
+        result_capacity: Option<NonZeroUsize>,
         stack: &mut SS::Stack<D::Output>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
@@ -1107,7 +1124,12 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
-        self.within_unsorted_impl_with_scratch::<D, EXCLUSIVE>(query, radius, stack)
+        self.within_unsorted_impl_with_scratch::<D, EXCLUSIVE>(
+            query,
+            radius,
+            result_capacity,
+            stack,
+        )
     }
 
     #[inline]
@@ -1338,6 +1360,14 @@ where
 /// [`unsorted`](Self::unsorted) is also available for the other multi-result
 /// query families when traversal order is acceptable.
 ///
+/// ## Result allocation
+///
+/// Eager [`within`](Self::within)`::<D>(radius)` queries materialize every
+/// matching result in a `Vec`. If the approximate number of matches is known,
+/// [`with_result_capacity`](Self::with_result_capacity) can reserve that space
+/// up front and avoid growth reallocations. The hint does not limit the number
+/// of results returned; omit it when a reasonable estimate is unavailable.
+///
 /// The concrete generic parameters on this type encode the current builder
 /// state and are considered an implementation detail of the fluent API.
 pub struct QueryBuilder<
@@ -1362,6 +1392,7 @@ pub struct QueryBuilder<
     query: &'a [A; K],
     box_size: Option<&'a [A; K]>,
     max_qty: Option<NonZeroUsize>,
+    result_capacity: Option<NonZeroUsize>,
     radius: <D as BuilderMetric<A, K>>::Output,
     _phantom: PhantomData<(T, SS, LS, Family, Space, Pj)>,
 }
@@ -1463,9 +1494,52 @@ where
             query: self.query,
             box_size,
             max_qty,
+            result_capacity: self.result_capacity,
             radius,
             _phantom: PhantomData,
         }
+    }
+}
+
+impl<
+        'a,
+        Tree,
+        A,
+        T,
+        SS,
+        LS,
+        D,
+        Space,
+        Pj,
+        const SORTED: bool,
+        const EXCLUSIVE: bool,
+        const K: usize,
+        const B: usize,
+    > QueryBuilder<'a, Tree, A, T, SS, LS, D, WithinState, Space, Pj, SORTED, EXCLUSIVE, K, B>
+where
+    D: BuilderMetric<A, K>,
+{
+    /// Reserves space for the expected number of materialized radius-query results.
+    ///
+    /// A good estimate avoids growth reallocations without limiting the number
+    /// of results returned. Overestimating can reserve substantially more memory
+    /// than the query needs, so omit the hint when no reasonable estimate is
+    /// available.
+    ///
+    /// This option applies to both sorted and unsorted [`within`](Self::within)
+    /// queries, including periodic and archived-tree queries. Streaming
+    /// [`iter`](Self::iter) and [`visit`](Self::visit) queries do not materialize
+    /// a result `Vec` and therefore do not use a capacity hint.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `result_capacity` is zero.
+    #[inline]
+    pub fn with_result_capacity(mut self, result_capacity: usize) -> Self {
+        self.result_capacity = Some(
+            NonZeroUsize::new(result_capacity).expect("result capacity must be greater than zero"),
+        );
+        self
     }
 }
 
@@ -2143,6 +2217,7 @@ fn scan_projected_nearest_results<Tree, A, T, SS, LS, D, Pj, const K: usize, con
     radius: Option<D::Output>,
     max_qty: Option<usize>,
     sorted: bool,
+    result_capacity: Option<NonZeroUsize>,
     boundary: BoundaryMode,
 ) -> Vec<Pj::NearestOut>
 where
@@ -2156,7 +2231,8 @@ where
     Pj: ProjectionSpec<A, T, D::Output, K>,
 {
     let query_wide = query.map(D::widen_coord);
-    let mut results = Vec::new();
+    let mut results =
+        result_capacity.map_or_else(Vec::new, |capacity| Vec::with_capacity(capacity.get()));
 
     for (item, point) in KdTreeIter::<Tree, A, T, SS, LS, K, B>::new(tree) {
         let point_wide = point.map(D::widen_coord);
@@ -2248,6 +2324,7 @@ where
             query,
             box_size: None,
             max_qty: None,
+            result_capacity: None,
             radius: (),
             _phantom: PhantomData,
         }
@@ -2327,6 +2404,7 @@ where
             query,
             box_size: None,
             max_qty: None,
+            result_capacity: None,
             radius: (),
             _phantom: PhantomData,
         }
@@ -3797,12 +3875,17 @@ where
     fn execute_with_scratch(self, scratch: &mut QueryScratch<SS, D::Output>) -> Self::Output {
         with_cleared_scratch(scratch, |stack| {
             let results = if SORTED {
-                self.tree
-                    .qb_within_with_scratch::<D, EXCLUSIVE>(self.query, self.radius, stack)
+                self.tree.qb_within_with_scratch::<D, EXCLUSIVE>(
+                    self.query,
+                    self.radius,
+                    self.result_capacity,
+                    stack,
+                )
             } else {
                 self.tree.qb_within_unsorted_with_scratch::<D, EXCLUSIVE>(
                     self.query,
                     self.radius,
+                    self.result_capacity,
                     stack,
                 )
             };
@@ -4551,6 +4634,7 @@ where
                 None,
                 self.max_qty.map(NonZeroUsize::get),
                 true,
+                None,
                 if EXCLUSIVE {
                     BoundaryMode::Exclusive
                 } else {
@@ -4627,6 +4711,7 @@ where
                 None,
                 self.max_qty.map(NonZeroUsize::get),
                 false,
+                None,
                 if EXCLUSIVE {
                     BoundaryMode::Exclusive
                 } else {
@@ -4703,6 +4788,7 @@ where
                 Some(self.radius),
                 self.max_qty.map(NonZeroUsize::get),
                 true,
+                None,
                 if EXCLUSIVE {
                     BoundaryMode::Exclusive
                 } else {
@@ -4793,6 +4879,7 @@ where
                 Some(self.radius),
                 self.max_qty.map(NonZeroUsize::get),
                 false,
+                None,
                 if EXCLUSIVE {
                     BoundaryMode::Exclusive
                 } else {
@@ -4883,6 +4970,7 @@ where
                 Some(self.radius),
                 None,
                 true,
+                self.result_capacity,
                 if EXCLUSIVE {
                     BoundaryMode::Exclusive
                 } else {
@@ -4891,9 +4979,11 @@ where
             )
         } else {
             let results = if EXCLUSIVE {
-                self.tree.qb_within::<D, true>(self.query, self.radius)
+                self.tree
+                    .qb_within::<D, true>(self.query, self.radius, self.result_capacity)
             } else {
-                self.tree.qb_within::<D, false>(self.query, self.radius)
+                self.tree
+                    .qb_within::<D, false>(self.query, self.radius, self.result_capacity)
             };
             results
                 .into_iter()
@@ -4963,6 +5053,7 @@ where
                 Some(self.radius),
                 None,
                 false,
+                self.result_capacity,
                 if EXCLUSIVE {
                     BoundaryMode::Exclusive
                 } else {
@@ -4971,11 +5062,17 @@ where
             )
         } else {
             let results = if EXCLUSIVE {
-                self.tree
-                    .qb_within_unsorted::<D, true>(self.query, self.radius)
+                self.tree.qb_within_unsorted::<D, true>(
+                    self.query,
+                    self.radius,
+                    self.result_capacity,
+                )
             } else {
-                self.tree
-                    .qb_within_unsorted::<D, false>(self.query, self.radius)
+                self.tree.qb_within_unsorted::<D, false>(
+                    self.query,
+                    self.radius,
+                    self.result_capacity,
+                )
             };
             results
                 .into_iter()
@@ -5187,6 +5284,7 @@ where
             None,
             self.max_qty,
             true,
+            self.result_capacity,
         )
         .into_iter()
         .map(project_nearest_without_point::<A, T, D::Output, P, I, Dp, K>)
@@ -5251,6 +5349,7 @@ macro_rules! impl_periodic_radius_vec_execute {
                     Some(self.radius),
                     self.max_qty,
                     SORTED,
+                    self.result_capacity,
                 )
                 .into_iter()
                 .map(project_nearest_without_point::<A, T, D::Output, P, I, Dp, K>)

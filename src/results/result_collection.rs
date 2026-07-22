@@ -1,4 +1,5 @@
 use std::collections::BinaryHeap;
+use std::num::NonZeroUsize;
 
 #[cfg(any(
     feature = "buffered_result_collection",
@@ -22,6 +23,11 @@ pub(crate) type ResultBuffer<E> = SmallVec<[E; BUFFERED_RESULT_COLLECTION_INLINE
 
 pub trait ResultCollection<O: Axis<Coord = O>, E>: Sized {
     fn with_max_qty(max_qty: usize) -> Self;
+    #[inline]
+    fn with_max_qty_and_capacity(max_qty: usize, result_capacity: Option<NonZeroUsize>) -> Self {
+        let _ = result_capacity;
+        Self::with_max_qty(max_qty)
+    }
     fn max_qty(&self) -> usize;
     fn len(&self) -> usize;
     fn add(&mut self, entry: E);
@@ -1262,11 +1268,15 @@ pub mod cargo_asm {
 
 impl<O: Axis<Coord = O>, E: Ord> ResultCollection<O, E> for Vec<E> {
     fn with_max_qty(max_qty: usize) -> Self {
+        <Self as ResultCollection<O, E>>::with_max_qty_and_capacity(max_qty, None)
+    }
+
+    fn with_max_qty_and_capacity(max_qty: usize, result_capacity: Option<NonZeroUsize>) -> Self {
         if max_qty == usize::MAX {
             // Unsorted query path: start with reasonable capacity to avoid
             // the first several realloc waves when many candidates fall within
             // the radius. 64 elements (1.55 KB at 24 B/elem) is negligible.
-            Vec::with_capacity(64)
+            Vec::with_capacity(result_capacity.map_or(64, NonZeroUsize::get))
         } else {
             Vec::with_capacity(max_qty)
         }

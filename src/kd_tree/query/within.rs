@@ -19,6 +19,7 @@ where
         &self,
         query: &[A; K],
         max_dist: D::Output,
+        result_capacity: Option<NonZeroUsize>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         D: DistanceMetric<A>,
@@ -30,13 +31,20 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.nearest_n_within_impl::<D, EXCLUSIVE>(query, max_dist, NonZeroUsize::MAX, true)
+        self.nearest_n_within_inner::<D, Vec<QueryResultItem<(), T, D::Output>>, EXCLUSIVE>(
+            query,
+            max_dist,
+            usize::MAX,
+            true,
+            result_capacity,
+        )
     }
 
     pub(crate) fn within_impl_with_scratch<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
         max_dist: D::Output,
+        result_capacity: Option<NonZeroUsize>,
         stack: &mut SS::Stack<D::Output>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
@@ -49,11 +57,16 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
-        self.nearest_n_within_impl_with_scratch::<D, EXCLUSIVE>(
+        self.nearest_n_within_inner_with_scratch::<
+            D,
+            Vec<QueryResultItem<(), T, D::Output>>,
+            EXCLUSIVE,
+        >(
             query,
             max_dist,
-            NonZeroUsize::MAX,
+            usize::MAX,
             true,
+            result_capacity,
             stack,
         )
     }
@@ -74,6 +87,29 @@ mod tests {
 
     const RNG_SEED: u64 = 42;
     const TILE_BOUNDARY_CASES: [usize; 7] = [1, 2, 4, 8, 32, 33, 47];
+
+    #[test]
+    fn result_capacity_hint_is_preserved_for_materialized_results() {
+        let points: Vec<_> = (0..128).map(|idx| [idx as f64 / 128.0, 0.0]).collect();
+        let tree: KdTree<f64, u32, Eytzinger, FlatVec<f64, u32, 2, 32>, 2, 32> =
+            KdTree::new_from_slice(&points).unwrap();
+        let query = [0.0, 0.0];
+
+        for results in [
+            tree.query(&query)
+                .within::<SquaredEuclidean<f64>>(1.0)
+                .with_result_capacity(256)
+                .execute(),
+            tree.query(&query)
+                .within::<SquaredEuclidean<f64>>(1.0)
+                .unsorted()
+                .with_result_capacity(256)
+                .execute(),
+        ] {
+            assert_eq!(results.len(), points.len());
+            assert!(results.capacity() >= 256);
+        }
+    }
 
     #[test]
     fn within_exclusive_boundaries_excludes_exact_threshold_matches() {
