@@ -247,7 +247,7 @@ bench-v6-leaf-strategies RESULT_KEY=benchmark_result_key OUTPUT_DIR='.' FEATURES
     cargo run --quiet --manifest-path tools/criterion-export/Cargo.toml -- \
         target/criterion \
         "$output_dir/bench_result-v6-leaf-strategies-${result_key}.json" \
-        profile_v6_leaf_strategies_criterion
+        profile_v6_leaf_strategies
 
 bench-v6-stem-strategies RESULT_KEY=benchmark_result_key OUTPUT_DIR='.' QUERIES='1000' SCALAR_FEATURES='simd,test_utils,logging_off' SIMD_FEATURES='simd,test_utils,logging_off':
     #!/usr/bin/env bash
