@@ -125,6 +125,9 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Run benchmark suite
+        env:
+          # The self-hosted runner is currently OOM-killed by the 2^26 leaf trees.
+          KIDDO_PROFILE_MAX_LOG2_POINTS: "25"
         run: |
           run_variant() {
             case "$1" in
