@@ -4,7 +4,9 @@
 use criterion::{
     criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
 };
-use kiddo::kd_tree::embedded_leaf_descriptor_experiment::EmbeddedLeafDescriptorF64Tree;
+use kiddo::kd_tree::embedded_leaf_descriptor_experiment::{
+    EmbeddedLeafDescriptorF64Tree, EmbeddedLeafDescriptorSimdF64Tree,
+};
 use kiddo::kd_tree::KdTree;
 use kiddo::leaf_strategy::{FlatVec, VecOfArenas, VecOfArrays};
 use kiddo::stem_strategy::{DonnellySimdDescent, DonnellyUnrolled, Eytzinger};
@@ -138,6 +140,57 @@ fn run_approx_extent_control(
     (checksum_dist, checksum_item)
 }
 
+fn run_approx_hybrid_shallow_simd(
+    tree: &EmbeddedLeafDescriptorSimdF64Tree<K, B>,
+    queries: &[[f64; K]],
+) -> (f64, u64) {
+    let mut checksum_dist = 0.0f64;
+    let mut checksum_item = 0u64;
+
+    for query in queries {
+        let (distance, item) = tree
+            .approx_nearest_one_embedded_shallow_simd::<SquaredEuclidean<f64>>(black_box(query));
+        checksum_dist += distance;
+        checksum_item = checksum_item.wrapping_add(u64::from(item));
+    }
+
+    (checksum_dist, checksum_item)
+}
+
+fn run_approx_hybrid_terminal_scalar(
+    tree: &EmbeddedLeafDescriptorSimdF64Tree<K, B>,
+    queries: &[[f64; K]],
+) -> (f64, u64) {
+    let mut checksum_dist = 0.0f64;
+    let mut checksum_item = 0u64;
+
+    for query in queries {
+        let (distance, item) = tree
+            .approx_nearest_one_embedded_terminal_scalar::<SquaredEuclidean<f64>>(black_box(query));
+        checksum_dist += distance;
+        checksum_item = checksum_item.wrapping_add(u64::from(item));
+    }
+
+    (checksum_dist, checksum_item)
+}
+
+fn run_approx_hybrid_extent_control(
+    tree: &EmbeddedLeafDescriptorSimdF64Tree<K, B>,
+    queries: &[[f64; K]],
+) -> (f64, u64) {
+    let mut checksum_dist = 0.0f64;
+    let mut checksum_item = 0u64;
+
+    for query in queries {
+        let (distance, item) = tree
+            .approx_nearest_one_via_extents_shallow_simd::<SquaredEuclidean<f64>>(black_box(query));
+        checksum_dist += distance;
+        checksum_item = checksum_item.wrapping_add(u64::from(item));
+    }
+
+    (checksum_dist, checksum_item)
+}
+
 fn run_approx_baseline<SS>(tree: &ApproxBaselineTree<SS>, queries: &[[f64; K]]) -> (f64, u64)
 where
     SS: StemStrategy,
@@ -237,6 +290,31 @@ fn leaf_strategies(c: &mut Criterion) {
             |b| b.iter(|| black_box(run_approx_extent_control(&embedded_tree, &queries))),
         );
         drop(embedded_tree);
+
+        let hybrid_tree =
+            EmbeddedLeafDescriptorSimdF64Tree::<K, B>::new_from_slice(&points).unwrap();
+        let hybrid_expected = run_approx_hybrid_shallow_simd(&hybrid_tree, &queries);
+        assert_eq!(
+            hybrid_expected,
+            run_approx_hybrid_terminal_scalar(&hybrid_tree, &queries)
+        );
+        assert_eq!(
+            hybrid_expected,
+            run_approx_hybrid_extent_control(&hybrid_tree, &queries)
+        );
+
+        approx_group.bench_function(BenchmarkId::new("hybrid_simd_embedded", point_count), |b| {
+            b.iter(|| black_box(run_approx_hybrid_shallow_simd(&hybrid_tree, &queries)))
+        });
+        approx_group.bench_function(
+            BenchmarkId::new("hybrid_scalar_terminal_embedded", point_count),
+            |b| b.iter(|| black_box(run_approx_hybrid_terminal_scalar(&hybrid_tree, &queries))),
+        );
+        approx_group.bench_function(
+            BenchmarkId::new("hybrid_simd_extent_control", point_count),
+            |b| b.iter(|| black_box(run_approx_hybrid_extent_control(&hybrid_tree, &queries))),
+        );
+        drop(hybrid_tree);
 
         bench_approx_baseline::<DonnellyUnrolled<3>>(
             &mut approx_group,

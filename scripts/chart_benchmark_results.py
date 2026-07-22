@@ -36,6 +36,8 @@ MATRIX_COLORS = (
     "#8e44ad",
     "#7f5f00",
     "#00838f",
+    "#c2185b",
+    "#455a64",
 )
 LEAF_STRATEGY_SUITE = "v6-leaf-strategies"
 EMBEDDED_LEAF_DESCRIPTOR_GROUP_ID = (
@@ -44,6 +46,9 @@ EMBEDDED_LEAF_DESCRIPTOR_GROUP_ID = (
 EMBEDDED_LEAF_DESCRIPTOR_SERIES = (
     ("embedded_descriptor", "embedded descriptor"),
     ("embedded_extent_control", "same-layout extent control"),
+    ("hybrid_simd_embedded", "hybrid shallow SIMD"),
+    ("hybrid_scalar_terminal_embedded", "hybrid scalar terminal"),
+    ("hybrid_simd_extent_control", "hybrid extent control"),
     ("baseline_donnelly_unrolled", "Donnelly unrolled"),
     ("baseline_donnelly_simd_descent", "Donnelly SIMD descent"),
     ("baseline_eytzinger", "Eytzinger"),

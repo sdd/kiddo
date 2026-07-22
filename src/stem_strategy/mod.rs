@@ -11,6 +11,9 @@ pub use donnelly::simd_full::{CompareBlock3, CompareBlock4, SimdPrune, SimdSelec
 pub use donnelly::Donnelly;
 #[cfg(feature = "test_utils")]
 #[doc(hidden)]
+pub use donnelly::DonnellySimdDescentLeafEmbedded3;
+#[cfg(feature = "test_utils")]
+#[doc(hidden)]
 pub use donnelly::DonnellyUnrolledLeafEmbedded3;
 #[doc(hidden)]
 pub use donnelly::{

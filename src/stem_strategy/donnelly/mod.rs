@@ -30,6 +30,8 @@
 mod no_pf;
 mod scalar;
 mod simd_descent;
+#[cfg(feature = "test_utils")]
+mod simd_descent_leaf_embedded;
 mod unrolled;
 mod unrolled_block_dim;
 #[cfg(feature = "test_utils")]
@@ -46,6 +48,9 @@ pub use no_pf::DonnellyNoPf;
 pub use scalar::Donnelly;
 #[doc(inline)]
 pub use simd_descent::DonnellySimdDescent;
+#[cfg(feature = "test_utils")]
+#[doc(hidden)]
+pub use simd_descent_leaf_embedded::DonnellySimdDescentLeafEmbedded3;
 #[doc(inline)]
 pub use simd_full::DonnellySimdFull;
 #[doc(inline)]
