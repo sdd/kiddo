@@ -636,6 +636,7 @@ fn periodic_nearest_results_inner<
     max_dist: D::Output,
     max_qty: usize,
     sorted: bool,
+    result_capacity: Option<NonZeroUsize>,
 ) -> Vec<QueryResultItem<(), T, D::Output>>
 where
     Tree: KdTreeAccessor<A, T, SS, LS, K, B> + KdTreeQueryOps<A, T, SS, LS, K, B>,
@@ -650,7 +651,7 @@ where
     let mut req_ctx = PeriodicNearestResultsReqCtx::<A, T, D::Output, R, EXCLUSIVE, K> {
         query,
         max_dist,
-        results: R::with_max_qty(max_qty),
+        results: R::with_max_qty_and_capacity(max_qty, result_capacity),
         _phantom: PhantomData,
     };
 
@@ -695,6 +696,7 @@ pub(crate) fn periodic_nearest_results<
     radius: Option<D::Output>,
     max_qty: Option<NonZeroUsize>,
     sorted: bool,
+    result_capacity: Option<NonZeroUsize>,
 ) -> Vec<QueryResultItem<(), T, D::Output>>
 where
     Tree: KdTreeAccessor<A, T, SS, LS, K, B> + KdTreeQueryOps<A, T, SS, LS, K, B>,
@@ -729,7 +731,15 @@ where
             EXCLUSIVE,
             K,
             B,
-        >(tree, query, box_size, max_dist, max_qty, sorted);
+        >(
+            tree,
+            query,
+            box_size,
+            max_dist,
+            max_qty,
+            sorted,
+            result_capacity,
+        );
     }
 
     if sorted {
@@ -746,7 +756,7 @@ where
                 EXCLUSIVE,
                 K,
                 B,
-            >(tree, query, box_size, max_dist, max_qty, sorted);
+            >(tree, query, box_size, max_dist, max_qty, sorted, None);
         }
 
         #[cfg(not(feature = "small_n_result_collectors"))]
@@ -762,7 +772,7 @@ where
                 EXCLUSIVE,
                 K,
                 B,
-            >(tree, query, box_size, max_dist, max_qty, sorted);
+            >(tree, query, box_size, max_dist, max_qty, sorted, None);
         }
     }
 
@@ -777,5 +787,5 @@ where
         EXCLUSIVE,
         K,
         B,
-    >(tree, query, box_size, max_dist, max_qty, sorted)
+    >(tree, query, box_size, max_dist, max_qty, sorted, None)
 }

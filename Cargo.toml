@@ -309,6 +309,12 @@ harness = false
 required-features = ["test_utils"]
 
 [[bench]]
+name = "profile_v6_result_capacity"
+path = "benches/profile_v6_result_capacity.rs"
+harness = false
+required-features = ["test_utils"]
+
+[[bench]]
 name = "profile_v6_archived_huge_pages"
 path = "benches/profile_v6_archived_huge_pages.rs"
 harness = false
