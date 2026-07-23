@@ -23,8 +23,8 @@ macro_rules! generate_immutable_nearest_n_within {
                 // When false, only points strictly less than the maximum distance are included.
                 let max_items = max_items.into();
 
-                if sorted && max_items < usize::MAX {
-                    if max_items <= MAX_VEC_RESULT_SIZE {
+                if max_items < usize::MAX {
+                    if sorted && max_items <= MAX_VEC_RESULT_SIZE {
                         self.nearest_n_within_stub::<D, SortedVec<NearestNeighbour<A, T>>>(query, dist, max_items, sorted, inclusive)
                     } else {
                         self.nearest_n_within_stub::<D, BinaryHeap<NearestNeighbour<A, T>>>(query, dist, max_items, sorted, inclusive)
