@@ -49,7 +49,7 @@ Kiddo supports the following query types through its fluent builder API, startin
 - `.within(radius).unsorted()` finds all items within a specified radius of a query point without sorting the results.
   This is often faster than `.within(radius)` when result order does not matter, such as finding all customers within 5 miles of a store, or collecting point-cloud neighbourhoods for clustering or normal estimation.
 
-The builder API also supports boundary exclusivity, result projection, and periodic boundary conditions where applicable.
+The builder API also supports boundary exclusivity, result projection, and periodic boundary conditions where applicable. If you can estimate how many matches an eagerly materialized `.within(radius)` query will return, add `.with_result_capacity(estimated_count)` before `.execute()` to avoid result-vector growth reallocations. This is only an allocation hint and does not limit the number of results returned; omit it when no reasonable estimate is available.
 
 ## What's New In v6
 

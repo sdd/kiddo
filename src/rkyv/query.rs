@@ -233,14 +233,14 @@ where
         let max_qty = max_qty.get();
         if max_qty == usize::MAX {
             self.nearest_n_within_inner::<D, Vec<QueryResultItem<(), T, D::Output>>, EXCLUSIVE>(
-                query, max_dist, max_qty, sorted,
+                query, max_dist, max_qty, sorted, None,
             )
         } else {
             self.nearest_n_within_inner::<
                 D,
                 BinaryHeapResultCollection<QueryResultItem<(), T, D::Output>>,
                 EXCLUSIVE,
-            >(query, max_dist, max_qty, sorted)
+            >(query, max_dist, max_qty, sorted, None)
         }
     }
 
@@ -250,6 +250,7 @@ where
         max_dist: D::Output,
         max_qty: usize,
         sorted: bool,
+        result_capacity: Option<NonZeroUsize>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         D: DistanceMetric<A>,
@@ -265,7 +266,7 @@ where
         let mut req_ctx = ArchivedNearestNWithinReqCtx::<A, T, D::Output, R, EXCLUSIVE, K> {
             query,
             max_dist,
-            results: R::with_max_qty(max_qty),
+            results: R::with_max_qty_and_capacity(max_qty, result_capacity),
             _phantom: std::marker::PhantomData,
         };
 
@@ -357,6 +358,7 @@ where
         &self,
         query: &[A; K],
         max_dist: D::Output,
+        result_capacity: Option<NonZeroUsize>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         D: DistanceMetric<A>,
@@ -368,13 +370,20 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.nearest_n_within_impl::<D, EXCLUSIVE>(query, max_dist, NonZeroUsize::MAX, true)
+        self.nearest_n_within_inner::<D, Vec<QueryResultItem<(), T, D::Output>>, EXCLUSIVE>(
+            query,
+            max_dist,
+            usize::MAX,
+            true,
+            result_capacity,
+        )
     }
 
     pub(crate) fn within_impl_with_scratch<D, const EXCLUSIVE: bool>(
         &self,
         query: &[A; K],
         max_dist: D::Output,
+        result_capacity: Option<NonZeroUsize>,
         stack: &mut SS::Stack<D::Output>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
@@ -387,11 +396,16 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
-        self.nearest_n_within_impl_with_scratch::<D, EXCLUSIVE>(
+        self.nearest_n_within_inner_with_scratch::<
+            D,
+            Vec<QueryResultItem<(), T, D::Output>>,
+            EXCLUSIVE,
+        >(
             query,
             max_dist,
-            NonZeroUsize::MAX,
+            usize::MAX,
             true,
+            result_capacity,
             stack,
         )
     }
@@ -433,6 +447,7 @@ where
         &self,
         query: &[A; K],
         max_dist: D::Output,
+        result_capacity: Option<NonZeroUsize>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         D: DistanceMetric<A>,
@@ -444,7 +459,8 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        let mut results = Vec::new();
+        let mut results =
+            result_capacity.map_or_else(Vec::new, |capacity| Vec::with_capacity(capacity.get()));
         self.within_unsorted_visit_impl::<D, _, EXCLUSIVE>(query, max_dist, |result| {
             results.push(result)
         });
@@ -455,6 +471,7 @@ where
         &self,
         query: &[A; K],
         max_dist: D::Output,
+        result_capacity: Option<NonZeroUsize>,
         stack: &mut SS::Stack<D::Output>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
@@ -467,7 +484,8 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
-        let mut results = Vec::new();
+        let mut results =
+            result_capacity.map_or_else(Vec::new, |capacity| Vec::with_capacity(capacity.get()));
         self.within_unsorted_visit_impl_with_scratch::<D, _, EXCLUSIVE>(
             query,
             max_dist,
@@ -501,13 +519,13 @@ where
                 D,
                 Vec<QueryResultItem<(), T, D::Output>>,
                 EXCLUSIVE,
-            >(query, max_dist, max_qty, sorted, stack)
+            >(query, max_dist, max_qty, sorted, None, stack)
         } else {
             self.nearest_n_within_inner_with_scratch::<
                 D,
                 BinaryHeapResultCollection<QueryResultItem<(), T, D::Output>>,
                 EXCLUSIVE,
-            >(query, max_dist, max_qty, sorted, stack)
+            >(query, max_dist, max_qty, sorted, None, stack)
         }
     }
 
@@ -517,6 +535,7 @@ where
         max_dist: D::Output,
         max_qty: usize,
         sorted: bool,
+        result_capacity: Option<NonZeroUsize>,
         stack: &mut SS::Stack<D::Output>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
@@ -533,7 +552,7 @@ where
         let mut req_ctx = ArchivedNearestNWithinReqCtx::<A, T, D::Output, R, EXCLUSIVE, K> {
             query,
             max_dist,
-            results: R::with_max_qty(max_qty),
+            results: R::with_max_qty_and_capacity(max_qty, result_capacity),
             _phantom: std::marker::PhantomData,
         };
 
