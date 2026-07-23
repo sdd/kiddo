@@ -213,7 +213,7 @@ fn leaf_strategies(c: &mut Criterion) {
     group.finish();
 
     eprintln!(
-        "benchmarking v6 approx_nearest_one f64 embedded leaf descriptors: dims={} tree_sizes=2^16..=2^26 queries={}",
+        "benchmarking v6 approx_nearest_one f64 embedded leaf descriptors: dims={} tree_sizes=2^16..=2^25 queries={}",
         K, query_count
     );
 
