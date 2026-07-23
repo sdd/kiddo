@@ -428,6 +428,11 @@ profile-v6-result-collection-thresholds FEATURES='test_utils,logging_off' TREE_S
     RUSTFLAGS='-C target-cpu=native' \
     cargo bench --bench profile_v6_result_collection_thresholds --features {{FEATURES}}
 
+# Compare default radius-query allocation growth with a caller-provided capacity hint.
+profile-v6-result-capacity FEATURES='test_utils,logging_off' TREE_SIZE='1048576' QUERIES='256' SAMPLES='5':
+    RUSTC_WRAPPER= KIDDO_PROFILE_TREE_SIZE='{{TREE_SIZE}}' KIDDO_PROFILE_QUERIES='{{QUERIES}}' KIDDO_PROFILE_SAMPLES='{{SAMPLES}}' RUSTFLAGS='-C target-cpu=native' \
+    cargo bench --bench profile_v6_result_capacity --features {{FEATURES}}
+
 build-v6-hugepage-archives FEATURES='rkyv_08,test_utils,logging_off' POINTS='33554432' QUERIES='100000' PREFIX='./target/kiddo-hugepage-v6':
     RUSTC_WRAPPER= \
     KIDDO_PROFILE_POINTS={{POINTS}} \
