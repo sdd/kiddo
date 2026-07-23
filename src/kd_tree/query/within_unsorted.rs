@@ -134,6 +134,7 @@ where
         &self,
         query: &[A; K],
         max_dist: D::Output,
+        result_capacity: Option<NonZeroUsize>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
         D: DistanceMetric<A>,
@@ -145,7 +146,13 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS> + 'static,
     {
-        self.nearest_n_within_impl::<D, EXCLUSIVE>(query, max_dist, NonZeroUsize::MAX, false)
+        self.nearest_n_within_inner::<D, Vec<QueryResultItem<(), T, D::Output>>, EXCLUSIVE>(
+            query,
+            max_dist,
+            usize::MAX,
+            false,
+            result_capacity,
+        )
     }
 
     #[inline]
@@ -153,6 +160,7 @@ where
         &self,
         query: &[A; K],
         max_dist: D::Output,
+        result_capacity: Option<NonZeroUsize>,
         stack: &mut SS::Stack<D::Output>,
     ) -> Vec<QueryResultItem<(), T, D::Output>>
     where
@@ -165,11 +173,16 @@ where
             + 'static,
         SS::Stack<D::Output>: StackTrait<D::Output, SS>,
     {
-        self.nearest_n_within_impl_with_scratch::<D, EXCLUSIVE>(
+        self.nearest_n_within_inner_with_scratch::<
+            D,
+            Vec<QueryResultItem<(), T, D::Output>>,
+            EXCLUSIVE,
+        >(
             query,
             max_dist,
-            NonZeroUsize::MAX,
+            usize::MAX,
             false,
+            result_capacity,
             stack,
         )
     }
