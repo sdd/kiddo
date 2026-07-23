@@ -119,6 +119,21 @@ mod tests {
     type AX = f32;
 
     #[test]
+    fn unsorted_respects_max_qty() {
+        let points = [[0.0f32, 0.0], [1.0, 0.0], [2.0, 0.0], [3.0, 0.0]];
+        let tree: ImmutableKdTree<f32, u32, 2, 4> = ImmutableKdTree::new_from_slice(&points);
+        let max_qty = NonZero::new(2).unwrap();
+
+        let mut results =
+            tree.nearest_n_within::<SquaredEuclidean>(&[0.1, 0.0], 100.0, max_qty, false);
+        results.sort_unstable();
+
+        assert_eq!(results.len(), max_qty.get());
+        assert_eq!(results[0].item, 0);
+        assert_eq!(results[1].item, 1);
+    }
+
+    #[test]
     fn can_query_items_within_radius() {
         let content_to_add: [[AX; 4]; 16] = [
             [0.9f32, 0.0f32, 0.9f32, 0.0f32],

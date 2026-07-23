@@ -30,6 +30,18 @@ def canonical_suite_name(suite: str) -> str:
     return re.sub(r"^v[0-9]+-", "", suite)
 
 
+def canonical_series_key(key: SeriesKey) -> SeriesKey:
+    return SeriesKey(re.sub(r"^profile_v[0-9]+_", "profile_", key.group_id), key.function_id)
+
+
+def shared_tree_points(left: list[Point], right: list[Point]) -> tuple[list[Point], list[Point]]:
+    shared_sizes = {point.tree_log2 for point in left} & {point.tree_log2 for point in right}
+    return (
+        [point for point in left if point.tree_log2 in shared_sizes],
+        [point for point in right if point.tree_log2 in shared_sizes],
+    )
+
+
 def latest_baseline_summary(line_root: Path) -> RunSummary | None:
     path = line_root / "baseline" / "latest" / "run.json"
     if not path.is_file():
@@ -46,7 +58,10 @@ def load_result_sets(
         if not name.startswith("bench_result-") or not name.endswith("-baseline.json"):
             continue
         suite = name[len("bench_result-") : -len("-baseline.json")]
-        sets[canonical_suite_name(suite)] = (suite, result_series(path))
+        series = {
+            canonical_series_key(key): points for key, points in result_series(path).items()
+        }
+        sets[canonical_suite_name(suite)] = (suite, series)
     return sets
 
 
@@ -183,6 +198,9 @@ def render_latest_comparison(pages_root: Path, site_url_base: str | None) -> str
             key=lambda key: (key.group_id, key.function_id),
         )
         for key in common_keys:
+            v5_points, v6_points = shared_tree_points(v5_series[key], v6_series[key])
+            if not v5_points:
+                continue
             title = f"{canonical_suite}: {key.group_id} / {key.function_id}"
             chart_path = comparison_chart_path(
                 charts_dir,
@@ -196,12 +214,12 @@ def render_latest_comparison(pages_root: Path, site_url_base: str | None) -> str
                 plt,
                 title,
                 "v5",
-                v5_series[key],
+                v5_points,
                 "v6",
-                v6_series[key],
+                v6_points,
                 chart_path,
             )
-            chart_rows.append((title, chart_path.name, change_score(v5_series[key], v6_series[key])))
+            chart_rows.append((title, chart_path.name, change_score(v5_points, v6_points)))
 
     chart_rows.sort(key=lambda row: row[2], reverse=True)
     sections = []
