@@ -1,5 +1,14 @@
 [
   {
+    "benchmark_variant": "leaf",
+    "branch_path_key": "codex-embedded-leaf-descriptor-experiment",
+    "latest_run_id": "20260723T073043Z-0efd65441bd6",
+    "latest_run_page_path": "branches/codex-embedded-leaf-descriptor-experiment/history/20260723T073043Z-0efd65441bd6/index.html",
+    "latest_run_page_url": "https://sdd-org.github.io/kiddo/v6/branches/codex-embedded-leaf-descriptor-experiment/history/20260723T073043Z-0efd65441bd6/index.html",
+    "ref_name": "codex/embedded-leaf-descriptor-experiment",
+    "run_count": 1
+  },
+  {
     "benchmark_variant": "basic",
     "branch_path_key": "feature-custom-inline-benches",
     "latest_run_id": "20260718T212528Z-ea82f810b149",
