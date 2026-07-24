@@ -178,6 +178,9 @@
 //! - `huge_pages` enables Linux-specific huge-page advice helpers for owned and
 //!   archived tree storage.
 //!
+//! - `parallel_construction` enables opt-in Rayon-backed constructors for
+//!   large immutable trees using soft-bucket leaf strategies.
+//!
 //! - `leaf_nta_prefetch` enables additional non-temporal leaf prefetch hints in
 //!   some query paths. This is an advanced tuning feature and is only useful in
 //!   specific workloads.

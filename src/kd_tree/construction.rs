@@ -1,4 +1,6 @@
 use std::ptr::NonNull;
+#[cfg(feature = "parallel_construction")]
+use std::sync::OnceLock;
 
 use aligned_vec::{avec, AVec, ConstAlign, CACHELINE_ALIGN};
 use nonmax::NonMaxUsize;
@@ -8,6 +10,218 @@ use crate::traits::leaf_strategy::{
     BucketLimitType, ConstructibleLeafStrategy, LeafStrategy, Mutability, MutableLeafStrategy,
 };
 use crate::{Axis, Content, KdTree, StemStrategy};
+
+trait ConstructionIndex: Copy + Send {
+    fn from_usize(value: usize) -> Self;
+    fn as_usize(self) -> usize;
+}
+
+impl ConstructionIndex for u32 {
+    #[inline(always)]
+    fn from_usize(value: usize) -> Self {
+        value as u32
+    }
+
+    #[inline(always)]
+    fn as_usize(self) -> usize {
+        self as usize
+    }
+}
+
+impl ConstructionIndex for usize {
+    #[inline(always)]
+    fn from_usize(value: usize) -> Self {
+        value
+    }
+
+    #[inline(always)]
+    fn as_usize(self) -> usize {
+        self
+    }
+}
+
+#[inline(always)]
+const fn construction_index_fits_u32(item_count: usize) -> bool {
+    item_count <= u32::MAX as usize
+}
+
+#[cfg(all(feature = "parallel_construction", not(test)))]
+const PARALLEL_SOFT_MIN_POINTS: usize = 262_144;
+#[cfg(all(feature = "parallel_construction", test))]
+const PARALLEL_SOFT_MIN_POINTS: usize = 1_024;
+
+struct ConstructionLeafScratch<A, T, const K: usize> {
+    points: [Vec<A>; K],
+    items: Vec<T>,
+}
+
+impl<A, T, const K: usize> ConstructionLeafScratch<A, T, K> {
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            points: array_init::array_init(|_| Vec::with_capacity(capacity)),
+            items: Vec::with_capacity(capacity),
+        }
+    }
+
+    fn clear_and_reserve(&mut self, leaf_len: usize) {
+        for axis in &mut self.points {
+            axis.clear();
+            if axis.capacity() < leaf_len {
+                axis.reserve(leaf_len);
+            }
+        }
+        self.items.clear();
+        if self.items.capacity() < leaf_len {
+            self.items.reserve(leaf_len);
+        }
+    }
+}
+
+struct SequentialConstruction;
+
+#[cfg(feature = "parallel_construction")]
+struct ParallelConstruction;
+
+trait SoftConstructionMode<A, T, SS, LS, I, X, FA, FI, const K: usize, const B: usize>
+where
+    A: Axis<Coord = A>,
+    T: Content,
+    SS: StemStrategy,
+    LS: ConstructibleLeafStrategy<A, T, SS, K, B>,
+    I: ConstructionIndex,
+    FA: Fn(&X, usize) -> A,
+    FI: FnMut(usize, &X) -> Result<T, ConstructionError>,
+{
+    #[allow(clippy::too_many_arguments)]
+    fn populate(
+        stems: &mut AVec<A, ConstAlign<{ CACHELINE_ALIGN }>>,
+        source: &[X],
+        axis_at: &FA,
+        sort_index: &mut [I],
+        root_stem_ordering: SS,
+        max_stem_level: i32,
+        leaf_budget: usize,
+        leaves: &mut LS,
+        actual_max_stem_level: &mut i32,
+        max_leaf_len: &mut usize,
+        leaf_scratch: &mut ConstructionLeafScratch<A, T, K>,
+        item_at: &mut FI,
+    ) -> Result<(), ConstructionError>;
+}
+
+impl<A, T, SS, LS, I, X, FA, FI, const K: usize, const B: usize>
+    SoftConstructionMode<A, T, SS, LS, I, X, FA, FI, K, B> for SequentialConstruction
+where
+    A: Axis<Coord = A>,
+    T: Content,
+    SS: StemStrategy,
+    LS: ConstructibleLeafStrategy<A, T, SS, K, B>,
+    I: ConstructionIndex,
+    FA: Fn(&X, usize) -> A,
+    FI: FnMut(usize, &X) -> Result<T, ConstructionError>,
+{
+    fn populate(
+        stems: &mut AVec<A, ConstAlign<{ CACHELINE_ALIGN }>>,
+        source: &[X],
+        axis_at: &FA,
+        sort_index: &mut [I],
+        root_stem_ordering: SS,
+        max_stem_level: i32,
+        leaf_budget: usize,
+        leaves: &mut LS,
+        actual_max_stem_level: &mut i32,
+        max_leaf_len: &mut usize,
+        leaf_scratch: &mut ConstructionLeafScratch<A, T, K>,
+        item_at: &mut FI,
+    ) -> Result<(), ConstructionError> {
+        KdTree::<A, T, SS, LS, K, B>::populate_recursive_soft(
+            stems,
+            source,
+            axis_at,
+            sort_index,
+            root_stem_ordering,
+            max_stem_level,
+            leaf_budget,
+            leaves,
+            actual_max_stem_level,
+            max_leaf_len,
+            leaf_scratch,
+            item_at,
+        )
+    }
+}
+
+#[cfg(feature = "parallel_construction")]
+impl<A, T, SS, LS, I, X, FA, FI, const K: usize, const B: usize>
+    SoftConstructionMode<A, T, SS, LS, I, X, FA, FI, K, B> for ParallelConstruction
+where
+    A: Axis<Coord = A> + Send + Sync,
+    T: Content,
+    SS: StemStrategy,
+    LS: ConstructibleLeafStrategy<A, T, SS, K, B>,
+    I: ConstructionIndex,
+    X: Sync,
+    FA: Fn(&X, usize) -> A + Sync,
+    FI: FnMut(usize, &X) -> Result<T, ConstructionError>,
+{
+    fn populate(
+        stems: &mut AVec<A, ConstAlign<{ CACHELINE_ALIGN }>>,
+        source: &[X],
+        axis_at: &FA,
+        sort_index: &mut [I],
+        root_stem_ordering: SS,
+        max_stem_level: i32,
+        leaf_budget: usize,
+        leaves: &mut LS,
+        actual_max_stem_level: &mut i32,
+        max_leaf_len: &mut usize,
+        leaf_scratch: &mut ConstructionLeafScratch<A, T, K>,
+        item_at: &mut FI,
+    ) -> Result<(), ConstructionError> {
+        if sort_index.len() < PARALLEL_SOFT_MIN_POINTS {
+            return <SequentialConstruction as SoftConstructionMode<
+                A,
+                T,
+                SS,
+                LS,
+                I,
+                X,
+                FA,
+                FI,
+                K,
+                B,
+            >>::populate(
+                stems,
+                source,
+                axis_at,
+                sort_index,
+                root_stem_ordering,
+                max_stem_level,
+                leaf_budget,
+                leaves,
+                actual_max_stem_level,
+                max_leaf_len,
+                leaf_scratch,
+                item_at,
+            );
+        }
+
+        KdTree::<A, T, SS, LS, K, B>::populate_parallel_soft(
+            stems,
+            source,
+            axis_at,
+            sort_index,
+            root_stem_ordering,
+            max_stem_level,
+            leaf_budget,
+            leaves,
+            actual_max_stem_level,
+            max_leaf_len,
+            leaf_scratch,
+            item_at,
+        )
+    }
+}
 
 impl<A, T, SS, LS, const K: usize, const B: usize> KdTree<A, T, SS, LS, K, B>
 where
@@ -302,6 +516,46 @@ where
         )
     }
 
+    /// Creates a `KdTree` from a slice of points using parallel construction.
+    ///
+    /// Parallel construction is currently used for soft-bucket leaf strategies
+    /// when the input is large enough to benefit. Hard-bucket strategies and
+    /// small inputs use the same sequential construction path as
+    /// [`KdTree::new_from_slice`].
+    ///
+    /// This method runs on the current Rayon thread pool. Use
+    /// [`rayon::ThreadPool::install`] when a caller needs to select a specific
+    /// thread count.
+    #[cfg(feature = "parallel_construction")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parallel_construction")))]
+    pub fn new_from_slice_parallel(source: &[[A; K]]) -> Result<Self, ConstructionError>
+    where
+        A: Send + Sync,
+        T: TryFrom<usize>,
+    {
+        if let Some(max_src_idx) = source.len().checked_sub(1) {
+            if T::try_from(max_src_idx).is_err() {
+                return Err(ConstructionError::AutoGeneratedItemIndexOverflow {
+                    item_count: source.len(),
+                    item_type: core::any::type_name::<T>(),
+                });
+            }
+        }
+
+        Self::new_from_source_with_parallel(
+            source,
+            |point: &[A; K], dim| point[dim],
+            |src_idx: usize, _point: &[A; K]| {
+                T::try_from(src_idx).map_err(|_| {
+                    ConstructionError::AutoGeneratedItemIndexOverflow {
+                        item_count: source.len(),
+                        item_type: core::any::type_name::<T>(),
+                    }
+                })
+            },
+        )
+    }
+
     /// Creates a `KdTree` from a generic slice source plus axis/item accessors.
     ///
     /// This is the most general bulk-construction ingress API. Callers provide
@@ -373,6 +627,29 @@ where
         Self::new_from_source_with(source, axis_at, |src_idx, src| Ok(item_at(src_idx, src)))
     }
 
+    /// Creates a `KdTree` from a generic source using parallel construction.
+    ///
+    /// This is the parallel counterpart to [`KdTree::new_from_source`].
+    /// Coordinate access must be thread-safe because partitioning may invoke
+    /// `axis_at` concurrently. Item construction remains sequential.
+    #[cfg(feature = "parallel_construction")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parallel_construction")))]
+    pub fn new_from_source_parallel<X, FA, FI>(
+        source: &[X],
+        axis_at: FA,
+        item_at: FI,
+    ) -> Result<Self, ConstructionError>
+    where
+        A: Send + Sync,
+        X: Sync,
+        FA: Fn(&X, usize) -> A + Sync,
+        FI: Fn(usize, &X) -> T,
+    {
+        Self::new_from_source_with_parallel(source, axis_at, |src_idx, src| {
+            Ok(item_at(src_idx, src))
+        })
+    }
+
     /// Creates a `KdTree` from explicit item/point pairs.
     ///
     /// This is the preferred ingress when callers already have items rather
@@ -408,12 +685,27 @@ where
         )
     }
 
+    /// Creates a `KdTree` from item/point pairs using parallel construction.
+    #[cfg(feature = "parallel_construction")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parallel_construction")))]
+    pub fn new_from_entries_parallel(source: &[(T, [A; K])]) -> Result<Self, ConstructionError>
+    where
+        A: Send + Sync,
+        T: Sync,
+    {
+        Self::new_from_source_parallel(
+            source,
+            |entry: &(T, [A; K]), dim| entry.1[dim],
+            |_src_idx, entry: &(T, [A; K])| entry.0,
+        )
+    }
+
     /// Inner constructor shared by all variants. The accessors are invoked
     /// wherever we would normally pull coordinates or items from the source.
     fn new_from_source_with<X, FA, FI>(
         source: &[X],
         axis_at: FA,
-        mut item_at: FI,
+        item_at: FI,
     ) -> Result<Self, ConstructionError>
     where
         FA: Fn(&X, usize) -> A,
@@ -426,6 +718,60 @@ where
             return Self::new_from_source_no_stems_with(source, &axis_at, item_at);
         }
 
+        if construction_index_fits_u32(item_count) {
+            Self::new_from_source_with_index::<SequentialConstruction, u32, _, _, _>(
+                source, axis_at, item_at,
+            )
+        } else {
+            Self::new_from_source_with_index::<SequentialConstruction, usize, _, _, _>(
+                source, axis_at, item_at,
+            )
+        }
+    }
+
+    #[cfg(feature = "parallel_construction")]
+    fn new_from_source_with_parallel<X, FA, FI>(
+        source: &[X],
+        axis_at: FA,
+        item_at: FI,
+    ) -> Result<Self, ConstructionError>
+    where
+        A: Send + Sync,
+        X: Sync,
+        FA: Fn(&X, usize) -> A + Sync,
+        FI: FnMut(usize, &X) -> Result<T, ConstructionError>,
+    {
+        let item_count = source.len();
+        let leaf_node_count = item_count.div_ceil(B);
+
+        if leaf_node_count < 2 {
+            return Self::new_from_source_no_stems_with(source, &axis_at, item_at);
+        }
+
+        if construction_index_fits_u32(item_count) {
+            Self::new_from_source_with_index::<ParallelConstruction, u32, _, _, _>(
+                source, axis_at, item_at,
+            )
+        } else {
+            Self::new_from_source_with_index::<ParallelConstruction, usize, _, _, _>(
+                source, axis_at, item_at,
+            )
+        }
+    }
+
+    fn new_from_source_with_index<M, I, X, FA, FI>(
+        source: &[X],
+        axis_at: FA,
+        mut item_at: FI,
+    ) -> Result<Self, ConstructionError>
+    where
+        I: ConstructionIndex,
+        FA: Fn(&X, usize) -> A,
+        FI: FnMut(usize, &X) -> Result<T, ConstructionError>,
+        M: SoftConstructionMode<A, T, SS, LS, I, X, FA, FI, K, B>,
+    {
+        let item_count = source.len();
+        let leaf_node_count = item_count.div_ceil(B);
         let mut stems_depth: usize = leaf_node_count.next_power_of_two().ilog2() as usize;
 
         // Pad stem tree height to the next block boundary for block-based strategies
@@ -472,7 +818,8 @@ where
         let mut terminal_stem_indices = Vec::with_capacity(leaf_node_count);
         let mut actual_max_stem_level: i32 = -1;
         let mut max_leaf_len = 0usize;
-        let mut sort_index = Vec::from_iter(0..item_count);
+        let mut leaf_scratch = ConstructionLeafScratch::<A, T, K>::with_capacity(B);
+        let mut sort_index = Vec::from_iter((0..item_count).map(I::from_usize));
 
         match LS::BUCKET_LIMIT_TYPE {
             BucketLimitType::Hard => Self::populate_recursive_hard(
@@ -487,9 +834,10 @@ where
                 &mut terminal_stem_indices,
                 &mut actual_max_stem_level,
                 &mut max_leaf_len,
+                &mut leaf_scratch,
                 &mut item_at,
             )?,
-            BucketLimitType::Soft => Self::populate_recursive_soft(
+            BucketLimitType::Soft => M::populate(
                 &mut stems,
                 source,
                 &axis_at,
@@ -500,6 +848,7 @@ where
                 &mut leaves,
                 &mut actual_max_stem_level,
                 &mut max_leaf_len,
+                &mut leaf_scratch,
                 &mut item_at,
             )?,
         }
@@ -628,6 +977,20 @@ where
             |_src_idx, _point| (),
         )
     }
+
+    /// Creates a `KdTree` with no stored items using parallel construction.
+    #[cfg(feature = "parallel_construction")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parallel_construction")))]
+    pub fn new_from_slice_no_items_parallel(source: &[[A; K]]) -> Result<Self, ConstructionError>
+    where
+        A: Send + Sync,
+    {
+        Self::new_from_source_parallel(
+            source,
+            |point: &[A; K], dim| point[dim],
+            |_src_idx, _point| (),
+        )
+    }
 }
 
 // Shared utility methods for construction (available to both Immutable and Mutable)
@@ -638,33 +1001,36 @@ where
     SS: StemStrategy,
     LS: ConstructibleLeafStrategy<A, T, SS, K, B>,
 {
-    fn write_leaf_from_sort_index<X, FA, FI>(
+    fn write_leaf_from_sort_index<I, X, FA, FI>(
         source: &[X],
         axis_at: &FA,
-        sort_index: &[usize],
+        sort_index: &[I],
         leaves: &mut LS,
         max_leaf_len: &mut usize,
+        leaf_scratch: &mut ConstructionLeafScratch<A, T, K>,
         item_at: &mut FI,
     ) -> Result<(), ConstructionError>
     where
+        I: ConstructionIndex,
         FA: Fn(&X, usize) -> A,
         FI: FnMut(usize, &X) -> Result<T, ConstructionError>,
     {
         let leaf_len = sort_index.len();
         *max_leaf_len = (*max_leaf_len).max(leaf_len);
 
-        let mut leaf_points: [Vec<A>; K] = array_init::array_init(|_| Vec::with_capacity(leaf_len));
-        let mut leaf_items: Vec<T> = Vec::with_capacity(leaf_len);
+        leaf_scratch.clear_and_reserve(leaf_len);
 
         for &src_idx in sort_index {
+            let src_idx = src_idx.as_usize();
             for d in 0..K {
-                leaf_points[d].push(axis_at(&source[src_idx], d));
+                leaf_scratch.points[d].push(axis_at(&source[src_idx], d));
             }
-            leaf_items.push(item_at(src_idx, &source[src_idx])?);
+            leaf_scratch.items.push(item_at(src_idx, &source[src_idx])?);
         }
 
-        let leaf_points_refs: [&[A]; K] = array_init::array_init(|d| leaf_points[d].as_slice());
-        leaves.append_leaf(&leaf_points_refs, leaf_items.as_slice());
+        let leaf_points_refs: [&[A]; K] =
+            array_init::array_init(|d| leaf_scratch.points[d].as_slice());
+        leaves.append_leaf(&leaf_points_refs, leaf_scratch.items.as_slice());
 
         Ok(())
     }
@@ -692,11 +1058,11 @@ where
 
     /// Hard-bucket recursive construction helper.
     #[allow(clippy::too_many_arguments)]
-    fn populate_recursive_hard<X, FA, FI>(
+    fn populate_recursive_hard<I, X, FA, FI>(
         stems: &mut AVec<A, ConstAlign<{ CACHELINE_ALIGN }>>,
         source: &[X],
         axis_at: &FA,
-        sort_index: &mut [usize],
+        sort_index: &mut [I],
         mut stem_ordering: SS,
         max_stem_level: i32,
         capacity: usize,
@@ -704,9 +1070,11 @@ where
         terminal_stem_indices: &mut Vec<usize>,
         actual_max_stem_level: &mut i32,
         max_leaf_len: &mut usize,
+        leaf_scratch: &mut ConstructionLeafScratch<A, T, K>,
         item_at: &mut FI,
     ) -> Result<(), ConstructionError>
     where
+        I: ConstructionIndex,
         FA: Fn(&X, usize) -> A,
         FI: FnMut(usize, &X) -> Result<T, ConstructionError>,
     {
@@ -729,6 +1097,7 @@ where
                 sort_index,
                 leaves,
                 max_leaf_len,
+                leaf_scratch,
                 item_at,
             )?;
             terminal_stem_indices.push(stem_ordering.stem_idx());
@@ -821,7 +1190,7 @@ where
                     "Wrote to stem #{stem_index:?} for a second time",
                 );
 
-                stems[stem_index] = axis_at(&source[sort_index[pivot]], dim);
+                stems[stem_index] = axis_at(&source[sort_index[pivot].as_usize()], dim);
             }
         }
 
@@ -840,6 +1209,7 @@ where
             terminal_stem_indices,
             actual_max_stem_level,
             max_leaf_len,
+            leaf_scratch,
             item_at,
         )?;
 
@@ -856,6 +1226,7 @@ where
                 terminal_stem_indices,
                 actual_max_stem_level,
                 max_leaf_len,
+                leaf_scratch,
                 item_at,
             )?;
         }
@@ -863,22 +1234,179 @@ where
         Ok(())
     }
 
-    /// Soft-bucket recursive construction helper preserving arithmetic layout.
+    #[cfg(feature = "parallel_construction")]
     #[allow(clippy::too_many_arguments)]
-    fn populate_recursive_soft<X, FA, FI>(
+    fn populate_parallel_soft<I, X, FA, FI>(
         stems: &mut AVec<A, ConstAlign<{ CACHELINE_ALIGN }>>,
         source: &[X],
         axis_at: &FA,
-        sort_index: &mut [usize],
+        sort_index: &mut [I],
+        root_stem_ordering: SS,
+        max_stem_level: i32,
+        leaf_budget: usize,
+        leaves: &mut LS,
+        actual_max_stem_level: &mut i32,
+        max_leaf_len: &mut usize,
+        leaf_scratch: &mut ConstructionLeafScratch<A, T, K>,
+        item_at: &mut FI,
+    ) -> Result<(), ConstructionError>
+    where
+        A: Send + Sync,
+        I: ConstructionIndex,
+        X: Sync,
+        FA: Fn(&X, usize) -> A + Sync,
+        FI: FnMut(usize, &X) -> Result<T, ConstructionError>,
+    {
+        let mut leaf_ranges = vec![(0usize, 0usize); leaf_budget];
+        let parallel_stems = (0..stems.len())
+            .map(|_| OnceLock::new())
+            .collect::<Vec<_>>();
+        *max_leaf_len = Self::partition_recursive_soft_parallel(
+            &parallel_stems,
+            source,
+            axis_at,
+            sort_index,
+            0,
+            root_stem_ordering,
+            max_stem_level,
+            leaf_budget,
+            &mut leaf_ranges,
+        )?;
+        for (stem_idx, parallel_stem) in parallel_stems.into_iter().enumerate() {
+            if let Some(value) = parallel_stem.into_inner() {
+                stems[stem_idx] = value;
+            }
+        }
+        *actual_max_stem_level = (*actual_max_stem_level).max(max_stem_level);
+
+        for (start, len) in leaf_ranges {
+            Self::write_leaf_from_sort_index(
+                source,
+                axis_at,
+                &sort_index[start..start + len],
+                leaves,
+                max_leaf_len,
+                leaf_scratch,
+                item_at,
+            )?;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "parallel_construction")]
+    #[allow(clippy::too_many_arguments)]
+    fn partition_recursive_soft_parallel<I, X, FA>(
+        parallel_stems: &[OnceLock<A>],
+        source: &[X],
+        axis_at: &FA,
+        sort_index: &mut [I],
+        sort_offset: usize,
+        mut stem_ordering: SS,
+        max_stem_level: i32,
+        leaf_budget: usize,
+        leaf_ranges: &mut [(usize, usize)],
+    ) -> Result<usize, ConstructionError>
+    where
+        A: Send + Sync,
+        I: ConstructionIndex,
+        X: Sync,
+        FA: Fn(&X, usize) -> A + Sync,
+    {
+        if leaf_budget == 0 {
+            return Ok(0);
+        }
+        if stem_ordering.level() > max_stem_level {
+            debug_assert_eq!(leaf_ranges.len(), 1);
+            leaf_ranges[0] = (sort_offset, sort_index.len());
+            return Ok(sort_index.len());
+        }
+
+        let chunk_length = sort_index.len();
+        let dim = stem_ordering.construction_dim::<K>();
+        let stem_index = stem_ordering.stem_idx();
+
+        let (left_leaf_budget, right_leaf_budget, pivot) = if leaf_budget == 1 {
+            (1usize, 0usize, chunk_length)
+        } else {
+            let left_leaf_budget = Self::soft_left_leaf_budget(leaf_budget);
+            let right_leaf_budget = leaf_budget - left_leaf_budget;
+            let mut pivot = Self::soft_ideal_pivot(chunk_length, left_leaf_budget, leaf_budget);
+            if pivot < chunk_length {
+                pivot = Self::update_pivot(source, axis_at, sort_index, dim, pivot)?;
+            }
+            (left_leaf_budget, right_leaf_budget, pivot)
+        };
+
+        if pivot < chunk_length {
+            let pivot_value = axis_at(&source[sort_index[pivot].as_usize()], dim);
+            assert!(
+                parallel_stems[stem_index].set(pivot_value).is_ok(),
+                "parallel construction wrote stem {stem_index} more than once"
+            );
+        }
+
+        let right_stem_ordering = stem_ordering.branch::<A, K>();
+        let (lower_sort_index, upper_sort_index) = sort_index.split_at_mut(pivot);
+        let (lower_leaf_ranges, upper_leaf_ranges) = leaf_ranges.split_at_mut(left_leaf_budget);
+
+        let recurse_left = || {
+            Self::partition_recursive_soft_parallel(
+                parallel_stems,
+                source,
+                axis_at,
+                lower_sort_index,
+                sort_offset,
+                stem_ordering,
+                max_stem_level,
+                left_leaf_budget,
+                lower_leaf_ranges,
+            )
+        };
+        let recurse_right = || {
+            Self::partition_recursive_soft_parallel(
+                parallel_stems,
+                source,
+                axis_at,
+                upper_sort_index,
+                sort_offset + pivot,
+                right_stem_ordering,
+                max_stem_level,
+                right_leaf_budget,
+                upper_leaf_ranges,
+            )
+        };
+
+        let (left_max_leaf, right_max_leaf) = if chunk_length >= PARALLEL_SOFT_MIN_POINTS
+            && left_leaf_budget > 0
+            && right_leaf_budget > 0
+        {
+            rayon::join(recurse_left, recurse_right)
+        } else {
+            (recurse_left(), recurse_right())
+        };
+
+        Ok(left_max_leaf?.max(right_max_leaf?))
+    }
+
+    /// Soft-bucket recursive construction helper preserving arithmetic layout.
+    #[allow(clippy::too_many_arguments)]
+    fn populate_recursive_soft<I, X, FA, FI>(
+        stems: &mut AVec<A, ConstAlign<{ CACHELINE_ALIGN }>>,
+        source: &[X],
+        axis_at: &FA,
+        sort_index: &mut [I],
         mut stem_ordering: SS,
         max_stem_level: i32,
         leaf_budget: usize,
         leaves: &mut LS,
         actual_max_stem_level: &mut i32,
         max_leaf_len: &mut usize,
+        leaf_scratch: &mut ConstructionLeafScratch<A, T, K>,
         item_at: &mut FI,
     ) -> Result<(), ConstructionError>
     where
+        I: ConstructionIndex,
         FA: Fn(&X, usize) -> A,
         FI: FnMut(usize, &X) -> Result<T, ConstructionError>,
     {
@@ -893,6 +1421,7 @@ where
                 sort_index,
                 leaves,
                 max_leaf_len,
+                leaf_scratch,
                 item_at,
             )?;
             return Ok(());
@@ -929,7 +1458,7 @@ where
                 A::Coord::is_max_value(stems[stem_index]),
                 "Wrote to stem #{stem_index:?} for a second time",
             );
-            stems[stem_index] = axis_at(&source[sort_index[pivot]], dim);
+            stems[stem_index] = axis_at(&source[sort_index[pivot].as_usize()], dim);
         }
 
         let right_stem_ordering = stem_ordering.branch::<A, K>();
@@ -947,6 +1476,7 @@ where
             leaves,
             actual_max_stem_level,
             max_leaf_len,
+            leaf_scratch,
             item_at,
         )?;
 
@@ -961,6 +1491,7 @@ where
             leaves,
             actual_max_stem_level,
             max_leaf_len,
+            leaf_scratch,
             item_at,
         )?;
 
@@ -1084,16 +1615,16 @@ where
         result
     }
 
-    // #[cfg(not(feature = "unreliable_select_nth_unstable"))]
     #[cfg_attr(not(feature = "no_inline"), inline)]
-    fn update_pivot<X, FA>(
+    fn update_pivot<I, X, FA>(
         source: &[X],
         axis_at: &FA,
-        sort_index: &mut [usize],
+        sort_index: &mut [I],
         dim: usize,
         init_pivot: usize,
     ) -> Result<usize, ConstructionError>
     where
+        I: ConstructionIndex,
         FA: Fn(&X, usize) -> A,
     {
         // TODO: this block might be faster by using a quickselect with a fat partition?
@@ -1106,13 +1637,16 @@ where
         // items that are equal to it are adjacent, according to our assumptions about the
         // behaviour of `select_nth_unstable_by` (See examples/check_select_nth_unstable.rs)
         sort_index.select_nth_unstable_by(pivot, |&ia, &ib| {
-            A::cmp((*axis_at)(&source[ia], dim), (*axis_at)(&source[ib], dim))
+            A::cmp(
+                (*axis_at)(&source[ia.as_usize()], dim),
+                (*axis_at)(&source[ib.as_usize()], dim),
+            )
         });
 
         // if the pivot straddles two values that are equal, keep nudging it left until they aren't
         while pivot > 0
-            && (*axis_at)(&source[sort_index[pivot]], dim)
-                == (*axis_at)(&source[sort_index[pivot - 1]], dim)
+            && (*axis_at)(&source[sort_index[pivot].as_usize()], dim)
+                == (*axis_at)(&source[sort_index[pivot - 1].as_usize()], dim)
         {
             pivot -= 1;
         }
@@ -1124,12 +1658,15 @@ where
             pivot = init_pivot;
 
             sort_index.sort_unstable_by(|&ia, &ib| {
-                A::cmp((*axis_at)(&source[ia], dim), (*axis_at)(&source[ib], dim))
+                A::cmp(
+                    (*axis_at)(&source[ia.as_usize()], dim),
+                    (*axis_at)(&source[ib.as_usize()], dim),
+                )
             });
 
             while pivot + 1 < sort_index.len()
-                && (*axis_at)(&source[sort_index[pivot]], dim)
-                    == (*axis_at)(&source[sort_index[pivot + 1]], dim)
+                && (*axis_at)(&source[sort_index[pivot].as_usize()], dim)
+                    == (*axis_at)(&source[sort_index[pivot + 1].as_usize()], dim)
             {
                 pivot += 1;
             }
@@ -1185,6 +1722,15 @@ mod tests {
     use crate::Eytzinger;
 
     #[test]
+    fn construction_index_selection_is_adaptive() {
+        assert!(construction_index_fits_u32(0));
+        assert!(construction_index_fits_u32(u32::MAX as usize));
+
+        #[cfg(target_pointer_width = "64")]
+        assert!(!construction_index_fits_u32(u32::MAX as usize + 1));
+    }
+
+    #[test]
     fn update_pivot_shifts_right_when_left_scan_hits_zero() {
         type TestTree = KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 2, 32>, 2, 32>;
 
@@ -1195,7 +1741,7 @@ mod tests {
             [2.0, 40.0],
             [3.0, 50.0],
         ];
-        let mut sort_index = [0usize, 1, 2, 3, 4];
+        let mut sort_index = [0u32, 1, 2, 3, 4];
 
         let pivot = TestTree::update_pivot(
             &source,
@@ -1208,8 +1754,8 @@ mod tests {
 
         assert_eq!(pivot, 3);
         assert_eq!(sort_index, [0, 1, 2, 3, 4]);
-        assert_eq!(source[sort_index[pivot - 1]][0], 1.0);
-        assert_eq!(source[sort_index[pivot]][0], 2.0);
+        assert_eq!(source[sort_index[pivot - 1].as_usize()][0], 1.0);
+        assert_eq!(source[sort_index[pivot].as_usize()][0], 2.0);
     }
 
     #[test]
@@ -1340,5 +1886,71 @@ mod tests {
             TestTree::new_from_slice(&points),
             Err(ConstructionError::UnsplittableBucket { split_dim: 0 })
         ));
+    }
+
+    #[cfg(feature = "parallel_construction")]
+    #[test]
+    fn parallel_soft_construction_matches_sequential_construction() {
+        type FlatTree = KdTree<f32, u32, Eytzinger, FlatVec<f32, u32, 2, 32>, 2, 32>;
+        type ArenaTree = KdTree<f32, u32, Eytzinger, VecOfArenas<f32, u32, 2, 32>, 2, 32>;
+
+        let points = (0..4_096)
+            .map(|idx| {
+                [
+                    ((idx * 17) % 997) as f32,
+                    ((idx * 53 + idx / 7) % 991) as f32,
+                ]
+            })
+            .collect::<Vec<_>>();
+
+        macro_rules! assert_parallel_matches {
+            ($tree:ty) => {{
+                let sequential = <$tree>::new_from_slice(&points).unwrap();
+                let parallel = <$tree>::new_from_slice_parallel(&points).unwrap();
+
+                assert_eq!(sequential.stems.as_slice(), parallel.stems.as_slice());
+                assert_eq!(sequential.size(), parallel.size());
+                assert_eq!(sequential.leaf_count(), parallel.leaf_count());
+                assert_eq!(sequential.max_leaf_len(), parallel.max_leaf_len());
+                assert_eq!(
+                    sequential.iter().collect::<Vec<_>>(),
+                    parallel.iter().collect::<Vec<_>>()
+                );
+
+                for query in [[0.0, 0.0], [500.0, 500.0], [996.0, 990.0]] {
+                    assert_eq!(
+                        sequential
+                            .query(&query)
+                            .nearest_one::<SquaredEuclidean<f32>>()
+                            .execute(),
+                        parallel
+                            .query(&query)
+                            .nearest_one::<SquaredEuclidean<f32>>()
+                            .execute()
+                    );
+                }
+            }};
+        }
+
+        assert_parallel_matches!(FlatTree);
+        assert_parallel_matches!(ArenaTree);
+    }
+
+    #[cfg(feature = "parallel_construction")]
+    #[test]
+    fn parallel_constructor_preserves_hard_bucket_construction() {
+        type TestTree = KdTree<f32, u32, Eytzinger, VecOfArrays<f32, u32, 2, 32>, 2, 32>;
+
+        let points = (0..4_096)
+            .map(|idx| [idx as f32, ((idx * 31) % 4_099) as f32])
+            .collect::<Vec<_>>();
+        let sequential = TestTree::new_from_slice(&points).unwrap();
+        let parallel = TestTree::new_from_slice_parallel(&points).unwrap();
+
+        assert_eq!(sequential.stems.as_slice(), parallel.stems.as_slice());
+        assert_eq!(
+            sequential.iter().collect::<Vec<_>>(),
+            parallel.iter().collect::<Vec<_>>()
+        );
     }
 }
