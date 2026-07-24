@@ -35,6 +35,8 @@ from chart_benchmark_results import (
 
 COMMENT_MARKER = "<!-- kiddo-benchmark-report -->"
 RESULT_GLOB = "bench_result-*.json"
+STEM_STRATEGY_SUITE_PREFIX = "v6-stem-strategies-"
+STEM_STRATEGY_ISA_ORDER = ("scalar", "avx2", "avx512", "neon")
 
 
 @dataclass(frozen=True)
@@ -359,6 +361,193 @@ def render_branch_index(
     )
 
 
+def stem_strategy_isa(suite: str) -> str | None:
+    if not suite.startswith(STEM_STRATEGY_SUITE_PREFIX):
+        return None
+    return suite[len(STEM_STRATEGY_SUITE_PREFIX) :]
+
+
+def stem_suite_sort_key(suite: str) -> tuple[int, str]:
+    isa = stem_strategy_isa(suite) or suite
+    try:
+        return STEM_STRATEGY_ISA_ORDER.index(isa), suite
+    except ValueError:
+        return len(STEM_STRATEGY_ISA_ORDER), suite
+
+
+def stem_group_label(group_id: str) -> str:
+    return group_id.rsplit("/", 1)[-1]
+
+
+def stem_strategy_colors(
+    plt: Any,
+    strategies: list[str],
+) -> dict[str, Any]:
+    color_map = plt.get_cmap("tab20")
+    return {
+        strategy: color_map(index % color_map.N)
+        for index, strategy in enumerate(strategies)
+    }
+
+
+def render_current_stem_strategy_chart(
+    plt: Any,
+    suite: str,
+    run_id: str,
+    run_dt: datetime,
+    series_map: dict[SeriesKey, list[Point]],
+    output_path: Path,
+) -> None:
+    group_ids = sorted({key.group_id for key in series_map})
+    strategies = sorted({key.function_id for key in series_map})
+    colors = stem_strategy_colors(plt, strategies)
+    figure, axes_grid = plt.subplots(
+        len(group_ids),
+        1,
+        figsize=(14, max(6, 5 * len(group_ids))),
+        squeeze=False,
+        sharex=True,
+    )
+    axes = [row[0] for row in axes_grid]
+    legend_handles: dict[str, Any] = {}
+
+    for axis, group_id in zip(axes, group_ids):
+        x_ticks: set[float] = set()
+        for strategy in strategies:
+            points = series_map.get(SeriesKey(group_id, strategy))
+            if not points:
+                continue
+            x_vals = [point.tree_log2 for point in points]
+            y_vals = [point.duration_ns / NS_PER_US for point in points]
+            lower = [point.lower_ns / NS_PER_US for point in points]
+            upper = [point.upper_ns / NS_PER_US for point in points]
+            (line,) = axis.plot(
+                x_vals,
+                y_vals,
+                marker="o",
+                linewidth=2,
+                label=strategy,
+                color=colors[strategy],
+            )
+            axis.fill_between(
+                x_vals,
+                lower,
+                upper,
+                color=colors[strategy],
+                alpha=0.06,
+            )
+            legend_handles.setdefault(strategy, line)
+            x_ticks.update(x_vals)
+        axis.set_yscale("log")
+        axis.set_ylabel("Mean duration/query (us, log)")
+        axis.set_title(stem_group_label(group_id))
+        axis.set_xticks(sorted(x_ticks))
+        axis.set_xticklabels([f"2^{value:g}" for value in sorted(x_ticks)])
+        axis.grid(True, which="both", alpha=0.25)
+
+    axes[-1].set_xlabel("Tree size")
+    isa = stem_strategy_isa(suite) or suite
+    figure.suptitle(
+        f"Current stem strategy comparison — {isa.upper()}\n"
+        f"{run_id} · {format_timestamp(run_dt)}"
+    )
+    figure.legend(
+        legend_handles.values(),
+        legend_handles.keys(),
+        loc="center right",
+        bbox_to_anchor=(0.995, 0.5),
+        fontsize="small",
+    )
+    figure.tight_layout(rect=(0, 0, 0.78, 0.94))
+    figure.savefig(output_path, dpi=140)
+    plt.close(figure)
+
+
+def render_historical_stem_strategy_chart(
+    plt: Any,
+    suite: str,
+    tree_size: float,
+    entries: list[tuple[datetime, str, dict[SeriesKey, list[Point]]]],
+    output_path: Path,
+) -> None:
+    group_ids = sorted(
+        {
+            key.group_id
+            for _, _, series_map in entries
+            for key in series_map
+        }
+    )
+    strategies = sorted(
+        {
+            key.function_id
+            for _, _, series_map in entries
+            for key in series_map
+        }
+    )
+    colors = stem_strategy_colors(plt, strategies)
+    figure, axes_grid = plt.subplots(
+        len(group_ids),
+        1,
+        figsize=(14, max(6, 5 * len(group_ids))),
+        squeeze=False,
+        sharex=True,
+    )
+    axes = [row[0] for row in axes_grid]
+    legend_handles: dict[str, Any] = {}
+
+    for axis, group_id in zip(axes, group_ids):
+        for strategy in strategies:
+            x_vals: list[datetime] = []
+            y_vals: list[float] = []
+            key = SeriesKey(group_id, strategy)
+            for run_dt, _, series_map in entries:
+                point = next(
+                    (
+                        point
+                        for point in series_map.get(key, [])
+                        if point.tree_log2 == tree_size
+                    ),
+                    None,
+                )
+                if point is None:
+                    continue
+                x_vals.append(run_dt)
+                y_vals.append(point.duration_ns / NS_PER_US)
+            if not x_vals:
+                continue
+            (line,) = axis.plot(
+                x_vals,
+                y_vals,
+                marker="o",
+                linewidth=2,
+                label=strategy,
+                color=colors[strategy],
+            )
+            legend_handles.setdefault(strategy, line)
+        axis.set_yscale("log")
+        axis.set_ylabel("Mean duration/query (us, log)")
+        axis.set_title(stem_group_label(group_id))
+        axis.grid(True, which="both", alpha=0.25)
+
+    axes[-1].set_xlabel("Baseline run")
+    isa = stem_strategy_isa(suite) or suite
+    figure.suptitle(
+        f"Historical stem strategy comparison — {isa.upper()} — "
+        f"tree size=2^{tree_size:g}"
+    )
+    figure.legend(
+        legend_handles.values(),
+        legend_handles.keys(),
+        loc="center right",
+        bbox_to_anchor=(0.995, 0.5),
+        fontsize="small",
+    )
+    figure.autofmt_xdate()
+    figure.tight_layout(rect=(0, 0, 0.78, 0.94))
+    figure.savefig(output_path, dpi=140)
+    plt.close(figure)
+
+
 def render_baseline_trends(pages_root: Path) -> list[str]:
     history_root = pages_root / "baseline" / "history"
     runs = gather_history_runs(history_root)
@@ -370,6 +559,10 @@ def render_baseline_trends(pages_root: Path) -> list[str]:
 
     _, plt = import_matplotlib()
     trends: dict[tuple[str, str, str], list[tuple[datetime, str, list[Point]]]] = {}
+    stem_runs: dict[
+        str,
+        list[tuple[datetime, str, dict[SeriesKey, list[Point]]]],
+    ] = {}
     for run in reversed(runs):
         run_dt = datetime.strptime(run.created_at, "%Y-%m-%dT%H:%M:%SZ").replace(
             tzinfo=timezone.utc
@@ -377,12 +570,64 @@ def render_baseline_trends(pages_root: Path) -> list[str]:
         run_dir, _ = run_dirs_for(run)
         suites = load_suite_series(pages_root / run_dir / "results")
         for suite, series_map in suites.items():
+            if stem_strategy_isa(suite) is not None:
+                stem_runs.setdefault(suite, []).append((run_dt, run.run_id, series_map))
+                continue
             for key, points in series_map.items():
                 trends.setdefault((suite, key.group_id, key.function_id), []).append(
                     (run_dt, run.run_id, points)
                 )
 
-    sections: list[str] = []
+    current_stem_sections: list[str] = []
+    historical_stem_sections: list[str] = []
+    for suite in sorted(stem_runs, key=stem_suite_sort_key):
+        entries = stem_runs[suite]
+        run_dt, run_id, series_map = entries[-1]
+        isa = stem_strategy_isa(suite) or suite
+        chart_name = slug(f"current-stem-strategies-{isa}") + ".png"
+        render_current_stem_strategy_chart(
+            plt,
+            suite,
+            run_id,
+            run_dt,
+            series_map,
+            trend_dir / chart_name,
+        )
+        charts_written.append(chart_name)
+        current_stem_sections.append(
+            f"<section><h3>{isa.upper()}</h3>"
+            f"<p class=\"meta\">Latest stem benchmark: <code>{run_id}</code></p>"
+            f"<img src=\"charts/{chart_name}\" alt=\"{chart_name}\"></section>"
+        )
+
+        if len(entries) < 2:
+            continue
+        tree_sizes = sorted(
+            {
+                point.tree_log2
+                for _, _, entry_series in entries
+                for points in entry_series.values()
+                for point in points
+            }
+        )
+        for tree_size in tree_sizes:
+            chart_name = (
+                slug(f"historical-stem-strategies-{isa}-log2-{tree_size:g}") + ".png"
+            )
+            render_historical_stem_strategy_chart(
+                plt,
+                suite,
+                tree_size,
+                entries,
+                trend_dir / chart_name,
+            )
+            charts_written.append(chart_name)
+            historical_stem_sections.append(
+                f"<section><h3>{isa.upper()} · tree size=2<sup>{tree_size:g}</sup></h3>"
+                f"<img src=\"charts/{chart_name}\" alt=\"{chart_name}\"></section>"
+            )
+
+    other_sections: list[str] = []
     for (suite, group_id, function_id), entries in sorted(trends.items()):
         if len(entries) < 2:
             continue
@@ -410,7 +655,7 @@ def render_baseline_trends(pages_root: Path) -> list[str]:
         figure.savefig(trend_dir / chart_name, dpi=140)
         plt.close(figure)
         charts_written.append(chart_name)
-        sections.append(
+        other_sections.append(
             f"<section><h2>{suite}: {group_id} / {function_id}</h2>"
             f"<img src=\"charts/{chart_name}\" alt=\"{chart_name}\"></section>"
         )
@@ -433,7 +678,14 @@ def render_baseline_trends(pages_root: Path) -> list[str]:
     <tbody>{rows}</tbody>
   </table>
 </section>
-{''.join(sections) if sections else '<section><p class="meta">At least two baseline runs are required before trend charts are available.</p></section>'}
+<h2>Current stem strategy comparisons</h2>
+<p class="meta">Latest available baseline stem results. Tree size is the x-axis and each series is a stem strategy; ISA variants are charted separately.</p>
+{''.join(current_stem_sections) if current_stem_sections else '<section><p class="meta">No stem strategy baseline results are available.</p></section>'}
+<h2>Historical stem strategy comparisons</h2>
+<p class="meta">One chart per ISA and tree size. The x-axis is the baseline-run timeline and each series is a stem strategy.</p>
+{''.join(historical_stem_sections) if historical_stem_sections else '<section><p class="meta">At least two stem strategy baseline runs are required before historical charts are available.</p></section>'}
+<h2>Other benchmark history</h2>
+{''.join(other_sections) if other_sections else '<section><p class="meta">At least two baseline runs are required before other trend charts are available.</p></section>'}
 """
     write_text(
         pages_root / "baseline" / "trends" / "index.html",

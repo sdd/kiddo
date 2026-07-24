@@ -261,10 +261,6 @@ bench-v6-stem-strategies RESULT_KEY=benchmark_result_key OUTPUT_DIR='.' QUERIES=
         exit 2
     fi
     host=$(rustc -vV | sed -n 's/^host: //p')
-    if [[ "$host" != x86_64-* ]]; then
-        echo "bench-v6-stem-strategies currently requires an x86-64 host; found $host" >&2
-        exit 2
-    fi
     mkdir -p "$output_dir"
 
     run_mode() {
@@ -286,9 +282,21 @@ bench-v6-stem-strategies RESULT_KEY=benchmark_result_key OUTPUT_DIR='.' QUERIES=
             profile_v6_stem_strategies
     }
 
-    run_mode scalar "-C target-cpu=x86-64-v2" "$scalar_features"
-    run_mode avx2 "-C target-cpu=x86-64-v2 -C target-feature=+avx2" "$simd_features"
-    run_mode avx512 "-C target-cpu=native" "$simd_features"
+    case "$host" in
+        x86_64-*)
+            run_mode scalar "-C target-cpu=x86-64-v2" "$scalar_features"
+            run_mode avx2 "-C target-cpu=x86-64-v2 -C target-feature=+avx2" "$simd_features"
+            run_mode avx512 "-C target-cpu=native" "$simd_features"
+            ;;
+        aarch64-*)
+            run_mode scalar "-C target-cpu=native" "$scalar_features"
+            run_mode neon "-C target-cpu=native -C target-feature=+neon" "$simd_features"
+            ;;
+        *)
+            echo "bench-v6-stem-strategies does not support host $host" >&2
+            exit 2
+            ;;
+    esac
 
 chart-benchmark-results VARIANT_KEY RESULTS_DIR='.' OUTPUT_DIR='.' PYTHON='python3':
     {{quote(PYTHON)}} scripts/chart_benchmark_results.py {{quote(VARIANT_KEY)}} --results-dir {{quote(RESULTS_DIR)}} --output-dir {{quote(OUTPUT_DIR)}}
