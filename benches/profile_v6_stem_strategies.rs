@@ -42,6 +42,7 @@ enum StemBenchMode {
     Scalar,
     Avx2,
     Avx512,
+    Neon,
 }
 
 fn read_usize_env(var: &str, default: usize) -> usize {
@@ -59,6 +60,7 @@ fn read_mode_env() -> StemBenchMode {
     {
         "avx2" => StemBenchMode::Avx2,
         "avx512" => StemBenchMode::Avx512,
+        "neon" => StemBenchMode::Neon,
         _ => StemBenchMode::Scalar,
     }
 }
@@ -340,7 +342,7 @@ fn stem_strategies(c: &mut Criterion) {
     let mode = read_mode_env();
 
     eprintln!(
-        "benchmarking v6 stem strategies: dims={} tree_sizes=2^16..2^26 queries={} mode={:?} point_seed={} query_seed={}",
+        "benchmarking v6 stem strategies: dims={} tree_sizes=2^16..2^25 queries={} mode={:?} point_seed={} query_seed={}",
         K, query_count, mode, POINT_SEED, QUERY_SEED
     );
 
@@ -353,7 +355,7 @@ fn stem_strategies(c: &mut Criterion) {
             StemBenchMode::Scalar => {
                 bench_scalar_f64(&mut f64_group, point_count, &points, &f64_queries)
             }
-            StemBenchMode::Avx2 | StemBenchMode::Avx512 => {
+            StemBenchMode::Avx2 | StemBenchMode::Avx512 | StemBenchMode::Neon => {
                 bench_simd_f64(&mut f64_group, point_count, &points, &f64_queries)
             }
         }
@@ -369,7 +371,7 @@ fn stem_strategies(c: &mut Criterion) {
             StemBenchMode::Scalar => {
                 bench_scalar_f32(&mut f32_group, point_count, &points, &f32_queries)
             }
-            StemBenchMode::Avx2 | StemBenchMode::Avx512 => {
+            StemBenchMode::Avx2 | StemBenchMode::Avx512 | StemBenchMode::Neon => {
                 bench_simd_f32(&mut f32_group, point_count, &points, &f32_queries)
             }
         }
